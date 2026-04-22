@@ -10,10 +10,14 @@ export function RoleGuard({
   feature: FeatureKey;
   children: ReactNode;
 }): JSX.Element {
-  const { user } = useAuth();
+  const { activeCompany, user } = useAuth();
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!activeCompany && feature !== "adminCompanies") {
+    return <Navigate to="/admin/companies" replace />;
   }
 
   if (!canAccessFeature(user.role, feature)) {
@@ -22,4 +26,3 @@ export function RoleGuard({
 
   return <>{children}</>;
 }
-

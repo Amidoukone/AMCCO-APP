@@ -2,12 +2,13 @@ import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authRouter } from "./auth.route.js";
 import { createTestApp } from "../test/test-app.js";
-import { login, logout, refresh } from "../services/auth.service.js";
+import { login, logout, refresh, switchCompany } from "../services/auth.service.js";
 
 vi.mock("../services/auth.service.js", () => ({
   login: vi.fn(),
   refresh: vi.fn(),
-  logout: vi.fn()
+  logout: vi.fn(),
+  switchCompany: vi.fn()
 }));
 
 describe("authRouter", () => {
@@ -17,6 +18,7 @@ describe("authRouter", () => {
     vi.mocked(login).mockReset();
     vi.mocked(refresh).mockReset();
     vi.mocked(logout).mockReset();
+    vi.mocked(switchCompany).mockReset();
   });
 
   it("POST /auth/login normalizes payload and returns service response", async () => {
@@ -29,7 +31,8 @@ describe("authRouter", () => {
         fullName: "User Example",
         role: "OWNER",
         companyId: "company-1",
-        companyCode: "AMCCO"
+        companyCode: "AMCCO",
+        bootstrapMode: false
       }
     });
 
@@ -38,8 +41,7 @@ describe("authRouter", () => {
       .set("user-agent", "vitest")
       .send({
         email: "USER@EXAMPLE.COM",
-        password: "secret",
-        companyCode: "amcco"
+        password: "secret"
       });
 
     expect(response.status).toBe(200);
@@ -47,7 +49,6 @@ describe("authRouter", () => {
       expect.objectContaining({
         email: "user@example.com",
         password: "secret",
-        companyCode: "AMCCO",
         meta: expect.objectContaining({
           userAgent: "vitest",
           ipAddress: expect.any(String)
@@ -60,8 +61,7 @@ describe("authRouter", () => {
   it("POST /auth/login rejects invalid payload with 400", async () => {
     const response = await request(app).post("/auth/login").send({
       email: "not-an-email",
-      password: "",
-      companyCode: "a"
+      password: ""
     });
 
     expect(response.status).toBe(400);
@@ -99,5 +99,33 @@ describe("authRouter", () => {
     expect(response.status).toBe(200);
     expect(logout).toHaveBeenCalledWith({ refreshToken: undefined });
     expect(response.body.status).toBe("logged_out");
+  });
+
+  it("POST /auth/switch-company forwards payload and returns tokens", async () => {
+    vi.mocked(switchCompany).mockResolvedValue({
+      accessToken: "switch-access",
+      refreshToken: "switch-refresh-token-value-1234567890"
+    });
+
+    const response = await request(app)
+      .post("/auth/switch-company")
+      .set("user-agent", "vitest")
+      .send({
+        refreshToken: "refresh-token-value-1234567890",
+        targetCompanyId: "57e12f5b-41f6-4523-973b-b5d3f9da1edc"
+      });
+
+    expect(response.status).toBe(200);
+    expect(switchCompany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        refreshToken: "refresh-token-value-1234567890",
+        targetCompanyId: "57e12f5b-41f6-4523-973b-b5d3f9da1edc",
+        meta: expect.objectContaining({
+          userAgent: "vitest",
+          ipAddress: expect.any(String)
+        })
+      })
+    );
+    expect(response.body.accessToken).toBe("switch-access");
   });
 });

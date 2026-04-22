@@ -6,6 +6,7 @@ import {
 type MetadataObject = Record<string, unknown>;
 
 export type FinanceTransactionNavigationTarget = {
+  kind: "transaction" | "salary";
   transactionId: string;
   activityCode: BusinessActivityCode | null;
 };
@@ -29,22 +30,31 @@ export function getFinanceTransactionNavigationTarget(
 ): FinanceTransactionNavigationTarget | null {
   const normalizedEntityType = entityType?.trim().toUpperCase() ?? null;
   const root = asObject(metadata);
+  const salaryRoot = asObject(root?.salary);
+  const isSalary =
+    normalizedEntityType === "SALARY" ||
+    asString(root?.entryCategory) === "SALARY" ||
+    salaryRoot !== null;
   const transactionId =
-    (normalizedEntityType === "TRANSACTION" ? asString(entityId) : null) ??
+    ((normalizedEntityType === "TRANSACTION" || normalizedEntityType === "SALARY")
+      ? asString(entityId)
+      : null) ??
     asString(root?.transactionId);
 
   if (!transactionId) {
     return null;
   }
 
-  if (normalizedEntityType && normalizedEntityType !== "TRANSACTION") {
+  if (normalizedEntityType && normalizedEntityType !== "TRANSACTION" && normalizedEntityType !== "SALARY") {
     return null;
   }
 
   const rawActivityCode = asString(root?.activityCode);
   return {
+    kind: isSalary ? "salary" : "transaction",
     transactionId,
-    activityCode: rawActivityCode && isBusinessActivityCode(rawActivityCode) ? rawActivityCode : null
+    activityCode:
+      !isSalary && rawActivityCode && isBusinessActivityCode(rawActivityCode) ? rawActivityCode : null
   };
 }
 
@@ -53,10 +63,12 @@ export function buildFinanceTransactionPath(
 ): string {
   const searchParams = new URLSearchParams();
   searchParams.set("transactionId", target.transactionId);
-  if (target.activityCode) {
+  if (target.kind === "transaction" && target.activityCode) {
     searchParams.set("activityCode", target.activityCode);
   }
-  return `/finance/transactions?${searchParams.toString()}`;
+  return target.kind === "salary"
+    ? `/finance/salaries?${searchParams.toString()}`
+    : `/finance/transactions?${searchParams.toString()}`;
 }
 
 export function getFinanceTraceLines(metadata: unknown): string[] {
@@ -71,9 +83,11 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
   const activityCode = asString(root.activityCode);
   const decision = asString(root.decision);
   const account = asObject(root.account);
+  const salary = asObject(root.salary);
+  const salaryConfirmation = asObject(root.salaryConfirmation);
 
   if (transactionId) {
-    lines.push(`Transaction: ${transactionId}`);
+    lines.push(`${salary ? "Salaire" : "Transaction"}: ${transactionId}`);
   }
 
   if (activityLabel || activityCode) {
@@ -96,6 +110,24 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
 
   if (decision) {
     lines.push(`Decision: ${decision}`);
+  }
+
+  if (salary) {
+    const employeeFullName = asString(salary.employeeFullName);
+    const payPeriod = asString(salary.payPeriod);
+    if (employeeFullName) {
+      lines.push(`Employe: ${employeeFullName}`);
+    }
+    if (payPeriod) {
+      lines.push(`Periode: ${payPeriod}`);
+    }
+  }
+
+  if (salaryConfirmation) {
+    const status = asString(salaryConfirmation.status);
+    if (status) {
+      lines.push(`Confirmation salaire: ${status}`);
+    }
   }
 
   return lines;

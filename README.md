@@ -90,20 +90,26 @@ mysql -u root -p < backend/sql/008_add_sector_metadata.sql
 mysql -u root -p < backend/sql/009_add_financial_account_scopes.sql
 ```
 
-12. Lancer backend et frontend dans deux terminaux:
+12. Si la base existait deja avant les profils entreprises multi-societes, appliquer:
+
+```bash
+mysql -u root -p < backend/sql/010_add_company_profiles.sql
+```
+
+13. Lancer backend et frontend dans deux terminaux:
 
 ```bash
 npm run dev:backend
 npm run dev:frontend
 ```
 
-13. Creer un utilisateur owner de dev:
+14. Creer un utilisateur owner de dev:
 
 ```bash
 npm --workspace backend run seed:dev-user
 ```
 
-14. Configurer ImageKit pour l'upload de preuves:
+15. Configurer ImageKit pour l'upload de preuves:
 
 Dans `backend/.env`, renseigner:
 

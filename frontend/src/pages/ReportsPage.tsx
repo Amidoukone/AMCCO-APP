@@ -364,22 +364,22 @@ export function ReportsPage(): JSX.Element {
             {activities.map((activity) => (
               <option key={activity.code} value={activity.code}>
                 {activity.label}
-                {activity.isEnabled ? "" : " (inactive)"}
+                {activity.isEnabled ? "" : " (inactif)"}
               </option>
             ))}
           </select>
-          <button type="submit">Appliquer periode</button>
+          <button type="submit">Mettre a jour</button>
           <button type="button" className="secondary-btn" onClick={handleResetFilters}>
-            Reinitialiser
+            Reinitialiser les filtres
           </button>
         </form>
         <p className="hint">
           Secteur actif: {selectedActivity?.label ?? "Tous les secteurs"}.
         </p>
         <p className="hint">
-          Transactions filtrees sur la date operationnelle `occurredAt`. Taches et charge equipe
-          filtrees sur la derniere mise a jour `updatedAt`. La repartition des roles reste un
-          snapshot courant.
+          Les transactions suivent leur date d'operation. Les taches et la charge equipe sont
+          basees sur la derniere activite enregistree. La repartition des roles reflete
+          l'organisation actuelle.
         </p>
       </section>
 
@@ -399,7 +399,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.activityProfile.operationsModel} | Regles: {overview.sectorRulesVersion}
                   </p>
                   <p className="hint">
-                    Focus reporting: {overview.activityProfile.reporting.focusArea}
+                    Priorite de suivi: {overview.activityProfile.reporting.focusArea}
                   </p>
                 </div>
               </div>
@@ -443,7 +443,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("overview", "pdf")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "overview-pdf" ? "Generation..." : "Exporter rapport PDF"}
+                  {busyExport === "overview-pdf" ? "Preparation..." : "Rapport PDF"}
                 </button>
                 <button
                   type="button"
@@ -451,9 +451,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("transactions", "csv")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "transactions-csv"
-                    ? "Generation..."
-                    : "Exporter transactions CSV"}
+                  {busyExport === "transactions-csv" ? "Preparation..." : "Transactions CSV"}
                 </button>
                 <button
                   type="button"
@@ -461,9 +459,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("transactions", "xlsx")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "transactions-xlsx"
-                    ? "Generation..."
-                    : "Exporter transactions Excel"}
+                  {busyExport === "transactions-xlsx" ? "Preparation..." : "Transactions Excel"}
                 </button>
                 <button
                   type="button"
@@ -471,7 +467,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("tasks", "csv")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "tasks-csv" ? "Generation..." : "Exporter taches CSV"}
+                  {busyExport === "tasks-csv" ? "Preparation..." : "Taches CSV"}
                 </button>
                 <button
                   type="button"
@@ -479,7 +475,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("tasks", "xlsx")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "tasks-xlsx" ? "Generation..." : "Exporter taches Excel"}
+                  {busyExport === "tasks-xlsx" ? "Preparation..." : "Taches Excel"}
                 </button>
               </div>
             </div>

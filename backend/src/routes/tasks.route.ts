@@ -9,11 +9,13 @@ import {
   assignCompanyTask,
   assignCompanyTasksBulk,
   createCompanyTask,
+  deleteCompanyTask,
   getCompanyTaskById,
   listCompanyTaskComments,
   listCompanyTaskMembers,
   listCompanyTasks,
   listCompanyTaskTimeline,
+  updateCompanyTask,
   updateCompanyTaskStatus
 } from "../services/tasks.service.js";
 
@@ -50,6 +52,13 @@ const createTaskSchema = z.object({
   assignedToId: z.string().trim().min(8).max(64).optional(),
   metadata: z.record(z.string().trim().min(1).max(64), z.string().trim().max(500)).optional(),
   dueDate: z.string().datetime().optional()
+});
+
+const updateTaskSchema = z.object({
+  title: z.string().trim().min(2).max(255),
+  description: z.string().trim().max(4000).optional(),
+  metadata: z.record(z.string().trim().min(1).max(64), z.string().trim().max(500)).optional(),
+  dueDate: z.string().datetime().optional().or(z.literal(""))
 });
 
 const taskIdParamSchema = z.object({
@@ -218,7 +227,6 @@ tasksRouter.post(
 
 tasksRouter.post(
   "/operations/tasks",
-  authorizeRoles("OWNER", "SYS_ADMIN", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -240,6 +248,53 @@ tasksRouter.post(
       }
     );
     res.status(201).json({ item });
+  })
+);
+
+tasksRouter.patch(
+  "/operations/tasks/:taskId",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+    const params = taskIdParamSchema.parse(req.params);
+    const body = updateTaskSchema.parse(req.body);
+    const item = await updateCompanyTask(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role
+      },
+      {
+        taskId: params.taskId,
+        title: body.title,
+        description: body.description,
+        metadata: body.metadata,
+        dueDate: body.dueDate || undefined
+      }
+    );
+    res.status(200).json({ item });
+  })
+);
+
+tasksRouter.delete(
+  "/operations/tasks/:taskId",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+    const params = taskIdParamSchema.parse(req.params);
+    await deleteCompanyTask(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role
+      },
+      {
+        taskId: params.taskId
+      }
+    );
+    res.status(200).json({ status: "deleted" });
   })
 );
 

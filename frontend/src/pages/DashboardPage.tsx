@@ -157,7 +157,7 @@ export function DashboardPage(): JSX.Element {
         <h2>Vue d'ensemble</h2>
         <p>
           Pilotage transversal de l'entreprise, avec un focus de travail sur le secteur{" "}
-          <strong>{selectedActivity?.label ?? "non defini"}</strong>.
+          <strong>{selectedActivity?.label ?? "aucun secteur actif"}</strong>.
         </p>
       </header>
 
@@ -234,7 +234,7 @@ export function DashboardPage(): JSX.Element {
                   {formatDateTime(summary.generatedAt)}
                 </p>
                 <p className="hint">
-                  Les indicateurs finance et operations ci-dessous suivent le secteur actif:{" "}
+                  Les indicateurs ci-dessous suivent le secteur actif:{" "}
                   {selectedActivity?.label ?? "Tous les secteurs"}.
                 </p>
               </div>
@@ -331,12 +331,12 @@ export function DashboardPage(): JSX.Element {
             <p className="hint">
               {selectedActivityCode
                 ? `${summary.finance.accountsSummary.incompatibleCount} compte(s) restent hors du secteur ${getBusinessActivityLabel(selectedActivityCode)}.`
-                : "Sans secteur actif, la lecture comptes reste entreprise-wide."}
+                : "Sans secteur actif, la vue comptes reste globale a l'entreprise."}
             </p>
 
             <div className="dashboard-currency-list">
               {summary.finance.totalsByCurrency.length === 0 ? (
-                <p className="hint">Aucun total approuve disponible pour le moment.</p>
+                <p className="hint">Aucun montant approuve n'est disponible pour le moment.</p>
               ) : (
                 summary.finance.totalsByCurrency.map((item) => (
                   <article key={item.currency} className="dashboard-currency-card">

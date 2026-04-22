@@ -3,10 +3,12 @@ import { HttpError } from "../errors/http-error.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import {
   createOperationTask,
+  deleteOperationTask,
   findCompanyTaskAssigneeByUserId,
   findOperationTaskById,
   findOperationTaskMinimalById,
   listCompanyTaskAssignees,
+  updateOperationTask,
   updateOperationTaskAssignment,
   updateOperationTaskStatus
 } from "../repositories/tasks.repository.js";
@@ -15,18 +17,22 @@ import { ensureCompanyActivityEnabledOrThrow } from "./company-activities.servic
 import {
   assignCompanyTask,
   createCompanyTask,
+  deleteCompanyTask,
   listCompanyTaskMembers,
+  updateCompanyTask,
   updateCompanyTaskStatus
 } from "./tasks.service.js";
 
 vi.mock("../repositories/tasks.repository.js", () => ({
   createOperationTask: vi.fn(),
+  deleteOperationTask: vi.fn(),
   findCompanyTaskAssigneeByUserId: vi.fn(),
   findOperationTaskById: vi.fn(),
   findOperationTaskMinimalById: vi.fn(),
   findOperationTasksMinimalByIds: vi.fn(),
   listCompanyTaskAssignees: vi.fn(),
   listOperationsTasks: vi.fn(),
+  updateOperationTask: vi.fn(),
   updateOperationTaskAssignment: vi.fn(),
   updateOperationTaskStatus: vi.fn()
 }));
@@ -68,7 +74,7 @@ describe("tasks.service", () => {
       const promise = createCompanyTask(
         {
           ...actor,
-          role: "EMPLOYEE"
+          role: "ACCOUNTANT"
         },
         {
           title: "Relancer client"
@@ -80,6 +86,64 @@ describe("tasks.service", () => {
         message: "Permissions insuffisantes pour creer une tache."
       });
       expect(createOperationTask).not.toHaveBeenCalled();
+    });
+
+    it("allows an employee to create a task and alerts supervisors", async () => {
+      vi.mocked(findOperationTaskById).mockResolvedValue({
+        id: "task-employee",
+        companyId: actor.companyId,
+        title: "Pointage terrain",
+        description: "Verifier la zone",
+        activityCode: "SERVICES",
+        metadata: {},
+        status: "IN_PROGRESS",
+        createdById: "employee-1",
+        createdByEmail: "employee@example.com",
+        createdByFullName: "Employee One",
+        assignedToId: "employee-1",
+        assignedToEmail: "employee@example.com",
+        assignedToFullName: "Employee One",
+        dueDate: null,
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z"
+      });
+
+      const result = await createCompanyTask(
+        {
+          actorId: "employee-1",
+          companyId: actor.companyId,
+          role: "EMPLOYEE"
+        },
+        {
+          title: "Pointage terrain",
+          description: "Verifier la zone",
+          activityCode: "SERVICES"
+        }
+      );
+
+      expect(createOperationTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdById: "employee-1",
+          assignedToId: "employee-1",
+          status: "IN_PROGRESS"
+        })
+      );
+      expect(createRoleTargetedAlerts).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        recipientRoles: ["SUPERVISOR"],
+        excludeUserIds: ["employee-1"],
+        code: "TASK_CREATED_BY_EMPLOYEE",
+        message: "Une nouvelle tache a ete creee par Employee One: Pointage terrain",
+        severity: "INFO",
+        entityType: "TASK",
+        entityId: "task-employee",
+        metadata: {
+          taskId: "task-employee",
+          title: "Pointage terrain",
+          createdById: "employee-1"
+        }
+      });
+      expect(result.assignedToId).toBe("employee-1");
     });
 
     it("creates an assigned task, audits it, and alerts the assignee", async () => {
@@ -288,6 +352,122 @@ describe("tasks.service", () => {
       });
 
       expect(listCompanyTaskAssignees).toHaveBeenCalledWith(actor.companyId, "WATER");
+    });
+  });
+
+  describe("updateCompanyTask", () => {
+    it("allows an employee to update a task they created", async () => {
+      vi.mocked(findOperationTaskById)
+        .mockResolvedValueOnce({
+          id: "task-6",
+          companyId: actor.companyId,
+          title: "Controle stock",
+          description: "Version initiale",
+          activityCode: "GENERAL_STORE",
+          metadata: {},
+          status: "TODO",
+          createdById: "employee-1",
+          createdByEmail: "employee@example.com",
+          createdByFullName: "Employee One",
+          assignedToId: "employee-1",
+          assignedToEmail: "employee@example.com",
+          assignedToFullName: "Employee One",
+          dueDate: null,
+          createdAt: "2026-04-20T08:00:00.000Z",
+          updatedAt: "2026-04-20T08:00:00.000Z"
+        })
+        .mockResolvedValueOnce({
+          id: "task-6",
+          companyId: actor.companyId,
+          title: "Controle stock urgent",
+          description: "Version ajustee",
+          activityCode: "GENERAL_STORE",
+          metadata: {},
+          status: "TODO",
+          createdById: "employee-1",
+          createdByEmail: "employee@example.com",
+          createdByFullName: "Employee One",
+          assignedToId: "employee-1",
+          assignedToEmail: "employee@example.com",
+          assignedToFullName: "Employee One",
+          dueDate: null,
+          createdAt: "2026-04-20T08:00:00.000Z",
+          updatedAt: "2026-04-20T09:00:00.000Z"
+        });
+
+      const result = await updateCompanyTask(
+        {
+          actorId: "employee-1",
+          companyId: actor.companyId,
+          role: "EMPLOYEE"
+        },
+        {
+          taskId: "task-6",
+          title: "Controle stock urgent",
+          description: "Version ajustee"
+        }
+      );
+
+      expect(updateOperationTask).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        taskId: "task-6",
+        title: "Controle stock urgent",
+        description: "Version ajustee",
+        metadata: {},
+        dueDate: null
+      });
+      expect(createAuditLogRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "TASK_UPDATED",
+          entityId: "task-6"
+        })
+      );
+      expect(result.title).toBe("Controle stock urgent");
+    });
+  });
+
+  describe("deleteCompanyTask", () => {
+    it("allows an employee to delete a task they created if not completed", async () => {
+      vi.mocked(findOperationTaskById).mockResolvedValue({
+        id: "task-7",
+        companyId: actor.companyId,
+        title: "Collecte infos",
+        description: null,
+        activityCode: "SERVICES",
+        metadata: {},
+        status: "TODO",
+        createdById: "employee-1",
+        createdByEmail: "employee@example.com",
+        createdByFullName: "Employee One",
+        assignedToId: "employee-1",
+        assignedToEmail: "employee@example.com",
+        assignedToFullName: "Employee One",
+        dueDate: null,
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z"
+      });
+
+      await deleteCompanyTask(
+        {
+          actorId: "employee-1",
+          companyId: actor.companyId,
+          role: "EMPLOYEE"
+        },
+        {
+          taskId: "task-7"
+        }
+      );
+
+      expect(deleteOperationTask).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        taskId: "task-7"
+      });
+      expect(createAuditLogRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "TASK_DELETED",
+          entityId: "task-7"
+        })
+      );
     });
   });
 

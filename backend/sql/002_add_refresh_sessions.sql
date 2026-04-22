@@ -3,7 +3,7 @@ USE amcco_dev;
 CREATE TABLE IF NOT EXISTS refresh_sessions (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36) NOT NULL,
-  company_id VARCHAR(36) NOT NULL,
+  company_id VARCHAR(36) NULL,
   token_hash CHAR(64) NOT NULL UNIQUE,
   expires_at DATETIME NOT NULL,
   revoked_at DATETIME NULL,
@@ -17,4 +17,3 @@ CREATE TABLE IF NOT EXISTS refresh_sessions (
   CONSTRAINT fk_refresh_session_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_refresh_session_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-

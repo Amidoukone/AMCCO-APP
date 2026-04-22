@@ -6,12 +6,16 @@ import {
   ApiError,
   createFinanceAccountRequest,
   createFinanceTransactionRequest,
+  deleteFinanceAccountRequest,
+  deleteFinanceTransactionRequest,
   getFinanceProofUploadAuthRequest,
   listFinanceAccountsRequest,
   listFinanceTransactionProofsRequest,
   listFinanceTransactionsRequest,
   reviewFinanceTransactionRequest,
-  submitFinanceTransactionRequest
+  submitFinanceTransactionRequest,
+  updateFinanceAccountRequest,
+  updateFinanceTransactionRequest
 } from "../lib/api";
 import {
   BUSINESS_ACTIVITY_CODES,
@@ -32,6 +36,9 @@ import {
   getAccountGovernanceLines,
   getTransactionGovernanceLines
 } from "../utils/governanceDisplay";
+
+const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
+const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -63,11 +70,64 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
+function toDateTimeLocalInput(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString().slice(0, 16);
+  }
+
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+
 function syncMetadataState(
   previous: Record<string, string>,
   fields: ActivityFieldDefinition[]
 ): Record<string, string> {
   return Object.fromEntries(fields.map((field) => [field.key, previous[field.key] ?? ""]));
+}
+
+function sameStringRecord(
+  left: Record<string, string>,
+  right: Record<string, string>
+): boolean {
+  const leftEntries = Object.entries(left);
+  const rightEntries = Object.entries(right);
+
+  if (leftEntries.length !== rightEntries.length) {
+    return false;
+  }
+
+  return leftEntries.every(([key, value]) => right[key] === value);
+}
+
+function sameActivityCodeArray(
+  left: BusinessActivityCode[],
+  right: BusinessActivityCode[]
+): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameAccountForm(
+  left: ReturnType<typeof buildDefaultAccountForm>,
+  right: ReturnType<typeof buildDefaultAccountForm>
+): boolean {
+  return (
+    left.name === right.name &&
+    left.accountRef === right.accountRef &&
+    left.openingBalance === right.openingBalance &&
+    left.scopeType === right.scopeType &&
+    left.primaryActivityCode === right.primaryActivityCode &&
+    sameActivityCodeArray(left.allowedActivityCodes, right.allowedActivityCodes)
+  );
+}
+
+function getLockedAccountMessage(account: FinancialAccount): string | null {
+  if (account.transactionsCount > 0) {
+    return "Ce compte financier est deja utilise par des transactions et ne peut pas etre supprime.";
+  }
+
+  return null;
 }
 
 function formatMetadataSummary(
@@ -173,13 +233,16 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [busyAccountId, setBusyAccountId] = useState<string | null>(null);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const canCreateAccount = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+    return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
 
   const canManageGlobalAccounts = useMemo(() => {
@@ -187,6 +250,20 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [user?.role]);
 
   const canReview = useMemo(() => {
+    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+  }, [user?.role]);
+
+  const canManageTransactions = useMemo(() => {
+    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+  }, [user?.role]);
+
+  const canManageAnyAccount = canCreateAccount;
+
+  const canDeleteApprovedTransactions = useMemo(() => {
+    return user?.role === "SYS_ADMIN";
+  }, [user?.role]);
+
+  const canManageSalaries = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
@@ -227,8 +304,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     {}
   );
 
-  const financeMetadataFields = selectedProfile?.finance.metadataFields ?? [];
-  const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? ["XOF"];
+  const financeMetadataFields = selectedProfile?.finance.metadataFields ?? EMPTY_METADATA_FIELDS;
+  const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
   const financeWorkflow = selectedProfile?.finance.workflow ?? [];
   const enabledActivityCodes = useMemo(
     () => enabledActivities.map((item) => item.code),
@@ -265,6 +342,58 @@ export function FinanceTransactionsPage(): JSX.Element {
     () => transactions.find((item) => item.id === selectedTransactionId) ?? null,
     [selectedTransactionId, transactions]
   );
+  const resetAccountForm = useCallback(() => {
+    setEditingAccountId(null);
+    setAccountForm(buildDefaultAccountForm(selectedActivityCode, canManageGlobalAccounts));
+  }, [canManageGlobalAccounts, selectedActivityCode]);
+
+  const resetTransactionForm = useCallback(() => {
+    setEditingTransactionId(null);
+    setTransactionForm({
+      accountId: accounts[0]?.id ?? "",
+      type: "CASH_OUT",
+      amount: "",
+      currency: allowedCurrencies[0] ?? "XOF",
+      description: "",
+      metadata: syncMetadataState({}, financeMetadataFields),
+      occurredAt: new Date().toISOString().slice(0, 16)
+    });
+  }, [accounts, allowedCurrencies, financeMetadataFields]);
+
+  const canManageAccount = useCallback(
+    (account: FinancialAccount): boolean => {
+      if (!canManageAnyAccount) {
+        return false;
+      }
+      return true;
+    },
+    [canManageAnyAccount]
+  );
+  const financePageCards = useMemo(() => {
+    const submittedTransactions = transactions.filter((item) => item.status === "SUBMITTED").length;
+
+    const cards = [
+      {
+        title: "Transactions chargees",
+        value: String(transactions.length),
+        note: selectedActivity
+          ? `Secteur actif: ${selectedActivity.label}`
+          : "Aucun secteur actif"
+      },
+      {
+        title: "Comptes visibles",
+        value: String(accounts.length),
+        note: "Comptes compatibles avec le contexte actuel"
+      },
+      {
+        title: "Elements a valider",
+        value: String(submittedTransactions),
+        note: "Transactions soumises"
+      }
+    ];
+
+    return cards;
+  }, [accounts.length, selectedActivity, transactions]);
 
   const handleOpenTransactionDetails = useCallback(
     (transactionId: string, activityCode: BusinessActivityCode | null) => {
@@ -306,18 +435,18 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [requestedTransactionId]);
 
   const loadData = useCallback(async () => {
-    if (!selectedActivityCode) {
-      setAccounts([]);
-      setTransactions([]);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [accountsResp, txResp] = await withAuthorizedToken(async (accessToken) => {
-        const [a, t] = await Promise.all([
+      const payload = await withAuthorizedToken(async (accessToken) => {
+        if (!selectedActivityCode) {
+          return {
+            accounts: [] as FinancialAccount[],
+            transactions: [] as FinancialTransaction[]
+          };
+        }
+
+        return Promise.all([
           listFinanceAccountsRequest(accessToken, {
             activityCode: selectedActivityCode
           }),
@@ -327,20 +456,28 @@ export function FinanceTransactionsPage(): JSX.Element {
             type: filters.type === "ALL" ? undefined : filters.type,
             activityCode: selectedActivityCode
           })
-        ]);
-        return [a, t] as const;
+        ]).then(([accountsResp, transactionsResp]) => ({
+          accounts: accountsResp.items,
+          transactions: transactionsResp.items
+        }));
       });
-      setAccounts(accountsResp.items);
-      setTransactions(txResp.items);
+      setAccounts(payload.accounts);
+      setTransactions(payload.transactions);
+      setEditingAccountId((prev) => (prev && payload.accounts.some((item) => item.id === prev) ? prev : null));
+      setEditingTransactionId((prev) =>
+        prev && payload.transactions.some((item) => item.id === prev) ? prev : null
+      );
       setSelectedTransactionId((prev) => {
         if (requestedTransactionId) {
-          return txResp.items.some((item) => item.id === requestedTransactionId)
+          return payload.transactions.some((item) => item.id === requestedTransactionId)
             ? requestedTransactionId
             : null;
         }
-        return txResp.items.some((item) => item.id === prev) ? prev : (txResp.items[0]?.id ?? null);
+        return payload.transactions.some((item) => item.id === prev)
+          ? prev
+          : (payload.transactions[0]?.id ?? null);
       });
-      const txIds = new Set(txResp.items.map((item) => item.id));
+      const txIds = new Set(payload.transactions.map((item) => item.id));
       setProofsByTransaction((prev) =>
         Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
       );
@@ -353,39 +490,45 @@ export function FinanceTransactionsPage(): JSX.Element {
       setTransactionForm((prev) => ({
         ...prev,
         accountId:
-          accountsResp.items.some((account) => account.id === prev.accountId)
+          payload.accounts.some((account) => account.id === prev.accountId)
             ? prev.accountId
-            : (accountsResp.items[0]?.id ?? "")
+            : (payload.accounts[0]?.id ?? "")
       }));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
-  }, [
-    filters.status,
-    filters.type,
-    requestedTransactionId,
-    selectedActivityCode,
-    withAuthorizedToken
-  ]);
+  }, [filters.status, filters.type, requestedTransactionId, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
   useEffect(() => {
-    setTransactionForm((prev) => ({
-      ...prev,
-      currency: allowedCurrencies.includes(prev.currency) ? prev.currency : (allowedCurrencies[0] ?? "XOF"),
-      metadata: syncMetadataState(prev.metadata, financeMetadataFields)
-    }));
+    setTransactionForm((prev) => {
+      const nextCurrency = allowedCurrencies.includes(prev.currency)
+        ? prev.currency
+        : (allowedCurrencies[0] ?? "XOF");
+      const nextMetadata = syncMetadataState(prev.metadata, financeMetadataFields);
+
+      if (prev.currency === nextCurrency && sameStringRecord(prev.metadata, nextMetadata)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        currency: nextCurrency,
+        metadata: nextMetadata
+      };
+    });
   }, [allowedCurrencies, financeMetadataFields]);
 
   useEffect(() => {
-    setAccountForm((prev) =>
-      normalizeAccountFormForActivities(prev, enabledActivityCodes, selectedActivityCode)
-    );
+    setAccountForm((prev) => {
+      const next = normalizeAccountFormForActivities(prev, enabledActivityCodes, selectedActivityCode);
+      return sameAccountForm(prev, next) ? prev : next;
+    });
   }, [enabledActivityCodes, selectedActivityCode]);
 
   useEffect(() => {
@@ -405,14 +548,14 @@ export function FinanceTransactionsPage(): JSX.Element {
     );
   }, [canManageGlobalAccounts, selectedActivityCode]);
 
-  async function handleCreateAccount(event: FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSaveAccount(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      await withAuthorizedToken((accessToken) =>
-        createFinanceAccountRequest(accessToken, {
+      const response = await withAuthorizedToken((accessToken) => {
+        const payload = {
           name: accountForm.name.trim(),
           accountRef: accountForm.accountRef.trim() || undefined,
           openingBalance: accountForm.openingBalance.trim(),
@@ -423,17 +566,83 @@ export function FinanceTransactionsPage(): JSX.Element {
               : undefined,
           allowedActivityCodes:
             accountForm.scopeType === "RESTRICTED" ? accountForm.allowedActivityCodes : undefined
-        })
+        };
+
+        return editingAccountId
+          ? updateFinanceAccountRequest(accessToken, editingAccountId, payload)
+          : createFinanceAccountRequest(accessToken, payload);
+      });
+      setSuccessMessage(
+        editingAccountId ? "Compte financier modifie." : "Compte financier cree."
       );
-      setSuccessMessage("Compte financier cree.");
-      setAccountForm(buildDefaultAccountForm(selectedActivityCode, canManageGlobalAccounts));
+      resetAccountForm();
       await loadData();
+      setTransactionForm((prev) => ({
+        ...prev,
+        accountId: response.item.id
+      }));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     }
   }
 
-  async function handleCreateTransaction(event: FormEvent<HTMLFormElement>): Promise<void> {
+  function handleStartEditAccount(account: FinancialAccount): void {
+    const lockedMessage = getLockedAccountMessage(account);
+    if (lockedMessage) {
+      setErrorMessage(lockedMessage);
+      setSuccessMessage(null);
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingAccountId(account.id);
+    setAccountForm({
+      name: account.name,
+      accountRef: account.accountRef ?? "",
+      openingBalance: account.balance,
+      scopeType: account.scopeType,
+      primaryActivityCode: account.primaryActivityCode ?? "",
+      allowedActivityCodes: account.allowedActivityCodes
+    });
+  }
+
+  function handleCancelEditAccount(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    resetAccountForm();
+  }
+
+  async function handleDeleteAccount(account: FinancialAccount): Promise<void> {
+    const lockedMessage = getLockedAccountMessage(account);
+    if (lockedMessage) {
+      setErrorMessage(lockedMessage);
+      setSuccessMessage(null);
+      return;
+    }
+
+    if (!window.confirm(`Confirmer la suppression du compte ${account.name} ?`)) {
+      return;
+    }
+
+    setBusyAccountId(account.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteFinanceAccountRequest(accessToken, account.id));
+      if (editingAccountId === account.id) {
+        resetAccountForm();
+      }
+      setSuccessMessage("Compte financier supprime.");
+      await loadData();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyAccountId(null);
+    }
+  }
+
+  async function handleSaveTransaction(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!selectedActivityCode) {
       return;
@@ -442,8 +651,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSuccessMessage(null);
 
     try {
-      await withAuthorizedToken((accessToken) =>
-        createFinanceTransactionRequest(accessToken, {
+      const response = await withAuthorizedToken((accessToken) => {
+        const payload = {
           accountId: transactionForm.accountId,
           type: transactionForm.type,
           amount: transactionForm.amount.trim(),
@@ -452,18 +661,80 @@ export function FinanceTransactionsPage(): JSX.Element {
           description: transactionForm.description.trim() || undefined,
           metadata: transactionForm.metadata,
           occurredAt: new Date(transactionForm.occurredAt).toISOString()
-        })
+        };
+
+        return editingTransactionId
+          ? updateFinanceTransactionRequest(accessToken, editingTransactionId, payload)
+          : createFinanceTransactionRequest(accessToken, payload);
+      });
+      handleOpenTransactionDetails(response.item.id, response.item.activityCode);
+      setSuccessMessage(
+        editingTransactionId
+          ? "Transaction modifiee. Elle repasse en brouillon avant nouvelle soumission."
+          : "Transaction creee en brouillon."
       );
-      setSuccessMessage("Transaction creee en brouillon.");
-      setTransactionForm((prev) => ({
-        ...prev,
-        amount: "",
-        description: "",
-        metadata: syncMetadataState({}, financeMetadataFields)
-      }));
+      resetTransactionForm();
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  function handleStartEditTransaction(transaction: FinancialTransaction): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingTransactionId(transaction.id);
+    setTransactionForm({
+      accountId: transaction.accountId,
+      type: transaction.type,
+      amount: transaction.amount,
+      currency: transaction.currency,
+      description: transaction.description ?? "",
+      metadata: syncMetadataState(transaction.metadata, financeMetadataFields),
+      occurredAt: toDateTimeLocalInput(transaction.occurredAt)
+    });
+    handleOpenTransactionDetails(transaction.id, transaction.activityCode);
+  }
+
+  function handleCancelEditTransaction(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    resetTransactionForm();
+  }
+
+  async function handleDeleteTransaction(transaction: FinancialTransaction): Promise<void> {
+    const isApproved = transaction.status === "APPROVED";
+    const confirmationMessage = isApproved
+      ? "Cette transaction est deja approuvee. Confirmer sa suppression definitive ?"
+      : "Confirmer la suppression de cette transaction ?";
+
+    if (!window.confirm(confirmationMessage)) {
+      return;
+    }
+
+    setBusyTransactionId(transaction.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) =>
+        deleteFinanceTransactionRequest(accessToken, transaction.id)
+      );
+      if (selectedTransactionId === transaction.id) {
+        handleCloseTransactionDetails();
+      }
+      if (editingTransactionId === transaction.id) {
+        resetTransactionForm();
+      }
+      setSuccessMessage(
+        isApproved
+          ? "Transaction approuvee supprimee par l'admin systeme."
+          : "Transaction supprimee."
+      );
+      await loadData();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyTransactionId(null);
     }
   }
 
@@ -632,21 +903,39 @@ export function FinanceTransactionsPage(): JSX.Element {
         <h2>Transactions financieres</h2>
         <p>
           Saisie terrain, preuves et validation comptable pour le secteur{" "}
-          <strong>{selectedActivity?.label ?? "non defini"}</strong>.
+          <strong>{selectedActivity?.label ?? "aucun secteur actif"}</strong>.
         </p>
       </header>
 
       {!selectedActivityCode && !isLoadingActivities ? (
         <p className="error-box">
-          Aucun secteur actif n'est disponible. Active d'abord un secteur d'activite dans
+          Aucun secteur actif n'est disponible. Activez d'abord un secteur d'activite dans
           l'administration.
         </p>
       ) : null}
 
+      <section className="grid">
+        {financePageCards.map((card) => (
+          <article key={card.title} className="metric-card finance-overview-card">
+            <h2>{card.title}</h2>
+            <p className="metric-value">{card.value}</p>
+            <p className="metric-note">{card.note}</p>
+          </article>
+        ))}
+      </section>
+
       {canCreateAccount ? (
         <section className="panel">
-          <h3>Nouveau compte financier</h3>
-          <form className="finance-account-form" onSubmit={handleCreateAccount}>
+          <details className="finance-section-toggle">
+            <summary className="finance-section-summary">
+              <span>{editingAccountId ? "Modifier un compte financier" : "Creer un compte financier"}</span>
+              <small>
+                {editingAccountId
+                  ? "Les comptes deja utilises restent verrouilles pour proteger l'historique."
+                  : "Ouvrir si vous devez ajouter une nouvelle caisse ou un nouveau compte."}
+              </small>
+            </summary>
+            <form className="finance-account-form" onSubmit={handleSaveAccount}>
             <input
               type="text"
               placeholder="Nom du compte (ex: Caisse principale)"
@@ -749,15 +1038,48 @@ export function FinanceTransactionsPage(): JSX.Element {
                 })}
               </div>
             ) : null}
-            <button type="submit">Creer compte</button>
-          </form>
-          <p className="hint">
-            {accountForm.scopeType === "GLOBAL"
-              ? "Le compte sera visible et utilisable dans tous les secteurs."
-              : accountForm.scopeType === "DEDICATED"
-                ? "Le compte sera reserve a un seul secteur."
-                : "Le compte sera partage uniquement entre les secteurs selectionnes."}
-          </p>
+            <button type="submit">
+              {editingAccountId ? "Enregistrer les modifications" : "Creer compte"}
+            </button>
+            {editingAccountId ? (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={handleCancelEditAccount}
+              >
+                Annuler la modification
+              </button>
+            ) : null}
+            </form>
+            <p className="hint">
+              {accountForm.scopeType === "GLOBAL"
+                ? "Le compte sera visible et utilisable dans tous les secteurs."
+                : accountForm.scopeType === "DEDICATED"
+                  ? "Le compte sera reserve a un seul secteur."
+                  : "Le compte sera partage uniquement entre les secteurs selectionnes."}
+            </p>
+          </details>
+        </section>
+      ) : null}
+
+      {canManageSalaries ? (
+        <section className="panel">
+          <div className="dashboard-panel-header">
+            <div>
+              <h3>Salaires</h3>
+              <p className="hint">
+                La paie est geree sur une page dediee pour separer les controles de salaire des
+                transactions courantes.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => navigate("/finance/salaries")}
+            >
+              Ouvrir la page salaires
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -798,23 +1120,30 @@ export function FinanceTransactionsPage(): JSX.Element {
             <option value="CASH_IN">Entree</option>
             <option value="CASH_OUT">Sortie</option>
           </select>
-          <button type="submit">Appliquer</button>
+          <button type="submit">Filtrer</button>
         </form>
         <p className="hint">
-          La liste est automatiquement alignee sur le secteur actif:{" "}
-          {selectedActivity?.label ?? "non defini"}.
+          La liste suit le secteur actif: {selectedActivity?.label ?? "aucun secteur actif"}.
         </p>
       </section>
 
       <section className="panel">
-        <h3>Nouvelle transaction</h3>
-        {accounts.length === 0 ? (
-          <p className="hint">
-            Aucun compte financier compatible avec le secteur actif. Contacte le proprietaire,
-            l'admin systeme ou le comptable.
-          </p>
-        ) : null}
-        <form className="finance-transaction-form" onSubmit={handleCreateTransaction}>
+        <details className="finance-section-toggle" open>
+          <summary className="finance-section-summary">
+            <span>{editingTransactionId ? "Modifier une transaction" : "Enregistrer une transaction"}</span>
+            <small>
+              {editingTransactionId
+                ? "Toute modification remet la transaction en brouillon avant une nouvelle soumission."
+                : "Utilisez ce bloc pour la saisie courante sur le secteur actif."}
+            </small>
+          </summary>
+          {accounts.length === 0 ? (
+            <p className="hint">
+              Aucun compte financier n'est disponible pour le secteur actif. Contactez le
+              proprietaire, l'admin systeme ou le comptable.
+            </p>
+          ) : null}
+          <form className="finance-transaction-form" onSubmit={handleSaveTransaction}>
           <select
             value={transactionForm.accountId}
             onChange={(event) =>
@@ -826,7 +1155,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             required
           >
             <option value="" disabled>
-              Selectionner un compte
+              Choisir un compte
             </option>
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -879,7 +1208,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
           <div className="scope-field">
             <span className="scope-field-label">Secteur de rattachement</span>
-            <strong>{selectedActivity?.label ?? "Non defini"}</strong>
+            <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
           </div>
 
           <input
@@ -898,8 +1227,8 @@ export function FinanceTransactionsPage(): JSX.Element {
             type="text"
             placeholder={
               selectedProfile?.finance.requiresDescription
-                ? "Description metier requise"
-                : "Description (optionnel)"
+                ? "Description requise"
+                : "Description (optionnelle)"
             }
             value={transactionForm.description}
             onChange={(event) =>
@@ -934,34 +1263,44 @@ export function FinanceTransactionsPage(): JSX.Element {
             type="submit"
             disabled={accounts.length === 0 || !selectedActivityCode || isLoadingActivities}
           >
-            Creer transaction
+            {editingTransactionId ? "Enregistrer les modifications" : "Enregistrer la transaction"}
           </button>
-        </form>
-        <div className="sector-form-guidance">
-          <p className="hint">
-            {selectedProfile?.finance.requiresProof
-              ? "La preuve est obligatoire avant soumission."
-              : "La preuve reste optionnelle pour ce secteur."}
-          </p>
-          {financeMetadataFields.length > 0 ? (
-            <div className="metadata-field-list">
-              {financeMetadataFields.map((field) => (
-                <p key={field.key} className="hint">
-                  <strong>{field.label}</strong>: {field.helpText}
-                </p>
-              ))}
-            </div>
+          {editingTransactionId ? (
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={handleCancelEditTransaction}
+            >
+              Annuler la modification
+            </button>
           ) : null}
-          {financeWorkflow.length > 0 ? (
-            <div className="workflow-chip-list">
-              {financeWorkflow.map((step) => (
-                <span key={step.code} className="workflow-chip" title={step.description}>
-                  {step.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
+          </form>
+          <div className="sector-form-guidance">
+            <p className="hint">
+              {selectedProfile?.finance.requiresProof
+                ? "La preuve est obligatoire avant soumission."
+                : "La preuve reste optionnelle pour ce secteur."}
+            </p>
+            {financeMetadataFields.length > 0 ? (
+              <div className="metadata-field-list">
+                {financeMetadataFields.map((field) => (
+                  <p key={field.key} className="hint">
+                    <strong>{field.label}</strong>: {field.helpText}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            {financeWorkflow.length > 0 ? (
+              <div className="workflow-chip-list">
+                {financeWorkflow.map((step) => (
+                  <span key={step.code} className="workflow-chip" title={step.description}>
+                    {step.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </details>
       </section>
 
       {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
@@ -977,12 +1316,10 @@ export function FinanceTransactionsPage(): JSX.Element {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Activite</th>
                   <th>Compte</th>
-                  <th>Type</th>
                   <th>Montant</th>
                   <th>Statut</th>
-                  <th>Preuves</th>
+                  <th>Suivi</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -992,70 +1329,33 @@ export function FinanceTransactionsPage(): JSX.Element {
                   const isProofsOpen = openProofs[tx.id] === true;
                   const proofs = proofsByTransaction[tx.id] ?? [];
                   const isProofsLoading = loadingProofsByTransaction[tx.id] === true;
+                  const canEditTransaction = canManageTransactions && tx.status !== "APPROVED";
+                  const canDeleteTransaction =
+                    tx.status === "APPROVED"
+                      ? canDeleteApprovedTransactions
+                      : canManageTransactions;
 
                   return (
                     <tr key={tx.id}>
                       <td>{new Date(tx.occurredAt).toLocaleString("fr-FR")}</td>
-                      <td>{getBusinessActivityLabel(tx.activityCode)}</td>
                       <td>
                         <strong>{tx.accountName}</strong>
                         <div className="hint">
-                          {formatAccountScopeLabel({
-                            scopeType: tx.accountScopeType,
-                            primaryActivityCode: tx.accountPrimaryActivityCode,
-                            allowedActivityCodes: tx.accountAllowedActivityCodes
-                          })}
+                          {tx.type === "CASH_IN" ? "Entree" : "Sortie"} |{" "}
+                          {tx.activityCode
+                            ? getBusinessActivityLabel(tx.activityCode)
+                            : "Charge transversale entreprise"}
                         </div>
                       </td>
-                      <td>{tx.type === "CASH_IN" ? "Entree" : "Sortie"}</td>
                       <td>
                         {tx.amount} {tx.currency}
                       </td>
                       <td>{statusLabel(tx.status)}</td>
                       <td>
                         <div>
-                          {tx.proofsCount}
-                          {tx.requiresProof ? " (obligatoire)" : ""}
+                          {tx.proofsCount} preuve{tx.proofsCount > 1 ? "s" : ""}
                         </div>
-                        {tx.proofsCount > 0 ? (
-                          <button
-                            type="button"
-                            className="secondary-btn"
-                            onClick={() => void handleToggleProofs(tx.id)}
-                            disabled={isProofsLoading}
-                          >
-                            {isProofsOpen ? "Masquer preuves" : "Voir preuves"}
-                          </button>
-                        ) : (
-                          <p className="hint proof-none">Aucune preuve</p>
-                        )}
-                        {isProofsOpen ? (
-                          <div className="proof-list">
-                            {isProofsLoading ? <p>Chargement des preuves...</p> : null}
-                            {!isProofsLoading && proofs.length === 0 ? (
-                              <p>Aucune preuve chargee.</p>
-                            ) : null}
-                            {!isProofsLoading && proofs.length > 0 ? (
-                              <ul>
-                                {proofs.map((proof) => (
-                                  <li key={proof.id}>
-                                    {proof.publicUrl ? (
-                                      <a href={proof.publicUrl} target="_blank" rel="noreferrer">
-                                        {proof.fileName}
-                                      </a>
-                                    ) : (
-                                      <span>{proof.fileName} (lien indisponible)</span>
-                                    )}
-                                    <small>
-                                      {formatFileSize(proof.fileSize)} |{" "}
-                                      {new Date(proof.uploadedAt).toLocaleString("fr-FR")}
-                                    </small>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </div>
-                        ) : null}
+                        <p className="hint">{tx.requiresProof ? "Justificatif requis" : "Justificatif libre"}</p>
                       </td>
                       <td>
                         <div className="actions-inline">
@@ -1064,8 +1364,28 @@ export function FinanceTransactionsPage(): JSX.Element {
                             className="secondary-btn"
                             onClick={() => handleOpenTransactionDetails(tx.id, tx.activityCode)}
                           >
-                            Details
+                            Voir le detail
                           </button>
+                          {canEditTransaction ? (
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() => handleStartEditTransaction(tx)}
+                              disabled={isBusy}
+                            >
+                              Modifier
+                            </button>
+                          ) : null}
+                          {canDeleteTransaction ? (
+                            <button
+                              type="button"
+                              className="danger-btn"
+                              onClick={() => void handleDeleteTransaction(tx)}
+                              disabled={isBusy}
+                            >
+                              Supprimer
+                            </button>
+                          ) : null}
                           {tx.status === "DRAFT" ? (
                             <button
                               type="button"
@@ -1102,30 +1422,98 @@ export function FinanceTransactionsPage(): JSX.Element {
                             </>
                           ) : null}
                         </div>
+                        <details className="table-inline-details">
+                          <summary className="table-inline-summary">Voir plus</summary>
+                          <div className="table-inline-content">
+                            <p className="hint">
+                              <strong>Portee du compte:</strong>{" "}
+                              {formatAccountScopeLabel({
+                                scopeType: tx.accountScopeType,
+                                primaryActivityCode: tx.accountPrimaryActivityCode,
+                                allowedActivityCodes: tx.accountAllowedActivityCodes
+                              })}
+                            </p>
+                            {tx.description?.trim() ? (
+                              <p className="hint">
+                                <strong>Description:</strong> {tx.description}
+                              </p>
+                            ) : null}
+                            <p className="hint">
+                              <strong>Contexte:</strong>{" "}
+                              {formatMetadataSummary(tx.metadata, financeMetadataFields)}
+                            </p>
+                            {getTransactionGovernanceLines(tx).map((line) => (
+                              <p key={`${tx.id}-${line}`} className="hint">
+                                {line}
+                              </p>
+                            ))}
+                            <div className="table-inline-meta">
+                              {tx.proofsCount > 0 ? (
+                                <button
+                                  type="button"
+                                  className="secondary-btn"
+                                  onClick={() => void handleToggleProofs(tx.id)}
+                                  disabled={isProofsLoading}
+                                >
+                                  {isProofsOpen ? "Masquer les preuves" : "Voir les preuves"}
+                                </button>
+                              ) : (
+                                <p className="hint proof-none">Aucune preuve disponible</p>
+                              )}
+                            </div>
+                            {isProofsOpen ? (
+                              <div className="proof-list">
+                                {isProofsLoading ? <p>Chargement des preuves...</p> : null}
+                                {!isProofsLoading && proofs.length === 0 ? (
+                                  <p>Aucune preuve ajoutee.</p>
+                                ) : null}
+                                {!isProofsLoading && proofs.length > 0 ? (
+                                  <ul>
+                                    {proofs.map((proof) => (
+                                      <li key={proof.id}>
+                                        {proof.publicUrl ? (
+                                          <a href={proof.publicUrl} target="_blank" rel="noreferrer">
+                                            {proof.fileName}
+                                          </a>
+                                        ) : (
+                                          <span>{proof.fileName} (lien indisponible)</span>
+                                        )}
+                                        <small>
+                                          {formatFileSize(proof.fileSize)} |{" "}
+                                          {new Date(proof.uploadedAt).toLocaleString("fr-FR")}
+                                        </small>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            ) : null}
 
-                        {(tx.status === "DRAFT" || tx.status === "SUBMITTED") ? (
-                          <div className="proof-inline-form">
-                            <input
-                              type="file"
-                              accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                              onChange={(event) =>
-                                setProofFiles((prev) => ({
-                                  ...prev,
-                                  [tx.id]: event.target.files?.[0] ?? null
-                                }))
-                              }
-                              disabled={isBusy}
-                            />
-                            <button
-                              type="button"
-                              className="secondary-btn"
-                              onClick={() => void handleAddProof(tx.id)}
-                              disabled={isBusy}
-                            >
-                              Ajouter preuve
-                            </button>
+                            {(tx.status === "DRAFT" || tx.status === "SUBMITTED") ? (
+                              <div className="proof-inline-form">
+                                <input
+                                  type="file"
+                                  accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                                  onChange={(event) =>
+                                    setProofFiles((prev) => ({
+                                      ...prev,
+                                      [tx.id]: event.target.files?.[0] ?? null
+                                    }))
+                                  }
+                                  disabled={isBusy}
+                                />
+                                <button
+                                  type="button"
+                                  className="secondary-btn"
+                                  onClick={() => void handleAddProof(tx.id)}
+                                  disabled={isBusy}
+                                >
+                                  Ajouter une preuve
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
+                        </details>
                       </td>
                     </tr>
                   );
@@ -1140,7 +1528,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         <section className="panel finance-transaction-detail-panel">
           <div className="task-detail-header">
             <div>
-              <h3>Detail transaction</h3>
+              <h3>Detail de la transaction</h3>
               <p className="hint">
                 {selectedTransaction.accountName} |{" "}
                 {new Date(selectedTransaction.occurredAt).toLocaleString("fr-FR")}
@@ -1157,7 +1545,10 @@ export function FinanceTransactionsPage(): JSX.Element {
 
           <div className="operations-task-meta">
             <p>
-              <strong>Secteur:</strong> {getBusinessActivityLabel(selectedTransaction.activityCode)}
+              <strong>Secteur:</strong>{" "}
+              {selectedTransaction.activityCode
+                ? getBusinessActivityLabel(selectedTransaction.activityCode)
+                : "Charge transversale entreprise"}
             </p>
             <p>
               <strong>Compte:</strong> {selectedTransaction.accountName}
@@ -1219,13 +1610,33 @@ export function FinanceTransactionsPage(): JSX.Element {
             <p className="hint">
               <strong>Contexte metier</strong>
             </p>
-            <p className="hint">
-              {formatMetadataSummary(selectedTransaction.metadata, financeMetadataFields)}
-            </p>
+            <p className="hint">{formatMetadataSummary(selectedTransaction.metadata, financeMetadataFields)}</p>
           </div>
 
           <div className="finance-transaction-detail-actions">
             <div className="actions-inline">
+              {canManageTransactions && selectedTransaction.status !== "APPROVED" ? (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => handleStartEditTransaction(selectedTransaction)}
+                  disabled={busyTransactionId === selectedTransaction.id}
+                >
+                  Modifier
+                </button>
+              ) : null}
+              {(selectedTransaction.status === "APPROVED"
+                ? canDeleteApprovedTransactions
+                : canManageTransactions) ? (
+                <button
+                  type="button"
+                  className="danger-btn"
+                  onClick={() => void handleDeleteTransaction(selectedTransaction)}
+                  disabled={busyTransactionId === selectedTransaction.id}
+                >
+                  Supprimer
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="secondary-btn"
@@ -1235,7 +1646,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   )
                 }
               >
-                Alertes liees
+                Voir les alertes
               </button>
               {canAccessAudit ? (
                 <button
@@ -1247,7 +1658,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                     )
                   }
                 >
-                  Audit lie
+                  Voir l'audit
                 </button>
               ) : null}
             </div>
@@ -1256,7 +1667,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               className="secondary-btn"
               onClick={() => void handleToggleProofs(selectedTransaction.id)}
             >
-              {openProofs[selectedTransaction.id] ? "Masquer preuves" : "Voir preuves"}
+              {openProofs[selectedTransaction.id] ? "Masquer les preuves" : "Voir les preuves"}
             </button>
             {(selectedTransaction.status === "DRAFT" || selectedTransaction.status === "SUBMITTED") ? (
               <div className="proof-inline-form">
@@ -1277,7 +1688,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   onClick={() => void handleAddProof(selectedTransaction.id)}
                   disabled={busyTransactionId === selectedTransaction.id}
                 >
-                  Ajouter preuve
+                  Ajouter une preuve
                 </button>
               </div>
             ) : null}
@@ -1288,7 +1699,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               {loadingProofsByTransaction[selectedTransaction.id] ? <p>Chargement des preuves...</p> : null}
               {!loadingProofsByTransaction[selectedTransaction.id] &&
               (proofsByTransaction[selectedTransaction.id] ?? []).length === 0 ? (
-                <p>Aucune preuve chargee.</p>
+                <p>Aucune preuve ajoutee.</p>
               ) : null}
               {!loadingProofsByTransaction[selectedTransaction.id] &&
               (proofsByTransaction[selectedTransaction.id] ?? []).length > 0 ? (
@@ -1317,24 +1728,73 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       {accounts.length > 0 ? (
         <section className="panel">
-          <h3>Comptes compatibles avec le secteur actif</h3>
-          <div className="operations-member-grid">
-            {accounts.map((account) => (
-              <article key={account.id} className="operations-member-card">
-                <h4>{account.name}</h4>
-                {getAccountGovernanceLines(account).map((line) => (
-                  <p key={`${account.id}-${line}`} className="hint">
-                    {line}
-                  </p>
-                ))}
-                <p className="hint">Solde: {account.balance}</p>
-                <p className="hint">
-                  Compatible secteur actif:{" "}
-                  {isAccountVisibleForSelectedActivity(account, selectedActivityCode) ? "Oui" : "Non"}
-                </p>
-              </article>
-            ))}
-          </div>
+          <details className="finance-section-toggle">
+            <summary className="finance-section-summary">
+              <span>Consulter les comptes financiers</span>
+              <small>{accounts.length} compte(s) visible(s) dans le contexte actuel.</small>
+            </summary>
+            <div className="operations-member-grid">
+              {accounts.map((account) => {
+                const canEditAccount = canManageAccount(account);
+                const isLockedAccount = account.transactionsCount > 0;
+                const isBusy = busyAccountId === account.id;
+
+                return (
+                  <article key={account.id} className="operations-member-card">
+                    <h4>{account.name}</h4>
+                    {getAccountGovernanceLines(account).map((line) => (
+                      <p key={`${account.id}-${line}`} className="hint">
+                        {line}
+                      </p>
+                    ))}
+                    <p className="hint">Solde: {account.balance}</p>
+                    <p className="hint">
+                      Transactions liees: {account.transactionsCount}
+                    </p>
+                    <p className="hint">
+                      Compatible secteur actif:{" "}
+                      {isAccountVisibleForSelectedActivity(account, selectedActivityCode) ? "Oui" : "Non"}
+                    </p>
+                    {isLockedAccount ? (
+                      <p className="hint">
+                        Ce compte est deja utilise. La modification et la suppression sont bloquees.
+                      </p>
+                    ) : null}
+                    {canEditAccount ? (
+                      <div className="actions-inline">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => handleStartEditAccount(account)}
+                          disabled={isBusy}
+                          title={
+                            isLockedAccount
+                              ? "Compte deja utilise par des transactions."
+                              : undefined
+                          }
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          onClick={() => void handleDeleteAccount(account)}
+                          disabled={isBusy}
+                          title={
+                            isLockedAccount
+                              ? "Compte deja utilise par des transactions."
+                              : undefined
+                          }
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </details>
         </section>
       ) : null}
     </>

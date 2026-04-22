@@ -14,7 +14,9 @@ export function loadSessionTokens(): SessionTokens | null {
     }
     return {
       accessToken: parsed.accessToken,
-      refreshToken: parsed.refreshToken
+      refreshToken: parsed.refreshToken,
+      companyCode: parsed.companyCode,
+      companyId: parsed.companyId
     };
   } catch {
     return null;
@@ -28,4 +30,3 @@ export function saveSessionTokens(tokens: SessionTokens): void {
 export function clearSessionTokens(): void {
   window.localStorage.removeItem(STORAGE_KEY);
 }
-

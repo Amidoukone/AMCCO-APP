@@ -1,8 +1,9 @@
 import request from "supertest";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { alertsRouter } from "./alerts.route.js";
 import { createTestApp } from "../test/test-app.js";
 import { verifyAccessToken } from "../lib/token.js";
+import { findUserProfileForCompany } from "../repositories/auth.repository.js";
 import {
   getCurrentUserAlertsSummary,
   listCurrentUserAlerts,
@@ -12,6 +13,10 @@ import {
 
 vi.mock("../lib/token.js", () => ({
   verifyAccessToken: vi.fn()
+}));
+
+vi.mock("../repositories/auth.repository.js", () => ({
+  findUserProfileForCompany: vi.fn()
 }));
 
 vi.mock("../services/alerts.service.js", () => ({
@@ -24,6 +29,15 @@ vi.mock("../services/alerts.service.js", () => ({
 describe("alertsRouter", () => {
   const app = createTestApp(alertsRouter);
 
+  beforeEach(() => {
+    vi.mocked(verifyAccessToken).mockReset();
+    vi.mocked(findUserProfileForCompany).mockReset();
+    vi.mocked(listCurrentUserAlerts).mockReset();
+    vi.mocked(getCurrentUserAlertsSummary).mockReset();
+    vi.mocked(markCurrentUserAlertAsRead).mockReset();
+    vi.mocked(markAllCurrentUserAlertsAsRead).mockReset();
+  });
+
   function mockAuthenticatedUser() {
     vi.mocked(verifyAccessToken).mockReturnValue({
       userId: "user-1",
@@ -31,6 +45,12 @@ describe("alertsRouter", () => {
       role: "SUPERVISOR",
       email: "user@example.com",
       type: "access"
+    });
+    vi.mocked(findUserProfileForCompany).mockResolvedValue({
+      userId: "user-1",
+      email: "user@example.com",
+      fullName: "User Example",
+      role: "SUPERVISOR"
     });
   }
 
@@ -134,5 +154,23 @@ describe("alertsRouter", () => {
       companyId: "company-1",
       role: "SUPERVISOR"
     });
+  });
+
+  it("GET /alerts rejects access token for a removed company membership", async () => {
+    vi.mocked(verifyAccessToken).mockReturnValue({
+      userId: "user-1",
+      companyId: "company-1",
+      role: "SUPERVISOR",
+      email: "user@example.com",
+      type: "access"
+    });
+    vi.mocked(findUserProfileForCompany).mockResolvedValue(null);
+
+    const response = await request(app)
+      .get("/alerts")
+      .set("Authorization", "Bearer valid-token");
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.message).toBe("Session invalide pour cette entreprise.");
   });
 });

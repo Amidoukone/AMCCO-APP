@@ -1,4 +1,6 @@
+import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
+import * as XLSX from "xlsx";
 import {
   assertTransactionInputMatchesActivityProfile,
   getBusinessActivityProfile,
@@ -12,19 +14,32 @@ import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import {
   addTransactionProof,
   countTransactionProofs,
+  confirmSalaryReceipt,
   createFinancialAccount,
+  deleteFinancialAccount,
   type FinancialAccountScopeType,
   createFinancialTransaction,
+  deleteFinancialTransaction,
   findFinancialAccountById,
   findFinancialTransactionById,
+  findSalaryTransactionByEmployeeAndPeriod,
   findTransactionById,
   listFinancialAccounts,
   listFinancialTransactions,
+  listSalaryTransactions,
   listTransactionProofs,
   reviewTransaction,
+  type SalaryConfirmationStatus,
   submitTransaction,
-  type TransactionProof
+  type SalaryPaymentMethod,
+  type TransactionProof,
+  updateFinancialAccount,
+  updateFinancialTransaction
 } from "../repositories/finance.repository.js";
+import {
+  findMembershipByCompanyAndUser,
+  listCompanyUsers
+} from "../repositories/admin-users.repository.js";
 import type { BusinessActivityCode } from "../types/business-activity.js";
 import type { RoleCode } from "../types/role.js";
 
@@ -34,8 +49,57 @@ type ActorContext = {
   role: RoleCode;
 };
 
-const ACCOUNT_CREATE_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT"];
+const ACCOUNT_CREATE_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN"];
 const TRANSACTION_REVIEW_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT"];
+const SALARY_MANAGEMENT_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT"];
+
+type SalarySnapshot = {
+  employeeUserId: string;
+  employeeFullName: string;
+  employeeEmail: string;
+  employeeRole: RoleCode;
+  payPeriod: string;
+  grossAmount: string;
+  bonusAmount: string;
+  deductionAmount: string;
+  netAmount: string;
+  paymentMethod: SalaryPaymentMethod;
+  note: string | null;
+};
+
+type SalaryConfirmationSnapshot = {
+  status: SalaryConfirmationStatus;
+  confirmedById: string | null;
+  confirmedByEmail: string | null;
+  confirmedAt: string | null;
+};
+
+type SalarySummaryItem = {
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  count: number;
+  grossAmount: string;
+  bonusAmount: string;
+  deductionAmount: string;
+  netAmount: string;
+};
+
+type SalaryPaymentMethodSummaryItem = {
+  paymentMethod: SalaryPaymentMethod;
+  count: number;
+  netAmount: string;
+};
+
+type SalaryEmployeeSummaryItem = {
+  employeeUserId: string;
+  employeeFullName: string;
+  employeeEmail: string;
+  employeeRole: RoleCode;
+  count: number;
+  grossAmount: string;
+  bonusAmount: string;
+  deductionAmount: string;
+  netAmount: string;
+};
 
 function canCreateAccount(role: RoleCode): boolean {
   return ACCOUNT_CREATE_ROLES.includes(role);
@@ -43,6 +107,46 @@ function canCreateAccount(role: RoleCode): boolean {
 
 function canReviewTransaction(role: RoleCode): boolean {
   return TRANSACTION_REVIEW_ROLES.includes(role);
+}
+
+function canManageTransaction(role: RoleCode): boolean {
+  return TRANSACTION_REVIEW_ROLES.includes(role);
+}
+
+function canDeleteApprovedTransaction(role: RoleCode): boolean {
+  return role === "SYS_ADMIN";
+}
+
+function canManageSalary(role: RoleCode): boolean {
+  return SALARY_MANAGEMENT_ROLES.includes(role);
+}
+
+function ensureSalaryManagementAccess(role: RoleCode): void {
+  if (!canManageSalary(role)) {
+    throw new HttpError(403, "Permissions insuffisantes pour gerer les salaires.");
+  }
+}
+
+function ensureTransactionManagementAccess(role: RoleCode): void {
+  if (!canManageTransaction(role)) {
+    throw new HttpError(403, "Permissions insuffisantes pour modifier ou supprimer les transactions.");
+  }
+}
+
+function resolveSalaryAccessScope(input: {
+  actorId: string;
+  role: RoleCode;
+  employeeUserId?: string;
+}): string | undefined {
+  if (canManageSalary(input.role)) {
+    return input.employeeUserId;
+  }
+
+  if (input.employeeUserId && input.employeeUserId !== input.actorId) {
+    throw new HttpError(403, "Permissions insuffisantes pour consulter le salaire d'un autre collaborateur.");
+  }
+
+  return input.actorId;
 }
 
 function assertAccountCreationGovernance(
@@ -54,6 +158,15 @@ function assertAccountCreationGovernance(
       403,
       "Seuls le proprietaire ou l'admin systeme peuvent creer un compte global entreprise."
     );
+  }
+}
+
+function assertAccountManagementGovernance(
+  role: RoleCode,
+  scopeType: FinancialAccountScopeType
+): void {
+  if (role !== "OWNER" && role !== "SYS_ADMIN") {
+    throw new HttpError(403, "Permissions insuffisantes pour modifier ou supprimer ce compte financier.");
   }
 }
 
@@ -158,6 +271,174 @@ function buildFinanceGovernanceMetadata(input: {
   };
 }
 
+function normalizeMoneyString(input: string | undefined, fallback = "0.00"): string {
+  const value = input?.trim();
+  return value && /^\d+(\.\d{1,2})?$/.test(value) ? value : fallback;
+}
+
+function toMoneyCents(input: string): number {
+  const [wholePart, decimalPart = ""] = input.split(".");
+  const normalizedDecimal = `${decimalPart}00`.slice(0, 2);
+  return Number.parseInt(wholePart, 10) * 100 + Number.parseInt(normalizedDecimal, 10);
+}
+
+function centsToMoney(input: number): string {
+  const isNegative = input < 0;
+  const absoluteValue = Math.abs(input);
+  const whole = Math.floor(absoluteValue / 100);
+  const decimals = absoluteValue % 100;
+  return `${isNegative ? "-" : ""}${whole}.${String(decimals).padStart(2, "0")}`;
+}
+
+function escapeCsvValue(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const normalized = String(value).replace(/\r?\n/g, " ").replace(/"/g, '""');
+  return `"${normalized}"`;
+}
+
+function buildCsv(headers: string[], rows: Array<Array<string | number | null | undefined>>): string {
+  const headerLine = headers.map((header) => escapeCsvValue(header)).join(",");
+  const lines = rows.map((row) => row.map((value) => escapeCsvValue(value)).join(","));
+  return [headerLine, ...lines].join("\n");
+}
+
+function buildWorkbookBuffer(sheets: Array<{ name: string; rows: Array<Record<string, unknown>> }>): Buffer {
+  const workbook = XLSX.utils.book_new();
+
+  for (const sheet of sheets) {
+    const worksheet = XLSX.utils.json_to_sheet(sheet.rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
+  }
+
+  return XLSX.write(workbook, {
+    type: "buffer",
+    bookType: "xlsx"
+  }) as Buffer;
+}
+
+function isSalaryPaymentMethod(value: string): value is SalaryPaymentMethod {
+  return ["BANK_TRANSFER", "CASH", "MOBILE_MONEY", "CHEQUE"].includes(value);
+}
+
+function extractSalarySnapshot(metadata?: Record<string, string> | null): SalarySnapshot | null {
+  if (!metadata) {
+    return null;
+  }
+
+  if (metadata.entryCategory !== "SALARY") {
+    return null;
+  }
+
+  if (
+    !metadata.employeeUserId ||
+    !metadata.employeeFullName ||
+    !metadata.employeeEmail ||
+    !metadata.employeeRole ||
+    !metadata.payPeriod ||
+    !metadata.grossAmount ||
+    !metadata.bonusAmount ||
+    !metadata.deductionAmount ||
+    !metadata.netAmount ||
+    !metadata.paymentMethod
+  ) {
+    return null;
+  }
+
+  if (!isSalaryPaymentMethod(metadata.paymentMethod)) {
+    return null;
+  }
+
+  return {
+    employeeUserId: metadata.employeeUserId,
+    employeeFullName: metadata.employeeFullName,
+    employeeEmail: metadata.employeeEmail,
+    employeeRole: metadata.employeeRole as RoleCode,
+    payPeriod: metadata.payPeriod,
+    grossAmount: metadata.grossAmount,
+    bonusAmount: metadata.bonusAmount,
+    deductionAmount: metadata.deductionAmount,
+    netAmount: metadata.netAmount,
+    paymentMethod: metadata.paymentMethod,
+    note: metadata.note?.trim() || null
+  };
+}
+
+function toSalaryActionLabel(snapshot: SalarySnapshot): string {
+  return `${snapshot.employeeFullName} | ${snapshot.payPeriod}`;
+}
+
+function buildSalaryMetadata(input: SalarySnapshot): Record<string, string> {
+  return {
+    entryCategory: "SALARY",
+    employeeUserId: input.employeeUserId,
+    employeeFullName: input.employeeFullName,
+    employeeEmail: input.employeeEmail,
+    employeeRole: input.employeeRole,
+    payPeriod: input.payPeriod,
+    grossAmount: input.grossAmount,
+    bonusAmount: input.bonusAmount,
+    deductionAmount: input.deductionAmount,
+    netAmount: input.netAmount,
+    paymentMethod: input.paymentMethod,
+    ...(input.note ? { note: input.note } : {})
+  };
+}
+
+function buildSalaryConfirmationSnapshot(input: {
+  salaryConfirmationStatus: SalaryConfirmationStatus;
+  salaryConfirmedById: string | null;
+  salaryConfirmedByEmail: string | null;
+  salaryConfirmedAt: string | null;
+}): SalaryConfirmationSnapshot {
+  return {
+    status: input.salaryConfirmationStatus,
+    confirmedById: input.salaryConfirmedById,
+    confirmedByEmail: input.salaryConfirmedByEmail,
+    confirmedAt: input.salaryConfirmedAt
+  };
+}
+
+function buildSalarySnapshotFromInput(input: {
+  membership: {
+    userId: string;
+    fullName: string;
+    email: string;
+    role: RoleCode;
+  };
+  payPeriod: string;
+  grossAmount: string;
+  bonusAmount?: string;
+  deductionAmount?: string;
+  paymentMethod: SalaryPaymentMethod;
+  note?: string;
+}): SalarySnapshot {
+  const grossAmount = normalizeMoneyString(input.grossAmount);
+  const bonusAmount = normalizeMoneyString(input.bonusAmount);
+  const deductionAmount = normalizeMoneyString(input.deductionAmount);
+  const netCents = toMoneyCents(grossAmount) + toMoneyCents(bonusAmount) - toMoneyCents(deductionAmount);
+
+  if (netCents <= 0) {
+    throw new HttpError(400, "Le salaire net doit etre superieur a zero.");
+  }
+
+  return {
+    employeeUserId: input.membership.userId,
+    employeeFullName: input.membership.fullName,
+    employeeEmail: input.membership.email,
+    employeeRole: input.membership.role,
+    payPeriod: input.payPeriod.trim(),
+    grossAmount,
+    bonusAmount,
+    deductionAmount,
+    netAmount: centsToMoney(netCents),
+    paymentMethod: input.paymentMethod,
+    note: input.note?.trim() || null
+  };
+}
+
 type TransactionProofItem = TransactionProof & {
   publicUrl: string | null;
 };
@@ -176,6 +457,11 @@ export async function listCompanyAccounts(input: {
   activityCode?: BusinessActivityCode;
 }) {
   return listFinancialAccounts(input);
+}
+
+export async function listCompanySalaryMembers(companyId: string) {
+  const members = await listCompanyUsers(companyId);
+  return members.filter((member) => member.isActive);
 }
 
 export async function createCompanyAccount(
@@ -264,6 +550,127 @@ export async function createCompanyAccount(
   return created;
 }
 
+export async function updateCompanyAccount(
+  actor: ActorContext,
+  input: {
+    accountId: string;
+    name: string;
+    accountRef?: string;
+    openingBalance?: string;
+    scopeType?: FinancialAccountScopeType;
+    primaryActivityCode?: BusinessActivityCode;
+    allowedActivityCodes?: BusinessActivityCode[];
+  }
+) {
+  const existing = await findFinancialAccountById(actor.companyId, input.accountId);
+  if (!existing) {
+    throw new HttpError(404, "Compte financier introuvable.");
+  }
+
+  assertAccountManagementGovernance(actor.role, existing.scopeType);
+
+  if (existing.transactionsCount > 0) {
+    throw new HttpError(
+      400,
+      "Ce compte financier est deja utilise par des transactions et ne peut plus etre modifie."
+    );
+  }
+
+  const scopeType = input.scopeType ?? existing.scopeType;
+  const primaryActivityCode = input.primaryActivityCode ?? null;
+  const allowedActivityCodes = normalizeActivityCodes(input.allowedActivityCodes);
+  assertAccountManagementGovernance(actor.role, scopeType);
+
+  if (scopeType === "DEDICATED" && !primaryActivityCode) {
+    throw new HttpError(400, "Selectionne un secteur principal pour un compte dedie.");
+  }
+
+  if (scopeType === "RESTRICTED" && allowedActivityCodes.length === 0) {
+    throw new HttpError(400, "Selectionne au moins un secteur autorise pour un compte restreint.");
+  }
+
+  const activityCodesToValidate =
+    scopeType === "DEDICATED"
+      ? (primaryActivityCode ? [primaryActivityCode] : [])
+      : scopeType === "RESTRICTED"
+        ? allowedActivityCodes
+        : [];
+
+  for (const activityCode of activityCodesToValidate) {
+    await ensureCompanyActivityEnabledOrThrow(actor.companyId, activityCode);
+  }
+
+  const effectiveAllowedActivityCodes = getEffectiveAllowedActivityCodes({
+    scopeType,
+    primaryActivityCode,
+    allowedActivityCodes
+  });
+  await updateFinancialAccount({
+    companyId: actor.companyId,
+    accountId: existing.id,
+    name: input.name.trim(),
+    accountRef: input.accountRef?.trim() || null,
+    balance: input.openingBalance ?? existing.balance,
+    scopeType,
+    primaryActivityCode,
+    allowedActivityCodes: scopeType === "RESTRICTED" ? effectiveAllowedActivityCodes : []
+  });
+
+  const updated = await findFinancialAccountById(actor.companyId, existing.id);
+  if (!updated) {
+    throw new HttpError(500, "Impossible de recharger le compte financier modifie.");
+  }
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_ACCOUNT_UPDATED",
+    entityType: "FINANCIAL_ACCOUNT",
+    entityId: updated.id,
+    metadataJson: JSON.stringify({
+      previousScopeType: existing.scopeType,
+      previousScopeLabel: toAccountScopeLabel(existing),
+      previousName: existing.name,
+      previousAccountRef: existing.accountRef,
+      previousOpeningBalance: existing.balance,
+      name: updated.name,
+      accountRef: updated.accountRef,
+      openingBalance: updated.balance,
+      scopeType: updated.scopeType,
+      scopeLabel: toAccountScopeLabel(updated),
+      primaryActivityCode: updated.primaryActivityCode,
+      primaryActivityLabel: toActivityLabel(updated.primaryActivityCode),
+      allowedActivityCodes: updated.allowedActivityCodes,
+      allowedActivityLabels: updated.allowedActivityCodes.map(
+        (activityCode) => toActivityLabel(activityCode) ?? activityCode
+      )
+    })
+  });
+
+  if (actor.role === "SYS_ADMIN") {
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER"],
+      excludeUserIds: [actor.actorId],
+      code: "FINANCE_ACCOUNT_UPDATED",
+      message: `Le compte financier ${updated.name} a ete modifie par l'admin systeme.`,
+      severity: "WARNING",
+      entityType: "FINANCIAL_ACCOUNT",
+      entityId: updated.id,
+      metadata: {
+        accountId: updated.id,
+        accountName: updated.name,
+        actorRole: actor.role,
+        scopeType: updated.scopeType,
+        scopeLabel: toAccountScopeLabel(updated)
+      }
+    });
+  }
+
+  return updated;
+}
+
 export async function createCompanyTransaction(
   actor: ActorContext,
   input: {
@@ -348,6 +755,671 @@ export async function createCompanyTransaction(
   return created;
 }
 
+export async function updateCompanyTransaction(
+  actor: ActorContext,
+  input: {
+    transactionId: string;
+    accountId: string;
+    type: "CASH_IN" | "CASH_OUT";
+    amount: string;
+    currency: string;
+    activityCode: BusinessActivityCode;
+    description?: string;
+    metadata?: Record<string, string>;
+    occurredAt: string;
+  }
+) {
+  ensureTransactionManagementAccess(actor.role);
+
+  const existing = await findFinancialTransactionById(actor.companyId, input.transactionId);
+  if (!existing) {
+    throw new HttpError(404, "Transaction introuvable.");
+  }
+
+  if (extractSalarySnapshot(existing.metadata)) {
+    throw new HttpError(400, "Les salaires doivent etre geres depuis la page salaires.");
+  }
+
+  if (existing.status === "APPROVED") {
+    throw new HttpError(403, "Une transaction approuvee ne peut plus etre modifiee.");
+  }
+
+  const account = await findFinancialAccountById(actor.companyId, input.accountId);
+  if (!account) {
+    throw new HttpError(404, "Compte financier introuvable.");
+  }
+  assertAccountSupportsActivity(account, input.activityCode);
+
+  await ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode);
+  const currency = input.currency.trim().toUpperCase();
+  const description = input.description?.trim();
+  const metadata = normalizeActivityMetadata(input.metadata);
+  try {
+    assertTransactionInputMatchesActivityProfile(input.activityCode, {
+      type: input.type,
+      currency,
+      description,
+      metadata
+    });
+  } catch (error) {
+    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+  }
+
+  const profile = getBusinessActivityProfile(input.activityCode);
+  await updateFinancialTransaction({
+    companyId: actor.companyId,
+    transactionId: existing.id,
+    accountId: input.accountId,
+    type: input.type,
+    amount: input.amount,
+    currency,
+    activityCode: input.activityCode,
+    description: description || null,
+    metadata,
+    requiresProof: profile.finance.requiresProof,
+    occurredAt: new Date(input.occurredAt)
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_TRANSACTION_UPDATED",
+    entityType: "TRANSACTION",
+    entityId: existing.id,
+    metadataJson: JSON.stringify({
+      ...buildFinanceGovernanceMetadata({
+        account,
+        activityCode: input.activityCode,
+        transactionId: existing.id
+      }),
+      previousStatus: existing.status,
+      accountId: input.accountId,
+      type: input.type,
+      amount: input.amount,
+      currency,
+      activityCode: input.activityCode,
+      activityLabel: profile.label,
+      metadata,
+      requiresProof: profile.finance.requiresProof,
+      financeWorkflow: profile.finance.workflow.map((step) => step.code)
+    })
+  });
+
+  const updated = await findFinancialTransactionById(actor.companyId, existing.id);
+  if (!updated) {
+    throw new HttpError(500, "Impossible de recharger la transaction modifiee.");
+  }
+
+  if (actor.role === "SYS_ADMIN") {
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER"],
+      excludeUserIds: [actor.actorId],
+      code: "FINANCE_TRANSACTION_UPDATED",
+      message: `La transaction ${profile.label} ${updated.amount} ${updated.currency} a ete modifiee par l'admin systeme.`,
+      severity: "WARNING",
+      entityType: "TRANSACTION",
+      entityId: updated.id,
+      metadata: {
+        transactionId: updated.id,
+        accountId: updated.accountId,
+        accountName: updated.accountName,
+        actorRole: actor.role,
+        activityCode: updated.activityCode,
+        activityLabel: profile.label,
+        status: updated.status
+      }
+    });
+  }
+
+  return updated;
+}
+
+export async function listCompanySalaryTransactions(input: {
+  actorId: string;
+  companyId: string;
+  role: RoleCode;
+  limit?: number;
+  offset?: number;
+  status?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  employeeUserId?: string;
+  payPeriod?: string;
+}) {
+  if (!canManageSalary(input.role) && input.status === "DRAFT") {
+    throw new HttpError(403, "Les brouillons de salaire sont reserves a la comptabilite.");
+  }
+
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
+  const offset = Math.max(input.offset ?? 0, 0);
+  const scopedEmployeeUserId = resolveSalaryAccessScope({
+    actorId: input.actorId,
+    role: input.role,
+    employeeUserId: input.employeeUserId
+  });
+  const items = await listSalaryTransactions({
+    companyId: input.companyId,
+    limit,
+    offset,
+    status: input.status,
+    employeeUserId: scopedEmployeeUserId,
+    payPeriod: input.payPeriod
+  });
+
+  return items
+    .map((item) => {
+      const snapshot = extractSalarySnapshot(item.metadata);
+      if (!snapshot) {
+        return null;
+      }
+      return {
+        ...item,
+        ...snapshot,
+        salaryConfirmation: buildSalaryConfirmationSnapshot(item)
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .filter((item) => canManageSalary(input.role) || item.status !== "DRAFT");
+}
+
+export async function getCompanySalarySummary(input: {
+  companyId: string;
+  role: RoleCode;
+  payPeriod: string;
+  employeeUserId?: string;
+}) {
+  ensureSalaryManagementAccess(input.role);
+
+  const items = await listCompanySalaryTransactions({
+    actorId: input.employeeUserId ?? "salary-summary",
+    companyId: input.companyId,
+    role: input.role,
+    limit: 2000,
+    offset: 0,
+    payPeriod: input.payPeriod,
+    employeeUserId: input.employeeUserId
+  });
+
+  const byStatus = new Map<SalarySummaryItem["status"], SalarySummaryItem>();
+  const byPaymentMethod = new Map<SalaryPaymentMethod, SalaryPaymentMethodSummaryItem>();
+  const byEmployee = new Map<string, SalaryEmployeeSummaryItem>();
+
+  let totalGrossCents = 0;
+  let totalBonusCents = 0;
+  let totalDeductionCents = 0;
+  let totalNetCents = 0;
+  let approvedNetCents = 0;
+  let pendingCount = 0;
+
+  for (const item of items) {
+    const grossCents = toMoneyCents(item.grossAmount);
+    const bonusCents = toMoneyCents(item.bonusAmount);
+    const deductionCents = toMoneyCents(item.deductionAmount);
+    const netCents = toMoneyCents(item.netAmount);
+
+    totalGrossCents += grossCents;
+    totalBonusCents += bonusCents;
+    totalDeductionCents += deductionCents;
+    totalNetCents += netCents;
+    if (item.status === "APPROVED") {
+      approvedNetCents += netCents;
+    }
+    if (item.status === "DRAFT" || item.status === "SUBMITTED") {
+      pendingCount += 1;
+    }
+
+    const statusSummary = byStatus.get(item.status) ?? {
+      status: item.status,
+      count: 0,
+      grossAmount: "0.00",
+      bonusAmount: "0.00",
+      deductionAmount: "0.00",
+      netAmount: "0.00"
+    };
+    statusSummary.count += 1;
+    statusSummary.grossAmount = centsToMoney(toMoneyCents(statusSummary.grossAmount) + grossCents);
+    statusSummary.bonusAmount = centsToMoney(toMoneyCents(statusSummary.bonusAmount) + bonusCents);
+    statusSummary.deductionAmount = centsToMoney(
+      toMoneyCents(statusSummary.deductionAmount) + deductionCents
+    );
+    statusSummary.netAmount = centsToMoney(toMoneyCents(statusSummary.netAmount) + netCents);
+    byStatus.set(item.status, statusSummary);
+
+    const paymentSummary = byPaymentMethod.get(item.paymentMethod) ?? {
+      paymentMethod: item.paymentMethod,
+      count: 0,
+      netAmount: "0.00"
+    };
+    paymentSummary.count += 1;
+    paymentSummary.netAmount = centsToMoney(toMoneyCents(paymentSummary.netAmount) + netCents);
+    byPaymentMethod.set(item.paymentMethod, paymentSummary);
+
+    const employeeSummary = byEmployee.get(item.employeeUserId) ?? {
+      employeeUserId: item.employeeUserId,
+      employeeFullName: item.employeeFullName,
+      employeeEmail: item.employeeEmail,
+      employeeRole: item.employeeRole,
+      count: 0,
+      grossAmount: "0.00",
+      bonusAmount: "0.00",
+      deductionAmount: "0.00",
+      netAmount: "0.00"
+    };
+    employeeSummary.count += 1;
+    employeeSummary.grossAmount = centsToMoney(toMoneyCents(employeeSummary.grossAmount) + grossCents);
+    employeeSummary.bonusAmount = centsToMoney(toMoneyCents(employeeSummary.bonusAmount) + bonusCents);
+    employeeSummary.deductionAmount = centsToMoney(
+      toMoneyCents(employeeSummary.deductionAmount) + deductionCents
+    );
+    employeeSummary.netAmount = centsToMoney(toMoneyCents(employeeSummary.netAmount) + netCents);
+    byEmployee.set(item.employeeUserId, employeeSummary);
+  }
+
+  return {
+    payPeriod: input.payPeriod,
+    employeeUserId: input.employeeUserId ?? null,
+    totalCount: items.length,
+    totalGrossAmount: centsToMoney(totalGrossCents),
+    totalBonusAmount: centsToMoney(totalBonusCents),
+    totalDeductionAmount: centsToMoney(totalDeductionCents),
+    totalNetAmount: centsToMoney(totalNetCents),
+    approvedNetAmount: centsToMoney(approvedNetCents),
+    pendingCount,
+    items,
+    byStatus: Array.from(byStatus.values()),
+    byPaymentMethod: Array.from(byPaymentMethod.values()),
+    byEmployee: Array.from(byEmployee.values()).sort((left, right) =>
+      left.employeeFullName.localeCompare(right.employeeFullName, "fr")
+    )
+  };
+}
+
+export async function createCompanySalaryTransaction(
+  actor: ActorContext,
+  input: {
+    accountId: string;
+    employeeUserId: string;
+    payPeriod: string;
+    grossAmount: string;
+    bonusAmount?: string;
+    deductionAmount?: string;
+    currency?: string;
+    paymentMethod: SalaryPaymentMethod;
+    note?: string;
+    occurredAt: string;
+  }
+) {
+  ensureSalaryManagementAccess(actor.role);
+
+  const account = await findFinancialAccountById(actor.companyId, input.accountId);
+  if (!account) {
+    throw new HttpError(404, "Compte financier introuvable.");
+  }
+
+  const membership = await findMembershipByCompanyAndUser(actor.companyId, input.employeeUserId);
+  if (!membership) {
+    throw new HttpError(404, "Collaborateur introuvable pour cette entreprise.");
+  }
+  if (!membership.isActive) {
+    throw new HttpError(400, "Le collaborateur selectionne est inactif.");
+  }
+
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.payPeriod.trim())) {
+    throw new HttpError(400, "La periode de paie doit etre au format AAAA-MM.");
+  }
+
+  const existing = await findSalaryTransactionByEmployeeAndPeriod({
+    companyId: actor.companyId,
+    employeeUserId: input.employeeUserId,
+    payPeriod: input.payPeriod.trim()
+  });
+  if (existing) {
+    throw new HttpError(
+      409,
+      "Un salaire existe deja pour ce collaborateur sur cette periode."
+    );
+  }
+
+  const snapshot = buildSalarySnapshotFromInput({
+    membership,
+    payPeriod: input.payPeriod,
+    grossAmount: input.grossAmount,
+    bonusAmount: input.bonusAmount,
+    deductionAmount: input.deductionAmount,
+    paymentMethod: input.paymentMethod,
+    note: input.note
+  });
+
+  const transactionId = randomUUID();
+  await createFinancialTransaction({
+    id: transactionId,
+    companyId: actor.companyId,
+    accountId: input.accountId,
+    type: "CASH_OUT",
+    amount: snapshot.netAmount,
+    currency: input.currency?.trim().toUpperCase() || "XOF",
+    activityCode: null,
+    description: `Salaire ${snapshot.payPeriod} - ${snapshot.employeeFullName}`,
+    metadata: buildSalaryMetadata(snapshot),
+    requiresProof: false,
+    salaryConfirmationStatus: "NOT_REQUIRED",
+    createdById: actor.actorId,
+    occurredAt: new Date(input.occurredAt)
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_SALARY_CREATED",
+    entityType: "SALARY",
+    entityId: transactionId,
+    metadataJson: JSON.stringify({
+      ...buildFinanceGovernanceMetadata({
+        account,
+        activityCode: null,
+        transactionId
+      }),
+      salary: snapshot
+    })
+  });
+
+  const created = await findFinancialTransactionById(actor.companyId, transactionId);
+  if (!created) {
+    throw new HttpError(500, "Impossible de recharger le salaire cree.");
+  }
+
+  const salarySnapshot = extractSalarySnapshot(created.metadata);
+  if (!salarySnapshot) {
+    throw new HttpError(500, "Impossible de reconstruire les informations du salaire.");
+  }
+
+  return {
+    ...created,
+    ...salarySnapshot,
+    salaryConfirmation: buildSalaryConfirmationSnapshot(created)
+  };
+}
+
+export async function updateCompanySalaryTransaction(
+  actor: ActorContext,
+  input: {
+    transactionId: string;
+    accountId: string;
+    employeeUserId: string;
+    payPeriod: string;
+    grossAmount: string;
+    bonusAmount?: string;
+    deductionAmount?: string;
+    currency?: string;
+    paymentMethod: SalaryPaymentMethod;
+    note?: string;
+    occurredAt: string;
+  }
+) {
+  ensureSalaryManagementAccess(actor.role);
+
+  const existing = await findFinancialTransactionById(actor.companyId, input.transactionId);
+  if (!existing) {
+    throw new HttpError(404, "Salaire introuvable.");
+  }
+
+  const existingSnapshot = extractSalarySnapshot(existing.metadata);
+  if (!existingSnapshot) {
+    throw new HttpError(400, "Cette transaction n'est pas un salaire.");
+  }
+
+  if (existing.status === "APPROVED") {
+    throw new HttpError(403, "Un salaire approuve ne peut plus etre modifie.");
+  }
+
+  const account = await findFinancialAccountById(actor.companyId, input.accountId);
+  if (!account) {
+    throw new HttpError(404, "Compte financier introuvable.");
+  }
+
+  const membership = await findMembershipByCompanyAndUser(actor.companyId, input.employeeUserId);
+  if (!membership) {
+    throw new HttpError(404, "Collaborateur introuvable pour cette entreprise.");
+  }
+  if (!membership.isActive) {
+    throw new HttpError(400, "Le collaborateur selectionne est inactif.");
+  }
+
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.payPeriod.trim())) {
+    throw new HttpError(400, "La periode de paie doit etre au format AAAA-MM.");
+  }
+
+  const duplicate = await findSalaryTransactionByEmployeeAndPeriod({
+    companyId: actor.companyId,
+    employeeUserId: input.employeeUserId,
+    payPeriod: input.payPeriod.trim()
+  });
+  if (duplicate && duplicate.id !== existing.id) {
+    throw new HttpError(
+      409,
+      "Un salaire existe deja pour ce collaborateur sur cette periode."
+    );
+  }
+
+  const snapshot = buildSalarySnapshotFromInput({
+    membership,
+    payPeriod: input.payPeriod,
+    grossAmount: input.grossAmount,
+    bonusAmount: input.bonusAmount,
+    deductionAmount: input.deductionAmount,
+    paymentMethod: input.paymentMethod,
+    note: input.note
+  });
+
+  await updateFinancialTransaction({
+    companyId: actor.companyId,
+    transactionId: existing.id,
+    accountId: input.accountId,
+    type: "CASH_OUT",
+    amount: snapshot.netAmount,
+    currency: input.currency?.trim().toUpperCase() || "XOF",
+    activityCode: null,
+    description: `Salaire ${snapshot.payPeriod} - ${snapshot.employeeFullName}`,
+    metadata: buildSalaryMetadata(snapshot),
+    requiresProof: false,
+    salaryConfirmationStatus: "NOT_REQUIRED",
+    occurredAt: new Date(input.occurredAt)
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_SALARY_UPDATED",
+    entityType: "SALARY",
+    entityId: existing.id,
+    metadataJson: JSON.stringify({
+      ...buildFinanceGovernanceMetadata({
+        account,
+        activityCode: null,
+        transactionId: existing.id
+      }),
+      previousStatus: existing.status,
+      previousSalary: existingSnapshot,
+      salary: snapshot,
+      salaryConfirmation: {
+        status: "NOT_REQUIRED",
+        confirmedById: null,
+        confirmedByEmail: null,
+        confirmedAt: null
+      }
+    })
+  });
+
+  const updated = await findFinancialTransactionById(actor.companyId, existing.id);
+  if (!updated) {
+    throw new HttpError(500, "Impossible de recharger le salaire modifie.");
+  }
+
+  const updatedSnapshot = extractSalarySnapshot(updated.metadata);
+  if (!updatedSnapshot) {
+    throw new HttpError(500, "Impossible de reconstruire les informations du salaire modifie.");
+  }
+
+  if (actor.role === "SYS_ADMIN") {
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER"],
+      excludeUserIds: [actor.actorId],
+      code: "FINANCE_SALARY_UPDATED",
+      message: `Le salaire ${toSalaryActionLabel(updatedSnapshot)} a ete modifie par l'admin systeme.`,
+      severity: "WARNING",
+      entityType: "SALARY",
+      entityId: updated.id,
+      metadata: {
+        transactionId: updated.id,
+        salary: updatedSnapshot,
+        salaryConfirmation: {
+          status: "NOT_REQUIRED",
+          confirmedById: null,
+          confirmedByEmail: null,
+          confirmedAt: null
+        },
+        actorRole: actor.role
+      }
+    });
+  }
+
+  return {
+    ...updated,
+    ...updatedSnapshot,
+    salaryConfirmation: buildSalaryConfirmationSnapshot(updated)
+  };
+}
+
+export async function exportCompanySalaryCsv(input: {
+  companyId: string;
+  role: RoleCode;
+  payPeriod: string;
+  employeeUserId?: string;
+}): Promise<string> {
+  const summary = await getCompanySalarySummary(input);
+
+  return buildCsv(
+    [
+      "salary_id",
+      "pay_period",
+      "employee_full_name",
+      "employee_email",
+      "employee_role",
+      "account_name",
+      "gross_amount",
+      "bonus_amount",
+      "deduction_amount",
+      "net_amount",
+      "currency",
+      "payment_method",
+      "status",
+      "created_by_email",
+      "validated_by_email",
+      "occurred_at",
+      "created_at",
+      "updated_at",
+      "note"
+    ],
+    summary.items.map((item) => [
+      item.id,
+      item.payPeriod,
+      item.employeeFullName,
+      item.employeeEmail,
+      item.employeeRole,
+      item.accountName,
+      item.grossAmount,
+      item.bonusAmount,
+      item.deductionAmount,
+      item.netAmount,
+      item.currency,
+      item.paymentMethod,
+      item.status,
+      item.createdByEmail,
+      item.validatedByEmail,
+      item.occurredAt,
+      item.createdAt,
+      item.updatedAt,
+      item.note
+    ])
+  );
+}
+
+export async function exportCompanySalaryExcel(input: {
+  companyId: string;
+  role: RoleCode;
+  payPeriod: string;
+  employeeUserId?: string;
+}): Promise<Buffer> {
+  const summary = await getCompanySalarySummary(input);
+
+  return buildWorkbookBuffer([
+    {
+      name: "Resume",
+      rows: [
+        {
+          payPeriod: summary.payPeriod,
+          totalCount: summary.totalCount,
+          totalGrossAmount: summary.totalGrossAmount,
+          totalBonusAmount: summary.totalBonusAmount,
+          totalDeductionAmount: summary.totalDeductionAmount,
+          totalNetAmount: summary.totalNetAmount,
+          approvedNetAmount: summary.approvedNetAmount,
+          pendingCount: summary.pendingCount
+        }
+      ]
+    },
+    {
+      name: "Par statut",
+      rows: summary.byStatus.map((item) => ({
+        status: item.status,
+        count: item.count,
+        grossAmount: item.grossAmount,
+        bonusAmount: item.bonusAmount,
+        deductionAmount: item.deductionAmount,
+        netAmount: item.netAmount
+      }))
+    },
+    {
+      name: "Par collaborateur",
+      rows: summary.byEmployee.map((item) => ({
+        employeeFullName: item.employeeFullName,
+        employeeEmail: item.employeeEmail,
+        employeeRole: item.employeeRole,
+        count: item.count,
+        grossAmount: item.grossAmount,
+        bonusAmount: item.bonusAmount,
+        deductionAmount: item.deductionAmount,
+        netAmount: item.netAmount
+      }))
+    },
+    {
+      name: "Salaires",
+      rows: summary.items.map((item) => ({
+        salaryId: item.id,
+        payPeriod: item.payPeriod,
+        employeeFullName: item.employeeFullName,
+        employeeEmail: item.employeeEmail,
+        employeeRole: item.employeeRole,
+        accountName: item.accountName,
+        grossAmount: item.grossAmount,
+        bonusAmount: item.bonusAmount,
+        deductionAmount: item.deductionAmount,
+        netAmount: item.netAmount,
+        currency: item.currency,
+        paymentMethod: item.paymentMethod,
+        status: item.status,
+        createdByEmail: item.createdByEmail,
+        validatedByEmail: item.validatedByEmail ?? "",
+        occurredAt: item.occurredAt,
+        note: item.note ?? ""
+      }))
+    }
+  ]);
+}
+
 export async function listCompanyTransactions(input: {
   companyId: string;
   limit?: number;
@@ -367,6 +1439,232 @@ export async function listCompanyTransactions(input: {
     type: input.type,
     activityCode: input.activityCode
   });
+}
+
+export async function deleteCompanyAccount(
+  actor: ActorContext,
+  input: {
+    accountId: string;
+  }
+) {
+  const existing = await findFinancialAccountById(actor.companyId, input.accountId);
+  if (!existing) {
+    throw new HttpError(404, "Compte financier introuvable.");
+  }
+
+  assertAccountManagementGovernance(actor.role, existing.scopeType);
+
+  if (existing.transactionsCount > 0) {
+    throw new HttpError(
+      400,
+      "Ce compte financier est deja utilise par des transactions et ne peut pas etre supprime."
+    );
+  }
+
+  await deleteFinancialAccount({
+    companyId: actor.companyId,
+    accountId: existing.id
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_ACCOUNT_DELETED",
+    entityType: "FINANCIAL_ACCOUNT",
+    entityId: existing.id,
+    metadataJson: JSON.stringify({
+      name: existing.name,
+      accountRef: existing.accountRef,
+      openingBalance: existing.balance,
+      scopeType: existing.scopeType,
+      scopeLabel: toAccountScopeLabel(existing),
+      primaryActivityCode: existing.primaryActivityCode,
+      primaryActivityLabel: toActivityLabel(existing.primaryActivityCode),
+      allowedActivityCodes: existing.allowedActivityCodes,
+      allowedActivityLabels: existing.allowedActivityCodes.map(
+        (activityCode) => toActivityLabel(activityCode) ?? activityCode
+      )
+    })
+  });
+
+  if (actor.role === "SYS_ADMIN") {
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER"],
+      excludeUserIds: [actor.actorId],
+      code: "FINANCE_ACCOUNT_DELETED",
+      message: `Le compte financier ${existing.name} a ete supprime par l'admin systeme.`,
+      severity: "WARNING",
+      entityType: "FINANCIAL_ACCOUNT",
+      entityId: existing.id,
+      metadata: {
+        accountId: existing.id,
+        accountName: existing.name,
+        actorRole: actor.role,
+        scopeType: existing.scopeType,
+        scopeLabel: toAccountScopeLabel(existing)
+      }
+    });
+  }
+}
+
+export async function deleteCompanyTransaction(
+  actor: ActorContext,
+  input: {
+    transactionId: string;
+  }
+) {
+  const existing = await findFinancialTransactionById(actor.companyId, input.transactionId);
+  if (!existing) {
+    throw new HttpError(404, "Transaction introuvable.");
+  }
+
+  if (extractSalarySnapshot(existing.metadata)) {
+    throw new HttpError(400, "Les salaires doivent etre geres depuis la page salaires.");
+  }
+
+  if (existing.status === "APPROVED") {
+    if (!canDeleteApprovedTransaction(actor.role)) {
+      throw new HttpError(
+        403,
+        "Seul l'admin systeme peut supprimer une transaction deja approuvee."
+      );
+    }
+  } else {
+    ensureTransactionManagementAccess(actor.role);
+  }
+
+  const account = await findFinancialAccountById(actor.companyId, existing.accountId);
+  await deleteFinancialTransaction({
+    companyId: actor.companyId,
+    transactionId: existing.id
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_TRANSACTION_DELETED",
+    entityType: "TRANSACTION",
+    entityId: existing.id,
+    metadataJson: JSON.stringify({
+      ...(account
+        ? buildFinanceGovernanceMetadata({
+            account,
+            activityCode: existing.activityCode,
+            transactionId: existing.id
+          })
+        : { transactionId: existing.id }),
+      deletedStatus: existing.status,
+      accountId: existing.accountId,
+      accountName: existing.accountName,
+      type: existing.type,
+      amount: existing.amount,
+      currency: existing.currency,
+      activityCode: existing.activityCode,
+      description: existing.description,
+      metadata: existing.metadata,
+      requiresProof: existing.requiresProof,
+      proofsCount: existing.proofsCount
+    })
+  });
+
+  if (actor.role === "SYS_ADMIN") {
+    const activityLabel = existing.activityCode ? toActivityLabel(existing.activityCode) : null;
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER"],
+      excludeUserIds: [actor.actorId],
+      code: "FINANCE_TRANSACTION_DELETED",
+      message: `La transaction ${activityLabel ?? "finance"} ${existing.amount} ${existing.currency} a ete supprimee par l'admin systeme.`,
+      severity: "WARNING",
+      entityType: "TRANSACTION",
+      entityId: existing.id,
+      metadata: {
+        transactionId: existing.id,
+        accountId: existing.accountId,
+        accountName: existing.accountName,
+        actorRole: actor.role,
+        activityCode: existing.activityCode,
+        activityLabel,
+        status: existing.status
+      }
+    });
+  }
+}
+
+export async function deleteCompanySalaryTransaction(
+  actor: ActorContext,
+  input: {
+    transactionId: string;
+  }
+) {
+  const existing = await findFinancialTransactionById(actor.companyId, input.transactionId);
+  if (!existing) {
+    throw new HttpError(404, "Salaire introuvable.");
+  }
+
+  const salarySnapshot = extractSalarySnapshot(existing.metadata);
+  if (!salarySnapshot) {
+    throw new HttpError(400, "Cette transaction n'est pas un salaire.");
+  }
+
+  if (existing.status === "APPROVED") {
+    if (!canDeleteApprovedTransaction(actor.role)) {
+      throw new HttpError(
+        403,
+        "Seul l'admin systeme peut supprimer un salaire deja approuve."
+      );
+    }
+  } else {
+    ensureSalaryManagementAccess(actor.role);
+  }
+
+  await deleteFinancialTransaction({
+    companyId: actor.companyId,
+    transactionId: existing.id
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_SALARY_DELETED",
+    entityType: "SALARY",
+    entityId: existing.id,
+    metadataJson: JSON.stringify({
+      salary: salarySnapshot,
+      salaryStatus: existing.status,
+      salaryConfirmation: buildSalaryConfirmationSnapshot(existing),
+      transactionId: existing.id,
+      accountId: existing.accountId,
+      accountName: existing.accountName,
+      amount: existing.amount,
+      currency: existing.currency,
+      proofsCount: existing.proofsCount
+    })
+  });
+
+  if (actor.role === "SYS_ADMIN") {
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER"],
+      excludeUserIds: [actor.actorId],
+      code: "FINANCE_SALARY_DELETED",
+      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete supprime par l'admin systeme.`,
+      severity: "WARNING",
+      entityType: "SALARY",
+      entityId: existing.id,
+      metadata: {
+        transactionId: existing.id,
+        salary: salarySnapshot,
+        salaryStatus: existing.status,
+        salaryConfirmation: buildSalaryConfirmationSnapshot(existing),
+        actorRole: actor.role
+      }
+    });
+  }
 }
 
 export async function addProofToTransaction(
@@ -470,6 +1768,7 @@ export async function submitCompanyTransaction(
     transaction.createdById === actor.actorId ||
     actor.role === "OWNER" ||
     actor.role === "SYS_ADMIN" ||
+    actor.role === "ACCOUNTANT" ||
     actor.role === "SUPERVISOR";
 
   if (!canSubmit) {
@@ -480,10 +1779,6 @@ export async function submitCompanyTransaction(
     throw new HttpError(400, "Seules les transactions en brouillon peuvent etre soumises.");
   }
 
-  if (!transaction.activityCode) {
-    throw new HttpError(400, "La transaction doit etre rattachee a un secteur.");
-  }
-
   const fullTransaction = await findFinancialTransactionById(actor.companyId, transaction.id);
   if (!fullTransaction) {
     throw new HttpError(500, "Impossible de recharger la transaction avant soumission.");
@@ -492,19 +1787,32 @@ export async function submitCompanyTransaction(
   if (!account) {
     throw new HttpError(500, "Impossible de recharger le compte financier avant soumission.");
   }
+  const salarySnapshot = extractSalarySnapshot(fullTransaction.metadata);
+  const profile =
+    !salarySnapshot && transaction.activityCode
+      ? getBusinessActivityProfile(transaction.activityCode)
+      : null;
 
-  try {
-    assertTransactionInputMatchesActivityProfile(transaction.activityCode, {
-      type: fullTransaction.type,
-      currency: fullTransaction.currency,
-      description: fullTransaction.description ?? undefined,
-      metadata: fullTransaction.metadata
-    });
-  } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+  if (salarySnapshot && !canManageSalary(actor.role)) {
+    throw new HttpError(403, "Permissions insuffisantes pour soumettre ce salaire.");
   }
 
-  const profile = getBusinessActivityProfile(transaction.activityCode);
+  if (!salarySnapshot) {
+    if (!transaction.activityCode) {
+      throw new HttpError(400, "La transaction doit etre rattachee a un secteur.");
+    }
+
+    try {
+      assertTransactionInputMatchesActivityProfile(transaction.activityCode, {
+        type: fullTransaction.type,
+        currency: fullTransaction.currency,
+        description: fullTransaction.description ?? undefined,
+        metadata: fullTransaction.metadata
+      });
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+    }
+  }
 
   if (transaction.requiresProof) {
     const proofsCount = await countTransactionProofs(transaction.id);
@@ -515,25 +1823,144 @@ export async function submitCompanyTransaction(
 
   await submitTransaction({
     companyId: actor.companyId,
-    transactionId: transaction.id
+    transactionId: transaction.id,
+    salaryConfirmationStatus: salarySnapshot ? "PENDING" : "NOT_REQUIRED"
   });
+
+  const actionCode = salarySnapshot ? "FINANCE_SALARY_SUBMITTED" : "FINANCE_TRANSACTION_SUBMITTED";
+  const entityType = salarySnapshot ? "SALARY" : "TRANSACTION";
+  const traceMetadata = {
+    ...buildFinanceGovernanceMetadata({
+      account,
+      activityCode: transaction.activityCode,
+      transactionId: transaction.id
+    }),
+    activityCode: transaction.activityCode,
+    activityLabel: profile?.label ?? null,
+    financeWorkflow: profile?.finance.workflow.map((step) => step.code) ?? [],
+    ...(salarySnapshot ? { salary: salarySnapshot } : {}),
+    ...(salarySnapshot
+      ? {
+          salaryConfirmation: {
+            status: "PENDING",
+            confirmedById: null,
+            confirmedByEmail: null,
+            confirmedAt: null
+          }
+        }
+      : {})
+  };
 
   await createAuditLogRecord({
     auditId: randomUUID(),
     companyId: actor.companyId,
     actorId: actor.actorId,
-    action: "FINANCE_TRANSACTION_SUBMITTED",
-    entityType: "TRANSACTION",
+    action: actionCode,
+    entityType,
+    entityId: transaction.id,
+    metadataJson: JSON.stringify(traceMetadata)
+  });
+
+  if (salarySnapshot) {
+    await createUserTargetedAlerts({
+      companyId: actor.companyId,
+      recipientUserIds: [salarySnapshot.employeeUserId],
+      code: actionCode,
+      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} est pret. Verifiez-le puis confirmez la reception du paiement.`,
+      severity: "WARNING",
+      entityType,
+      entityId: transaction.id,
+      metadata: {
+        ...traceMetadata,
+        transactionId: transaction.id,
+        createdById: transaction.createdById
+      }
+    });
+    return;
+  }
+
+  await createRoleTargetedAlerts({
+    companyId: actor.companyId,
+    recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
+    excludeUserIds: [actor.actorId],
+    code: actionCode,
+    message: `Une transaction ${profile?.label ?? "finance"} a ete soumise et attend une validation comptable.`,
+    severity: "WARNING",
+    entityType,
+    entityId: transaction.id,
+    metadata: {
+      ...traceMetadata,
+      transactionId: transaction.id,
+      createdById: transaction.createdById
+    }
+  });
+}
+
+export async function confirmCompanySalaryReceipt(
+  actor: ActorContext,
+  input: {
+    transactionId: string;
+  }
+) {
+  const transaction = await findFinancialTransactionById(actor.companyId, input.transactionId);
+  if (!transaction) {
+    throw new HttpError(404, "Salaire introuvable.");
+  }
+
+  const salarySnapshot = extractSalarySnapshot(transaction.metadata);
+  if (!salarySnapshot) {
+    throw new HttpError(400, "Cette transaction n'est pas un salaire.");
+  }
+
+  if (salarySnapshot.employeeUserId !== actor.actorId) {
+    throw new HttpError(403, "Seul le collaborateur concerne peut confirmer ce salaire.");
+  }
+
+  if (transaction.status !== "SUBMITTED") {
+    throw new HttpError(400, "Le salaire doit etre soumis avant confirmation de reception.");
+  }
+
+  if (transaction.salaryConfirmationStatus === "CONFIRMED") {
+    throw new HttpError(400, "Le salaire a deja ete confirme.");
+  }
+
+  if (transaction.salaryConfirmationStatus !== "PENDING") {
+    throw new HttpError(400, "Le salaire n'est pas encore en attente de confirmation employe.");
+  }
+
+  const account = await findFinancialAccountById(actor.companyId, transaction.accountId);
+  if (!account) {
+    throw new HttpError(500, "Impossible de recharger le compte financier avant confirmation.");
+  }
+
+  await confirmSalaryReceipt({
+    companyId: actor.companyId,
+    transactionId: transaction.id,
+    confirmerId: actor.actorId
+  });
+
+  const confirmationMetadata = {
+    status: "CONFIRMED",
+    confirmedById: actor.actorId,
+    confirmedByEmail: salarySnapshot.employeeEmail,
+    confirmedAt: new Date().toISOString()
+  };
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "FINANCE_SALARY_RECEIPT_CONFIRMED",
+    entityType: "SALARY",
     entityId: transaction.id,
     metadataJson: JSON.stringify({
       ...buildFinanceGovernanceMetadata({
         account,
-        activityCode: transaction.activityCode,
+        activityCode: null,
         transactionId: transaction.id
       }),
-      activityCode: transaction.activityCode,
-      activityLabel: profile.label,
-      financeWorkflow: profile.finance.workflow.map((step) => step.code)
+      salary: salarySnapshot,
+      salaryConfirmation: confirmationMetadata
     })
   });
 
@@ -541,19 +1968,20 @@ export async function submitCompanyTransaction(
     companyId: actor.companyId,
     recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
     excludeUserIds: [actor.actorId],
-    code: "FINANCE_TRANSACTION_SUBMITTED",
-    message: `Une transaction ${profile.label} a ete soumise et attend une validation comptable.`,
+    code: "FINANCE_SALARY_RECEIPT_CONFIRMED",
+    message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete confirme par ${salarySnapshot.employeeFullName} et peut maintenant etre approuve.`,
     severity: "WARNING",
-    entityType: "TRANSACTION",
+    entityType: "SALARY",
     entityId: transaction.id,
     metadata: {
       ...buildFinanceGovernanceMetadata({
         account,
-        activityCode: transaction.activityCode,
+        activityCode: null,
         transactionId: transaction.id
       }),
       transactionId: transaction.id,
-      createdById: transaction.createdById
+      salary: salarySnapshot,
+      salaryConfirmation: confirmationMetadata
     }
   });
 }
@@ -589,6 +2017,26 @@ export async function reviewCompanyTransaction(
   if (!account) {
     throw new HttpError(500, "Impossible de recharger le compte financier avant validation.");
   }
+  const salarySnapshot = extractSalarySnapshot(fullTransaction.metadata);
+  const actionCode = salarySnapshot
+    ? input.decision === "APPROVED"
+      ? "FINANCE_SALARY_APPROVED"
+      : "FINANCE_SALARY_REJECTED"
+    : input.decision === "APPROVED"
+      ? "FINANCE_TRANSACTION_APPROVED"
+      : "FINANCE_TRANSACTION_REJECTED";
+  const entityType = salarySnapshot ? "SALARY" : "TRANSACTION";
+
+  if (salarySnapshot && input.decision === "APPROVED" && fullTransaction.salaryConfirmationStatus !== "CONFIRMED") {
+    throw new HttpError(
+      400,
+      "Le salaire doit d'abord etre confirme par le collaborateur avant approbation."
+    );
+  }
+
+  const confirmationMetadata = salarySnapshot
+    ? buildSalaryConfirmationSnapshot(fullTransaction)
+    : null;
 
   await reviewTransaction({
     companyId: actor.companyId,
@@ -601,8 +2049,8 @@ export async function reviewCompanyTransaction(
     auditId: randomUUID(),
     companyId: actor.companyId,
     actorId: actor.actorId,
-    action: input.decision === "APPROVED" ? "FINANCE_TRANSACTION_APPROVED" : "FINANCE_TRANSACTION_REJECTED",
-    entityType: "TRANSACTION",
+    action: actionCode,
+    entityType,
     entityId: transaction.id,
     metadataJson: JSON.stringify({
       ...buildFinanceGovernanceMetadata({
@@ -612,22 +2060,34 @@ export async function reviewCompanyTransaction(
       }),
       activityCode: transaction.activityCode,
       activityLabel: profile?.label ?? null,
-      financeWorkflow: profile?.finance.workflow.map((step) => step.code) ?? []
+      financeWorkflow: profile?.finance.workflow.map((step) => step.code) ?? [],
+      ...(salarySnapshot ? { salary: salarySnapshot, salaryConfirmation: confirmationMetadata } : {})
     })
   });
 
-  if (transaction.createdById !== actor.actorId) {
+  const recipientUserIds = salarySnapshot
+    ? Array.from(new Set([transaction.createdById, salarySnapshot.employeeUserId])).filter(
+        (userId) => userId !== actor.actorId
+      )
+    : transaction.createdById !== actor.actorId
+      ? [transaction.createdById]
+      : [];
+
+  if (recipientUserIds.length > 0) {
     await createUserTargetedAlerts({
       companyId: actor.companyId,
-      recipientUserIds: [transaction.createdById],
-      code:
-        input.decision === "APPROVED" ? "FINANCE_TRANSACTION_APPROVED" : "FINANCE_TRANSACTION_REJECTED",
+      recipientUserIds,
+      code: actionCode,
       message:
-        input.decision === "APPROVED"
-          ? `Votre transaction${profile ? ` ${profile.label}` : ""} a ete approuvee.`
-          : `Votre transaction${profile ? ` ${profile.label}` : ""} a ete rejetee.`,
+        salarySnapshot
+          ? input.decision === "APPROVED"
+            ? `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete approuve.`
+            : `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete rejete.`
+          : input.decision === "APPROVED"
+            ? `Votre transaction${profile ? ` ${profile.label}` : ""} a ete approuvee.`
+            : `Votre transaction${profile ? ` ${profile.label}` : ""} a ete rejetee.`,
       severity: input.decision === "APPROVED" ? "INFO" : "WARNING",
-      entityType: "TRANSACTION",
+      entityType,
       entityId: transaction.id,
       metadata: {
         ...buildFinanceGovernanceMetadata({
@@ -636,7 +2096,8 @@ export async function reviewCompanyTransaction(
           transactionId: transaction.id
         }),
         transactionId: transaction.id,
-        decision: input.decision
+        decision: input.decision,
+        ...(salarySnapshot ? { salary: salarySnapshot, salaryConfirmation: confirmationMetadata } : {})
       }
     });
   }

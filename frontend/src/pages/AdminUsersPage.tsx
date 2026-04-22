@@ -314,7 +314,7 @@ export function AdminUsersPage(): JSX.Element {
             ))}
           </select>
           <button type="submit" disabled={isSubmittingCreate}>
-            {isSubmittingCreate ? "Creation..." : "Ajouter"}
+            {isSubmittingCreate ? "Enregistrement..." : "Ajouter l'utilisateur"}
           </button>
         </form>
       </section>
@@ -425,7 +425,7 @@ export function AdminUsersPage(): JSX.Element {
                             onClick={() => void handleSaveProfile(item.userId)}
                             disabled={isBusy}
                           >
-                            Profil
+                            Enregistrer
                           </button>
                           <button
                             type="button"
@@ -433,7 +433,7 @@ export function AdminUsersPage(): JSX.Element {
                             onClick={() => void handleChangeRole(item.userId)}
                             disabled={isBusy}
                           >
-                            Changer role
+                            Mettre a jour le role
                           </button>
                           <button
                             type="button"
@@ -471,7 +471,7 @@ export function AdminUsersPage(): JSX.Element {
                             onClick={() => void handleResetPassword(item.userId)}
                             disabled={isBusy}
                           >
-                            Reinitialiser MDP
+                            Reinitialiser le mot de passe
                           </button>
                         </div>
                       </td>

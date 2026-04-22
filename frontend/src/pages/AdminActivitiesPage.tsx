@@ -122,8 +122,8 @@ export function AdminActivitiesPage(): JSX.Element {
       <section className="panel">
         <h3>Configuration des secteurs</h3>
         <p className="hint">
-          Un secteur desactive n'est plus disponible pour les nouvelles transactions et nouvelles
-          taches. L'historique existant reste visible.
+          Un secteur desactive n'est plus propose pour les nouvelles transactions et taches.
+          L'historique reste accessible.
         </p>
         {isLoading ? <p>Chargement...</p> : null}
         {!isLoading ? (
@@ -146,8 +146,8 @@ export function AdminActivitiesPage(): JSX.Element {
                   {busyActivityCode === item.code
                     ? "Mise a jour..."
                     : item.isEnabled
-                      ? "Desactiver secteur"
-                      : "Activer secteur"}
+                      ? "Desactiver"
+                      : "Activer"}
                 </button>
               </article>
             ))}

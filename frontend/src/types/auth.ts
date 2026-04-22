@@ -1,9 +1,9 @@
+import type { CompanyMembershipSummary, CompanyProfile } from "./companies";
 import type { RoleCode } from "./role";
 
 export type LoginInput = {
   email: string;
   password: string;
-  companyCode: string;
 };
 
 export type LoginUser = {
@@ -11,8 +11,9 @@ export type LoginUser = {
   email: string;
   fullName: string;
   role: RoleCode;
-  companyId: string;
-  companyCode: string;
+  companyId: string | null;
+  companyCode: string | null;
+  bootstrapMode: boolean;
 };
 
 export type LoginResponse = {
@@ -33,11 +34,14 @@ export type MeResponse = {
     fullName: string;
     role: RoleCode;
   };
-  companyId: string;
+  company: CompanyProfile | null;
+  memberships: CompanyMembershipSummary[];
+  bootstrapMode: boolean;
 };
 
 export type SessionTokens = {
   accessToken: string;
   refreshToken: string;
   companyCode?: string;
+  companyId?: string;
 };

@@ -4,8 +4,11 @@ import {
   isBusinessActivityCode,
   type BusinessActivityCode
 } from "../types/business-activity.js";
+import type { RoleCode } from "../types/role.js";
 
 export type FinancialAccountScopeType = "GLOBAL" | "DEDICATED" | "RESTRICTED";
+export type SalaryPaymentMethod = "BANK_TRANSFER" | "CASH" | "MOBILE_MONEY" | "CHEQUE";
+export type SalaryConfirmationStatus = "NOT_REQUIRED" | "PENDING" | "CONFIRMED";
 
 type AccountRow = RowDataPacket & {
   id: string;
@@ -16,6 +19,7 @@ type AccountRow = RowDataPacket & {
   scopeType: FinancialAccountScopeType;
   primaryActivityCode: BusinessActivityCode | null;
   allowedActivitiesCsv: string | null;
+  transactionsCount: number;
   createdAt: Date;
 };
 
@@ -40,6 +44,10 @@ type TransactionRow = RowDataPacket & {
   createdByEmail: string;
   validatedById: string | null;
   validatedByEmail: string | null;
+  salaryConfirmationStatus: SalaryConfirmationStatus;
+  salaryConfirmedById: string | null;
+  salaryConfirmedByEmail: string | null;
+  salaryConfirmedAt: Date | null;
   occurredAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -63,6 +71,7 @@ type TransactionMinimalRow = RowDataPacket & {
   activityCode: BusinessActivityCode | null;
   status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
   requiresProof: number;
+  salaryConfirmationStatus: SalaryConfirmationStatus;
 };
 
 export type FinancialAccount = {
@@ -74,6 +83,7 @@ export type FinancialAccount = {
   scopeType: FinancialAccountScopeType;
   primaryActivityCode: BusinessActivityCode | null;
   allowedActivityCodes: BusinessActivityCode[];
+  transactionsCount: number;
   createdAt: string;
 };
 
@@ -98,6 +108,10 @@ export type FinancialTransaction = {
   createdByEmail: string;
   validatedById: string | null;
   validatedByEmail: string | null;
+  salaryConfirmationStatus: SalaryConfirmationStatus;
+  salaryConfirmedById: string | null;
+  salaryConfirmedByEmail: string | null;
+  salaryConfirmedAt: string | null;
   occurredAt: string;
   createdAt: string;
   updatedAt: string;
@@ -121,6 +135,21 @@ export type TransactionMinimal = {
   activityCode: BusinessActivityCode | null;
   status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
   requiresProof: boolean;
+  salaryConfirmationStatus: SalaryConfirmationStatus;
+};
+
+export type SalaryTransaction = FinancialTransaction & {
+  employeeUserId: string;
+  employeeFullName: string;
+  employeeEmail: string;
+  employeeRole: RoleCode;
+  payPeriod: string;
+  grossAmount: string;
+  bonusAmount: string;
+  deductionAmount: string;
+  netAmount: string;
+  paymentMethod: SalaryPaymentMethod;
+  note: string | null;
 };
 
 function toAllowedActivityCodes(
@@ -160,6 +189,7 @@ function toAccount(row: AccountRow): FinancialAccount {
       row.primaryActivityCode,
       row.allowedActivitiesCsv
     ),
+    transactionsCount: row.transactionsCount ?? 0,
     createdAt: new Date(row.createdAt).toISOString()
   };
 }
@@ -212,6 +242,10 @@ function toTransaction(row: TransactionRow): FinancialTransaction {
     createdByEmail: row.createdByEmail,
     validatedById: row.validatedById,
     validatedByEmail: row.validatedByEmail,
+    salaryConfirmationStatus: row.salaryConfirmationStatus,
+    salaryConfirmedById: row.salaryConfirmedById,
+    salaryConfirmedByEmail: row.salaryConfirmedByEmail,
+    salaryConfirmedAt: row.salaryConfirmedAt ? new Date(row.salaryConfirmedAt).toISOString() : null,
     occurredAt: new Date(row.occurredAt).toISOString(),
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
@@ -238,7 +272,8 @@ function toTransactionMinimal(row: TransactionMinimalRow): TransactionMinimal {
     createdById: row.createdById,
     activityCode: row.activityCode,
     status: row.status,
-    requiresProof: row.requiresProof === 1
+    requiresProof: row.requiresProof === 1,
+    salaryConfirmationStatus: row.salaryConfirmationStatus
   };
 }
 
@@ -272,6 +307,11 @@ export async function listFinancialAccounts(input: {
         fa.scope_type AS scopeType,
         fa.primary_activity_code AS primaryActivityCode,
         GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS allowedActivitiesCsv,
+        (
+          SELECT COUNT(*)
+          FROM transactions t
+          WHERE t.account_id = fa.id
+        ) AS transactionsCount,
         fa.created_at AS createdAt
       FROM financial_accounts fa
       LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
@@ -284,6 +324,7 @@ export async function listFinancialAccounts(input: {
         fa.balance,
         fa.scope_type,
         fa.primary_activity_code,
+        transactionsCount,
         fa.created_at
       ORDER BY fa.name ASC
     `,
@@ -338,6 +379,89 @@ export async function createFinancialAccount(input: {
   }
 }
 
+export async function updateFinancialAccount(input: {
+  companyId: string;
+  accountId: string;
+  name: string;
+  accountRef: string | null;
+  balance: string;
+  scopeType: FinancialAccountScopeType;
+  primaryActivityCode: BusinessActivityCode | null;
+  allowedActivityCodes: BusinessActivityCode[];
+}): Promise<void> {
+  const connection = await getDbPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute<ResultSetHeader>(
+      `
+        UPDATE financial_accounts
+        SET
+          name = ?,
+          account_ref = ?,
+          balance = ?,
+          scope_type = ?,
+          primary_activity_code = ?
+        WHERE company_id = ?
+          AND id = ?
+      `,
+      [
+        input.name,
+        input.accountRef,
+        input.balance,
+        input.scopeType,
+        input.primaryActivityCode,
+        input.companyId,
+        input.accountId
+      ]
+    );
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM financial_account_activities
+        WHERE account_id = ?
+      `,
+      [input.accountId]
+    );
+
+    if (input.allowedActivityCodes.length > 0) {
+      const valuesSql = input.allowedActivityCodes.map(() => "(?, ?)").join(", ");
+      const values: Array<string> = [];
+
+      for (const activityCode of input.allowedActivityCodes) {
+        values.push(input.accountId, activityCode);
+      }
+
+      await connection.execute<ResultSetHeader>(
+        `
+          INSERT INTO financial_account_activities (account_id, activity_code)
+          VALUES ${valuesSql}
+        `,
+        values
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+export async function deleteFinancialAccount(input: {
+  companyId: string;
+  accountId: string;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      DELETE FROM financial_accounts
+      WHERE company_id = ?
+        AND id = ?
+    `,
+    [input.companyId, input.accountId]
+  );
+}
+
 export async function findFinancialAccountById(
   companyId: string,
   accountId: string
@@ -353,6 +477,11 @@ export async function findFinancialAccountById(
         fa.scope_type AS scopeType,
         fa.primary_activity_code AS primaryActivityCode,
         GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS allowedActivitiesCsv,
+        (
+          SELECT COUNT(*)
+          FROM transactions t
+          WHERE t.account_id = fa.id
+        ) AS transactionsCount,
         fa.created_at AS createdAt
       FROM financial_accounts fa
       LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
@@ -366,6 +495,7 @@ export async function findFinancialAccountById(
         fa.balance,
         fa.scope_type,
         fa.primary_activity_code,
+        transactionsCount,
         fa.created_at
       LIMIT 1
     `,
@@ -384,10 +514,11 @@ export async function createFinancialTransaction(input: {
   type: "CASH_IN" | "CASH_OUT";
   amount: string;
   currency: string;
-  activityCode: BusinessActivityCode;
+  activityCode: BusinessActivityCode | null;
   description: string | null;
   metadata: Record<string, string>;
   requiresProof: boolean;
+  salaryConfirmationStatus?: SalaryConfirmationStatus;
   createdById: string;
   occurredAt: Date;
 }): Promise<void> {
@@ -395,9 +526,9 @@ export async function createFinancialTransaction(input: {
     `
       INSERT INTO transactions (
         id, company_id, account_id, type, amount, currency, activity_code, description, metadata_json,
-        status, requires_proof, created_by_id, occurred_at
+        status, requires_proof, salary_confirmation_status, created_by_id, occurred_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?)
     `,
     [
       input.id,
@@ -410,9 +541,77 @@ export async function createFinancialTransaction(input: {
       input.description,
       JSON.stringify(input.metadata),
       input.requiresProof ? 1 : 0,
+      input.salaryConfirmationStatus ?? "NOT_REQUIRED",
       input.createdById,
       input.occurredAt
     ]
+  );
+}
+
+export async function updateFinancialTransaction(input: {
+  companyId: string;
+  transactionId: string;
+  accountId: string;
+  type: "CASH_IN" | "CASH_OUT";
+  amount: string;
+  currency: string;
+  activityCode: BusinessActivityCode | null;
+  description: string | null;
+  metadata: Record<string, string>;
+  requiresProof: boolean;
+  salaryConfirmationStatus?: SalaryConfirmationStatus;
+  occurredAt: Date;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      UPDATE transactions
+      SET account_id = ?,
+          type = ?,
+          amount = ?,
+          currency = ?,
+          activity_code = ?,
+          description = ?,
+          metadata_json = ?,
+          requires_proof = ?,
+          status = 'DRAFT',
+          validated_by_id = NULL,
+          salary_confirmation_status = ?,
+          salary_confirmed_by_id = NULL,
+          salary_confirmed_at = NULL,
+          occurred_at = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE company_id = ?
+        AND id = ?
+        AND status <> 'APPROVED'
+    `,
+    [
+      input.accountId,
+      input.type,
+      input.amount,
+      input.currency,
+      input.activityCode,
+      input.description,
+      JSON.stringify(input.metadata),
+      input.requiresProof ? 1 : 0,
+      input.salaryConfirmationStatus ?? "NOT_REQUIRED",
+      input.occurredAt,
+      input.companyId,
+      input.transactionId
+    ]
+  );
+}
+
+export async function deleteFinancialTransaction(input: {
+  companyId: string;
+  transactionId: string;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      DELETE FROM transactions
+      WHERE company_id = ?
+        AND id = ?
+    `,
+    [input.companyId, input.transactionId]
   );
 }
 
@@ -465,6 +664,10 @@ export async function listFinancialTransactions(input: {
         cu.email AS createdByEmail,
         t.validated_by_id AS validatedById,
         vu.email AS validatedByEmail,
+        t.salary_confirmation_status AS salaryConfirmationStatus,
+        t.salary_confirmed_by_id AS salaryConfirmedById,
+        su.email AS salaryConfirmedByEmail,
+        t.salary_confirmed_at AS salaryConfirmedAt,
         t.occurred_at AS occurredAt,
         t.created_at AS createdAt,
         t.updated_at AS updatedAt,
@@ -478,6 +681,7 @@ export async function listFinancialTransactions(input: {
       LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users vu ON vu.id = t.validated_by_id
+      LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
       WHERE ${filters.join(" AND ")}
       GROUP BY
         t.id,
@@ -499,6 +703,10 @@ export async function listFinancialTransactions(input: {
         cu.email,
         t.validated_by_id,
         vu.email,
+        t.salary_confirmation_status,
+        t.salary_confirmed_by_id,
+        su.email,
+        t.salary_confirmed_at,
         t.occurred_at,
         t.created_at,
         t.updated_at
@@ -509,6 +717,207 @@ export async function listFinancialTransactions(input: {
   );
 
   return rows.map(toTransaction);
+}
+
+export async function listSalaryTransactions(input: {
+  companyId: string;
+  limit: number;
+  offset: number;
+  status?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  employeeUserId?: string;
+  payPeriod?: string;
+}): Promise<FinancialTransaction[]> {
+  const filters: string[] = [
+    "t.company_id = ?",
+    "t.type = 'CASH_OUT'",
+    "t.activity_code IS NULL",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.entryCategory')) = 'SALARY'"
+  ];
+  const values: Array<string | number> = [input.companyId];
+
+  if (input.status) {
+    filters.push("t.status = ?");
+    values.push(input.status);
+  }
+  if (input.employeeUserId) {
+    filters.push("JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeUserId')) = ?");
+    values.push(input.employeeUserId);
+  }
+  if (input.payPeriod) {
+    filters.push("JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.payPeriod')) = ?");
+    values.push(input.payPeriod);
+  }
+
+  values.push(input.limit, input.offset);
+
+  const rows = await queryRows<TransactionRow[]>(
+    `
+      SELECT
+        t.id AS id,
+        t.company_id AS companyId,
+        t.account_id AS accountId,
+        fa.name AS accountName,
+        fa.account_ref AS accountRef,
+        fa.scope_type AS accountScopeType,
+        fa.primary_activity_code AS accountPrimaryActivityCode,
+        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS accountAllowedActivitiesCsv,
+        t.type AS type,
+        CAST(t.amount AS CHAR) AS amount,
+        t.currency AS currency,
+        t.activity_code AS activityCode,
+        t.description AS description,
+        t.metadata_json AS metadataJson,
+        t.status AS status,
+        t.requires_proof AS requiresProof,
+        t.created_by_id AS createdById,
+        cu.email AS createdByEmail,
+        t.validated_by_id AS validatedById,
+        vu.email AS validatedByEmail,
+        t.salary_confirmation_status AS salaryConfirmationStatus,
+        t.salary_confirmed_by_id AS salaryConfirmedById,
+        su.email AS salaryConfirmedByEmail,
+        t.salary_confirmed_at AS salaryConfirmedAt,
+        t.occurred_at AS occurredAt,
+        t.created_at AS createdAt,
+        t.updated_at AS updatedAt,
+        (
+          SELECT COUNT(*)
+          FROM transaction_proofs tp
+          WHERE tp.transaction_id = t.id
+        ) AS proofsCount
+      FROM transactions t
+      INNER JOIN financial_accounts fa ON fa.id = t.account_id
+      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
+      INNER JOIN users cu ON cu.id = t.created_by_id
+      LEFT JOIN users vu ON vu.id = t.validated_by_id
+      LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
+      WHERE ${filters.join(" AND ")}
+      GROUP BY
+        t.id,
+        t.company_id,
+        t.account_id,
+        fa.name,
+        fa.account_ref,
+        fa.scope_type,
+        fa.primary_activity_code,
+        t.type,
+        t.amount,
+        t.currency,
+        t.activity_code,
+        t.description,
+        t.metadata_json,
+        t.status,
+        t.requires_proof,
+        t.created_by_id,
+        cu.email,
+        t.validated_by_id,
+        vu.email,
+        t.salary_confirmation_status,
+        t.salary_confirmed_by_id,
+        su.email,
+        t.salary_confirmed_at,
+        t.occurred_at,
+        t.created_at,
+        t.updated_at
+      ORDER BY t.occurred_at DESC, t.created_at DESC
+      LIMIT ? OFFSET ?
+    `,
+    values
+  );
+
+  return rows.map(toTransaction);
+}
+
+export async function findSalaryTransactionByEmployeeAndPeriod(input: {
+  companyId: string;
+  employeeUserId: string;
+  payPeriod: string;
+}): Promise<FinancialTransaction | null> {
+  const rows = await queryRows<TransactionRow[]>(
+    `
+      SELECT
+        t.id AS id,
+        t.company_id AS companyId,
+        t.account_id AS accountId,
+        fa.name AS accountName,
+        fa.account_ref AS accountRef,
+        fa.scope_type AS accountScopeType,
+        fa.primary_activity_code AS accountPrimaryActivityCode,
+        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS accountAllowedActivitiesCsv,
+        t.type AS type,
+        CAST(t.amount AS CHAR) AS amount,
+        t.currency AS currency,
+        t.activity_code AS activityCode,
+        t.description AS description,
+        t.metadata_json AS metadataJson,
+        t.status AS status,
+        t.requires_proof AS requiresProof,
+        t.created_by_id AS createdById,
+        cu.email AS createdByEmail,
+        t.validated_by_id AS validatedById,
+        vu.email AS validatedByEmail,
+        t.salary_confirmation_status AS salaryConfirmationStatus,
+        t.salary_confirmed_by_id AS salaryConfirmedById,
+        su.email AS salaryConfirmedByEmail,
+        t.salary_confirmed_at AS salaryConfirmedAt,
+        t.occurred_at AS occurredAt,
+        t.created_at AS createdAt,
+        t.updated_at AS updatedAt,
+        (
+          SELECT COUNT(*)
+          FROM transaction_proofs tp
+          WHERE tp.transaction_id = t.id
+        ) AS proofsCount
+      FROM transactions t
+      INNER JOIN financial_accounts fa ON fa.id = t.account_id
+      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
+      INNER JOIN users cu ON cu.id = t.created_by_id
+      LEFT JOIN users vu ON vu.id = t.validated_by_id
+      LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
+      WHERE t.company_id = ?
+        AND t.type = 'CASH_OUT'
+        AND t.activity_code IS NULL
+        AND t.status <> 'REJECTED'
+        AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.entryCategory')) = 'SALARY'
+        AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeUserId')) = ?
+        AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.payPeriod')) = ?
+      GROUP BY
+        t.id,
+        t.company_id,
+        t.account_id,
+        fa.name,
+        fa.account_ref,
+        fa.scope_type,
+        fa.primary_activity_code,
+        t.type,
+        t.amount,
+        t.currency,
+        t.activity_code,
+        t.description,
+        t.metadata_json,
+        t.status,
+        t.requires_proof,
+        t.created_by_id,
+        cu.email,
+        t.validated_by_id,
+        vu.email,
+        t.salary_confirmation_status,
+        t.salary_confirmed_by_id,
+        su.email,
+        t.salary_confirmed_at,
+        t.occurred_at,
+        t.created_at,
+        t.updated_at
+      ORDER BY t.created_at DESC
+      LIMIT 1
+    `,
+    [input.companyId, input.employeeUserId, input.payPeriod]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+  return toTransaction(rows[0]);
 }
 
 export async function findTransactionById(
@@ -523,7 +932,8 @@ export async function findTransactionById(
         created_by_id AS createdById,
         activity_code AS activityCode,
         status AS status,
-        requires_proof AS requiresProof
+        requires_proof AS requiresProof,
+        salary_confirmation_status AS salaryConfirmationStatus
       FROM transactions
       WHERE company_id = ?
         AND id = ?
@@ -564,6 +974,10 @@ export async function findFinancialTransactionById(
         cu.email AS createdByEmail,
         t.validated_by_id AS validatedById,
         vu.email AS validatedByEmail,
+        t.salary_confirmation_status AS salaryConfirmationStatus,
+        t.salary_confirmed_by_id AS salaryConfirmedById,
+        su.email AS salaryConfirmedByEmail,
+        t.salary_confirmed_at AS salaryConfirmedAt,
         t.occurred_at AS occurredAt,
         t.created_at AS createdAt,
         t.updated_at AS updatedAt,
@@ -577,6 +991,7 @@ export async function findFinancialTransactionById(
       LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users vu ON vu.id = t.validated_by_id
+      LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
       WHERE t.company_id = ?
         AND t.id = ?
       GROUP BY
@@ -599,6 +1014,10 @@ export async function findFinancialTransactionById(
         cu.email,
         t.validated_by_id,
         vu.email,
+        t.salary_confirmation_status,
+        t.salary_confirmed_by_id,
+        su.email,
+        t.salary_confirmed_at,
         t.occurred_at,
         t.created_at,
         t.updated_at
@@ -665,16 +1084,18 @@ export async function countTransactionProofs(transactionId: string): Promise<num
 export async function submitTransaction(input: {
   companyId: string;
   transactionId: string;
+  salaryConfirmationStatus?: SalaryConfirmationStatus;
 }): Promise<void> {
   await getDbPool().execute<ResultSetHeader>(
     `
       UPDATE transactions
-      SET status = 'SUBMITTED'
+      SET status = 'SUBMITTED',
+          salary_confirmation_status = ?
       WHERE company_id = ?
         AND id = ?
         AND status = 'DRAFT'
     `,
-    [input.companyId, input.transactionId]
+    [input.salaryConfirmationStatus ?? "NOT_REQUIRED", input.companyId, input.transactionId]
   );
 }
 
@@ -693,5 +1114,25 @@ export async function reviewTransaction(input: {
         AND status = 'SUBMITTED'
     `,
     [input.status, input.reviewerId, input.companyId, input.transactionId]
+  );
+}
+
+export async function confirmSalaryReceipt(input: {
+  companyId: string;
+  transactionId: string;
+  confirmerId: string;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      UPDATE transactions
+      SET salary_confirmation_status = 'CONFIRMED',
+          salary_confirmed_by_id = ?,
+          salary_confirmed_at = CURRENT_TIMESTAMP
+      WHERE company_id = ?
+        AND id = ?
+        AND status = 'SUBMITTED'
+        AND salary_confirmation_status = 'PENDING'
+    `,
+    [input.confirmerId, input.companyId, input.transactionId]
   );
 }

@@ -18,17 +18,33 @@ const auditActionLabels: Record<string, string> = {
   AUTH_LOGIN: "Connexion",
   AUTH_REFRESH: "Rafraichissement de session",
   AUTH_LOGOUT: "Deconnexion",
+  COMPANY_CREATED: "Entreprise creee",
+  COMPANY_UPDATED: "Entreprise modifiee",
+  COMPANY_DELETED: "Entreprise supprimee",
   ADMIN_USER_CREATED: "Creation utilisateur",
   ADMIN_USER_UPDATED: "Mise a jour utilisateur",
   ADMIN_USER_ROLE_UPDATED: "Role utilisateur modifie",
   ADMIN_USER_ACTIVATED: "Utilisateur active",
   ADMIN_USER_DEACTIVATED: "Utilisateur desactive",
   FINANCE_ACCOUNT_CREATED: "Compte financier cree",
+  FINANCE_ACCOUNT_UPDATED: "Compte financier modifie",
+  FINANCE_ACCOUNT_DELETED: "Compte financier supprime",
+  FINANCE_SALARY_CREATED: "Salaire cree",
+  FINANCE_SALARY_UPDATED: "Salaire modifie",
+  FINANCE_SALARY_DELETED: "Salaire supprime",
+  FINANCE_SALARY_SUBMITTED: "Salaire soumis a confirmation",
+  FINANCE_SALARY_RECEIPT_CONFIRMED: "Reception salaire confirmee",
+  FINANCE_SALARY_APPROVED: "Salaire approuve",
+  FINANCE_SALARY_REJECTED: "Salaire rejete",
   FINANCE_TRANSACTION_CREATED: "Transaction creee",
+  FINANCE_TRANSACTION_UPDATED: "Transaction modifiee",
+  FINANCE_TRANSACTION_DELETED: "Transaction supprimee",
   FINANCE_TRANSACTION_SUBMITTED: "Transaction soumise",
   FINANCE_TRANSACTION_APPROVED: "Transaction approuvee",
   FINANCE_TRANSACTION_REJECTED: "Transaction rejetee",
   TASK_CREATED: "Tache creee",
+  TASK_UPDATED: "Tache modifiee",
+  TASK_DELETED: "Tache supprimee",
   TASK_ASSIGNED: "Tache assignee",
   TASK_UNASSIGNED: "Tache desassignee",
   TASK_STATUS_CHANGED: "Statut de tache modifie",
@@ -42,7 +58,9 @@ const entityTypeLabels: Record<string, string> = {
   USER: "Utilisateur",
   TASK: "Tache",
   TASK_COMMENT: "Commentaire",
+  COMPANY: "Entreprise",
   TRANSACTION: "Transaction",
+  SALARY: "Salaire",
   FINANCIAL_ACCOUNT: "Compte financier"
 };
 
@@ -144,6 +162,16 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
   if (action === "TASK_ASSIGNED" || action === "TASK_UNASSIGNED") {
     const note = asText(root.note);
     return note ? `Assignation mise a jour. Note: ${truncateText(note, 90)}` : "Assignation mise a jour.";
+  }
+
+  if (action === "TASK_UPDATED") {
+    const nextTitle = asText(root.nextTitle);
+    return nextTitle ? `Tache mise a jour: ${truncateText(nextTitle, 90)}` : "Contenu de la tache mis a jour.";
+  }
+
+  if (action === "TASK_DELETED") {
+    const title = asText(root.title);
+    return title ? `Tache supprimee: ${truncateText(title, 90)}` : "Tache supprimee.";
   }
 
   if (action === "TASK_COMMENT_ADDED") {
@@ -327,7 +355,7 @@ export function SecuritySettingsPage(): JSX.Element {
         <form className="audit-filter-form" onSubmit={handleFilterSubmit}>
           <input
             type="text"
-            placeholder="Action (ex: ADMIN_USER_CREATED)"
+            placeholder="Action (ex: creation utilisateur)"
             value={query.action}
             onChange={(event) =>
               setQuery((prev) => ({
@@ -338,7 +366,7 @@ export function SecuritySettingsPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="ID acteur"
+            placeholder="Identifiant acteur"
             value={query.actorId}
             onChange={(event) =>
               setQuery((prev) => ({
@@ -349,7 +377,7 @@ export function SecuritySettingsPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="Type entite (ex: TRANSACTION)"
+            placeholder="Type d'entite"
             value={query.entityType}
             onChange={(event) =>
               setQuery((prev) => ({
@@ -360,7 +388,7 @@ export function SecuritySettingsPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="ID entite"
+            placeholder="Identifiant entite"
             value={query.entityId}
             onChange={(event) =>
               setQuery((prev) => ({
@@ -382,7 +410,7 @@ export function SecuritySettingsPage(): JSX.Element {
             <option value={50}>50 lignes</option>
             <option value={100}>100 lignes</option>
           </select>
-          <button type="submit">Actualiser</button>
+          <button type="submit">Filtrer</button>
         </form>
       </section>
 
@@ -401,7 +429,7 @@ export function SecuritySettingsPage(): JSX.Element {
                   <th>Action</th>
                   <th>Acteur</th>
                   <th>Entite</th>
-                  <th>Metadata</th>
+                  <th>Details</th>
                   <th>Navigation</th>
                 </tr>
               </thead>
@@ -444,7 +472,7 @@ export function SecuritySettingsPage(): JSX.Element {
                           <span>{metadataSummary}</span>
                           {metadataDetails && metadataDetails !== metadataSummary ? (
                             <details className="audit-metadata-details">
-                              <summary>Voir le detail</summary>
+                              <summary>Voir les details</summary>
                               <pre>{metadataDetails}</pre>
                             </details>
                           ) : null}
@@ -457,7 +485,7 @@ export function SecuritySettingsPage(): JSX.Element {
                             className="secondary-btn"
                             onClick={() => navigate(buildFinanceTransactionPath(financeTarget))}
                           >
-                            Ouvrir transaction
+                            {financeTarget.kind === "salary" ? "Voir le salaire" : "Voir la transaction"}
                           </button>
                         ) : (
                           <span className="hint">-</span>

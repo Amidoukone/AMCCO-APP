@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import { HttpError } from "../errors/http-error.js";
+import { isBootstrapCompanyId } from "../lib/bootstrap-auth.js";
 import { verifyAccessToken } from "../lib/token.js";
+import { findActiveUserById, findUserProfileForCompany } from "../repositories/auth.repository.js";
 import type { RoleCode } from "../types/role.js";
 
 function extractBearerToken(authHeader?: string): string | null {
@@ -14,7 +16,11 @@ function extractBearerToken(authHeader?: string): string | null {
   return token;
 }
 
-export function authenticateAccessToken(req: Request, _res: Response, next: NextFunction): void {
+export async function authenticateAccessToken(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
   const token = extractBearerToken(req.headers.authorization);
   if (!token) {
     next(new HttpError(401, "En-tete d'autorisation manquant ou invalide."));
@@ -23,14 +29,41 @@ export function authenticateAccessToken(req: Request, _res: Response, next: Next
 
   try {
     const payload = verifyAccessToken(token);
+    if (isBootstrapCompanyId(payload.companyId)) {
+      const bootstrapUser = await findActiveUserById(payload.userId);
+      if (!bootstrapUser) {
+        next(new HttpError(401, "Session d'initialisation invalide."));
+        return;
+      }
+
+      req.auth = {
+        userId: bootstrapUser.userId,
+        companyId: payload.companyId,
+        role: payload.role,
+        email: bootstrapUser.email
+      };
+      next();
+      return;
+    }
+
+    const currentProfile = await findUserProfileForCompany(payload.userId, payload.companyId);
+    if (!currentProfile) {
+      next(new HttpError(401, "Session invalide pour cette entreprise."));
+      return;
+    }
+
     req.auth = {
-      userId: payload.userId,
+      userId: currentProfile.userId,
       companyId: payload.companyId,
-      role: payload.role,
-      email: payload.email
+      role: currentProfile.role,
+      email: currentProfile.email
     };
     next();
-  } catch {
+  } catch (error) {
+    if (error instanceof HttpError) {
+      next(error);
+      return;
+    }
     next(new HttpError(401, "Jeton d'acces invalide ou expire."));
   }
 }

@@ -12,6 +12,7 @@ import { HttpError } from "../errors/http-error.js";
 import { createAuditLogRecord, listAuditLogsByEntity } from "../repositories/audit.repository.js";
 import {
   createOperationTask,
+  deleteOperationTask,
   findCompanyTaskAssigneeByUserId,
   findOperationTaskById,
   findOperationTaskMinimalById,
@@ -19,6 +20,7 @@ import {
   listCompanyTaskAssignees,
   listOperationsTasks,
   type TaskStatus,
+  updateOperationTask,
   updateOperationTaskAssignment,
   updateOperationTaskStatus
 } from "../repositories/tasks.repository.js";
@@ -42,6 +44,7 @@ const OPERATIONS_ACCESS_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "SUPERVISOR",
 const TASK_MANAGEMENT_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "SUPERVISOR"];
 const TASK_TIMELINE_ACTIONS = [
   "TASK_CREATED",
+  "TASK_UPDATED",
   "TASK_ASSIGNED",
   "TASK_UNASSIGNED",
   "TASK_STATUS_CHANGED"
@@ -57,6 +60,17 @@ function canManageTasks(role: RoleCode): boolean {
   return TASK_MANAGEMENT_ROLES.includes(role);
 }
 
+function canCreateTasks(role: RoleCode): boolean {
+  return OPERATIONS_ACCESS_ROLES.includes(role);
+}
+
+function canEditTask(actor: ActorContext, task: { createdById: string }): boolean {
+  if (canManageTasks(actor.role)) {
+    return true;
+  }
+  return actor.role === "EMPLOYEE" && task.createdById === actor.actorId;
+}
+
 function canViewTask(actor: ActorContext, task: { createdById: string; assignedToId: string | null }): boolean {
   if (canManageTasks(actor.role)) {
     return true;
@@ -70,7 +84,7 @@ function computeListFilters(actor: ActorContext, scope: TaskScope | undefined): 
   assignedToId?: string;
 } {
   if (actor.role === "EMPLOYEE") {
-    return { scopeUserId: actor.actorId };
+    return { assignedToId: actor.actorId };
   }
 
   if (scope === "ASSIGNED_TO_ME") {
@@ -155,16 +169,17 @@ export async function createCompanyTask(
     dueDate?: string;
   }
 ) {
-  if (!canManageTasks(actor.role)) {
+  if (!canCreateTasks(actor.role)) {
     throw new HttpError(403, "Permissions insuffisantes pour creer une tache.");
   }
 
   await ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode);
   const metadata = normalizeActivityMetadata(input.metadata);
+  const requestedAssignedToId = actor.role === "EMPLOYEE" ? actor.actorId : input.assignedToId;
   try {
     assertTaskInputMatchesActivityProfile(input.activityCode, {
       description: input.description,
-      assignedToId: input.assignedToId,
+      assignedToId: requestedAssignedToId,
       dueDate: input.dueDate,
       metadata
     });
@@ -174,7 +189,9 @@ export async function createCompanyTask(
   const profile = getBusinessActivityProfile(input.activityCode);
 
   let assignedToId: string | null = null;
-  if (input.assignedToId) {
+  if (actor.role === "EMPLOYEE") {
+    assignedToId = actor.actorId;
+  } else if (input.assignedToId) {
     const assignee = await findCompanyTaskAssigneeByUserId(actor.companyId, input.assignedToId);
     if (!assignee) {
       throw new HttpError(400, "Utilisateur assigne invalide ou inactif.");
@@ -252,6 +269,24 @@ export async function createCompanyTask(
       metadata: {
         taskId: created.id,
         title: created.title
+      }
+    });
+  }
+
+  if (actor.role === "EMPLOYEE") {
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["SUPERVISOR"],
+      excludeUserIds: [actor.actorId],
+      code: "TASK_CREATED_BY_EMPLOYEE",
+      message: `Une nouvelle tache a ete creee par ${created.createdByFullName}: ${created.title}`,
+      severity: "INFO",
+      entityType: "TASK",
+      entityId: created.id,
+      metadata: {
+        taskId: created.id,
+        title: created.title,
+        createdById: created.createdById
       }
     });
   }
@@ -421,6 +456,130 @@ export async function assignCompanyTasksBulk(
     items.push(updated);
   }
   return items;
+}
+
+export async function updateCompanyTask(
+  actor: ActorContext,
+  input: {
+    taskId: string;
+    title: string;
+    description?: string;
+    metadata?: Record<string, string>;
+    dueDate?: string;
+  }
+) {
+  ensureOperationsAccess(actor.role);
+
+  const existing = await findOperationTaskById(actor.companyId, input.taskId);
+  if (!existing) {
+    throw new HttpError(404, "Tache introuvable.");
+  }
+  if (!canEditTask(actor, existing)) {
+    throw new HttpError(403, "Permissions insuffisantes pour modifier cette tache.");
+  }
+  if (existing.status === "DONE") {
+    throw new HttpError(400, "Une tache terminee ne peut plus etre modifiee.");
+  }
+  if (!existing.activityCode) {
+    throw new HttpError(400, "L'activite de cette tache est introuvable.");
+  }
+
+  const title = input.title.trim();
+  if (!title) {
+    throw new HttpError(400, "Le titre de la tache est obligatoire.");
+  }
+
+  const metadata = normalizeActivityMetadata(input.metadata);
+  const dueDate = input.dueDate ? new Date(input.dueDate) : null;
+
+  try {
+    assertTaskInputMatchesActivityProfile(existing.activityCode, {
+      description: input.description,
+      assignedToId: existing.assignedToId ?? undefined,
+      dueDate: input.dueDate,
+      metadata
+    });
+  } catch (error) {
+    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+  }
+
+  await updateOperationTask({
+    companyId: actor.companyId,
+    taskId: existing.id,
+    title,
+    description: input.description?.trim() || null,
+    metadata,
+    dueDate
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "TASK_UPDATED",
+    entityType: "TASK",
+    entityId: existing.id,
+    metadataJson: JSON.stringify({
+      previousTitle: existing.title,
+      nextTitle: title,
+      previousDescription: existing.description,
+      nextDescription: input.description?.trim() || null,
+      previousDueDate: existing.dueDate,
+      nextDueDate: dueDate ? dueDate.toISOString() : null,
+      previousMetadata: existing.metadata,
+      nextMetadata: metadata
+    })
+  });
+
+  const updated = await findOperationTaskById(actor.companyId, existing.id);
+  if (!updated) {
+    throw new HttpError(500, "Impossible de recharger la tache modifiee.");
+  }
+
+  return updated;
+}
+
+export async function deleteCompanyTask(
+  actor: ActorContext,
+  input: {
+    taskId: string;
+  }
+): Promise<void> {
+  ensureOperationsAccess(actor.role);
+
+  const existing = await findOperationTaskById(actor.companyId, input.taskId);
+  if (!existing) {
+    throw new HttpError(404, "Tache introuvable.");
+  }
+  if (!canEditTask(actor, existing)) {
+    throw new HttpError(403, "Permissions insuffisantes pour supprimer cette tache.");
+  }
+  if (existing.status === "DONE") {
+    throw new HttpError(400, "Une tache terminee ne peut plus etre supprimee.");
+  }
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "TASK_DELETED",
+    entityType: "TASK",
+    entityId: existing.id,
+    metadataJson: JSON.stringify({
+      title: existing.title,
+      description: existing.description,
+      status: existing.status,
+      activityCode: existing.activityCode,
+      assignedToId: existing.assignedToId,
+      dueDate: existing.dueDate,
+      metadata: existing.metadata
+    })
+  });
+
+  await deleteOperationTask({
+    companyId: actor.companyId,
+    taskId: existing.id
+  });
 }
 
 export async function updateCompanyTaskStatus(

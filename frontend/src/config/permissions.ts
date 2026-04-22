@@ -3,9 +3,11 @@ import type { RoleCode } from "../types/role";
 export type FeatureKey =
   | "dashboard"
   | "alerts"
+  | "adminCompanies"
   | "adminUsers"
   | "adminActivities"
   | "financeTransactions"
+  | "financeSalaries"
   | "operationsTasks"
   | "reports"
   | "settingsSecurity";
@@ -28,9 +30,11 @@ export const ROLE_LABELS: Record<RoleCode, string> = {
 const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
   dashboard: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   alerts: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
+  adminCompanies: ["OWNER", "SYS_ADMIN"],
   adminUsers: ["OWNER", "SYS_ADMIN"],
   adminActivities: ["OWNER", "SYS_ADMIN"],
   financeTransactions: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
+  financeSalaries: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   operationsTasks: ["OWNER", "SYS_ADMIN", "SUPERVISOR", "EMPLOYEE"],
   reports: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"],
   settingsSecurity: ["OWNER", "SYS_ADMIN"]
@@ -46,7 +50,19 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     to: "/finance/transactions",
     section: "Execution"
   },
+  {
+    key: "financeSalaries",
+    label: "Salaires",
+    to: "/finance/salaries",
+    section: "Execution"
+  },
   { key: "operationsTasks", label: "Taches", to: "/operations/tasks", section: "Execution" },
+  {
+    key: "adminCompanies",
+    label: "Entreprises",
+    to: "/admin/companies",
+    section: "Administration"
+  },
   { key: "adminUsers", label: "Utilisateurs", to: "/admin/users", section: "Administration" },
   {
     key: "adminActivities",

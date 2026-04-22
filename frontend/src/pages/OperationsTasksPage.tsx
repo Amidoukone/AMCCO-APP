@@ -14,8 +14,10 @@ import {
   assignOperationsTaskRequest,
   assignOperationsTasksBulkRequest,
   createOperationsTaskRequest,
+  deleteOperationsTaskRequest,
   listOperationsMembersRequest,
   listOperationsTasksRequest,
+  updateOperationsTaskRequest,
   updateOperationsTaskStatusRequest
 } from "../lib/api";
 import {
@@ -44,6 +46,45 @@ function statusLabel(status: TaskStatus): string {
     return "Terminee";
   }
   return "Bloquee";
+}
+
+function statusDescription(status: TaskStatus): string {
+  if (status === "TODO") {
+    return "Tache en attente de demarrage ou de reprise.";
+  }
+  if (status === "IN_PROGRESS") {
+    return "Execution en cours sur le terrain ou au bureau.";
+  }
+  if (status === "DONE") {
+    return "Execution terminee et tache cloturee.";
+  }
+  return "Blocage actif, arbitrage ou action de debloquage requis.";
+}
+
+function statusToneClass(status: TaskStatus): string {
+  if (status === "TODO") {
+    return "todo";
+  }
+  if (status === "IN_PROGRESS") {
+    return "in-progress";
+  }
+  if (status === "DONE") {
+    return "done";
+  }
+  return "blocked";
+}
+
+function statusShortMetric(status: TaskStatus): string {
+  if (status === "TODO") {
+    return "A lancer";
+  }
+  if (status === "IN_PROGRESS") {
+    return "En execution";
+  }
+  if (status === "DONE") {
+    return "Cloturees";
+  }
+  return "A debloquer";
 }
 
 function memberLabel(member: OperationTaskMember): string {
@@ -95,6 +136,22 @@ function formatMetadataSummary(
   return fallbackItems.length > 0 ? fallbackItems.join(" | ") : "-";
 }
 
+function createDefaultTaskForm(): {
+  title: string;
+  description: string;
+  dueDate: string;
+  assignedToId: string;
+  metadata: Record<string, string>;
+} {
+  return {
+    title: "",
+    description: "",
+    dueDate: "",
+    assignedToId: "",
+    metadata: {}
+  };
+}
+
 export function OperationsTasksPage(): JSX.Element {
   const navigate = useNavigate();
   const { session, refreshSession, user } = useAuth();
@@ -109,6 +166,7 @@ export function OperationsTasksPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -122,13 +180,7 @@ export function OperationsTasksPage(): JSX.Element {
     unassignedOnly: false
   });
 
-  const [createForm, setCreateForm] = useState({
-    title: "",
-    description: "",
-    dueDate: "",
-    assignedToId: "",
-    metadata: {} as Record<string, string>
-  });
+  const [createForm, setCreateForm] = useState(createDefaultTaskForm);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [assignmentNotes, setAssignmentNotes] = useState<Record<string, string>>({});
@@ -138,12 +190,43 @@ export function OperationsTasksPage(): JSX.Element {
     note: ""
   });
 
-  const canManageTasks = useMemo(() => {
+  const canAssignTasks = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
   }, [user?.role]);
+  const canCreateTasks = useMemo(() => {
+    return Boolean(user);
+  }, [user]);
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
   const taskWorkflow = selectedProfile?.tasks.workflow ?? [];
+
+  const statusSummary = useMemo(() => {
+    const counts: Record<TaskStatus, number> = {
+      TODO: 0,
+      IN_PROGRESS: 0,
+      DONE: 0,
+      BLOCKED: 0
+    };
+
+    for (const task of tasks) {
+      counts[task.status] += 1;
+    }
+
+    return counts;
+  }, [tasks]);
+
+  const statusCards = useMemo(
+    () =>
+      (["TODO", "IN_PROGRESS", "BLOCKED", "DONE"] as TaskStatus[]).map((status) => ({
+        status,
+        label: statusLabel(status),
+        description: statusDescription(status),
+        metricLabel: statusShortMetric(status),
+        total: statusSummary[status],
+        isActiveFilter: filters.status === status
+      })),
+    [filters.status, statusSummary]
+  );
 
   const selectedTaskIds = useMemo(() => {
     return tasks.filter((task) => selectedTasks[task.id]).map((task) => task.id);
@@ -192,8 +275,8 @@ export function OperationsTasksPage(): JSX.Element {
         limit: 200,
         status: filters.status === "ALL" ? undefined : filters.status,
         activityCode: selectedActivityCode,
-        scope: canManageTasks ? filters.scope : ("MINE" as TaskScope),
-        unassignedOnly: canManageTasks ? filters.unassignedOnly : undefined
+        scope: canAssignTasks ? filters.scope : ("ASSIGNED_TO_ME" as TaskScope),
+        unassignedOnly: canAssignTasks ? filters.unassignedOnly : undefined
       };
 
       const taskResponse = await withAuthorizedToken((accessToken) =>
@@ -208,7 +291,7 @@ export function OperationsTasksPage(): JSX.Element {
         Object.fromEntries(taskResponse.items.map((task) => [task.id, prev[task.id] ?? ""]))
       );
 
-      if (canManageTasks) {
+      if (canAssignTasks) {
         const membersResponse = await withAuthorizedToken((accessToken) =>
           listOperationsMembersRequest(accessToken, {
             activityCode: selectedActivityCode
@@ -224,7 +307,7 @@ export function OperationsTasksPage(): JSX.Element {
       setIsLoading(false);
     }
   }, [
-    canManageTasks,
+    canAssignTasks,
     filters.scope,
     filters.status,
     filters.unassignedOnly,
@@ -245,38 +328,132 @@ export function OperationsTasksPage(): JSX.Element {
 
   async function handleCreateTask(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (!canManageTasks || !selectedActivityCode) {
+    if (!canCreateTasks || !selectedActivityCode) {
       return;
     }
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) =>
-        createOperationsTaskRequest(accessToken, {
-          title: createForm.title.trim(),
-          description: createForm.description.trim() || undefined,
-          activityCode: selectedActivityCode as BusinessActivityCode,
-          assignedToId: createForm.assignedToId || undefined,
-          metadata: createForm.metadata,
-          dueDate: createForm.dueDate ? new Date(createForm.dueDate).toISOString() : undefined
-        })
+        editingTaskId
+          ? updateOperationsTaskRequest(accessToken, editingTaskId, {
+              title: createForm.title.trim(),
+              description: createForm.description.trim() || undefined,
+              metadata: createForm.metadata,
+              dueDate: createForm.dueDate
+                ? new Date(createForm.dueDate).toISOString()
+                : undefined
+            })
+          : createOperationsTaskRequest(accessToken, {
+              title: createForm.title.trim(),
+              description: createForm.description.trim() || undefined,
+              activityCode: selectedActivityCode as BusinessActivityCode,
+              assignedToId: canAssignTasks ? createForm.assignedToId || undefined : undefined,
+              metadata: createForm.metadata,
+              dueDate: createForm.dueDate
+                ? new Date(createForm.dueDate).toISOString()
+                : undefined
+            })
       );
+      setEditingTaskId(null);
       setCreateForm({
-        title: "",
-        description: "",
-        dueDate: "",
-        assignedToId: "",
+        ...createDefaultTaskForm(),
         metadata: syncMetadataState({}, taskMetadataFields)
       });
-      setSuccessMessage("Tache creee.");
+      setSuccessMessage(editingTaskId ? "Tache modifiee." : "Tache creee.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     }
   }
 
+  function getTaskEditLockMessage(task: OperationTask): string | null {
+    if (task.status === "DONE") {
+      return "Une tache terminee ne peut plus etre modifiee.";
+    }
+    if (canAssignTasks) {
+      return null;
+    }
+    if (task.createdById !== user?.id) {
+      return "Vous ne pouvez modifier que les taches que vous avez creees.";
+    }
+    return null;
+  }
+
+  function getTaskDeleteLockMessage(task: OperationTask): string | null {
+    if (task.status === "DONE") {
+      return "Une tache terminee ne peut plus etre supprimee.";
+    }
+    if (canAssignTasks) {
+      return null;
+    }
+    if (task.createdById !== user?.id) {
+      return "Vous ne pouvez supprimer que les taches que vous avez creees.";
+    }
+    return null;
+  }
+
+  function handleStartEditTask(task: OperationTask): void {
+    const lockMessage = getTaskEditLockMessage(task);
+    if (lockMessage) {
+      setErrorMessage(lockMessage);
+      setSuccessMessage(null);
+      return;
+    }
+
+    setEditingTaskId(task.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setCreateForm({
+      title: task.title,
+      description: task.description ?? "",
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : "",
+      assignedToId: task.assignedToId ?? "",
+      metadata: syncMetadataState(task.metadata, taskMetadataFields)
+    });
+  }
+
+  function handleCancelEditTask(): void {
+    setEditingTaskId(null);
+    setCreateForm({
+      ...createDefaultTaskForm(),
+      metadata: syncMetadataState({}, taskMetadataFields)
+    });
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }
+
+  async function handleDeleteTask(task: OperationTask): Promise<void> {
+    const lockMessage = getTaskDeleteLockMessage(task);
+    if (lockMessage) {
+      setErrorMessage(lockMessage);
+      setSuccessMessage(null);
+      return;
+    }
+
+    if (!window.confirm(`Confirmer la suppression de la tache ${task.title} ?`)) {
+      return;
+    }
+
+    setBusyTaskId(task.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteOperationsTaskRequest(accessToken, task.id));
+      if (editingTaskId === task.id) {
+        handleCancelEditTask();
+      }
+      setSuccessMessage("Tache supprimee.");
+      await loadData();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyTaskId(null);
+    }
+  }
+
   async function handleSaveAssignment(taskId: string): Promise<void> {
-    if (!canManageTasks) {
+    if (!canAssignTasks) {
       return;
     }
     const task = tasks.find((item) => item.id === taskId);
@@ -311,7 +488,7 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   async function handleBulkAssign(): Promise<void> {
-    if (!canManageTasks || selectedTaskIds.length === 0) {
+    if (!canAssignTasks || selectedTaskIds.length === 0) {
       return;
     }
     setIsBulkAssigning(true);
@@ -357,7 +534,7 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   function canUpdateTask(task: OperationTask): boolean {
-    if (canManageTasks) {
+    if (canAssignTasks) {
       return true;
     }
     return task.assignedToId === user?.id;
@@ -388,13 +565,13 @@ export function OperationsTasksPage(): JSX.Element {
         <h2>Suivi des taches</h2>
         <p>
           Planification, assignation et suivi de l'execution terrain pour le secteur{" "}
-          <strong>{selectedActivity?.label ?? "non defini"}</strong>.
+          <strong>{selectedActivity?.label ?? "aucun secteur actif"}</strong>.
         </p>
       </header>
 
       {!selectedActivityCode && !isLoadingActivities ? (
         <p className="error-box">
-          Aucun secteur actif n'est disponible. Active d'abord un secteur d'activite dans
+          Aucun secteur actif n'est disponible. Activez d'abord un secteur d'activite dans
           l'administration.
         </p>
       ) : null}
@@ -424,7 +601,7 @@ export function OperationsTasksPage(): JSX.Element {
             <option value="BLOCKED">Bloquee</option>
           </select>
 
-          {canManageTasks ? (
+          {canAssignTasks ? (
             <select
               value={filters.scope}
               onChange={(event) =>
@@ -440,10 +617,10 @@ export function OperationsTasksPage(): JSX.Element {
               <option value="CREATED_BY_ME">Creees par moi</option>
             </select>
           ) : (
-            <p className="hint">Vue employee: taches creees par vous ou assignees a vous.</p>
+            <p className="hint">Vue collaborateur: taches qui vous sont assignees.</p>
           )}
 
-          {canManageTasks ? (
+          {canAssignTasks ? (
             <label className="inline-checkbox">
               <input
                 type="checkbox"
@@ -459,17 +636,52 @@ export function OperationsTasksPage(): JSX.Element {
             </label>
           ) : null}
 
-          <button type="submit">Appliquer</button>
+          <button type="submit">Filtrer</button>
         </form>
         <p className="hint">
-          La liste est automatiquement alignee sur le secteur actif:{" "}
-          {selectedActivity?.label ?? "non defini"}.
+          La liste suit le secteur actif: {selectedActivity?.label ?? "aucun secteur actif"}.
         </p>
       </section>
 
-      {canManageTasks ? (
+      <section className="panel operations-status-panel">
+        <div className="operations-status-panel-header">
+          <div>
+            <h3>Pilotage des statuts</h3>
+            <p className="hint">
+              Lecture rapide du flux de traitement pour le secteur actif.
+            </p>
+          </div>
+          <div className="operations-status-panel-note">
+            <strong>{tasks.length}</strong>
+            <span>tache(s) visibles dans cette vue</span>
+          </div>
+        </div>
+        <div className="operations-status-grid">
+          {statusCards.map((card) => (
+            <article
+              key={card.status}
+              className={
+                card.isActiveFilter
+                  ? `operations-status-card status-tone-${statusToneClass(card.status)} is-active`
+                  : `operations-status-card status-tone-${statusToneClass(card.status)}`
+              }
+            >
+              <div className="operations-status-card-top">
+                <span className={`task-status-chip status-${card.status.toLowerCase()}`}>
+                  {card.label}
+                </span>
+                <strong>{card.total}</strong>
+              </div>
+              <p className="operations-status-card-metric">{card.metricLabel}</p>
+              <p className="operations-status-card-description">{card.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {canCreateTasks ? (
         <section className="panel">
-          <h3>Nouvelle tache</h3>
+          <h3>{editingTaskId ? "Modifier une tache" : "Nouvelle tache"}</h3>
           <form className="operations-task-form" onSubmit={handleCreateTask}>
             <input
               type="text"
@@ -487,8 +699,8 @@ export function OperationsTasksPage(): JSX.Element {
               type="text"
               placeholder={
                 selectedProfile?.tasks.requiresDescription
-                  ? "Description metier requise"
-                  : "Description (optionnel)"
+                  ? "Description requise"
+                  : "Description (optionnelle)"
               }
               value={createForm.description}
               onChange={(event) =>
@@ -500,7 +712,7 @@ export function OperationsTasksPage(): JSX.Element {
             />
             <div className="scope-field">
               <span className="scope-field-label">Secteur de rattachement</span>
-              <strong>{selectedActivity?.label ?? "Non defini"}</strong>
+              <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
             </div>
             <input
               type="datetime-local"
@@ -512,22 +724,29 @@ export function OperationsTasksPage(): JSX.Element {
                 }))
               }
             />
-            <select
-              value={createForm.assignedToId}
-              onChange={(event) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  assignedToId: event.target.value
-                }))
-              }
-            >
-              <option value="">Non assignee</option>
-              {members.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {memberLabel(member)}
-                </option>
-              ))}
-            </select>
+            {canAssignTasks ? (
+              <select
+                value={createForm.assignedToId}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    assignedToId: event.target.value
+                  }))
+                }
+              >
+                <option value="">Non assignee</option>
+                {members.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {memberLabel(member)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="scope-field">
+                <span className="scope-field-label">Assignation initiale</span>
+                <strong>Cette tache sera assignee a votre compte.</strong>
+              </div>
+            )}
             {taskMetadataFields.map((field) => (
               <input
                 key={field.key}
@@ -551,8 +770,13 @@ export function OperationsTasksPage(): JSX.Element {
               type="submit"
               disabled={!selectedActivityCode || isLoadingActivities}
             >
-              Creer tache
+              {editingTaskId ? "Enregistrer les modifications" : "Enregistrer la tache"}
             </button>
+            {editingTaskId ? (
+              <button type="button" className="secondary-btn" onClick={handleCancelEditTask}>
+                Annuler
+              </button>
+            ) : null}
           </form>
           <div className="sector-form-guidance">
             {taskMetadataFields.length > 0 ? (
@@ -577,11 +801,12 @@ export function OperationsTasksPage(): JSX.Element {
         </section>
       ) : null}
 
-      {canManageTasks && members.length > 0 ? (
+      {canAssignTasks && members.length > 0 ? (
         <section className="panel">
-          <h3>Charge d'assignation</h3>
+          <h3>Charge equipe</h3>
           <p className="hint">
-            Charge calculee sur le secteur actif: {selectedActivity?.label ?? "non defini"}.
+            Vue d'ensemble calculee pour le secteur actif:{" "}
+            {selectedActivity?.label ?? "aucun secteur actif"}.
           </p>
           <div className="operations-member-grid">
             {members.map((member) => (
@@ -600,7 +825,7 @@ export function OperationsTasksPage(): JSX.Element {
         </section>
       ) : null}
 
-      {canManageTasks ? (
+      {canAssignTasks ? (
         <section className="panel">
           <h3>Assignation en lot</h3>
           <div className="operations-bulk-form">
@@ -623,7 +848,7 @@ export function OperationsTasksPage(): JSX.Element {
             </select>
             <input
               type="text"
-              placeholder="Note d'assignation (optionnel)"
+              placeholder="Commentaire d'assignation (optionnel)"
               value={bulkAssignForm.note}
               onChange={(event) =>
                 setBulkAssignForm((prev) => ({
@@ -638,12 +863,12 @@ export function OperationsTasksPage(): JSX.Element {
               onClick={() => void handleBulkAssign()}
               disabled={isBulkAssigning || selectedTaskIds.length === 0}
             >
-              Assigner {selectedTaskIds.length} tache(s)
+              Mettre a jour {selectedTaskIds.length} tache(s)
             </button>
           </div>
           <p className="hint">
-            Les taches terminees sont proteges contre re-assignation. Les taches TODO deviennent automatiquement En
-            cours quand elles sont assignees.
+            Les taches terminees ne peuvent plus etre reassignees. Les taches a faire passent
+            automatiquement En cours lors de l'assignation.
           </p>
         </section>
       ) : null}
@@ -654,7 +879,7 @@ export function OperationsTasksPage(): JSX.Element {
       <section className="panel">
         <div className="operations-list-header">
           <h3>Taches</h3>
-          {canManageTasks && tasks.length > 0 ? (
+          {canAssignTasks && tasks.length > 0 ? (
             <label className="inline-checkbox">
               <input
                 type="checkbox"
@@ -677,6 +902,8 @@ export function OperationsTasksPage(): JSX.Element {
               const isBusy = busyTaskId === task.id;
               const canUpdate = canUpdateTask(task);
               const isCompleted = task.status === "DONE";
+              const editLockMessage = getTaskEditLockMessage(task);
+              const deleteLockMessage = getTaskDeleteLockMessage(task);
               const selectedAssignee = assignments[task.id] ?? "";
               const selectedOrNull = selectedAssignee || null;
               const assignmentChanged = task.assignedToId !== selectedOrNull;
@@ -695,7 +922,7 @@ export function OperationsTasksPage(): JSX.Element {
                     onClick={preventCardNavigation}
                     onKeyDown={preventCardKeyboardNavigation}
                   >
-                    {canManageTasks ? (
+                    {canAssignTasks ? (
                       <input
                         type="checkbox"
                         checked={selectedTasks[task.id] === true}
@@ -710,12 +937,23 @@ export function OperationsTasksPage(): JSX.Element {
                     <span className={`task-status-chip status-${task.status.toLowerCase()}`}>
                       {statusLabel(task.status)}
                     </span>
+                    <span className={`task-status-inline-note status-tone-${statusToneClass(task.status)}`}>
+                      {statusShortMetric(task.status)}
+                    </span>
                   </div>
 
                   <h4 className="operations-task-title">{task.title}</h4>
                   <p className="operations-task-description">
                     {task.description?.trim() || "Aucune description fournie."}
                   </p>
+
+                  <div className="operations-task-status-band">
+                    <div className="operations-task-status-main">
+                      <span className="operations-task-status-label">Statut operationnel</span>
+                      <strong>{statusLabel(task.status)}</strong>
+                    </div>
+                    <p className="operations-task-status-text">{statusDescription(task.status)}</p>
+                  </div>
 
                   <div className="operations-task-meta">
                     <p>
@@ -746,9 +984,30 @@ export function OperationsTasksPage(): JSX.Element {
                     onClick={preventCardNavigation}
                     onKeyDown={preventCardKeyboardNavigation}
                   >
+                    <div className="actions-inline">
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => handleStartEditTask(task)}
+                        disabled={isBusy || editingTaskId === task.id}
+                        title={editLockMessage ?? undefined}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-btn"
+                        onClick={() => void handleDeleteTask(task)}
+                        disabled={isBusy}
+                        title={deleteLockMessage ?? undefined}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+
                     {isCompleted ? (
                       <div className="operations-task-closed-note">
-                        Tache terminee: statut et assignation verrouilles.
+                        Tache terminee: statut, modification et assignation verrouilles.
                       </div>
                     ) : (
                       <>
@@ -772,7 +1031,7 @@ export function OperationsTasksPage(): JSX.Element {
                           )}
                         </div>
 
-                        {canManageTasks ? (
+                        {canAssignTasks ? (
                           <div className="operations-assign-card">
                             <div className="operations-inline-group">
                               <label>Assigner a</label>

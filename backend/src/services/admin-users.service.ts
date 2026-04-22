@@ -4,6 +4,7 @@ import { hashPassword } from "../lib/password.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import {
   countOwnersInCompany,
+  createMembershipIfMissing,
   createMembership,
   createUser,
   deleteMembership,
@@ -15,6 +16,7 @@ import {
   updateUserPasswordHash,
   updateUserProfile
 } from "../repositories/admin-users.repository.js";
+import { listAllCompanyIds } from "../repositories/companies.repository.js";
 import type { RoleCode } from "../types/role.js";
 
 type ActorContext = {
@@ -78,18 +80,31 @@ export async function createCompanyUser(
     });
   }
 
-  try {
-    await createMembership({
+  const companyIds = await listAllCompanyIds();
+  for (const companyId of companyIds) {
+    if (companyId === actor.companyId) {
+      try {
+        await createMembership({
+          membershipId: randomUUID(),
+          companyId,
+          userId,
+          role: input.role
+        });
+      } catch (error) {
+        if (mysqlErrorCode(error) === "ER_DUP_ENTRY") {
+          throw new HttpError(409, "Le rattachement utilisateur existe deja pour cette entreprise.");
+        }
+        throw error;
+      }
+      continue;
+    }
+
+    await createMembershipIfMissing({
       membershipId: randomUUID(),
-      companyId: actor.companyId,
+      companyId,
       userId,
       role: input.role
     });
-  } catch (error) {
-    if (mysqlErrorCode(error) === "ER_DUP_ENTRY") {
-      throw new HttpError(409, "Le rattachement utilisateur existe deja pour cette entreprise.");
-    }
-    throw error;
   }
 
   const membership = await findMembershipByCompanyAndUser(actor.companyId, userId);
@@ -226,6 +241,7 @@ export async function deleteCompanyUser(actor: ActorContext, userId: string): Pr
   }
 
   await deleteMembership(actor.companyId, userId);
+  await revokeRefreshSessionsForUserInCompany(actor.companyId, userId);
 
   await createAuditLogRecord({
     auditId: randomUUID(),

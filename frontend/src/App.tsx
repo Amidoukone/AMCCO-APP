@@ -8,8 +8,10 @@ import { useAuth } from "./context/AuthContext";
 import { BusinessActivityProvider } from "./context/BusinessActivityContext";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminActivitiesPage } from "./pages/AdminActivitiesPage";
+import { AdminCompaniesPage } from "./pages/AdminCompaniesPage";
 import { AlertsPage } from "./pages/AlertsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { FinanceSalariesPage } from "./pages/FinanceSalariesPage";
 import { FinanceTransactionsPage } from "./pages/FinanceTransactionsPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -19,14 +21,20 @@ import { SecuritySettingsPage } from "./pages/SecuritySettingsPage";
 import { TaskDetailsPage } from "./pages/TaskDetailsPage";
 
 export function App(): JSX.Element {
-  const { isAuthenticated, user } = useAuth();
-  const defaultAuthenticatedPath = user ? getDefaultRouteForRole(user.role) : "/dashboard";
+  const { activeCompany, isAuthenticated, user } = useAuth();
+  const defaultAuthenticatedPath = !isAuthenticated
+    ? "/login"
+    : activeCompany
+      ? user
+        ? getDefaultRouteForRole(user.role)
+        : "/dashboard"
+      : "/admin/companies";
 
   return (
     <Routes>
       <Route
         path="/"
-        element={<Navigate to={isAuthenticated ? defaultAuthenticatedPath : "/login"} replace />}
+        element={<Navigate to={defaultAuthenticatedPath} replace />}
       />
       <Route
         path="/login"
@@ -46,7 +54,14 @@ export function App(): JSX.Element {
           </AuthGuard>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <RoleGuard feature="dashboard">
+              <DashboardPage />
+            </RoleGuard>
+          }
+        />
         <Route
           path="/alerts"
           element={
@@ -56,6 +71,15 @@ export function App(): JSX.Element {
           }
         />
         <Route path="/forbidden" element={<ForbiddenPage />} />
+
+        <Route
+          path="/admin/companies"
+          element={
+            <RoleGuard feature="adminCompanies">
+              <AdminCompaniesPage />
+            </RoleGuard>
+          }
+        />
 
         <Route
           path="/admin/users"
@@ -80,6 +104,15 @@ export function App(): JSX.Element {
           element={
             <RoleGuard feature="financeTransactions">
               <FinanceTransactionsPage />
+            </RoleGuard>
+          }
+        />
+
+        <Route
+          path="/finance/salaries"
+          element={
+            <RoleGuard feature="financeSalaries">
+              <FinanceSalariesPage />
             </RoleGuard>
           }
         />

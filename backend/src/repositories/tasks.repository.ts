@@ -372,6 +372,50 @@ export async function updateOperationTaskStatus(input: {
   );
 }
 
+export async function updateOperationTask(input: {
+  companyId: string;
+  taskId: string;
+  title: string;
+  description: string | null;
+  metadata: Record<string, string>;
+  dueDate: Date | null;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      UPDATE tasks
+      SET
+        title = ?,
+        description = ?,
+        metadata_json = ?,
+        due_date = ?
+      WHERE company_id = ?
+        AND id = ?
+    `,
+    [
+      input.title,
+      input.description,
+      JSON.stringify(input.metadata),
+      input.dueDate,
+      input.companyId,
+      input.taskId
+    ]
+  );
+}
+
+export async function deleteOperationTask(input: {
+  companyId: string;
+  taskId: string;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      DELETE FROM tasks
+      WHERE company_id = ?
+        AND id = ?
+    `,
+    [input.companyId, input.taskId]
+  );
+}
+
 export async function listCompanyTaskAssignees(
   companyId: string,
   activityCode?: BusinessActivityCode

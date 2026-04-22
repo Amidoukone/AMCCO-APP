@@ -58,7 +58,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function BusinessActivityProvider({ children }: { children: ReactNode }): JSX.Element {
-  const { refreshSession, session, user } = useAuth();
+  const { activeCompany, refreshSession, session, user } = useAuth();
   const [activities, setActivities] = useState<CompanyActivityItem[]>([]);
   const [profiles, setProfiles] = useState<BusinessActivityProfile[]>([]);
   const [selectedActivityCode, setSelectedActivityCodeState] =
@@ -68,13 +68,13 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
 
   const syncSelectedActivity = useCallback(
     (items: CompanyActivityItem[], preferredCode: BusinessActivityCode | null = null) => {
-      if (!user?.companyId) {
+      if (!activeCompany?.id) {
         setSelectedActivityCodeState(null);
         return;
       }
 
       const enabledItems = items.filter((item) => item.isEnabled);
-      const persistedCode = readPersistedActivityCode(user.companyId);
+      const persistedCode = readPersistedActivityCode(activeCompany.id);
       const nextSelectedCode =
         enabledItems.find((item) => item.code === preferredCode)?.code ??
         enabledItems.find((item) => item.code === persistedCode)?.code ??
@@ -82,9 +82,9 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
         null;
 
       setSelectedActivityCodeState(nextSelectedCode);
-      persistActivityCode(user.companyId, nextSelectedCode);
+      persistActivityCode(activeCompany.id, nextSelectedCode);
     },
-    [user?.companyId]
+    [activeCompany?.id]
   );
 
   const withAuthorizedToken = useCallback(
@@ -111,7 +111,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   );
 
   const reloadActivities = useCallback(async () => {
-    if (!user) {
+    if (!user || !activeCompany) {
       setActivities([]);
       setProfiles([]);
       setSelectedActivityCodeState(null);
@@ -138,7 +138,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
     } finally {
       setIsLoading(false);
     }
-  }, [selectedActivityCode, syncSelectedActivity, user, withAuthorizedToken]);
+  }, [activeCompany, selectedActivityCode, syncSelectedActivity, user, withAuthorizedToken]);
 
   useEffect(() => {
     void reloadActivities();
@@ -147,11 +147,11 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   const setSelectedActivityCode = useCallback(
     (activityCode: BusinessActivityCode) => {
       setSelectedActivityCodeState(activityCode);
-      if (user?.companyId) {
-        persistActivityCode(user.companyId, activityCode);
+      if (activeCompany?.id) {
+        persistActivityCode(activeCompany.id, activityCode);
       }
     },
-    [user?.companyId]
+    [activeCompany?.id]
   );
 
   const selectedActivity = useMemo(

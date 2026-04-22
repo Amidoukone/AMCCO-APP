@@ -4,6 +4,12 @@ import type {
   MeResponse,
   RefreshResponse
 } from "../types/auth";
+import type {
+  AdminCompaniesListResponse,
+  AdminCompanySingleResponse,
+  CreateCompanyInput,
+  UpdateCompanyInput
+} from "../types/companies";
 import type { AuditLogsQuery, AuditLogsResponse } from "../types/audit";
 import type { AlertListResponse, AlertSeverity, AlertSummaryResponse } from "../types/alerts";
 import type {
@@ -22,11 +28,17 @@ import type {
   ReclassifyLegacyActivitiesResponse
 } from "../types/activities";
 import type {
+  FinancialAccountScopeType,
   FinancialAccountListResponse,
   FinancialAccountSingleResponse,
   FinanceProofUploadAuthResponse,
   FinancialTransactionListResponse,
   FinancialTransactionSingleResponse,
+  SalaryMemberListResponse,
+  SalaryPaymentMethod,
+  SalarySummaryResponse,
+  SalaryTransactionListResponse,
+  SalaryTransactionSingleResponse,
   TransactionProofListResponse
 } from "../types/finance";
 import type { BusinessActivityCode } from "../config/businessActivities";
@@ -119,6 +131,16 @@ export function refreshRequest(refreshToken: string): Promise<RefreshResponse> {
   return request<RefreshResponse>("/auth/refresh", {
     method: "POST",
     body: { refreshToken }
+  });
+}
+
+export function switchCompanyRequest(
+  refreshToken: string,
+  targetCompanyId: string
+): Promise<RefreshResponse> {
+  return request<RefreshResponse>("/auth/switch-company", {
+    method: "POST",
+    body: { refreshToken, targetCompanyId }
   });
 }
 
@@ -321,6 +343,48 @@ export function listAdminUsersRequest(accessToken: string): Promise<AdminUsersLi
   });
 }
 
+export function listAdminCompaniesRequest(
+  accessToken: string
+): Promise<AdminCompaniesListResponse> {
+  return request<AdminCompaniesListResponse>("/admin/companies", {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function createAdminCompanyRequest(
+  accessToken: string,
+  input: CreateCompanyInput
+): Promise<AdminCompanySingleResponse> {
+  return request<AdminCompanySingleResponse>("/admin/companies", {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function updateAdminCompanyRequest(
+  accessToken: string,
+  companyId: string,
+  input: UpdateCompanyInput
+): Promise<AdminCompanySingleResponse> {
+  return request<AdminCompanySingleResponse>(`/admin/companies/${companyId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function deleteAdminCompanyRequest(
+  accessToken: string,
+  companyId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/admin/companies/${companyId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
 export function createAdminUserRequest(
   accessToken: string,
   input: CreateAdminUserInput
@@ -448,6 +512,25 @@ export function createFinanceAccountRequest(
   });
 }
 
+export function updateFinanceAccountRequest(
+  accessToken: string,
+  accountId: string,
+  input: {
+    name: string;
+    accountRef?: string;
+    openingBalance?: string;
+    scopeType?: FinancialAccountScopeType;
+    primaryActivityCode?: BusinessActivityCode;
+    allowedActivityCodes?: BusinessActivityCode[];
+  }
+): Promise<FinancialAccountSingleResponse> {
+  return request<FinancialAccountSingleResponse>(`/finance/accounts/${accountId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
 export function listFinanceTransactionsRequest(
   accessToken: string,
   query: {
@@ -500,6 +583,183 @@ export function createFinanceTransactionRequest(
     body: input,
     accessToken
   });
+}
+
+export function deleteFinanceAccountRequest(
+  accessToken: string,
+  accountId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/finance/accounts/${accountId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
+export function updateFinanceTransactionRequest(
+  accessToken: string,
+  transactionId: string,
+  input: {
+    accountId: string;
+    type: "CASH_IN" | "CASH_OUT";
+    amount: string;
+    currency: string;
+    activityCode: BusinessActivityCode;
+    description?: string;
+    metadata?: Record<string, string>;
+    occurredAt: string;
+  }
+): Promise<FinancialTransactionSingleResponse> {
+  return request<FinancialTransactionSingleResponse>(`/finance/transactions/${transactionId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function listFinanceSalaryMembersRequest(
+  accessToken: string
+): Promise<SalaryMemberListResponse> {
+  return request<SalaryMemberListResponse>("/finance/salary-members", {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function listFinanceSalariesRequest(
+  accessToken: string,
+  query: {
+    limit?: number;
+    offset?: number;
+    status?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+    employeeUserId?: string;
+    payPeriod?: string;
+  } = {}
+): Promise<SalaryTransactionListResponse> {
+  const params = new URLSearchParams();
+  if (typeof query.limit === "number") {
+    params.set("limit", String(query.limit));
+  }
+  if (typeof query.offset === "number") {
+    params.set("offset", String(query.offset));
+  }
+  if (query.status) {
+    params.set("status", query.status);
+  }
+  if (query.employeeUserId) {
+    params.set("employeeUserId", query.employeeUserId);
+  }
+  if (query.payPeriod) {
+    params.set("payPeriod", query.payPeriod);
+  }
+  const suffix = params.toString();
+  const path = suffix ? `/finance/salaries?${suffix}` : "/finance/salaries";
+
+  return request<SalaryTransactionListResponse>(path, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function createFinanceSalaryRequest(
+  accessToken: string,
+  input: {
+    accountId: string;
+    employeeUserId: string;
+    payPeriod: string;
+    grossAmount: string;
+    bonusAmount?: string;
+    deductionAmount?: string;
+    currency?: string;
+    paymentMethod: SalaryPaymentMethod;
+    note?: string;
+    occurredAt: string;
+  }
+): Promise<SalaryTransactionSingleResponse> {
+  return request<SalaryTransactionSingleResponse>("/finance/salaries", {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function updateFinanceSalaryRequest(
+  accessToken: string,
+  transactionId: string,
+  input: {
+    accountId: string;
+    employeeUserId: string;
+    payPeriod: string;
+    grossAmount: string;
+    bonusAmount?: string;
+    deductionAmount?: string;
+    currency?: string;
+    paymentMethod: SalaryPaymentMethod;
+    note?: string;
+    occurredAt: string;
+  }
+): Promise<SalaryTransactionSingleResponse> {
+  return request<SalaryTransactionSingleResponse>(`/finance/salaries/${transactionId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function deleteFinanceSalaryRequest(
+  accessToken: string,
+  transactionId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/finance/salaries/${transactionId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
+export function confirmFinanceSalaryReceiptRequest(
+  accessToken: string,
+  transactionId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/finance/salaries/${transactionId}/confirm-receipt`, {
+    method: "PATCH",
+    accessToken
+  });
+}
+
+export function getFinanceSalarySummaryRequest(
+  accessToken: string,
+  query: {
+    payPeriod: string;
+    employeeUserId?: string;
+  }
+): Promise<SalarySummaryResponse> {
+  const params = new URLSearchParams();
+  params.set("payPeriod", query.payPeriod);
+  if (query.employeeUserId) {
+    params.set("employeeUserId", query.employeeUserId);
+  }
+  return request<SalarySummaryResponse>(`/finance/salaries/summary?${params.toString()}`, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function downloadFinanceSalaryExportRequest(
+  accessToken: string,
+  format: "csv" | "xlsx",
+  query: {
+    payPeriod: string;
+    employeeUserId?: string;
+  }
+): Promise<Blob> {
+  const params = new URLSearchParams();
+  params.set("payPeriod", query.payPeriod);
+  if (query.employeeUserId) {
+    params.set("employeeUserId", query.employeeUserId);
+  }
+  return download(
+    `/finance/salaries/exports/monthly.${format}?${params.toString()}`,
+    accessToken
+  );
 }
 
 export function listFinanceTransactionProofsRequest(
@@ -564,6 +824,16 @@ export function reviewFinanceTransactionRequest(
   });
 }
 
+export function deleteFinanceTransactionRequest(
+  accessToken: string,
+  transactionId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/finance/transactions/${transactionId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
 export function listOperationsTasksRequest(
   accessToken: string,
   query: {
@@ -617,6 +887,33 @@ export function createOperationsTaskRequest(
   return request<OperationTaskSingleResponse>("/operations/tasks", {
     method: "POST",
     body: input,
+    accessToken
+  });
+}
+
+export function updateOperationsTaskRequest(
+  accessToken: string,
+  taskId: string,
+  input: {
+    title: string;
+    description?: string;
+    metadata?: Record<string, string>;
+    dueDate?: string;
+  }
+): Promise<OperationTaskSingleResponse> {
+  return request<OperationTaskSingleResponse>(`/operations/tasks/${taskId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function deleteOperationsTaskRequest(
+  accessToken: string,
+  taskId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/operations/tasks/${taskId}`, {
+    method: "DELETE",
     accessToken
   });
 }

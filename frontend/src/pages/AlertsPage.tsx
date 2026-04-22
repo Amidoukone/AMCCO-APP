@@ -181,14 +181,14 @@ export function AlertsPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Alertes</h2>
-        <p>Centre d'alertes ciblees liees aux transactions et aux taches.</p>
+        <p>Centre de suivi des alertes liees aux transactions et aux taches.</p>
       </header>
 
       <section className="panel">
         <div className="alerts-header">
           <div>
             <h3>Vue utilisateur</h3>
-            <p className="hint">{unreadCount} alerte(s) non lue(s).</p>
+            <p className="hint">{unreadCount} alerte(s) a traiter.</p>
           </div>
           <button
             type="button"
@@ -254,7 +254,7 @@ export function AlertsPage(): JSX.Element {
             }
           />
 
-          <button type="submit">Appliquer</button>
+          <button type="submit">Filtrer</button>
         </form>
       </section>
 
@@ -264,7 +264,7 @@ export function AlertsPage(): JSX.Element {
       <section className="panel">
         <h3>Liste</h3>
         {isLoading ? <p>Chargement...</p> : null}
-        {!isLoading && items.length === 0 ? <p>Aucune alerte sur ce filtre.</p> : null}
+        {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond a ces filtres.</p> : null}
         {!isLoading && items.length > 0 ? (
           <div className="alerts-list">
             {items.map((item) => {
@@ -312,7 +312,7 @@ export function AlertsPage(): JSX.Element {
                           className="secondary-btn"
                           onClick={() => navigate(buildFinanceTransactionPath(financeTarget))}
                         >
-                          Ouvrir transaction
+                          {financeTarget.kind === "salary" ? "Voir le salaire" : "Voir la transaction"}
                         </button>
                       ) : null}
                       {isUnread ? (

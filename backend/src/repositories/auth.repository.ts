@@ -14,28 +14,42 @@ export type AuthUserRecord = {
   role: RoleCode;
 };
 
+export type ActiveUserRecord = {
+  userId: string;
+  email: string;
+  fullName: string;
+  passwordHash: string;
+};
+
+export type ActiveUserProfile = Omit<ActiveUserRecord, "passwordHash">;
+
 export type RefreshSessionRecord = {
   id: string;
   userId: string;
-  companyId: string;
+  companyId: string | null;
   tokenHash: string;
   expiresAt: Date;
   revokedAt: Date | null;
 };
 
 type AuthUserRow = RowDataPacket & AuthUserRecord;
+type ActiveUserRow = RowDataPacket & ActiveUserRecord;
 type RefreshSessionRow = RowDataPacket & {
   id: string;
   user_id: string;
-  company_id: string;
+  company_id: string | null;
   token_hash: string;
   expires_at: Date;
   revoked_at: Date | null;
 };
 
-export async function findAuthUserByEmailAndCompanyCode(
+type CountRow = RowDataPacket & {
+  total: number;
+};
+
+export async function findPreferredAuthUserByEmail(
   email: string,
-  companyCode: string
+  preferredCompanyCode = "AMCCO"
 ): Promise<AuthUserRecord | null> {
   const rows = await queryRows<AuthUserRow[]>(
     `
@@ -53,10 +67,73 @@ export async function findAuthUserByEmailAndCompanyCode(
       INNER JOIN memberships m ON m.user_id = u.id
       INNER JOIN companies c ON c.id = m.company_id
       WHERE u.email = ?
-        AND c.code = ?
+        AND u.is_active = 1
+        AND c.is_active = 1
+      ORDER BY
+        CASE WHEN c.code = ? THEN 0 ELSE 1 END,
+        CASE WHEN m.role = 'OWNER' THEN 0 WHEN m.role = 'SYS_ADMIN' THEN 1 ELSE 2 END,
+        c.name ASC,
+        c.code ASC
       LIMIT 1
     `,
-    [email, companyCode]
+    [email, preferredCompanyCode]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+}
+
+export async function countActiveCompanies(): Promise<number> {
+  const rows = await queryRows<CountRow[]>(
+    `
+      SELECT COUNT(*) AS total
+      FROM companies
+      WHERE is_active = 1
+    `
+  );
+
+  return rows[0]?.total ?? 0;
+}
+
+export async function findActiveUserByEmail(email: string): Promise<ActiveUserRecord | null> {
+  const rows = await queryRows<ActiveUserRow[]>(
+    `
+      SELECT
+        id AS userId,
+        email,
+        full_name AS fullName,
+        password_hash AS passwordHash
+      FROM users
+      WHERE email = ?
+        AND is_active = 1
+      LIMIT 1
+    `,
+    [email]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+}
+
+export async function findActiveUserById(userId: string): Promise<ActiveUserProfile | null> {
+  const rows = await queryRows<(RowDataPacket & ActiveUserProfile)[]>(
+    `
+      SELECT
+        id AS userId,
+        email,
+        full_name AS fullName
+      FROM users
+      WHERE id = ?
+        AND is_active = 1
+      LIMIT 1
+    `,
+    [userId]
   );
 
   if (rows.length === 0) {
@@ -69,7 +146,7 @@ export async function findAuthUserByEmailAndCompanyCode(
 export async function upsertRefreshSession(input: {
   id: string;
   userId: string;
-  companyId: string;
+  companyId: string | null;
   tokenHash: string;
   expiresAt: Date;
   ipAddress?: string | null;
@@ -166,4 +243,3 @@ export async function findUserProfileForCompany(
   }
   return rows[0];
 }
-

@@ -8,6 +8,21 @@ CREATE TABLE IF NOT EXISTS companies (
   id VARCHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   code VARCHAR(64) NOT NULL UNIQUE,
+  legal_name VARCHAR(255) NULL,
+  registration_number VARCHAR(128) NULL,
+  tax_id VARCHAR(128) NULL,
+  email VARCHAR(255) NULL,
+  phone VARCHAR(64) NULL,
+  website VARCHAR(255) NULL,
+  address_line_1 VARCHAR(255) NULL,
+  address_line_2 VARCHAR(255) NULL,
+  city VARCHAR(120) NULL,
+  state_region VARCHAR(120) NULL,
+  postal_code VARCHAR(32) NULL,
+  country VARCHAR(120) NULL,
+  business_sector VARCHAR(120) NULL,
+  contact_full_name VARCHAR(255) NULL,
+  contact_job_title VARCHAR(255) NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -49,7 +64,7 @@ CREATE TABLE IF NOT EXISTS memberships (
 CREATE TABLE IF NOT EXISTS refresh_sessions (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36) NOT NULL,
-  company_id VARCHAR(36) NOT NULL,
+  company_id VARCHAR(36) NULL,
   token_hash CHAR(64) NOT NULL UNIQUE,
   expires_at DATETIME NOT NULL,
   revoked_at DATETIME NULL,
@@ -100,6 +115,9 @@ CREATE TABLE IF NOT EXISTS transactions (
   metadata_json JSON NULL,
   status ENUM('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'DRAFT',
   requires_proof TINYINT(1) NOT NULL DEFAULT 1,
+  salary_confirmation_status ENUM('NOT_REQUIRED', 'PENDING', 'CONFIRMED') NOT NULL DEFAULT 'NOT_REQUIRED',
+  salary_confirmed_by_id VARCHAR(36) NULL,
+  salary_confirmed_at DATETIME NULL,
   created_by_id VARCHAR(36) NOT NULL,
   validated_by_id VARCHAR(36) NULL,
   occurred_at DATETIME NOT NULL,
@@ -108,10 +126,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   KEY idx_transaction_company_status_occurred (company_id, status, occurred_at),
   KEY idx_transaction_company_type_occurred (company_id, type, occurred_at),
   KEY idx_transaction_company_activity_occurred (company_id, activity_code, occurred_at),
+  KEY idx_transaction_company_salary_confirmation (company_id, salary_confirmation_status, occurred_at),
   CONSTRAINT fk_transaction_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
   CONSTRAINT fk_transaction_account FOREIGN KEY (account_id) REFERENCES financial_accounts(id) ON DELETE RESTRICT,
   CONSTRAINT fk_transaction_created_by FOREIGN KEY (created_by_id) REFERENCES users(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_transaction_validated_by FOREIGN KEY (validated_by_id) REFERENCES users(id) ON DELETE RESTRICT
+  CONSTRAINT fk_transaction_validated_by FOREIGN KEY (validated_by_id) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_transaction_salary_confirmed_by FOREIGN KEY (salary_confirmed_by_id) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS transaction_proofs (

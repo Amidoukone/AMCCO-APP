@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../lib/async-handler.js";
-import { login, logout, refresh } from "../services/auth.service.js";
+import { login, logout, refresh, switchCompany } from "../services/auth.service.js";
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
-  companyCode: z.string().trim().min(2).max(64)
+  password: z.string().min(1)
 });
 
 const refreshSchema = z.object({
@@ -15,6 +14,11 @@ const refreshSchema = z.object({
 
 const logoutSchema = z.object({
   refreshToken: z.string().min(20).optional()
+});
+
+const switchCompanySchema = z.object({
+  refreshToken: z.string().min(20),
+  targetCompanyId: z.string().uuid()
 });
 
 function getRequestMeta(req: { ip?: string; get: (name: string) => string | undefined }) {
@@ -34,7 +38,19 @@ authRouter.post(
     const result = await login({
       email: body.email.toLowerCase(),
       password: body.password,
-      companyCode: body.companyCode.toUpperCase(),
+      meta: getRequestMeta(req)
+    });
+    res.status(200).json(result);
+  })
+);
+
+authRouter.post(
+  "/auth/switch-company",
+  asyncHandler(async (req, res) => {
+    const body = switchCompanySchema.parse(req.body);
+    const result = await switchCompany({
+      refreshToken: body.refreshToken,
+      targetCompanyId: body.targetCompanyId,
       meta: getRequestMeta(req)
     });
     res.status(200).json(result);

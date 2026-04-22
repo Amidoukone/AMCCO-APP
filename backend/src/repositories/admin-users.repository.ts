@@ -111,6 +111,37 @@ export async function listCompanyUsers(companyId: string): Promise<CompanyUser[]
   return rows.map(toCompanyUser);
 }
 
+export async function listCompanyUsersByRoles(
+  companyId: string,
+  roles: RoleCode[]
+): Promise<CompanyUser[]> {
+  if (roles.length === 0) {
+    return [];
+  }
+
+  const placeholders = roles.map(() => "?").join(", ");
+  const rows = await queryRows<CompanyUserRow[]>(
+    `
+      SELECT
+        m.id AS membershipId,
+        u.id AS userId,
+        u.email AS email,
+        u.full_name AS fullName,
+        u.is_active AS isActive,
+        m.role AS role,
+        m.created_at AS membershipCreatedAt
+      FROM memberships m
+      INNER JOIN users u ON u.id = m.user_id
+      WHERE m.company_id = ?
+        AND m.role IN (${placeholders})
+      ORDER BY u.full_name ASC, u.email ASC
+    `,
+    [companyId, ...roles]
+  );
+
+  return rows.map(toCompanyUser);
+}
+
 export async function findMembershipByCompanyAndUser(
   companyId: string,
   userId: string
@@ -159,6 +190,22 @@ export async function findUserByEmail(email: string): Promise<UserRecord | null>
     return null;
   }
   return toUserRecord(rows[0]);
+}
+
+export async function listAllUsers(): Promise<UserRecord[]> {
+  const rows = await queryRows<UserRow[]>(
+    `
+      SELECT
+        id AS userId,
+        email AS email,
+        full_name AS fullName,
+        is_active AS isActive
+      FROM users
+      ORDER BY full_name ASC, email ASC
+    `
+  );
+
+  return rows.map(toUserRecord);
 }
 
 export async function createUser(input: {
@@ -232,6 +279,21 @@ export async function createMembership(input: {
   await getDbPool().execute<ResultSetHeader>(
     `
       INSERT INTO memberships (id, user_id, company_id, role)
+      VALUES (?, ?, ?, ?)
+    `,
+    [input.membershipId, input.userId, input.companyId, input.role]
+  );
+}
+
+export async function createMembershipIfMissing(input: {
+  membershipId: string;
+  companyId: string;
+  userId: string;
+  role: RoleCode;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      INSERT IGNORE INTO memberships (id, user_id, company_id, role)
       VALUES (?, ?, ?, ?)
     `,
     [input.membershipId, input.userId, input.companyId, input.role]

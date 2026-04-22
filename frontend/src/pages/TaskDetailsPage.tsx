@@ -41,9 +41,38 @@ function statusLabel(status: TaskStatus): string {
   return "Bloquee";
 }
 
+function statusDescription(status: TaskStatus): string {
+  if (status === "TODO") {
+    return "Tache en attente de lancement ou de prise en charge.";
+  }
+  if (status === "IN_PROGRESS") {
+    return "Execution active avec suivi operationnel en cours.";
+  }
+  if (status === "DONE") {
+    return "Execution finalisee. La tache est consideree comme cloturee.";
+  }
+  return "Blocage actif. Une action de supervision ou de debloquage est attendue.";
+}
+
+function statusToneClass(status: TaskStatus): string {
+  if (status === "TODO") {
+    return "todo";
+  }
+  if (status === "IN_PROGRESS") {
+    return "in-progress";
+  }
+  if (status === "DONE") {
+    return "done";
+  }
+  return "blocked";
+}
+
 function timelineActionLabel(action: string): string {
   if (action === "TASK_CREATED") {
     return "Creation de la tache";
+  }
+  if (action === "TASK_UPDATED") {
+    return "Modification de la tache";
   }
   if (action === "TASK_ASSIGNED") {
     return "Assignation";
@@ -78,6 +107,9 @@ function timelineDetail(event: OperationTaskTimelineEvent): string {
   }
   if (event.action === "TASK_ASSIGNED") {
     return "Tache assignee.";
+  }
+  if (event.action === "TASK_UPDATED") {
+    return "Contenu de la tache mis a jour.";
   }
   if (event.action === "TASK_UNASSIGNED") {
     return "Tache retiree de l'assigne precedent.";
@@ -350,10 +382,10 @@ export function TaskDetailsPage(): JSX.Element {
       <header className="section-header">
         <p>
           <Link to="/operations/tasks" className="task-back-link">
-            Retour aux taches
+            Retour a la liste des taches
           </Link>
         </p>
-        <h2>Detail tache</h2>
+        <h2>Detail de la tache</h2>
         {task ? (
           <p>
             Cette fiche est rattachee au secteur <strong>{getBusinessActivityLabel(task.activityCode)}</strong>.
@@ -371,6 +403,13 @@ export function TaskDetailsPage(): JSX.Element {
           <div className="task-detail-header">
             <h3>{task.title}</h3>
             <span className={`task-status-chip status-${task.status.toLowerCase()}`}>{statusLabel(task.status)}</span>
+          </div>
+          <div className={`task-status-hero status-tone-${statusToneClass(task.status)}`}>
+            <div className="task-status-hero-main">
+              <span className="task-status-hero-label">Etat actuel</span>
+              <strong>{statusLabel(task.status)}</strong>
+            </div>
+            <p className="task-status-hero-text">{statusDescription(task.status)}</p>
           </div>
           <p className="operations-task-description">{task.description?.trim() || "Aucune description fournie."}</p>
 
@@ -409,7 +448,7 @@ export function TaskDetailsPage(): JSX.Element {
           {isTaskCompleted ? (
             <div className="task-detail-closed-note">
               <strong>Tache terminee</strong>
-              <p>Les champs de statut et d'assignation sont masques une fois la tache cloturee.</p>
+              <p>Cette tache est cloturee. Les actions de statut et d'assignation sont masquees.</p>
             </div>
           ) : (
             <div className="task-detail-actions">
@@ -449,12 +488,12 @@ export function TaskDetailsPage(): JSX.Element {
                     </select>
                   </div>
                   <div className="operations-inline-group">
-                    <label>Note (optionnel)</label>
+                    <label>Commentaire (optionnel)</label>
                     <input
                       type="text"
                       value={assignmentNote}
                       onChange={(event) => setAssignmentNote(event.target.value)}
-                      placeholder="Contexte d'assignation"
+                      placeholder="Ajouter un commentaire d'assignation"
                       disabled={isSaving}
                     />
                   </div>
@@ -490,7 +529,7 @@ export function TaskDetailsPage(): JSX.Element {
               onClick={() => void handleAddComment()}
               disabled={isSaving || newComment.trim().length === 0}
             >
-              Publier commentaire
+              Ajouter le commentaire
             </button>
           </div>
         </section>
@@ -499,7 +538,7 @@ export function TaskDetailsPage(): JSX.Element {
       {!isLoading && task ? (
         <section className="panel">
           <h3>Timeline operationnelle</h3>
-          {timelineEntries.length === 0 ? <p>Aucun evenement.</p> : null}
+          {timelineEntries.length === 0 ? <p>Aucun evenement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
             <ol className="task-timeline">
               {timelineEntries.map((entry) => (

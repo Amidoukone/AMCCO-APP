@@ -1,16 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { HttpError } from "../errors/http-error.js";
+import { BOOTSTRAP_COMPANY_CODE, BOOTSTRAP_COMPANY_ID, isBootstrapCompanyId } from "../lib/bootstrap-auth.js";
 import { logger } from "../lib/logger.js";
 import { getTokenExpiryDate, signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/token.js";
 import { tokenHash } from "../lib/token-hash.js";
 import { verifyPassword } from "../lib/password.js";
 import {
-  findAuthUserByEmailAndCompanyCode,
+  countActiveCompanies,
+  findActiveUserByEmail,
+  findActiveUserById,
+  findPreferredAuthUserByEmail,
   findRefreshSessionById,
   findUserProfileForCompany,
   revokeRefreshSession,
   upsertRefreshSession
 } from "../repositories/auth.repository.js";
+import { findUserCompanyMembership } from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import type { AuthContext } from "../types/auth.js";
 
@@ -49,16 +54,84 @@ async function safeCreateAuditLog(input: {
 export async function login(input: {
   email: string;
   password: string;
-  companyCode: string;
   meta?: ClientMeta;
 }): Promise<{
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email: string; fullName: string; role: string; companyId: string; companyCode: string };
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+    companyId: string;
+    companyCode: string;
+    bootstrapMode: boolean;
+  };
 }> {
-  const record = await findAuthUserByEmailAndCompanyCode(input.email, input.companyCode);
+  const record = await findPreferredAuthUserByEmail(input.email, "AMCCO");
   if (!record) {
-    throw invalidCredentialsError();
+    const activeCompaniesCount = await countActiveCompanies();
+    if (activeCompaniesCount > 0) {
+      throw invalidCredentialsError();
+    }
+
+    const bootstrapUser = await findActiveUserByEmail(input.email);
+    if (!bootstrapUser) {
+      throw invalidCredentialsError();
+    }
+
+    const isPasswordValid = await verifyPassword(input.password, bootstrapUser.passwordHash);
+    if (!isPasswordValid) {
+      throw invalidCredentialsError();
+    }
+
+    const auth: AuthContext = {
+      userId: bootstrapUser.userId,
+      companyId: BOOTSTRAP_COMPANY_ID,
+      role: "OWNER",
+      email: bootstrapUser.email
+    };
+
+    const sessionId = randomUUID();
+    const accessToken = signAccessToken(auth);
+    const refreshToken = signRefreshToken(auth, sessionId);
+
+    await upsertRefreshSession({
+      id: sessionId,
+      userId: auth.userId,
+      companyId: null,
+      tokenHash: tokenHash(refreshToken),
+      expiresAt: getTokenExpiryDate(refreshToken),
+      ipAddress: input.meta?.ipAddress ?? null,
+      userAgent: input.meta?.userAgent ?? null
+    });
+
+    await safeCreateAuditLog({
+      companyId: auth.companyId,
+      actorId: auth.userId,
+      action: "AUTH_LOGIN",
+      entityType: "SESSION",
+      entityId: sessionId,
+      metadata: {
+        bootstrapMode: true,
+        ipAddress: input.meta?.ipAddress ?? null,
+        userAgent: input.meta?.userAgent ?? null
+      }
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: bootstrapUser.userId,
+        email: bootstrapUser.email,
+        fullName: bootstrapUser.fullName,
+        role: auth.role,
+        companyId: BOOTSTRAP_COMPANY_ID,
+        companyCode: BOOTSTRAP_COMPANY_CODE,
+        bootstrapMode: true
+      }
+    };
   }
   if (!record.userIsActive || !record.companyIsActive) {
     throw new HttpError(403, "Le compte utilisateur ou l'entreprise est desactive.");
@@ -111,7 +184,8 @@ export async function login(input: {
       fullName: record.fullName,
       role: record.role,
       companyId: record.companyId,
-      companyCode: record.companyCode
+      companyCode: record.companyCode,
+      bootstrapMode: false
     }
   };
 }
@@ -139,8 +213,51 @@ export async function refresh(input: {
     throw new HttpError(401, "Jeton de rafraichissement non reconnu.");
   }
 
-  if (session.userId !== payload.userId || session.companyId !== payload.companyId) {
+  const expectedCompanyId = session.companyId ?? BOOTSTRAP_COMPANY_ID;
+  if (session.userId !== payload.userId || expectedCompanyId !== payload.companyId) {
     throw new HttpError(401, "Jeton de rafraichissement hors perimetre.");
+  }
+
+  if (isBootstrapCompanyId(payload.companyId)) {
+    const bootstrapUser = await findActiveUserById(payload.userId);
+    if (!bootstrapUser) {
+      throw new HttpError(403, "L'utilisateur n'est plus actif.");
+    }
+
+    const auth: AuthContext = {
+      userId: bootstrapUser.userId,
+      companyId: BOOTSTRAP_COMPANY_ID,
+      role: "OWNER",
+      email: bootstrapUser.email
+    };
+
+    const accessToken = signAccessToken(auth);
+    const refreshToken = signRefreshToken(auth, payload.sessionId);
+
+    await upsertRefreshSession({
+      id: payload.sessionId,
+      userId: payload.userId,
+      companyId: null,
+      tokenHash: tokenHash(refreshToken),
+      expiresAt: getTokenExpiryDate(refreshToken),
+      ipAddress: input.meta?.ipAddress ?? null,
+      userAgent: input.meta?.userAgent ?? null
+    });
+
+    await safeCreateAuditLog({
+      companyId: auth.companyId,
+      actorId: auth.userId,
+      action: "AUTH_REFRESH",
+      entityType: "SESSION",
+      entityId: payload.sessionId,
+      metadata: {
+        bootstrapMode: true,
+        ipAddress: input.meta?.ipAddress ?? null,
+        userAgent: input.meta?.userAgent ?? null
+      }
+    });
+
+    return { accessToken, refreshToken };
   }
 
   const currentProfile = await findUserProfileForCompany(payload.userId, payload.companyId);
@@ -175,6 +292,78 @@ export async function refresh(input: {
     entityType: "SESSION",
     entityId: payload.sessionId,
     metadata: {
+      ipAddress: input.meta?.ipAddress ?? null,
+      userAgent: input.meta?.userAgent ?? null
+    }
+  });
+
+  return { accessToken, refreshToken };
+}
+
+export async function switchCompany(input: {
+  refreshToken: string;
+  targetCompanyId: string;
+  meta?: ClientMeta;
+}): Promise<{
+  accessToken: string;
+  refreshToken: string;
+}> {
+  const payload = verifyRefreshToken(input.refreshToken);
+  const session = await findRefreshSessionById(payload.sessionId);
+
+  if (!session) {
+    throw new HttpError(401, "Jeton de rafraichissement invalide.");
+  }
+
+  const now = new Date();
+  if (session.revokedAt || session.expiresAt <= now) {
+    throw new HttpError(401, "Jeton de rafraichissement expire ou revoque.");
+  }
+
+  if (session.tokenHash !== tokenHash(input.refreshToken)) {
+    throw new HttpError(401, "Jeton de rafraichissement non reconnu.");
+  }
+
+  const targetMembership = await findUserCompanyMembership({
+    userId: payload.userId,
+    companyId: input.targetCompanyId
+  });
+  if (!targetMembership || !targetMembership.company.isActive) {
+    throw new HttpError(403, "Aucun acces a l'entreprise cible.");
+  }
+
+  const auth: AuthContext = {
+    userId: payload.userId,
+    companyId: targetMembership.company.id,
+    role: targetMembership.role,
+    email: payload.email
+  };
+
+  await revokeRefreshSession(payload.sessionId);
+
+  const nextSessionId = randomUUID();
+  const accessToken = signAccessToken(auth);
+  const refreshToken = signRefreshToken(auth, nextSessionId);
+
+  await upsertRefreshSession({
+    id: nextSessionId,
+    userId: auth.userId,
+    companyId: auth.companyId,
+    tokenHash: tokenHash(refreshToken),
+    expiresAt: getTokenExpiryDate(refreshToken),
+    ipAddress: input.meta?.ipAddress ?? null,
+    userAgent: input.meta?.userAgent ?? null
+  });
+
+  await safeCreateAuditLog({
+    companyId: auth.companyId,
+    actorId: auth.userId,
+    action: "AUTH_COMPANY_SWITCH",
+    entityType: "SESSION",
+    entityId: nextSessionId,
+    metadata: {
+      fromCompanyId: payload.companyId,
+      toCompanyId: auth.companyId,
       ipAddress: input.meta?.ipAddress ?? null,
       userAgent: input.meta?.userAgent ?? null
     }
