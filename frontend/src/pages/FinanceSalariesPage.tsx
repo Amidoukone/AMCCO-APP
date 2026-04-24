@@ -253,9 +253,9 @@ export function FinanceSalariesPage(): JSX.Element {
           note: "Reception a confirmer"
         },
         {
-          title: "Prets a approuver",
+          title: "Prêts à approuver",
           value: String(readyForApprovalCount),
-          note: "Confirmation employee recue"
+          note: "Confirmation employé reçue"
         }
       ];
     }
@@ -274,7 +274,7 @@ export function FinanceSalariesPage(): JSX.Element {
       {
         title: "Approuves",
         value: String(salaryItems.filter((item) => item.status === "APPROVED").length),
-        note: "Salaires finalises"
+        note: "Salaires finalisés"
       }
     ];
   }, [canManageSalaries, salaryFilters.payPeriod, salaryItems, salarySummary?.totalNetAmount]);
@@ -430,8 +430,8 @@ export function FinanceSalariesPage(): JSX.Element {
       handleOpenSalaryDetails(response.item.id);
       setSuccessMessage(
         editingSalaryId
-          ? "Salaire modifie. Il repasse en brouillon et devra etre soumis a nouveau."
-          : "Salaire enregistre en brouillon."
+          ? "Salaire modifié. Il repasse en brouillon et devra être soumis à nouveau."
+          : "Salaire enregistré en brouillon."
       );
       resetSalaryForm();
       await loadData();
@@ -468,7 +468,7 @@ export function FinanceSalariesPage(): JSX.Element {
   async function handleDeleteSalary(item: SalaryTransaction): Promise<void> {
     const isApproved = item.status === "APPROVED";
     const confirmationMessage = isApproved
-      ? "Ce salaire est deja approuve. Confirmer sa suppression definitive ?"
+      ? "Ce salaire est déjà approuvé. Confirmer sa suppression définitive ?"
       : "Confirmer la suppression de ce salaire ?";
 
     if (!window.confirm(confirmationMessage)) {
@@ -488,7 +488,7 @@ export function FinanceSalariesPage(): JSX.Element {
       }
       setSuccessMessage(
         isApproved
-          ? "Salaire approuve supprime par l'admin systeme."
+          ? "Salaire approuvé supprimé par l'admin système."
           : "Salaire supprime."
       );
       await loadData();
@@ -660,7 +660,7 @@ export function FinanceSalariesPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         reviewFinanceTransactionRequest(accessToken, transactionId, decision)
       );
-      setSuccessMessage(decision === "APPROVED" ? "Salaire approuve." : "Salaire rejete.");
+      setSuccessMessage(decision === "APPROVED" ? "Salaire approuvé." : "Salaire rejeté.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -674,7 +674,7 @@ export function FinanceSalariesPage(): JSX.Element {
       <header className="section-header">
         <h2>Salaires</h2>
         <p>
-          Espace dedie au cycle de paie: preparation comptable, confirmation de reception par
+          Espace dédié au cycle de paie: préparation comptable, confirmation de réception par
           l'employe, puis approbation finale.
         </p>
       </header>
@@ -753,7 +753,7 @@ export function FinanceSalariesPage(): JSX.Element {
               <p className="hint">
                 {editingSalaryId
                   ? "Toute modification remet le salaire en brouillon et reinitialise la confirmation employe."
-                  : "Le salaire est cree en brouillon. Le comptable le verifie, le soumet a l'employe, puis l'approuve seulement apres confirmation de reception."}
+                  : "Le salaire est créé en brouillon. Le comptable le vérifie, le soumet à l'employé, puis l'approuve seulement après confirmation de réception."}
               </p>
             </div>
           </div>
@@ -942,7 +942,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 onClick={() => void handleExportSalaries("csv")}
                 disabled={busySalaryExport !== null}
               >
-                {busySalaryExport === "csv" ? "Preparation..." : "Salaires CSV"}
+                {busySalaryExport === "csv" ? "Préparation..." : "Salaires CSV"}
               </button>
               <button
                 type="button"
@@ -950,7 +950,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 onClick={() => void handleExportSalaries("xlsx")}
                 disabled={busySalaryExport !== null}
               >
-                {busySalaryExport === "xlsx" ? "Preparation..." : "Salaires Excel"}
+                {busySalaryExport === "xlsx" ? "Préparation..." : "Salaires Excel"}
               </button>
             </div>
           </div>
@@ -1086,7 +1086,7 @@ export function FinanceSalariesPage(): JSX.Element {
                               onClick={() => void handleConfirmReceipt(item.id)}
                               disabled={isBusy}
                             >
-                              Confirmer reception
+                              Confirmer réception
                             </button>
                           ) : null}
                           {canReview && item.status === "SUBMITTED" ? (
@@ -1099,7 +1099,7 @@ export function FinanceSalariesPage(): JSX.Element {
                                 title={
                                   canApproveSalary
                                     ? undefined
-                                    : "Attendre la confirmation de reception par l'employe."
+                                    : "Attendre la confirmation de réception par l'employé."
                                 }
                               >
                                 Approuver

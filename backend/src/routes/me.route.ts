@@ -1,8 +1,10 @@
 import { Router } from "express";
+import { z } from "zod";
 import { asyncHandler } from "../lib/async-handler.js";
 import { HttpError } from "../errors/http-error.js";
 import { isBootstrapCompanyId } from "../lib/bootstrap-auth.js";
 import { authenticateAccessToken, authorizeRoles } from "../middleware/auth.middleware.js";
+import { changeOwnPassword } from "../services/auth.service.js";
 import {
   findCompanyById,
   listUserCompanyMemberships
@@ -10,6 +12,10 @@ import {
 import { findActiveUserById, findUserProfileForCompany } from "../repositories/auth.repository.js";
 
 export const meRouter = Router();
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(128)
+});
 
 meRouter.get(
   "/me",
@@ -61,6 +67,27 @@ meRouter.get(
       memberships,
       bootstrapMode: false
     });
+  })
+);
+
+meRouter.patch(
+  "/me/password",
+  authenticateAccessToken,
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+
+    const body = changePasswordSchema.parse(req.body);
+
+    await changeOwnPassword({
+      userId: req.auth.userId,
+      companyId: req.auth.companyId,
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword
+    });
+
+    res.status(200).json({ status: "password_changed" });
   })
 );
 

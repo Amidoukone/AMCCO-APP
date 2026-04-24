@@ -38,15 +38,15 @@ function financeStatusLabel(status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECT
 
 function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
   if (status === "TODO") {
-    return "A faire";
+    return "À faire";
   }
   if (status === "IN_PROGRESS") {
     return "En cours";
   }
   if (status === "DONE") {
-    return "Terminee";
+    return "Terminée";
   }
-  return "Bloquee";
+  return "Bloquée";
 }
 
 export function DashboardPage(): JSX.Element {
@@ -118,17 +118,17 @@ export function DashboardPage(): JSX.Element {
         value: String(summary.company.financialAccountsCount),
         note: selectedActivityCode
           ? `${summary.finance.accountsSummary.compatibleCount} compatible(s) avec ${getBusinessActivityLabel(selectedActivityCode)}`
-          : `${summary.finance.totalTransactionsCount} transaction(s) enregistrees`
+          : `${summary.finance.totalTransactionsCount} transaction(s) enregistrées`
       },
       {
-        title: "Taches ouvertes",
+        title: "Tâches ouvertes",
         value: String(openTasksCount),
-        note: `${summary.operations.overdueCount} echeance(s) depassee(s)`
+        note: `${summary.operations.overdueCount} échéance(s) dépassée(s)`
       },
       {
-        title: "Mes taches ouvertes",
+        title: "Mes tâches ouvertes",
         value: String(summary.operations.myOpenTasksCount),
-        note: `${summary.operations.dueSoonCount} echeance(s) proche(s) sur 72h`
+        note: `${summary.operations.dueSoonCount} échéance(s) proche(s) sur 72h`
       }
     ];
   }, [selectedActivityCode, summary]);
@@ -331,12 +331,12 @@ export function DashboardPage(): JSX.Element {
             <p className="hint">
               {selectedActivityCode
                 ? `${summary.finance.accountsSummary.incompatibleCount} compte(s) restent hors du secteur ${getBusinessActivityLabel(selectedActivityCode)}.`
-                : "Sans secteur actif, la vue comptes reste globale a l'entreprise."}
+                : "Sans secteur actif, la vue comptes reste globale à l'entreprise."}
             </p>
 
             <div className="dashboard-currency-list">
               {summary.finance.totalsByCurrency.length === 0 ? (
-                <p className="hint">Aucun montant approuve n'est disponible pour le moment.</p>
+                <p className="hint">Aucun montant approuvé n'est disponible pour le moment.</p>
               ) : (
                 summary.finance.totalsByCurrency.map((item) => (
                   <article key={item.currency} className="dashboard-currency-card">
@@ -372,7 +372,7 @@ export function DashboardPage(): JSX.Element {
                         <td>{formatDateTime(item.occurredAt)}</td>
                         <td>{getBusinessActivityLabel(item.activityCode)}</td>
                         <td>{item.accountName}</td>
-                        <td>{item.type === "CASH_IN" ? "Entree" : "Sortie"}</td>
+                        <td>{item.type === "CASH_IN" ? "Entrée" : "Sortie"}</td>
                         <td>{formatAmount(item.amount, item.currency)}</td>
                         <td>{financeStatusLabel(item.status)}</td>
                       </tr>

@@ -83,6 +83,7 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
   const activityCode = asString(root.activityCode);
   const decision = asString(root.decision);
   const account = asObject(root.account);
+  const reviewer = asObject(root.reviewer);
   const salary = asObject(root.salary);
   const salaryConfirmation = asObject(root.salaryConfirmation);
 
@@ -112,6 +113,14 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
     lines.push(`Decision: ${decision}`);
   }
 
+  if (reviewer) {
+    const reviewerDisplayName =
+      asString(reviewer.displayName) ?? asString(reviewer.fullName) ?? asString(reviewer.email);
+    if (reviewerDisplayName) {
+      lines.push(`Validateur: ${reviewerDisplayName}`);
+    }
+  }
+
   if (salary) {
     const employeeFullName = asString(salary.employeeFullName);
     const payPeriod = asString(salary.payPeriod);
@@ -125,7 +134,7 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
 
   if (salaryConfirmation) {
     const status = asString(salaryConfirmation.status);
-    if (status) {
+    if (status && status !== "NOT_REQUIRED") {
       lines.push(`Confirmation salaire: ${status}`);
     }
   }

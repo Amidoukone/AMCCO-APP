@@ -121,7 +121,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: false,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte de caisse", true, "Caisse ou compte de vente utilise."),
         field("amount", "Montant", true, "Montant encaisse ou depense."),
@@ -129,8 +129,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       workflow: [
         workflow("CREATE", "Saisie terrain", "Le point de vente saisit le flux financier."),
-        workflow("PROOF", "Justificatif", "La facture, le recu ou le bon d'achat est joint."),
-        workflow("ACCOUNTING_REVIEW", "Validation comptable", "Le comptable valide ou rejette le flux.")
+        workflow("PROOF_OPTIONAL", "Justificatif", "Une preuve peut etre jointe quand elle est disponible."),
+        workflow("OVERVIEW", "Suivi global", "Le flux remonte directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -185,7 +185,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: false,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte d'exploitation", true, "Caisse ou compte utilise."),
         field("amount", "Montant", true, "Montant de l'operation."),
@@ -193,8 +193,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       workflow: [
         workflow("CREATE", "Saisie", "Le personnel saisit les encaissements ou depenses."),
-        workflow("PROOF", "Preuve", "Le justificatif est rattache avant soumission."),
-        workflow("ACCOUNTING_REVIEW", "Controle", "Le comptable controle et arbitre.")
+        workflow("PROOF_OPTIONAL", "Preuve", "Le justificatif peut etre rattache sans bloquer le flux."),
+        workflow("OVERVIEW", "Suivi global", "Le flux reste visible directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -228,8 +228,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         },
         {
           code: "pending-finance",
-          label: "Flux a arbitrer",
-          description: "Operations encore en attente de validation comptable.",
+          label: "Flux suivis",
+          description: "Operations remontees dans le suivi financier du commerce general.",
           metric: "submittedTransactionsCount",
           thresholds: { warningAt: 2, criticalAt: 6 }
         },
@@ -249,7 +249,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: true,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte d'encaissement", true, "Caisse ou compte utilise."),
         field("amount", "Montant", true, "Montant encaisse ou depense."),
@@ -262,7 +262,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       workflow: [
         workflow("CREATE", "Saisie rapide", "Le point de vente saisit ventes et achats."),
         workflow("TRACE", "Traçabilite", "Le libelle identifie le produit ou le lot concerne."),
-        workflow("ACCOUNTING_REVIEW", "Validation", "La comptabilite consolide les flux.")
+        workflow("OVERVIEW", "Suivi global", "Le flux consolide remonte directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -321,7 +321,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: true,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte locatif", true, "Compte ou caisse affecte au portefeuille locatif."),
         field("amount", "Montant du flux", true, "Montant du loyer, depot ou depense."),
@@ -333,8 +333,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       workflow: [
         workflow("CREATE", "Enregistrement", "Le flux est saisi en mentionnant bien ou locataire."),
-        workflow("PROOF", "Justificatif", "Le recu, l'avis ou la piece est rattache."),
-        workflow("ACCOUNTING_REVIEW", "Validation", "La comptabilite valide le flux locatif.")
+        workflow("PROOF_OPTIONAL", "Justificatif", "Le recu, l'avis ou la piece peuvent etre rattaches."),
+        workflow("OVERVIEW", "Suivi global", "Le flux locatif remonte directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -393,7 +393,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "USD"],
       requiresDescription: true,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte campagne", true, "Compte ou caisse de l'exploitation."),
         field("amount", "Montant", true, "Montant de l'operation."),
@@ -406,7 +406,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       workflow: [
         workflow("CREATE", "Saisie terrain", "Les depenses et recettes sont saisies par campagne."),
         workflow("TRACE", "Traçabilite", "Chaque flux mentionne parcelle, culture ou intrant."),
-        workflow("ACCOUNTING_REVIEW", "Validation", "Le back-office consolide le flux.")
+        workflow("OVERVIEW", "Suivi global", "Le flux remonte directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -465,7 +465,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: false,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte service", true, "Compte de facturation ou de depense."),
         field("amount", "Montant", true, "Montant du flux."),
@@ -473,8 +473,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       workflow: [
         workflow("CREATE", "Saisie", "Le flux est saisi a la creation ou facturation."),
-        workflow("PROOF", "Justificatif", "Facture ou piece jointe."),
-        workflow("ACCOUNTING_REVIEW", "Validation", "Le service comptable valide le flux.")
+        workflow("PROOF_OPTIONAL", "Justificatif", "Facture ou piece jointe si disponible."),
+        workflow("OVERVIEW", "Suivi global", "Le flux reste visible directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -529,7 +529,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "USD"],
       requiresDescription: true,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte de site", true, "Compte ou caisse rattache au site minier."),
         field("amount", "Montant", true, "Montant de la recette ou de la charge."),
@@ -541,8 +541,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       workflow: [
         workflow("CREATE", "Declaration terrain", "Le flux est declare avec reference site ou lot."),
-        workflow("TRACE", "Traçabilite forte", "Le justificatif et le contexte d'exploitation sont obligatoires."),
-        workflow("ACCOUNTING_REVIEW", "Validation renforcee", "Le comptable valide les flux a forte sensibilite.")
+        workflow("TRACE", "Traçabilite forte", "Le contexte d'exploitation conserve la tracabilite du flux."),
+        workflow("OVERVIEW", "Suivi global", "Le flux reste visible directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -575,8 +575,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       highlights: [
         {
           code: "mining-pending-review",
-          label: "Flux miniers a valider",
-          description: "Operations financieres minieres en attente de revue.",
+          label: "Flux miniers suivis",
+          description: "Operations financieres minieres visibles dans le suivi global.",
           metric: "submittedTransactionsCount",
           thresholds: { warningAt: 1, criticalAt: 4 }
         },
@@ -603,7 +603,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF"],
       requiresDescription: true,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte exploitation eau", true, "Compte ou caisse du service d'eau."),
         field("amount", "Montant", true, "Montant de l'operation."),
@@ -615,8 +615,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       workflow: [
         workflow("CREATE", "Declaration exploitation", "Le flux est declare avec le site ou reseau concerne."),
-        workflow("TRACE", "Justification", "Le justificatif et le contexte technique sont obligatoires."),
-        workflow("ACCOUNTING_REVIEW", "Validation", "Validation comptable du flux d'exploitation.")
+        workflow("TRACE", "Justification", "Le contexte technique documente le flux quand c'est necessaire."),
+        workflow("OVERVIEW", "Suivi global", "Le flux d'exploitation remonte directement dans le suivi financier.")
       ]
     },
     tasks: {
@@ -649,8 +649,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       highlights: [
         {
           code: "water-pending-review",
-          label: "Flux exploitation a valider",
-          description: "Flux financiers eau en attente de validation.",
+          label: "Flux exploitation suivis",
+          description: "Flux financiers eau visibles dans le suivi global.",
           metric: "submittedTransactionsCount",
           thresholds: { warningAt: 1, criticalAt: 3 }
         },
@@ -677,7 +677,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: true,
-      requiresProof: true,
+      requiresProof: false,
       fields: [
         field("accountId", "Compte agence", true, "Compte ou caisse de l'agence."),
         field("amount", "Montant", true, "Montant de la commission, avance ou depense."),
@@ -689,8 +689,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       workflow: [
         workflow("CREATE", "Enregistrement dossier", "Le flux est rattache a un mandat ou un bien."),
-        workflow("TRACE", "Traçabilite commerciale", "Justificatif et reference dossier obligatoires."),
-        workflow("ACCOUNTING_REVIEW", "Validation", "La comptabilite valide le flux commercial.")
+        workflow("TRACE", "Traçabilite commerciale", "La reference dossier garde la tracabilite commerciale du flux."),
+        workflow("OVERVIEW", "Suivi global", "Le flux commercial remonte directement dans le suivi financier.")
       ]
     },
     tasks: {

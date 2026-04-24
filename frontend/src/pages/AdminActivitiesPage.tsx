@@ -89,7 +89,7 @@ export function AdminActivitiesPage(): JSX.Element {
       setSuccessMessage(
         response.item.isEnabled
           ? `Secteur ${response.item.label} active.`
-          : `Secteur ${response.item.label} desactive.`
+          : `Secteur ${response.item.label} désactivé.`
       );
       await loadData();
       await reloadActivities();
@@ -104,7 +104,7 @@ export function AdminActivitiesPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Administration secteurs</h2>
-        <p>Ton role ne permet pas d'administrer les secteurs d'activite.</p>
+        <p>Votre rôle ne permet pas d'administrer les secteurs d'activité.</p>
       </section>
     );
   }
@@ -122,7 +122,7 @@ export function AdminActivitiesPage(): JSX.Element {
       <section className="panel">
         <h3>Configuration des secteurs</h3>
         <p className="hint">
-          Un secteur desactive n'est plus propose pour les nouvelles transactions et taches.
+          Un secteur désactivé n'est plus proposé pour les nouvelles transactions et tâches.
           L'historique reste accessible.
         </p>
         {isLoading ? <p>Chargement...</p> : null}
@@ -134,7 +134,7 @@ export function AdminActivitiesPage(): JSX.Element {
                   <h4>{item.label}</h4>
                   <p className="hint">{item.description}</p>
                   <p className="hint">
-                    Statut actuel: <strong>{item.isEnabled ? "Actif" : "Desactive"}</strong>
+                    Statut actuel: <strong>{item.isEnabled ? "Actif" : "Désactivé"}</strong>
                   </p>
                 </div>
                 <button
@@ -146,7 +146,7 @@ export function AdminActivitiesPage(): JSX.Element {
                   {busyActivityCode === item.code
                     ? "Mise a jour..."
                     : item.isEnabled
-                      ? "Desactiver"
+                      ? "Désactiver"
                       : "Activer"}
                 </button>
               </article>

@@ -6,6 +6,11 @@ export type LoginInput = {
   password: string;
 };
 
+export type ChangeOwnPasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
 export type LoginUser = {
   id: string;
   email: string;

@@ -28,7 +28,7 @@ export function LoginPage(): JSX.Element {
       if (error instanceof ApiError) {
         setErrorMessage(error.message);
       } else {
-        setErrorMessage("Connexion impossible. Verifie le backend.");
+        setErrorMessage("Connexion impossible. Vérifiez le backend.");
       }
     } finally {
       setIsSubmitting(false);

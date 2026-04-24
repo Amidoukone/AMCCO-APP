@@ -40,7 +40,7 @@ type ActorContext = {
 
 type TaskScope = "ALL" | "ASSIGNED_TO_ME" | "CREATED_BY_ME" | "MINE";
 
-const OPERATIONS_ACCESS_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "SUPERVISOR", "EMPLOYEE"];
+const OPERATIONS_ACCESS_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"];
 const TASK_MANAGEMENT_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "SUPERVISOR"];
 const TASK_TIMELINE_ACTIONS = [
   "TASK_CREATED",
@@ -65,10 +65,7 @@ function canCreateTasks(role: RoleCode): boolean {
 }
 
 function canEditTask(actor: ActorContext, task: { createdById: string }): boolean {
-  if (canManageTasks(actor.role)) {
-    return true;
-  }
-  return actor.role === "EMPLOYEE" && task.createdById === actor.actorId;
+  return task.createdById === actor.actorId;
 }
 
 function canViewTask(actor: ActorContext, task: { createdById: string; assignedToId: string | null }): boolean {
@@ -389,18 +386,21 @@ export async function assignCompanyTask(
   }
 
   if (nextAssignedToId && nextAssignedToId !== actor.actorId) {
+    const note = input.note?.trim() || null;
     await createUserTargetedAlerts({
       companyId: actor.companyId,
       recipientUserIds: [nextAssignedToId],
       code: "TASK_ASSIGNED",
-      message: `Une tache vous a ete assignee: ${updated.title}`,
+      message: note
+        ? `Une tache vous a ete assignee: ${updated.title}. Note: ${note}`
+        : `Une tache vous a ete assignee: ${updated.title}`,
       severity: "INFO",
       entityType: "TASK",
       entityId: updated.id,
       metadata: {
         taskId: updated.id,
         title: updated.title,
-        note: input.note?.trim() || null
+        note
       }
     });
   }

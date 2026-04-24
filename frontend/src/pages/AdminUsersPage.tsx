@@ -129,7 +129,7 @@ export function AdminUsersPage(): JSX.Element {
         password: "",
         role: "EMPLOYEE"
       });
-      setSuccessMessage("Utilisateur cree avec succes.");
+      setSuccessMessage("Utilisateur créé avec succès.");
       await loadUsers();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -247,7 +247,7 @@ export function AdminUsersPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Administration utilisateurs</h2>
-        <p>Ton role ne permet pas de gerer les utilisateurs.</p>
+        <p>Votre rôle ne permet pas de gérer les utilisateurs.</p>
       </section>
     );
   }

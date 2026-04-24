@@ -70,22 +70,48 @@ describe("tasks.service", () => {
   });
 
   describe("createCompanyTask", () => {
-    it("rejects task creation for unauthorized roles", async () => {
-      const promise = createCompanyTask(
+    it("allows an accountant to create a task", async () => {
+      vi.mocked(findOperationTaskById).mockResolvedValue({
+        id: "task-accountant",
+        companyId: actor.companyId,
+        title: "Relancer fournisseur",
+        description: "Suivre le paiement",
+        activityCode: "SERVICES",
+        metadata: {},
+        status: "TODO",
+        createdById: "accountant-1",
+        createdByEmail: "accountant@example.com",
+        createdByFullName: "Comptable Test",
+        assignedToId: null,
+        assignedToEmail: null,
+        assignedToFullName: null,
+        dueDate: null,
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z"
+      });
+
+      const result = await createCompanyTask(
         {
           ...actor,
+          actorId: "accountant-1",
           role: "ACCOUNTANT"
         },
         {
-          title: "Relancer client"
+          title: "Relancer fournisseur",
+          description: "Suivre le paiement",
+          activityCode: "SERVICES"
         }
       );
 
-      await expect(promise).rejects.toMatchObject<HttpError>({
-        statusCode: 403,
-        message: "Permissions insuffisantes pour creer une tache."
-      });
-      expect(createOperationTask).not.toHaveBeenCalled();
+      expect(createOperationTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdById: "accountant-1",
+          assignedToId: null,
+          status: "TODO",
+          title: "Relancer fournisseur"
+        })
+      );
+      expect(result.createdById).toBe("accountant-1");
     });
 
     it("allows an employee to create a task and alerts supervisors", async () => {
@@ -329,7 +355,7 @@ describe("tasks.service", () => {
         companyId: actor.companyId,
         recipientUserIds: ["employee-2"],
         code: "TASK_ASSIGNED",
-        message: "Une tache vous a ete assignee: Verifier dossier",
+        message: "Une tache vous a ete assignee: Verifier dossier. Note: A traiter aujourd'hui",
         severity: "INFO",
         entityType: "TASK",
         entityId: "task-2",
@@ -424,6 +450,39 @@ describe("tasks.service", () => {
       );
       expect(result.title).toBe("Controle stock urgent");
     });
+
+    it("rejects update when the actor did not create the task", async () => {
+      vi.mocked(findOperationTaskById).mockResolvedValue({
+        id: "task-6b",
+        companyId: actor.companyId,
+        title: "Controle stock",
+        description: "Version initiale",
+        activityCode: "GENERAL_STORE",
+        metadata: {},
+        status: "TODO",
+        createdById: "employee-1",
+        createdByEmail: "employee@example.com",
+        createdByFullName: "Employee One",
+        assignedToId: actor.actorId,
+        assignedToEmail: "manager@example.com",
+        assignedToFullName: "Manager One",
+        dueDate: null,
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z"
+      });
+
+      const promise = updateCompanyTask(actor, {
+        taskId: "task-6b",
+        title: "Controle stock urgent",
+        description: "Version ajustee"
+      });
+
+      await expect(promise).rejects.toMatchObject<HttpError>({
+        statusCode: 403,
+        message: "Permissions insuffisantes pour modifier cette tache."
+      });
+      expect(updateOperationTask).not.toHaveBeenCalled();
+    });
   });
 
   describe("deleteCompanyTask", () => {
@@ -468,6 +527,37 @@ describe("tasks.service", () => {
           entityId: "task-7"
         })
       );
+    });
+
+    it("rejects deletion when the actor did not create the task", async () => {
+      vi.mocked(findOperationTaskById).mockResolvedValue({
+        id: "task-7b",
+        companyId: actor.companyId,
+        title: "Collecte infos",
+        description: null,
+        activityCode: "SERVICES",
+        metadata: {},
+        status: "TODO",
+        createdById: "employee-1",
+        createdByEmail: "employee@example.com",
+        createdByFullName: "Employee One",
+        assignedToId: actor.actorId,
+        assignedToEmail: "manager@example.com",
+        assignedToFullName: "Manager One",
+        dueDate: null,
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z"
+      });
+
+      const promise = deleteCompanyTask(actor, {
+        taskId: "task-7b"
+      });
+
+      await expect(promise).rejects.toMatchObject<HttpError>({
+        statusCode: 403,
+        message: "Permissions insuffisantes pour supprimer cette tache."
+      });
+      expect(deleteOperationTask).not.toHaveBeenCalled();
     });
   });
 

@@ -4,9 +4,10 @@ import { BOOTSTRAP_COMPANY_CODE, BOOTSTRAP_COMPANY_ID, isBootstrapCompanyId } fr
 import { logger } from "../lib/logger.js";
 import { getTokenExpiryDate, signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/token.js";
 import { tokenHash } from "../lib/token-hash.js";
-import { verifyPassword } from "../lib/password.js";
+import { hashPassword, verifyPassword } from "../lib/password.js";
 import {
   countActiveCompanies,
+  findActiveUserAuthById,
   findActiveUserByEmail,
   findActiveUserById,
   findPreferredAuthUserByEmail,
@@ -17,6 +18,7 @@ import {
 } from "../repositories/auth.repository.js";
 import { findUserCompanyMembership } from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
+import { updateUserPasswordHash } from "../repositories/admin-users.repository.js";
 import type { AuthContext } from "../types/auth.js";
 
 export type ClientMeta = {
@@ -89,7 +91,8 @@ export async function login(input: {
       userId: bootstrapUser.userId,
       companyId: BOOTSTRAP_COMPANY_ID,
       role: "OWNER",
-      email: bootstrapUser.email
+      email: bootstrapUser.email,
+      fullName: bootstrapUser.fullName
     };
 
     const sessionId = randomUUID();
@@ -146,7 +149,8 @@ export async function login(input: {
     userId: record.userId,
     companyId: record.companyId,
     role: record.role,
-    email: record.email
+    email: record.email,
+    fullName: record.fullName
   };
 
   const sessionId = randomUUID();
@@ -228,7 +232,8 @@ export async function refresh(input: {
       userId: bootstrapUser.userId,
       companyId: BOOTSTRAP_COMPANY_ID,
       role: "OWNER",
-      email: bootstrapUser.email
+      email: bootstrapUser.email,
+      fullName: bootstrapUser.fullName
     };
 
     const accessToken = signAccessToken(auth);
@@ -269,7 +274,8 @@ export async function refresh(input: {
     userId: currentProfile.userId,
     companyId: payload.companyId,
     role: currentProfile.role,
-    email: currentProfile.email
+    email: currentProfile.email,
+    fullName: currentProfile.fullName
   };
 
   const accessToken = signAccessToken(auth);
@@ -336,7 +342,8 @@ export async function switchCompany(input: {
     userId: payload.userId,
     companyId: targetMembership.company.id,
     role: targetMembership.role,
-    email: payload.email
+    email: payload.email,
+    fullName: payload.fullName
   };
 
   await revokeRefreshSession(payload.sessionId);
@@ -390,4 +397,53 @@ export async function logout(input: { refreshToken?: string }): Promise<void> {
   } catch {
     return;
   }
+}
+
+export async function changeOwnPassword(input: {
+  userId: string;
+  companyId: string;
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  const user = await findActiveUserAuthById(input.userId);
+  if (!user) {
+    throw new HttpError(404, "Utilisateur introuvable.");
+  }
+
+  const currentPassword = input.currentPassword.trim();
+  const newPassword = input.newPassword.trim();
+
+  if (currentPassword.length === 0) {
+    throw new HttpError(400, "Le mot de passe actuel est requis.");
+  }
+
+  if (newPassword.length < 8) {
+    throw new HttpError(400, "Le nouveau mot de passe doit contenir au moins 8 caracteres.");
+  }
+
+  if (currentPassword === newPassword) {
+    throw new HttpError(400, "Le nouveau mot de passe doit etre different de l'ancien.");
+  }
+
+  const isPasswordValid = await verifyPassword(currentPassword, user.passwordHash);
+  if (!isPasswordValid) {
+    throw new HttpError(400, "Le mot de passe actuel est incorrect.");
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  await updateUserPasswordHash({
+    userId: input.userId,
+    passwordHash
+  });
+
+  await safeCreateAuditLog({
+    companyId: input.companyId,
+    actorId: input.userId,
+    action: "AUTH_PASSWORD_CHANGED",
+    entityType: "USER",
+    entityId: input.userId,
+    metadata: {
+      email: user.email
+    }
+  });
 }

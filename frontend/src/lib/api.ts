@@ -1,4 +1,5 @@
 import type {
+  ChangeOwnPasswordInput,
   LoginInput,
   LoginResponse,
   MeResponse,
@@ -154,6 +155,17 @@ export function logoutRequest(refreshToken: string): Promise<{ status: string }>
 export function meRequest(accessToken: string): Promise<MeResponse> {
   return request<MeResponse>("/me", {
     method: "GET",
+    accessToken
+  });
+}
+
+export function changeOwnPasswordRequest(
+  accessToken: string,
+  input: ChangeOwnPasswordInput
+): Promise<{ status: string }> {
+  return request<{ status: string }>("/me/password", {
+    method: "PATCH",
+    body: input,
     accessToken
   });
 }

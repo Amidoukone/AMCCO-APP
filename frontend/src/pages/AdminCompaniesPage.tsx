@@ -47,7 +47,7 @@ function formatCompanyAddress(item: AdminCompanyItem): string {
     item.company.country
   ].filter((value): value is string => Boolean(value && value.trim()));
 
-  return parts.length > 0 ? parts.join(", ") : "Adresse non renseignee";
+  return parts.length > 0 ? parts.join(", ") : "Adresse non renseignée";
 }
 
 function createFormStateFromCompany(item: AdminCompanyItem): CreateCompanyInput {
@@ -148,7 +148,7 @@ export function AdminCompaniesPage(): JSX.Element {
 
   function getCompanyUpdateLockMessage(item: AdminCompanyItem): string | null {
     if (!item.company.isActive) {
-      return "Cette entreprise est inactive et ne peut plus etre modifiee.";
+      return "Cette entreprise est inactive et ne peut plus être modifiée.";
     }
 
     if (item.role !== "OWNER" && item.role !== "SYS_ADMIN") {
@@ -164,7 +164,7 @@ export function AdminCompaniesPage(): JSX.Element {
     }
 
     if (item.role !== "OWNER") {
-      return "Seul le proprietaire de cette entreprise peut la supprimer.";
+      return "Seul le propriétaire de cette entreprise peut la supprimer.";
     }
 
     if (activeCompany?.id === item.company.id) {
@@ -172,7 +172,7 @@ export function AdminCompaniesPage(): JSX.Element {
     }
 
     if (item.company.code === "AMCCO") {
-      return "L'entreprise par defaut AMCCO ne peut pas etre supprimee.";
+      return "L'entreprise par défaut AMCCO ne peut pas être supprimée.";
     }
 
     return null;
@@ -265,7 +265,7 @@ export function AdminCompaniesPage(): JSX.Element {
       if (editingCompanyId === item.company.id) {
         resetCompanyForm();
       }
-      setSuccessMessage(`Entreprise ${item.company.name} desactivee.`);
+      setSuccessMessage(`Entreprise ${item.company.name} désactivée.`);
       await reloadProfile();
       await loadCompanies();
     } catch (error) {
@@ -281,7 +281,7 @@ export function AdminCompaniesPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await switchCompany(companyId);
-      setSuccessMessage("Entreprise active mise a jour.");
+      setSuccessMessage("Entreprise active mise à jour.");
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -293,7 +293,7 @@ export function AdminCompaniesPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Administration entreprises</h2>
-        <p>Ton role ne permet pas d'administrer les entreprises.</p>
+        <p>Votre rôle ne permet pas d'administrer les entreprises.</p>
       </section>
     );
   }
@@ -304,8 +304,8 @@ export function AdminCompaniesPage(): JSX.Element {
         <h2>Administration entreprises</h2>
         <p>
           {activeCompany
-            ? "AMCCO reste l'entreprise par defaut. Tu peux creer d'autres entreprises et basculer entre les societes auxquelles ton compte est rattache."
-            : "Aucune entreprise active n'existe encore. Cree la premiere entreprise pour initialiser l'application et debloquer les modules metier."}
+            ? "AMCCO reste l'entreprise par défaut. Vous pouvez créer d'autres entreprises et basculer entre les sociétés auxquelles votre compte est rattaché."
+            : "Aucune entreprise active n'existe encore. Créez la première entreprise pour initialiser l'application et débloquer les modules métier."}
         </p>
       </header>
 
@@ -317,11 +317,11 @@ export function AdminCompaniesPage(): JSX.Element {
           <div>
             <h3>Entreprises accessibles</h3>
             <p className="hint">
-              {memberships.length} entreprise(s) rattachee(s) a votre compte.
+              {memberships.length} entreprise(s) rattachée(s) à votre compte.
             </p>
           </div>
           <div className="company-active-badge">
-            Entreprise active: <strong>{activeCompany?.name ?? "Non definie"}</strong>
+            Entreprise active: <strong>{activeCompany?.name ?? "Non définie"}</strong>
           </div>
         </div>
 
@@ -427,10 +427,10 @@ export function AdminCompaniesPage(): JSX.Element {
       </section>
 
       <section className="panel">
-        <h3>{isEditingCompany ? "Modifier une entreprise" : "Creer une entreprise"}</h3>
+        <h3>{isEditingCompany ? "Modifier une entreprise" : "Créer une entreprise"}</h3>
         <p className="hint">
           {isEditingCompany
-            ? "Le code reste immuable apres creation pour proteger le routage multi-entreprises."
+            ? "Le code reste immuable après création pour protéger le routage multi-entreprises."
             : "Formulaire simplifie avec les informations essentielles. La creation reste compatible avec la structure multi-sectorielle deja en place."}
         </p>
         <div className="company-admin-form">
@@ -449,7 +449,7 @@ export function AdminCompaniesPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="Numero RCCM / registre"
+            placeholder="Numéro RCCM / registre"
             value={form.registrationNumber ?? ""}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, registrationNumber: event.target.value }))
@@ -503,9 +503,9 @@ export function AdminCompaniesPage(): JSX.Element {
           >
             <option value="Mali">Mali</option>
             <option value="Cote d'Ivoire">Cote d'Ivoire</option>
-            <option value="Senegal">Senegal</option>
+            <option value="Senegal">Sénégal</option>
             <option value="Burkina Faso">Burkina Faso</option>
-            <option value="Guinee">Guinee</option>
+            <option value="Guinee">Guinée</option>
             <option value="Niger">Niger</option>
           </select>
           <button

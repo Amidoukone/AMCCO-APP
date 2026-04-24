@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "../errors/http-error.js";
 import {
+  addTransactionProof,
   confirmSalaryReceipt,
   countTransactionProofs,
   createFinancialAccount,
@@ -22,6 +23,7 @@ import { createRoleTargetedAlerts, createUserTargetedAlerts } from "./alerts.ser
 import { ensureCompanyActivityEnabledOrThrow } from "./company-activities.service.js";
 import { findMembershipByCompanyAndUser, listCompanyUsers } from "../repositories/admin-users.repository.js";
 import {
+  addProofToTransaction,
   createCompanyAccount,
   confirmCompanySalaryReceipt,
   deleteCompanyAccount,
@@ -902,8 +904,78 @@ describe("finance.service", () => {
     });
   });
 
+  describe("addProofToTransaction", () => {
+    it("rejects proofs on salary transactions", async () => {
+      vi.mocked(findTransactionById).mockResolvedValue({
+        id: "salary-1",
+        companyId: actor.companyId,
+        createdById: actor.actorId,
+        activityCode: null,
+        status: "DRAFT",
+        requiresProof: false,
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
+      vi.mocked(findFinancialTransactionById).mockResolvedValue({
+        id: "salary-1",
+        companyId: actor.companyId,
+        accountId: "account-salary",
+        accountName: "Compte paie",
+        accountRef: "PAY-01",
+        accountScopeType: "GLOBAL",
+        accountPrimaryActivityCode: null,
+        accountAllowedActivityCodes: [],
+        type: "CASH_OUT",
+        amount: "125000.00",
+        currency: "XOF",
+        activityCode: null,
+        description: "Salaire 2026-04 - Agent Test",
+        metadata: {
+          entryCategory: "SALARY",
+          employeeUserId: "employee-1",
+          employeeFullName: "Agent Test",
+          employeeEmail: "agent@example.com",
+          employeeRole: "ACCOUNTANT",
+          payPeriod: "2026-04",
+          grossAmount: "130000.00",
+          bonusAmount: "0.00",
+          deductionAmount: "5000.00",
+          netAmount: "125000.00",
+          paymentMethod: "BANK_TRANSFER"
+        },
+        status: "DRAFT",
+        requiresProof: false,
+        createdById: actor.actorId,
+        createdByEmail: "actor@example.com",
+        validatedById: null,
+        validatedByEmail: null,
+        salaryConfirmationStatus: "NOT_REQUIRED",
+        salaryConfirmedById: null,
+        salaryConfirmedByEmail: null,
+        salaryConfirmedAt: null,
+        occurredAt: "2026-04-20T08:00:00.000Z",
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z",
+        proofsCount: 0
+      });
+
+      const promise = addProofToTransaction(actor, {
+        transactionId: "salary-1",
+        storageKey: "/salary-proof.pdf",
+        fileName: "salary-proof.pdf",
+        mimeType: "application/pdf",
+        fileSize: 1024
+      });
+
+      await expect(promise).rejects.toMatchObject<HttpError>({
+        statusCode: 400,
+        message: "Les preuves ne sont pas gerees pour les salaires."
+      });
+      expect(addTransactionProof).not.toHaveBeenCalled();
+    });
+  });
+
   describe("submitCompanyTransaction", () => {
-    it("rejects submission when required proof is missing", async () => {
+    it("submits a transaction without proof and finalizes it immediately", async () => {
       vi.mocked(findTransactionById).mockResolvedValue({
         id: "txn-1",
         companyId: actor.companyId,
@@ -953,21 +1025,40 @@ describe("finance.service", () => {
         allowedActivityCodes: [],
         createdAt: "2026-04-20T08:00:00.000Z"
       });
-      vi.mocked(countTransactionProofs).mockResolvedValue(0);
+      vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue(null);
+      await submitCompanyTransaction(
+        {
+          ...actor,
+          email: "actor@example.com",
+          fullName: "Agent Finance"
+        },
+        {
+          transactionId: "txn-1"
+        }
+      );
 
-      const promise = submitCompanyTransaction(actor, {
-        transactionId: "txn-1"
+      expect(submitTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "txn-1",
+        salaryConfirmationStatus: "NOT_REQUIRED"
       });
-
-      await expect(promise).rejects.toMatchObject<HttpError>({
-        statusCode: 400,
-        message: "Une preuve est obligatoire avant la soumission."
+      expect(reviewTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "txn-1",
+        reviewerId: actor.actorId,
+        status: "APPROVED"
       });
-      expect(submitTransaction).not.toHaveBeenCalled();
-      expect(createRoleTargetedAlerts).not.toHaveBeenCalled();
+      expect(countTransactionProofs).not.toHaveBeenCalled();
+      expect(createRoleTargetedAlerts).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "FINANCE_TRANSACTION_SUBMITTED",
+          severity: "INFO",
+          entityId: "txn-1"
+        })
+      );
     });
 
-    it("submits the transaction, audits, and alerts reviewers", async () => {
+    it("submits the transaction, finalizes it, audits, and alerts the finance overview", async () => {
       vi.mocked(findTransactionById).mockResolvedValue({
         id: "txn-1",
         companyId: actor.companyId,
@@ -1017,16 +1108,28 @@ describe("finance.service", () => {
         allowedActivityCodes: ["GENERAL_STORE", "FOOD"],
         createdAt: "2026-04-20T08:00:00.000Z"
       });
-      vi.mocked(countTransactionProofs).mockResolvedValue(1);
-
-      await submitCompanyTransaction(actor, {
-        transactionId: "txn-1"
-      });
+      vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue(null);
+      await submitCompanyTransaction(
+        {
+          ...actor,
+          email: "actor@example.com",
+          fullName: "Agent Finance"
+        },
+        {
+          transactionId: "txn-1"
+        }
+      );
 
       expect(submitTransaction).toHaveBeenCalledWith({
         companyId: actor.companyId,
         transactionId: "txn-1",
         salaryConfirmationStatus: "NOT_REQUIRED"
+      });
+      expect(reviewTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "txn-1",
+        reviewerId: actor.actorId,
+        status: "APPROVED"
       });
       expect(createAuditLogRecord).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1037,28 +1140,39 @@ describe("finance.service", () => {
           metadataJson: expect.stringContaining("\"scopeType\":\"RESTRICTED\"")
         })
       );
+      expect(createAuditLogRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadataJson: expect.stringContaining("\"displayName\":\"Agent Finance\"")
+        })
+      );
       expect(createRoleTargetedAlerts).toHaveBeenCalledWith({
         companyId: actor.companyId,
         recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_TRANSACTION_SUBMITTED",
-        message: "Une transaction Magasins (commerce general) a ete soumise et attend une validation comptable.",
-        severity: "WARNING",
+        message: "Une transaction Magasins (commerce general) a ete enregistree et est disponible dans le suivi financier.",
+        severity: "INFO",
         entityType: "TRANSACTION",
         entityId: "txn-1",
         metadata: expect.objectContaining({
           transactionId: "txn-1",
           createdById: actor.actorId,
           activityCode: "GENERAL_STORE",
+          status: "APPROVED",
+          reviewer: expect.objectContaining({
+            id: actor.actorId,
+            displayName: "Agent Finance"
+          }),
           account: expect.objectContaining({
             scopeType: "RESTRICTED",
             scopeLabel: "Restreint: Magasins (commerce general), Alimentation"
           })
         })
       });
+      expect(countTransactionProofs).not.toHaveBeenCalled();
     });
 
-    it("submits a salary for employee confirmation and alerts the employee", async () => {
+    it("submits and finalizes a salary, then alerts the employee and the finance overview", async () => {
       vi.mocked(findTransactionById).mockResolvedValue({
         id: "salary-1",
         companyId: actor.companyId,
@@ -1121,11 +1235,14 @@ describe("finance.service", () => {
         allowedActivityCodes: [],
         createdAt: "2026-04-20T08:00:00.000Z"
       });
+      vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue(null);
 
       await submitCompanyTransaction(
         {
           ...actor,
-          role: "ACCOUNTANT"
+          role: "ACCOUNTANT",
+          email: "payroll@example.com",
+          fullName: "Awa Comptable"
         },
         {
           transactionId: "salary-1"
@@ -1135,15 +1252,43 @@ describe("finance.service", () => {
       expect(submitTransaction).toHaveBeenCalledWith({
         companyId: actor.companyId,
         transactionId: "salary-1",
-        salaryConfirmationStatus: "PENDING"
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
+      expect(reviewTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "salary-1",
+        reviewerId: actor.actorId,
+        status: "APPROVED"
+      });
+      expect(createRoleTargetedAlerts).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
+        excludeUserIds: [actor.actorId],
+        code: "FINANCE_SALARY_SUBMITTED",
+        message: "Le salaire Agent Test | 2026-04 a ete finalise et est disponible dans le suivi de paie.",
+        severity: "INFO",
+        entityType: "SALARY",
+        entityId: "salary-1",
+        metadata: expect.objectContaining({
+          transactionId: "salary-1",
+          createdById: "payroll-1",
+          status: "APPROVED",
+          reviewer: expect.objectContaining({
+            id: actor.actorId,
+            displayName: "Awa Comptable"
+          }),
+          salaryConfirmation: expect.objectContaining({
+            status: "NOT_REQUIRED"
+          })
+        })
       });
       expect(createUserTargetedAlerts).toHaveBeenCalledWith({
         companyId: actor.companyId,
         recipientUserIds: ["employee-1"],
         code: "FINANCE_SALARY_SUBMITTED",
         message:
-          "Le salaire Agent Test | 2026-04 est pret. Verifiez-le puis confirmez la reception du paiement.",
-        severity: "WARNING",
+          "Votre salaire Agent Test | 2026-04 a ete enregistre par la comptabilite et est disponible dans votre suivi.",
+        severity: "INFO",
         entityType: "SALARY",
         entityId: "salary-1",
         metadata: expect.objectContaining({
@@ -1153,72 +1298,20 @@ describe("finance.service", () => {
             employeeUserId: "employee-1",
             payPeriod: "2026-04"
           }),
+          reviewer: expect.objectContaining({
+            displayName: "Awa Comptable"
+          }),
           salaryConfirmation: expect.objectContaining({
-            status: "PENDING"
+            status: "NOT_REQUIRED"
           })
         })
       });
-      expect(createRoleTargetedAlerts).not.toHaveBeenCalled();
     });
   });
 
   describe("confirmCompanySalaryReceipt", () => {
-    it("confirms a submitted salary and alerts finance reviewers", async () => {
-      vi.mocked(findFinancialTransactionById).mockResolvedValue({
-        id: "salary-1",
-        companyId: actor.companyId,
-        accountId: "account-1",
-        accountName: "Banque principale",
-        accountRef: "BNK-01",
-        accountScopeType: "GLOBAL",
-        accountPrimaryActivityCode: null,
-        accountAllowedActivityCodes: [],
-        type: "CASH_OUT",
-        amount: "92500.00",
-        currency: "XOF",
-        activityCode: null,
-        description: "Salaire 2026-04 - Agent Test",
-        metadata: {
-          entryCategory: "SALARY",
-          employeeUserId: "employee-1",
-          employeeFullName: "Agent Test",
-          employeeEmail: "employee@example.com",
-          employeeRole: "EMPLOYEE",
-          payPeriod: "2026-04",
-          grossAmount: "90000.00",
-          bonusAmount: "5000.00",
-          deductionAmount: "2500.00",
-          netAmount: "92500.00",
-          paymentMethod: "BANK_TRANSFER"
-        },
-        status: "SUBMITTED",
-        requiresProof: false,
-        createdById: "payroll-1",
-        createdByEmail: "payroll@example.com",
-        validatedById: null,
-        validatedByEmail: null,
-        salaryConfirmationStatus: "PENDING",
-        salaryConfirmedById: null,
-        salaryConfirmedByEmail: null,
-        salaryConfirmedAt: null,
-        occurredAt: "2026-04-20T08:00:00.000Z",
-        createdAt: "2026-04-20T08:00:00.000Z",
-        updatedAt: "2026-04-20T08:00:00.000Z",
-        proofsCount: 0
-      });
-      vi.mocked(findFinancialAccountById).mockResolvedValue({
-        id: "account-1",
-        companyId: actor.companyId,
-        name: "Banque principale",
-        accountRef: "BNK-01",
-        balance: "100000.00",
-        scopeType: "GLOBAL",
-        primaryActivityCode: null,
-        allowedActivityCodes: [],
-        createdAt: "2026-04-20T08:00:00.000Z"
-      });
-
-      await confirmCompanySalaryReceipt(
+    it("rejects employee confirmation because it is no longer required", async () => {
+      const promise = confirmCompanySalaryReceipt(
         {
           actorId: "employee-1",
           companyId: actor.companyId,
@@ -1229,33 +1322,12 @@ describe("finance.service", () => {
         }
       );
 
-      expect(confirmSalaryReceipt).toHaveBeenCalledWith({
-        companyId: actor.companyId,
-        transactionId: "salary-1",
-        confirmerId: "employee-1"
+      await expect(promise).rejects.toMatchObject<HttpError>({
+        statusCode: 400,
+        message: "La confirmation employe n'est plus requise pour les salaires."
       });
-      expect(createRoleTargetedAlerts).toHaveBeenCalledWith({
-        companyId: actor.companyId,
-        recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
-        excludeUserIds: ["employee-1"],
-        code: "FINANCE_SALARY_RECEIPT_CONFIRMED",
-        message:
-          "Le salaire Agent Test | 2026-04 a ete confirme par Agent Test et peut maintenant etre approuve.",
-        severity: "WARNING",
-        entityType: "SALARY",
-        entityId: "salary-1",
-        metadata: expect.objectContaining({
-          transactionId: "salary-1",
-          salary: expect.objectContaining({
-            employeeUserId: "employee-1"
-          }),
-          salaryConfirmation: expect.objectContaining({
-            status: "CONFIRMED",
-            confirmedById: "employee-1",
-            confirmedByEmail: "employee@example.com"
-          })
-        })
-      });
+      expect(confirmSalaryReceipt).not.toHaveBeenCalled();
+      expect(createRoleTargetedAlerts).not.toHaveBeenCalled();
     });
   });
 
@@ -1462,7 +1534,7 @@ describe("finance.service", () => {
         metadata: {
           serviceType: "Installation"
         },
-        requiresProof: true,
+        requiresProof: false,
         occurredAt: new Date("2026-04-21T09:00:00.000Z")
       });
       expect(createAuditLogRecord).toHaveBeenCalledWith(
@@ -2119,7 +2191,7 @@ describe("finance.service", () => {
       expect(findTransactionById).not.toHaveBeenCalled();
     });
 
-    it("blocks salary approval until employee confirmation is recorded", async () => {
+    it("approves a submitted salary even when the old employee confirmation flag is pending", async () => {
       vi.mocked(findTransactionById).mockResolvedValue({
         id: "salary-2",
         companyId: actor.companyId,
@@ -2182,11 +2254,14 @@ describe("finance.service", () => {
         allowedActivityCodes: [],
         createdAt: "2026-04-20T08:00:00.000Z"
       });
+      vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue(null);
 
-      const promise = reviewCompanyTransaction(
+      await reviewCompanyTransaction(
         {
           ...actor,
-          role: "ACCOUNTANT"
+          role: "ACCOUNTANT",
+          email: "reviewer@example.com",
+          fullName: "Awa Comptable"
         },
         {
           transactionId: "salary-2",
@@ -2194,14 +2269,32 @@ describe("finance.service", () => {
         }
       );
 
-      await expect(promise).rejects.toMatchObject<HttpError>({
-        statusCode: 400,
-        message: "Le salaire doit d'abord etre confirme par le collaborateur avant approbation."
+      expect(reviewTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "salary-2",
+        reviewerId: actor.actorId,
+        status: "APPROVED"
       });
-      expect(reviewTransaction).not.toHaveBeenCalled();
+      expect(createUserTargetedAlerts).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        recipientUserIds: ["payroll-1", "employee-1"],
+        code: "FINANCE_SALARY_APPROVED",
+        message: "Le salaire Agent Test | 2026-04 a ete approuve par Awa Comptable.",
+        severity: "INFO",
+        entityType: "SALARY",
+        entityId: "salary-2",
+        metadata: expect.objectContaining({
+          reviewer: expect.objectContaining({
+            displayName: "Awa Comptable"
+          }),
+          salaryConfirmation: expect.objectContaining({
+            status: "NOT_REQUIRED"
+          })
+        })
+      });
     });
 
-    it("reviews a submitted transaction and notifies its creator", async () => {
+    it("reviews an approved transaction and notifies its creator with the reviewer name", async () => {
       vi.mocked(findTransactionById).mockResolvedValue({
         id: "txn-2",
         companyId: actor.companyId,
@@ -2251,15 +2344,18 @@ describe("finance.service", () => {
         allowedActivityCodes: ["SERVICES"],
         createdAt: "2026-04-20T08:00:00.000Z"
       });
+      vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue(null);
 
       await reviewCompanyTransaction(
         {
           ...actor,
-          role: "ACCOUNTANT"
+          role: "ACCOUNTANT",
+          email: "reviewer@example.com",
+          fullName: "Awa Comptable"
         },
         {
           transactionId: "txn-2",
-          decision: "REJECTED"
+          decision: "APPROVED"
         }
       );
 
@@ -2267,28 +2363,32 @@ describe("finance.service", () => {
         companyId: actor.companyId,
         transactionId: "txn-2",
         reviewerId: actor.actorId,
-        status: "REJECTED"
+        status: "APPROVED"
       });
       expect(createAuditLogRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           actorId: actor.actorId,
-          action: "FINANCE_TRANSACTION_REJECTED",
+          action: "FINANCE_TRANSACTION_APPROVED",
           entityId: "txn-2",
-          metadataJson: expect.stringContaining("\"scopeType\":\"DEDICATED\"")
+          metadataJson: expect.stringContaining("\"displayName\":\"Awa Comptable\"")
         })
       );
       expect(createUserTargetedAlerts).toHaveBeenCalledWith({
         companyId: actor.companyId,
         recipientUserIds: ["user-owner"],
-        code: "FINANCE_TRANSACTION_REJECTED",
-        message: "Votre transaction Services divers a ete rejetee.",
-        severity: "WARNING",
+        code: "FINANCE_TRANSACTION_APPROVED",
+        message: "Votre transaction Services divers a ete approuvee par Awa Comptable.",
+        severity: "INFO",
         entityType: "TRANSACTION",
         entityId: "txn-2",
         metadata: expect.objectContaining({
           transactionId: "txn-2",
-          decision: "REJECTED",
+          decision: "APPROVED",
           activityCode: "SERVICES",
+          reviewer: expect.objectContaining({
+            id: actor.actorId,
+            displayName: "Awa Comptable"
+          }),
           account: expect.objectContaining({
             scopeType: "DEDICATED",
             scopeLabel: "Dedie: Services divers"

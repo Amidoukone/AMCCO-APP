@@ -54,7 +54,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Chargement impossible des secteurs d'activite.";
+  return "Chargement impossible des secteurs d'activité.";
 }
 
 export function BusinessActivityProvider({ children }: { children: ReactNode }): JSX.Element {

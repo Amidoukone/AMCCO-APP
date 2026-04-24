@@ -143,6 +143,29 @@ export async function findActiveUserById(userId: string): Promise<ActiveUserProf
   return rows[0];
 }
 
+export async function findActiveUserAuthById(userId: string): Promise<ActiveUserRecord | null> {
+  const rows = await queryRows<ActiveUserRow[]>(
+    `
+      SELECT
+        id AS userId,
+        email,
+        full_name AS fullName,
+        password_hash AS passwordHash
+      FROM users
+      WHERE id = ?
+        AND is_active = 1
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+}
+
 export async function upsertRefreshSession(input: {
   id: string;
   userId: string;

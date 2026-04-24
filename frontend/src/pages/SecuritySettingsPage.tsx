@@ -18,45 +18,45 @@ const auditActionLabels: Record<string, string> = {
   AUTH_LOGIN: "Connexion",
   AUTH_REFRESH: "Rafraichissement de session",
   AUTH_LOGOUT: "Deconnexion",
-  COMPANY_CREATED: "Entreprise creee",
-  COMPANY_UPDATED: "Entreprise modifiee",
-  COMPANY_DELETED: "Entreprise supprimee",
+  COMPANY_CREATED: "Entreprise créée",
+  COMPANY_UPDATED: "Entreprise modifiée",
+  COMPANY_DELETED: "Entreprise supprimée",
   ADMIN_USER_CREATED: "Creation utilisateur",
-  ADMIN_USER_UPDATED: "Mise a jour utilisateur",
-  ADMIN_USER_ROLE_UPDATED: "Role utilisateur modifie",
+  ADMIN_USER_UPDATED: "Mise à jour utilisateur",
+  ADMIN_USER_ROLE_UPDATED: "Rôle utilisateur modifié",
   ADMIN_USER_ACTIVATED: "Utilisateur active",
-  ADMIN_USER_DEACTIVATED: "Utilisateur desactive",
-  FINANCE_ACCOUNT_CREATED: "Compte financier cree",
-  FINANCE_ACCOUNT_UPDATED: "Compte financier modifie",
+  ADMIN_USER_DEACTIVATED: "Utilisateur désactivé",
+  FINANCE_ACCOUNT_CREATED: "Compte financier créé",
+  FINANCE_ACCOUNT_UPDATED: "Compte financier modifié",
   FINANCE_ACCOUNT_DELETED: "Compte financier supprime",
-  FINANCE_SALARY_CREATED: "Salaire cree",
-  FINANCE_SALARY_UPDATED: "Salaire modifie",
+  FINANCE_SALARY_CREATED: "Salaire créé",
+  FINANCE_SALARY_UPDATED: "Salaire modifié",
   FINANCE_SALARY_DELETED: "Salaire supprime",
   FINANCE_SALARY_SUBMITTED: "Salaire soumis a confirmation",
   FINANCE_SALARY_RECEIPT_CONFIRMED: "Reception salaire confirmee",
-  FINANCE_SALARY_APPROVED: "Salaire approuve",
+  FINANCE_SALARY_APPROVED: "Salaire approuvé",
   FINANCE_SALARY_REJECTED: "Salaire rejete",
-  FINANCE_TRANSACTION_CREATED: "Transaction creee",
-  FINANCE_TRANSACTION_UPDATED: "Transaction modifiee",
-  FINANCE_TRANSACTION_DELETED: "Transaction supprimee",
+  FINANCE_TRANSACTION_CREATED: "Transaction créée",
+  FINANCE_TRANSACTION_UPDATED: "Transaction modifiée",
+  FINANCE_TRANSACTION_DELETED: "Transaction supprimée",
   FINANCE_TRANSACTION_SUBMITTED: "Transaction soumise",
-  FINANCE_TRANSACTION_APPROVED: "Transaction approuvee",
-  FINANCE_TRANSACTION_REJECTED: "Transaction rejetee",
-  TASK_CREATED: "Tache creee",
-  TASK_UPDATED: "Tache modifiee",
-  TASK_DELETED: "Tache supprimee",
-  TASK_ASSIGNED: "Tache assignee",
-  TASK_UNASSIGNED: "Tache desassignee",
-  TASK_STATUS_CHANGED: "Statut de tache modifie",
+  FINANCE_TRANSACTION_APPROVED: "Transaction approuvée",
+  FINANCE_TRANSACTION_REJECTED: "Transaction rejetée",
+  TASK_CREATED: "Tâche créée",
+  TASK_UPDATED: "Tâche modifiée",
+  TASK_DELETED: "Tâche supprimée",
+  TASK_ASSIGNED: "Tâche assignée",
+  TASK_UNASSIGNED: "Tâche désassignée",
+  TASK_STATUS_CHANGED: "Statut de tâche modifié",
   TASK_COMMENT_ADDED: "Commentaire ajoute",
-  COMPANY_ACTIVITY_UPDATED: "Secteur mis a jour",
+  COMPANY_ACTIVITY_UPDATED: "Secteur mis à jour",
   COMPANY_ACTIVITY_RECLASSIFIED: "Donnees reclassees"
 };
 
 const entityTypeLabels: Record<string, string> = {
   SESSION: "Session",
   USER: "Utilisateur",
-  TASK: "Tache",
+  TASK: "Tâche",
   TASK_COMMENT: "Commentaire",
   COMPANY: "Entreprise",
   TRANSACTION: "Transaction",
@@ -150,7 +150,7 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
     if (userAgent) {
       parts.push(`Navigateur: ${summarizeUserAgent(userAgent)}`);
     }
-    return parts.length > 0 ? parts.join(" | ") : "Session utilisateur mise a jour.";
+    return parts.length > 0 ? parts.join(" | ") : "Session utilisateur mise à jour.";
   }
 
   const previousStatus = asText(root.previousStatus);
@@ -161,17 +161,17 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
 
   if (action === "TASK_ASSIGNED" || action === "TASK_UNASSIGNED") {
     const note = asText(root.note);
-    return note ? `Assignation mise a jour. Note: ${truncateText(note, 90)}` : "Assignation mise a jour.";
+    return note ? `Assignation mise à jour. Note: ${truncateText(note, 90)}` : "Assignation mise à jour.";
   }
 
   if (action === "TASK_UPDATED") {
     const nextTitle = asText(root.nextTitle);
-    return nextTitle ? `Tache mise a jour: ${truncateText(nextTitle, 90)}` : "Contenu de la tache mis a jour.";
+    return nextTitle ? `Tâche mise à jour: ${truncateText(nextTitle, 90)}` : "Contenu de la tâche mis à jour.";
   }
 
   if (action === "TASK_DELETED") {
     const title = asText(root.title);
-    return title ? `Tache supprimee: ${truncateText(title, 90)}` : "Tache supprimee.";
+    return title ? `Tâche supprimée: ${truncateText(title, 90)}` : "Tâche supprimée.";
   }
 
   if (action === "TASK_COMMENT_ADDED") {
@@ -338,7 +338,7 @@ export function SecuritySettingsPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Securite et acces</h2>
-        <p>Ton role ne permet pas d'acceder au journal d'audit.</p>
+        <p>Votre rôle ne permet pas d'accéder au journal d'audit.</p>
       </section>
     );
   }

@@ -7,7 +7,7 @@ export function AuthGuard({ children }: { children: ReactNode }): JSX.Element {
   const location = useLocation();
 
   if (isInitializing) {
-    return <main className="page center">Chargement de la session...</main>;
+    return <main className="page center">Chargement de la session en cours...</main>;
   }
 
   if (!isAuthenticated) {
@@ -16,4 +16,3 @@ export function AuthGuard({ children }: { children: ReactNode }): JSX.Element {
 
   return <>{children}</>;
 }
-

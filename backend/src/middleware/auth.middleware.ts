@@ -40,7 +40,8 @@ export async function authenticateAccessToken(
         userId: bootstrapUser.userId,
         companyId: payload.companyId,
         role: payload.role,
-        email: bootstrapUser.email
+        email: bootstrapUser.email,
+        fullName: bootstrapUser.fullName
       };
       next();
       return;
@@ -56,7 +57,8 @@ export async function authenticateAccessToken(
       userId: currentProfile.userId,
       companyId: payload.companyId,
       role: currentProfile.role,
-      email: currentProfile.email
+      email: currentProfile.email,
+      fullName: currentProfile.fullName
     };
     next();
   } catch (error) {

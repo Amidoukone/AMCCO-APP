@@ -37,26 +37,26 @@ function toErrorMessage(error: unknown): string {
 
 function statusLabel(status: TaskStatus): string {
   if (status === "TODO") {
-    return "A faire";
+    return "À faire";
   }
   if (status === "IN_PROGRESS") {
     return "En cours";
   }
   if (status === "DONE") {
-    return "Terminee";
+    return "Terminée";
   }
-  return "Bloquee";
+  return "Bloquée";
 }
 
 function statusDescription(status: TaskStatus): string {
   if (status === "TODO") {
-    return "Tache en attente de demarrage ou de reprise.";
+    return "Tâche en attente de démarrage ou de reprise.";
   }
   if (status === "IN_PROGRESS") {
-    return "Execution en cours sur le terrain ou au bureau.";
+    return "Exécution en cours sur le terrain ou au bureau.";
   }
   if (status === "DONE") {
-    return "Execution terminee et tache cloturee.";
+    return "Exécution terminée et tâche clôturée.";
   }
   return "Blocage actif, arbitrage ou action de debloquage requis.";
 }
@@ -84,7 +84,7 @@ function statusShortMetric(status: TaskStatus): string {
   if (status === "DONE") {
     return "Cloturees";
   }
-  return "A debloquer";
+  return "À débloquer";
 }
 
 function memberLabel(member: OperationTaskMember): string {
@@ -360,7 +360,7 @@ export function OperationsTasksPage(): JSX.Element {
         ...createDefaultTaskForm(),
         metadata: syncMetadataState({}, taskMetadataFields)
       });
-      setSuccessMessage(editingTaskId ? "Tache modifiee." : "Tache creee.");
+      setSuccessMessage(editingTaskId ? "Tâche modifiée." : "Tâche créée.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -369,26 +369,26 @@ export function OperationsTasksPage(): JSX.Element {
 
   function getTaskEditLockMessage(task: OperationTask): string | null {
     if (task.status === "DONE") {
-      return "Une tache terminee ne peut plus etre modifiee.";
+      return "Une tâche terminée ne peut plus être modifiée.";
     }
     if (canAssignTasks) {
       return null;
     }
     if (task.createdById !== user?.id) {
-      return "Vous ne pouvez modifier que les taches que vous avez creees.";
+      return "Vous ne pouvez modifier que les tâches que vous avez créées.";
     }
     return null;
   }
 
   function getTaskDeleteLockMessage(task: OperationTask): string | null {
     if (task.status === "DONE") {
-      return "Une tache terminee ne peut plus etre supprimee.";
+      return "Une tâche terminée ne peut plus être supprimée.";
     }
     if (canAssignTasks) {
       return null;
     }
     if (task.createdById !== user?.id) {
-      return "Vous ne pouvez supprimer que les taches que vous avez creees.";
+      return "Vous ne pouvez supprimer que les tâches que vous avez créées.";
     }
     return null;
   }
@@ -443,7 +443,7 @@ export function OperationsTasksPage(): JSX.Element {
       if (editingTaskId === task.id) {
         handleCancelEditTask();
       }
-      setSuccessMessage("Tache supprimee.");
+      setSuccessMessage("Tâche supprimée.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -478,7 +478,7 @@ export function OperationsTasksPage(): JSX.Element {
           assignmentNotes[taskId]?.trim() || undefined
         )
       );
-      setSuccessMessage("Assignation mise a jour.");
+      setSuccessMessage("Assignation mise à jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -595,10 +595,10 @@ export function OperationsTasksPage(): JSX.Element {
             }
           >
             <option value="ALL">Tous les statuts</option>
-            <option value="TODO">A faire</option>
+            <option value="TODO">À faire</option>
             <option value="IN_PROGRESS">En cours</option>
-            <option value="DONE">Terminee</option>
-            <option value="BLOCKED">Bloquee</option>
+            <option value="DONE">Terminée</option>
+            <option value="BLOCKED">Bloquée</option>
           </select>
 
           {canAssignTasks ? (
@@ -681,11 +681,11 @@ export function OperationsTasksPage(): JSX.Element {
 
       {canCreateTasks ? (
         <section className="panel">
-          <h3>{editingTaskId ? "Modifier une tache" : "Nouvelle tache"}</h3>
+          <h3>{editingTaskId ? "Modifier une tâche" : "Nouvelle tâche"}</h3>
           <form className="operations-task-form" onSubmit={handleCreateTask}>
             <input
               type="text"
-              placeholder="Titre de la tache"
+              placeholder="Titre de la tâche"
               value={createForm.title}
               onChange={(event) =>
                 setCreateForm((prev) => ({
@@ -770,7 +770,7 @@ export function OperationsTasksPage(): JSX.Element {
               type="submit"
               disabled={!selectedActivityCode || isLoadingActivities}
             >
-              {editingTaskId ? "Enregistrer les modifications" : "Enregistrer la tache"}
+              {editingTaskId ? "Enregistrer les modifications" : "Enregistrer la tâche"}
             </button>
             {editingTaskId ? (
               <button type="button" className="secondary-btn" onClick={handleCancelEditTask}>
@@ -1021,10 +1021,10 @@ export function OperationsTasksPage(): JSX.Element {
                               }
                               disabled={isBusy || isBulkAssigning}
                             >
-                              <option value="TODO">A faire</option>
+                              <option value="TODO">À faire</option>
                               <option value="IN_PROGRESS">En cours</option>
-                              <option value="DONE">Terminee</option>
-                              <option value="BLOCKED">Bloquee</option>
+                              <option value="DONE">Terminée</option>
+                              <option value="BLOCKED">Bloquée</option>
                             </select>
                           ) : (
                             <span className="hint">Lecture seule</span>

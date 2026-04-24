@@ -22,12 +22,12 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "HARDWARE",
     label: "Quincaillerie",
-    description: "Materiaux, quincaillerie et fournitures."
+    description: "Matériaux, quincaillerie et fournitures."
   },
   {
     code: "GENERAL_STORE",
-    label: "Magasins (commerce general)",
-    description: "Commerce general et ventes multi-produits."
+    label: "Magasins (commerce général)",
+    description: "Commerce général et ventes multi-produits."
   },
   {
     code: "FOOD",
@@ -36,12 +36,12 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   },
   {
     code: "RENTAL",
-    label: "Location immobiliere",
+    label: "Location immobilière",
     description: "Gestion des locations et encaissements."
   },
   {
     code: "AGRICULTURE",
-    label: "Activites agricoles",
+    label: "Activités agricoles",
     description: "Production agricole et suivi terrain."
   },
   {
@@ -51,8 +51,8 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   },
   {
     code: "MINING",
-    label: "Exploitation miniere",
-    description: "Operations et charges minieres."
+    label: "Exploitation minière",
+    description: "Opérations et charges minières."
   },
   {
     code: "WATER",
@@ -61,8 +61,8 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   },
   {
     code: "REAL_ESTATE_AGENCY",
-    label: "Agence immobiliere",
-    description: "Mandats, ventes et intermediation."
+    label: "Agence immobilière",
+    description: "Mandats, ventes et intermédiation."
   }
 ];
 
@@ -76,7 +76,7 @@ export function isBusinessActivityCode(value: string): value is BusinessActivity
 
 export function getBusinessActivityLabel(activityCode: BusinessActivityCode | null): string {
   if (!activityCode) {
-    return "Non renseignee";
+    return "Non renseignée";
   }
   return BUSINESS_ACTIVITY_LABELS[activityCode];
 }

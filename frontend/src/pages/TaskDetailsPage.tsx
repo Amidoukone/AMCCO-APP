@@ -30,26 +30,26 @@ function toErrorMessage(error: unknown): string {
 
 function statusLabel(status: TaskStatus): string {
   if (status === "TODO") {
-    return "A faire";
+    return "À faire";
   }
   if (status === "IN_PROGRESS") {
     return "En cours";
   }
   if (status === "DONE") {
-    return "Terminee";
+    return "Terminée";
   }
-  return "Bloquee";
+  return "Bloquée";
 }
 
 function statusDescription(status: TaskStatus): string {
   if (status === "TODO") {
-    return "Tache en attente de lancement ou de prise en charge.";
+    return "Tâche en attente de lancement ou de prise en charge.";
   }
   if (status === "IN_PROGRESS") {
-    return "Execution active avec suivi operationnel en cours.";
+    return "Exécution active avec suivi opérationnel en cours.";
   }
   if (status === "DONE") {
-    return "Execution finalisee. La tache est consideree comme cloturee.";
+    return "Exécution finalisée. La tâche est considérée comme clôturée.";
   }
   return "Blocage actif. Une action de supervision ou de debloquage est attendue.";
 }
@@ -69,10 +69,10 @@ function statusToneClass(status: TaskStatus): string {
 
 function timelineActionLabel(action: string): string {
   if (action === "TASK_CREATED") {
-    return "Creation de la tache";
+    return "Création de la tâche";
   }
   if (action === "TASK_UPDATED") {
-    return "Modification de la tache";
+    return "Modification de la tâche";
   }
   if (action === "TASK_ASSIGNED") {
     return "Assignation";
@@ -106,16 +106,16 @@ function timelineDetail(event: OperationTaskTimelineEvent): string {
     }
   }
   if (event.action === "TASK_ASSIGNED") {
-    return "Tache assignee.";
+    return "Tâche assignée.";
   }
   if (event.action === "TASK_UPDATED") {
-    return "Contenu de la tache mis a jour.";
+    return "Contenu de la tâche mis à jour.";
   }
   if (event.action === "TASK_UNASSIGNED") {
-    return "Tache retiree de l'assigne precedent.";
+    return "Tâche retirée de l'assigné précédent.";
   }
   if (event.action === "TASK_CREATED") {
-    return "Tache creee.";
+    return "Tâche créée.";
   }
   return "";
 }
@@ -274,7 +274,7 @@ export function TaskDetailsPage(): JSX.Element {
         assignOperationsTaskRequest(accessToken, taskId, nextAssignedToId, assignmentNote.trim() || undefined)
       );
       setAssignmentNote("");
-      setSuccessMessage("Assignation mise a jour.");
+      setSuccessMessage("Assignation mise à jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -388,7 +388,7 @@ export function TaskDetailsPage(): JSX.Element {
         <h2>Detail de la tache</h2>
         {task ? (
           <p>
-            Cette fiche est rattachee au secteur <strong>{getBusinessActivityLabel(task.activityCode)}</strong>.
+            Cette fiche est rattachée au secteur <strong>{getBusinessActivityLabel(task.activityCode)}</strong>.
           </p>
         ) : null}
       </header>
@@ -460,10 +460,10 @@ export function TaskDetailsPage(): JSX.Element {
                     onChange={(event) => void handleStatusChange(event.target.value as TaskStatus)}
                     disabled={isSaving}
                   >
-                    <option value="TODO">A faire</option>
+                    <option value="TODO">À faire</option>
                     <option value="IN_PROGRESS">En cours</option>
-                    <option value="DONE">Terminee</option>
-                    <option value="BLOCKED">Bloquee</option>
+                    <option value="DONE">Terminée</option>
+                    <option value="BLOCKED">Bloquée</option>
                   </select>
                 ) : (
                   <p className="hint">Vous ne pouvez pas modifier ce statut.</p>

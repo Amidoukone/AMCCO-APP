@@ -13,8 +13,6 @@ import { getImageKitUploadAuthParameters, resolveImageKitProofUrl } from "../lib
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import {
   addTransactionProof,
-  countTransactionProofs,
-  confirmSalaryReceipt,
   createFinancialAccount,
   deleteFinancialAccount,
   type FinancialAccountScopeType,
@@ -47,6 +45,8 @@ type ActorContext = {
   actorId: string;
   companyId: string;
   role: RoleCode;
+  email?: string;
+  fullName?: string;
 };
 
 const ACCOUNT_CREATE_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN"];
@@ -271,6 +271,29 @@ function buildFinanceGovernanceMetadata(input: {
   };
 }
 
+function buildReviewerMetadata(
+  reviewer: {
+    userId?: string;
+    fullName?: string;
+    email?: string;
+    role?: RoleCode;
+  } | null | undefined,
+  actor: ActorContext
+) {
+  const fullName = reviewer?.fullName?.trim() || null;
+  const email = reviewer?.email?.trim() || null;
+  const actorFullName = actor.fullName?.trim() || null;
+  const actorEmail = actor.email?.trim() || null;
+
+  return {
+    id: reviewer?.userId ?? actor.actorId,
+    fullName: fullName ?? actorFullName,
+    email: email ?? actorEmail,
+    role: reviewer?.role ?? actor.role,
+    displayName: fullName ?? actorFullName ?? email ?? actorEmail ?? null
+  };
+}
+
 function normalizeMoneyString(input: string | undefined, fallback = "0.00"): string {
   const value = input?.trim();
   return value && /^\d+(\.\d{1,2})?$/.test(value) ? value : fallback;
@@ -393,6 +416,15 @@ function buildSalaryConfirmationSnapshot(input: {
   salaryConfirmedByEmail: string | null;
   salaryConfirmedAt: string | null;
 }): SalaryConfirmationSnapshot {
+  if (input.salaryConfirmationStatus === "PENDING") {
+    return {
+      status: "NOT_REQUIRED",
+      confirmedById: null,
+      confirmedByEmail: null,
+      confirmedAt: null
+    };
+  }
+
   return {
     status: input.salaryConfirmationStatus,
     confirmedById: input.salaryConfirmedById,
@@ -450,6 +482,17 @@ async function toTransactionProofItems(proofs: TransactionProof[]): Promise<Tran
       publicUrl: await resolveImageKitProofUrl(proof.storageKey)
     }))
   );
+}
+
+async function findTransactionForProofs(companyId: string, transactionId: string) {
+  const fullTransaction = await findFinancialTransactionById(companyId, transactionId);
+  if (!fullTransaction) {
+    throw new HttpError(500, "Impossible de recharger la transaction.");
+  }
+  if (extractSalarySnapshot(fullTransaction.metadata)) {
+    throw new HttpError(400, "Les preuves ne sont pas gerees pour les salaires.");
+  }
+  return fullTransaction;
 }
 
 export async function listCompanyAccounts(input: {
@@ -1697,6 +1740,7 @@ export async function addProofToTransaction(
     throw new HttpError(400, "Ajout de preuve impossible apres validation finale.");
   }
 
+  const fullTransaction = await findTransactionForProofs(actor.companyId, transaction.id);
   const proofId = randomUUID();
   await addTransactionProof({
     id: proofId,
@@ -1706,10 +1750,6 @@ export async function addProofToTransaction(
     mimeType: input.mimeType.trim(),
     fileSize: input.fileSize
   });
-  const fullTransaction = await findFinancialTransactionById(actor.companyId, transaction.id);
-  if (!fullTransaction) {
-    throw new HttpError(500, "Impossible de recharger la transaction apres ajout de preuve.");
-  }
   const account = await findFinancialAccountById(actor.companyId, fullTransaction.accountId);
   if (!account) {
     throw new HttpError(500, "Impossible de recharger le compte financier apres ajout de preuve.");
@@ -1749,6 +1789,7 @@ export async function listCompanyTransactionProofs(
     throw new HttpError(404, "Transaction introuvable.");
   }
 
+  await findTransactionForProofs(actor.companyId, transaction.id);
   const proofs = await listTransactionProofs(input.transactionId);
   return toTransactionProofItems(proofs);
 }
@@ -1814,17 +1855,20 @@ export async function submitCompanyTransaction(
     }
   }
 
-  if (transaction.requiresProof) {
-    const proofsCount = await countTransactionProofs(transaction.id);
-    if (proofsCount < 1) {
-      throw new HttpError(400, "Une preuve est obligatoire avant la soumission.");
-    }
-  }
+  const reviewerMembership = await findMembershipByCompanyAndUser(actor.companyId, actor.actorId);
+  const reviewer = buildReviewerMetadata(reviewerMembership, actor);
 
   await submitTransaction({
     companyId: actor.companyId,
     transactionId: transaction.id,
-    salaryConfirmationStatus: salarySnapshot ? "PENDING" : "NOT_REQUIRED"
+    salaryConfirmationStatus: "NOT_REQUIRED"
+  });
+
+  await reviewTransaction({
+    companyId: actor.companyId,
+    transactionId: transaction.id,
+    reviewerId: actor.actorId,
+    status: "APPROVED"
   });
 
   const actionCode = salarySnapshot ? "FINANCE_SALARY_SUBMITTED" : "FINANCE_TRANSACTION_SUBMITTED";
@@ -1838,11 +1882,13 @@ export async function submitCompanyTransaction(
     activityCode: transaction.activityCode,
     activityLabel: profile?.label ?? null,
     financeWorkflow: profile?.finance.workflow.map((step) => step.code) ?? [],
+    status: "APPROVED",
+    reviewer,
     ...(salarySnapshot ? { salary: salarySnapshot } : {}),
     ...(salarySnapshot
       ? {
           salaryConfirmation: {
-            status: "PENDING",
+            status: "NOT_REQUIRED",
             confirmedById: null,
             confirmedByEmail: null,
             confirmedAt: null
@@ -1862,12 +1908,27 @@ export async function submitCompanyTransaction(
   });
 
   if (salarySnapshot) {
+    await createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
+      excludeUserIds: [actor.actorId],
+      code: actionCode,
+      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete finalise et est disponible dans le suivi de paie.`,
+      severity: "INFO",
+      entityType,
+      entityId: transaction.id,
+      metadata: {
+        ...traceMetadata,
+        transactionId: transaction.id,
+        createdById: transaction.createdById
+      }
+    });
     await createUserTargetedAlerts({
       companyId: actor.companyId,
       recipientUserIds: [salarySnapshot.employeeUserId],
       code: actionCode,
-      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} est pret. Verifiez-le puis confirmez la reception du paiement.`,
-      severity: "WARNING",
+      message: `Votre salaire ${toSalaryActionLabel(salarySnapshot)} a ete enregistre par la comptabilite et est disponible dans votre suivi.`,
+      severity: "INFO",
       entityType,
       entityId: transaction.id,
       metadata: {
@@ -1884,8 +1945,8 @@ export async function submitCompanyTransaction(
     recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
     excludeUserIds: [actor.actorId],
     code: actionCode,
-    message: `Une transaction ${profile?.label ?? "finance"} a ete soumise et attend une validation comptable.`,
-    severity: "WARNING",
+    message: `Une transaction ${profile?.label ?? "finance"} a ete enregistree et est disponible dans le suivi financier.`,
+    severity: "INFO",
     entityType,
     entityId: transaction.id,
     metadata: {
@@ -1902,88 +1963,9 @@ export async function confirmCompanySalaryReceipt(
     transactionId: string;
   }
 ) {
-  const transaction = await findFinancialTransactionById(actor.companyId, input.transactionId);
-  if (!transaction) {
-    throw new HttpError(404, "Salaire introuvable.");
-  }
-
-  const salarySnapshot = extractSalarySnapshot(transaction.metadata);
-  if (!salarySnapshot) {
-    throw new HttpError(400, "Cette transaction n'est pas un salaire.");
-  }
-
-  if (salarySnapshot.employeeUserId !== actor.actorId) {
-    throw new HttpError(403, "Seul le collaborateur concerne peut confirmer ce salaire.");
-  }
-
-  if (transaction.status !== "SUBMITTED") {
-    throw new HttpError(400, "Le salaire doit etre soumis avant confirmation de reception.");
-  }
-
-  if (transaction.salaryConfirmationStatus === "CONFIRMED") {
-    throw new HttpError(400, "Le salaire a deja ete confirme.");
-  }
-
-  if (transaction.salaryConfirmationStatus !== "PENDING") {
-    throw new HttpError(400, "Le salaire n'est pas encore en attente de confirmation employe.");
-  }
-
-  const account = await findFinancialAccountById(actor.companyId, transaction.accountId);
-  if (!account) {
-    throw new HttpError(500, "Impossible de recharger le compte financier avant confirmation.");
-  }
-
-  await confirmSalaryReceipt({
-    companyId: actor.companyId,
-    transactionId: transaction.id,
-    confirmerId: actor.actorId
-  });
-
-  const confirmationMetadata = {
-    status: "CONFIRMED",
-    confirmedById: actor.actorId,
-    confirmedByEmail: salarySnapshot.employeeEmail,
-    confirmedAt: new Date().toISOString()
-  };
-
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "FINANCE_SALARY_RECEIPT_CONFIRMED",
-    entityType: "SALARY",
-    entityId: transaction.id,
-    metadataJson: JSON.stringify({
-      ...buildFinanceGovernanceMetadata({
-        account,
-        activityCode: null,
-        transactionId: transaction.id
-      }),
-      salary: salarySnapshot,
-      salaryConfirmation: confirmationMetadata
-    })
-  });
-
-  await createRoleTargetedAlerts({
-    companyId: actor.companyId,
-    recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
-    excludeUserIds: [actor.actorId],
-    code: "FINANCE_SALARY_RECEIPT_CONFIRMED",
-    message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete confirme par ${salarySnapshot.employeeFullName} et peut maintenant etre approuve.`,
-    severity: "WARNING",
-    entityType: "SALARY",
-    entityId: transaction.id,
-    metadata: {
-      ...buildFinanceGovernanceMetadata({
-        account,
-        activityCode: null,
-        transactionId: transaction.id
-      }),
-      transactionId: transaction.id,
-      salary: salarySnapshot,
-      salaryConfirmation: confirmationMetadata
-    }
-  });
+  void actor;
+  void input;
+  throw new HttpError(400, "La confirmation employe n'est plus requise pour les salaires.");
 }
 
 export async function reviewCompanyTransaction(
@@ -2027,16 +2009,12 @@ export async function reviewCompanyTransaction(
       : "FINANCE_TRANSACTION_REJECTED";
   const entityType = salarySnapshot ? "SALARY" : "TRANSACTION";
 
-  if (salarySnapshot && input.decision === "APPROVED" && fullTransaction.salaryConfirmationStatus !== "CONFIRMED") {
-    throw new HttpError(
-      400,
-      "Le salaire doit d'abord etre confirme par le collaborateur avant approbation."
-    );
-  }
-
   const confirmationMetadata = salarySnapshot
     ? buildSalaryConfirmationSnapshot(fullTransaction)
     : null;
+  const reviewerMembership = await findMembershipByCompanyAndUser(actor.companyId, actor.actorId);
+  const reviewer = buildReviewerMetadata(reviewerMembership, actor);
+  const reviewerSuffix = reviewer.displayName ? ` par ${reviewer.displayName}` : "";
 
   await reviewTransaction({
     companyId: actor.companyId,
@@ -2061,6 +2039,7 @@ export async function reviewCompanyTransaction(
       activityCode: transaction.activityCode,
       activityLabel: profile?.label ?? null,
       financeWorkflow: profile?.finance.workflow.map((step) => step.code) ?? [],
+      reviewer,
       ...(salarySnapshot ? { salary: salarySnapshot, salaryConfirmation: confirmationMetadata } : {})
     })
   });
@@ -2081,11 +2060,11 @@ export async function reviewCompanyTransaction(
       message:
         salarySnapshot
           ? input.decision === "APPROVED"
-            ? `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete approuve.`
-            : `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete rejete.`
+            ? `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete approuve${reviewerSuffix}.`
+            : `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete rejete${reviewerSuffix}.`
           : input.decision === "APPROVED"
-            ? `Votre transaction${profile ? ` ${profile.label}` : ""} a ete approuvee.`
-            : `Votre transaction${profile ? ` ${profile.label}` : ""} a ete rejetee.`,
+            ? `Votre transaction${profile ? ` ${profile.label}` : ""} a ete approuvee${reviewerSuffix}.`
+            : `Votre transaction${profile ? ` ${profile.label}` : ""} a ete rejetee${reviewerSuffix}.`,
       severity: input.decision === "APPROVED" ? "INFO" : "WARNING",
       entityType,
       entityId: transaction.id,
@@ -2097,6 +2076,7 @@ export async function reviewCompanyTransaction(
         }),
         transactionId: transaction.id,
         decision: input.decision,
+        reviewer,
         ...(salarySnapshot ? { salary: salarySnapshot, salaryConfirmation: confirmationMetadata } : {})
       }
     });
@@ -2129,6 +2109,7 @@ export async function getTransactionProofUploadAuth(
     throw new HttpError(400, "Ajout de preuve impossible apres validation finale.");
   }
 
+  await findTransactionForProofs(actor.companyId, transaction.id);
   const auth = getImageKitUploadAuthParameters();
   return {
     ...auth,

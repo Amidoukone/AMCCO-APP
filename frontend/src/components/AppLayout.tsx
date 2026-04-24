@@ -156,7 +156,7 @@ export function AppLayout(): JSX.Element {
             <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
             <p className="hint">
               {selectedActivity?.description ??
-                "Activez au moins un secteur pour structurer les operations et la saisie."}
+                "Activez au moins un secteur pour structurer les opérations et la saisie."}
             </p>
             <select
               className="sidebar-sector-select"
@@ -165,7 +165,7 @@ export function AppLayout(): JSX.Element {
                 setSelectedActivityCode(event.target.value as BusinessActivityCode)
               }
               disabled={isLoadingActivities || enabledActivities.length === 0}
-              aria-label="Selectionner le secteur actif"
+              aria-label="Sélectionner le secteur actif"
             >
               {enabledActivities.length === 0 ? (
                 <option value="">Aucun secteur actif</option>
@@ -242,7 +242,7 @@ export function AppLayout(): JSX.Element {
             ) : null}
             {canManageCompanies ? (
               <Link to="/admin/companies" className="secondary-btn company-manage-link">
-                {isBootstrapMode ? "Creer une entreprise" : "Gerer les entreprises"}
+                {isBootstrapMode ? "Créer une entreprise" : "Gérer les entreprises"}
               </Link>
             ) : null}
             <button className="secondary-btn" type="button" onClick={() => void logout()}>

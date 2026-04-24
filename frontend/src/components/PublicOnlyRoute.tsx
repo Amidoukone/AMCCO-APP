@@ -6,7 +6,7 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }): JSX.Elem
   const { isInitializing, isAuthenticated } = useAuth();
 
   if (isInitializing) {
-    return <main className="page center">Chargement de la session...</main>;
+    return <main className="page center">Chargement de la session en cours...</main>;
   }
 
   if (isAuthenticated) {
@@ -15,4 +15,3 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }): JSX.Elem
 
   return <>{children}</>;
 }
-

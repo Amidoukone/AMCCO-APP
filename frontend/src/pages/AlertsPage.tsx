@@ -264,7 +264,7 @@ export function AlertsPage(): JSX.Element {
       <section className="panel">
         <h3>Liste</h3>
         {isLoading ? <p>Chargement...</p> : null}
-        {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond a ces filtres.</p> : null}
+        {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond à ces filtres.</p> : null}
         {!isLoading && items.length > 0 ? (
           <div className="alerts-list">
             {items.map((item) => {

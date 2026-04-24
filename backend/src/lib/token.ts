@@ -8,7 +8,8 @@ const baseAuthPayloadSchema = z.object({
   userId: z.string().min(1),
   companyId: z.string().min(1),
   role: z.enum(ROLE_CODES),
-  email: z.string().email()
+  email: z.string().email(),
+  fullName: z.string().min(1).optional()
 });
 
 const accessTokenSchema = baseAuthPayloadSchema.extend({

@@ -58,15 +58,15 @@ function financeStatusLabel(status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECT
 
 function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
   if (status === "TODO") {
-    return "A faire";
+    return "À faire";
   }
   if (status === "IN_PROGRESS") {
     return "En cours";
   }
   if (status === "DONE") {
-    return "Terminee";
+    return "Terminée";
   }
-  return "Bloquee";
+  return "Bloquée";
 }
 
 function accountScopeLabel(account: ReportsOverview["financeAccounts"][number]): string {
@@ -234,7 +234,7 @@ export function ReportsPage(): JSX.Element {
         note: `${overview.financeByType.length} ligne(s) devise/type sur ${formatAppliedRange(overview)}`
       },
       {
-        title: "Taches consolidees",
+        title: "Tâches consolidées",
         value: String(taskCount),
         note: `${blockedCount} tache(s) bloquee(s) sur la periode`
       },
@@ -305,11 +305,11 @@ export function ReportsPage(): JSX.Element {
       } else if (kind === "transactions" && format === "xlsx") {
         setSuccessMessage("Export Excel des transactions genere pour la periode appliquee.");
       } else if (kind === "tasks" && format === "xlsx") {
-        setSuccessMessage("Export Excel des taches genere pour la periode appliquee.");
+        setSuccessMessage("Export Excel des tâches généré pour la période appliquée.");
       } else if (kind === "transactions") {
         setSuccessMessage("Export CSV des transactions genere pour la periode appliquee.");
       } else {
-        setSuccessMessage("Export CSV des taches genere pour la periode appliquee.");
+        setSuccessMessage("Export CSV des tâches généré pour la période appliquée.");
       }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -443,7 +443,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("overview", "pdf")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "overview-pdf" ? "Preparation..." : "Rapport PDF"}
+                  {busyExport === "overview-pdf" ? "Préparation..." : "Rapport PDF"}
                 </button>
                 <button
                   type="button"
@@ -451,7 +451,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("transactions", "csv")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "transactions-csv" ? "Preparation..." : "Transactions CSV"}
+                  {busyExport === "transactions-csv" ? "Préparation..." : "Transactions CSV"}
                 </button>
                 <button
                   type="button"
@@ -459,7 +459,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("transactions", "xlsx")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "transactions-xlsx" ? "Preparation..." : "Transactions Excel"}
+                  {busyExport === "transactions-xlsx" ? "Préparation..." : "Transactions Excel"}
                 </button>
                 <button
                   type="button"
@@ -467,7 +467,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("tasks", "csv")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "tasks-csv" ? "Preparation..." : "Taches CSV"}
+                  {busyExport === "tasks-csv" ? "Préparation..." : "Tâches CSV"}
                 </button>
                 <button
                   type="button"
@@ -475,7 +475,7 @@ export function ReportsPage(): JSX.Element {
                   onClick={() => void handleExport("tasks", "xlsx")}
                   disabled={busyExport !== null}
                 >
-                  {busyExport === "tasks-xlsx" ? "Preparation..." : "Taches Excel"}
+                  {busyExport === "tasks-xlsx" ? "Préparation..." : "Tâches Excel"}
                 </button>
               </div>
             </div>
@@ -536,7 +536,7 @@ export function ReportsPage(): JSX.Element {
                   ) : (
                     overview.financeByType.map((item) => (
                       <tr key={`${item.type}-${item.currency}`}>
-                        <td>{item.type === "CASH_IN" ? "Entree" : "Sortie"}</td>
+                        <td>{item.type === "CASH_IN" ? "Entrée" : "Sortie"}</td>
                         <td>{item.currency}</td>
                         <td>{item.count}</td>
                         <td>
@@ -697,8 +697,8 @@ export function ReportsPage(): JSX.Element {
                     <th>Activite</th>
                     <th>Total</th>
                     <th>Ouvertes</th>
-                    <th>Bloquees</th>
-                    <th>Terminees</th>
+                    <th>Bloquées</th>
+                    <th>Terminées</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -764,7 +764,7 @@ export function ReportsPage(): JSX.Element {
                       Ouvertes: {item.openTasksCount} | En cours: {item.inProgressTasksCount}
                     </p>
                     <p className="hint">
-                      Bloquees: {item.blockedTasksCount} | Terminees: {item.doneTasksCount}
+                      Bloquées: {item.blockedTasksCount} | Terminées: {item.doneTasksCount}
                     </p>
                   </article>
                 ))

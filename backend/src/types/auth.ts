@@ -5,6 +5,7 @@ export type AuthContext = {
   companyId: string;
   role: RoleCode;
   email: string;
+  fullName?: string;
 };
 
 export type AccessTokenPayload = AuthContext & {
@@ -15,4 +16,3 @@ export type RefreshTokenPayload = AuthContext & {
   type: "refresh";
   sessionId: string;
 };
-

@@ -16,15 +16,15 @@ export type NavigationItem = {
   key: FeatureKey;
   label: string;
   to: string;
-  section: "Pilotage" | "Execution" | "Administration";
+  section: "Pilotage" | "Exécution" | "Administration";
 };
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
-  OWNER: "Proprietaire",
-  SYS_ADMIN: "Admin Systeme",
+  OWNER: "Propriétaire",
+  SYS_ADMIN: "Admin Système",
   ACCOUNTANT: "Comptable",
   SUPERVISOR: "Superviseur",
-  EMPLOYEE: "Employe"
+  EMPLOYEE: "Employé"
 };
 
 const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
@@ -48,15 +48,15 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     key: "financeTransactions",
     label: "Transactions",
     to: "/finance/transactions",
-    section: "Execution"
+    section: "Exécution"
   },
   {
     key: "financeSalaries",
     label: "Salaires",
     to: "/finance/salaries",
-    section: "Execution"
+    section: "Exécution"
   },
-  { key: "operationsTasks", label: "Taches", to: "/operations/tasks", section: "Execution" },
+  { key: "operationsTasks", label: "Tâches", to: "/operations/tasks", section: "Exécution" },
   {
     key: "adminCompanies",
     label: "Entreprises",
@@ -72,7 +72,7 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
   },
   {
     key: "settingsSecurity",
-    label: "Securite",
+    label: "Sécurité",
     to: "/settings/security",
     section: "Administration"
   }

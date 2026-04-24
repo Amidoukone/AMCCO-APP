@@ -571,7 +571,9 @@ financeRouter.patch(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
+        email: req.auth.email,
+        fullName: req.auth.fullName
       },
       {
         transactionId: params.transactionId
@@ -594,7 +596,9 @@ financeRouter.patch(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
+        email: req.auth.email,
+        fullName: req.auth.fullName
       },
       {
         transactionId: params.transactionId,

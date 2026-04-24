@@ -573,7 +573,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           : createFinanceAccountRequest(accessToken, payload);
       });
       setSuccessMessage(
-        editingAccountId ? "Compte financier modifie." : "Compte financier cree."
+        editingAccountId ? "Compte financier modifié." : "Compte financier créé."
       );
       resetAccountForm();
       await loadData();
@@ -670,8 +670,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       handleOpenTransactionDetails(response.item.id, response.item.activityCode);
       setSuccessMessage(
         editingTransactionId
-          ? "Transaction modifiee. Elle repasse en brouillon avant nouvelle soumission."
-          : "Transaction creee en brouillon."
+          ? "Transaction modifiée. Elle repasse en brouillon avant nouvelle soumission."
+          : "Transaction créée en brouillon."
       );
       resetTransactionForm();
       await loadData();
@@ -705,7 +705,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   async function handleDeleteTransaction(transaction: FinancialTransaction): Promise<void> {
     const isApproved = transaction.status === "APPROVED";
     const confirmationMessage = isApproved
-      ? "Cette transaction est deja approuvee. Confirmer sa suppression definitive ?"
+      ? "Cette transaction est déjà approuvée. Confirmer sa suppression définitive ?"
       : "Confirmer la suppression de cette transaction ?";
 
     if (!window.confirm(confirmationMessage)) {
@@ -727,8 +727,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage(
         isApproved
-          ? "Transaction approuvee supprimee par l'admin systeme."
-          : "Transaction supprimee."
+          ? "Transaction approuvée supprimée par l'admin système."
+          : "Transaction supprimée."
       );
       await loadData();
     } catch (error) {
@@ -888,7 +888,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         reviewFinanceTransactionRequest(accessToken, transactionId, decision)
       );
-      setSuccessMessage(decision === "APPROVED" ? "Transaction approuvee." : "Transaction rejetee.");
+      setSuccessMessage(decision === "APPROVED" ? "Transaction approuvée." : "Transaction rejetée.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -928,10 +928,10 @@ export function FinanceTransactionsPage(): JSX.Element {
         <section className="panel">
           <details className="finance-section-toggle">
             <summary className="finance-section-summary">
-              <span>{editingAccountId ? "Modifier un compte financier" : "Creer un compte financier"}</span>
+              <span>{editingAccountId ? "Modifier un compte financier" : "Créer un compte financier"}</span>
               <small>
                 {editingAccountId
-                  ? "Les comptes deja utilises restent verrouilles pour proteger l'historique."
+                  ? "Les comptes déjà utilisés restent verrouillés pour protéger l'historique."
                   : "Ouvrir si vous devez ajouter une nouvelle caisse ou un nouveau compte."}
               </small>
             </summary>
@@ -1039,7 +1039,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               </div>
             ) : null}
             <button type="submit">
-              {editingAccountId ? "Enregistrer les modifications" : "Creer compte"}
+              {editingAccountId ? "Enregistrer les modifications" : "Créer le compte"}
             </button>
             {editingAccountId ? (
               <button
@@ -1055,8 +1055,8 @@ export function FinanceTransactionsPage(): JSX.Element {
               {accountForm.scopeType === "GLOBAL"
                 ? "Le compte sera visible et utilisable dans tous les secteurs."
                 : accountForm.scopeType === "DEDICATED"
-                  ? "Le compte sera reserve a un seul secteur."
-                  : "Le compte sera partage uniquement entre les secteurs selectionnes."}
+                  ? "Le compte sera réservé à un seul secteur."
+                  : "Le compte sera partagé uniquement entre les secteurs sélectionnés."}
             </p>
           </details>
         </section>
@@ -1117,7 +1117,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             }
           >
             <option value="ALL">Tous les types</option>
-            <option value="CASH_IN">Entree</option>
+            <option value="CASH_IN">Entrée</option>
             <option value="CASH_OUT">Sortie</option>
           </select>
           <button type="submit">Filtrer</button>
@@ -1173,7 +1173,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               }))
             }
           >
-            <option value="CASH_IN">Entree</option>
+            <option value="CASH_IN">Entrée</option>
             <option value="CASH_OUT">Sortie</option>
           </select>
 
@@ -1341,7 +1341,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                       <td>
                         <strong>{tx.accountName}</strong>
                         <div className="hint">
-                          {tx.type === "CASH_IN" ? "Entree" : "Sortie"} |{" "}
+                          {tx.type === "CASH_IN" ? "Entrée" : "Sortie"} |{" "}
                           {tx.activityCode
                             ? getBusinessActivityLabel(tx.activityCode)
                             : "Charge transversale entreprise"}
@@ -1554,7 +1554,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               <strong>Compte:</strong> {selectedTransaction.accountName}
             </p>
             <p>
-              <strong>Type:</strong> {selectedTransaction.type === "CASH_IN" ? "Entree" : "Sortie"}
+              <strong>Type:</strong> {selectedTransaction.type === "CASH_IN" ? "Entrée" : "Sortie"}
             </p>
             <p>
               <strong>Montant:</strong> {selectedTransaction.amount} {selectedTransaction.currency}

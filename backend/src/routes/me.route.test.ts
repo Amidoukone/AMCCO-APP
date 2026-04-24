@@ -4,6 +4,7 @@ import { meRouter } from "./me.route.js";
 import { createTestApp } from "../test/test-app.js";
 import { verifyAccessToken } from "../lib/token.js";
 import { findActiveUserById, findUserProfileForCompany } from "../repositories/auth.repository.js";
+import { changeOwnPassword } from "../services/auth.service.js";
 import {
   findCompanyById,
   listUserCompanyMemberships
@@ -23,6 +24,10 @@ vi.mock("../repositories/companies.repository.js", () => ({
   listUserCompanyMemberships: vi.fn()
 }));
 
+vi.mock("../services/auth.service.js", () => ({
+  changeOwnPassword: vi.fn()
+}));
+
 describe("meRouter / RBAC", () => {
   const app = createTestApp(meRouter);
 
@@ -32,6 +37,7 @@ describe("meRouter / RBAC", () => {
     vi.mocked(findUserProfileForCompany).mockReset();
     vi.mocked(findCompanyById).mockReset();
     vi.mocked(listUserCompanyMemberships).mockReset();
+    vi.mocked(changeOwnPassword).mockReset();
   });
 
   it("GET /admin/ping rejects missing auth header", async () => {
@@ -210,5 +216,67 @@ describe("meRouter / RBAC", () => {
       memberships: [],
       bootstrapMode: true
     });
+  });
+
+  it("PATCH /me/password updates the authenticated user's password", async () => {
+    vi.mocked(verifyAccessToken).mockReturnValue({
+      userId: "user-2",
+      companyId: "company-1",
+      role: "EMPLOYEE",
+      email: "employee@example.com",
+      type: "access"
+    });
+    vi.mocked(findUserProfileForCompany).mockResolvedValue({
+      userId: "user-2",
+      email: "employee@example.com",
+      fullName: "Employee User",
+      role: "EMPLOYEE"
+    });
+
+    const response = await request(app)
+      .patch("/me/password")
+      .set("Authorization", "Bearer employee-token")
+      .send({
+        currentPassword: "current-password-test-123",
+        newPassword: "new-password-test-456"
+      });
+
+    expect(response.status).toBe(200);
+    expect(changeOwnPassword).toHaveBeenCalledWith({
+      userId: "user-2",
+      companyId: "company-1",
+      currentPassword: "current-password-test-123",
+      newPassword: "new-password-test-456"
+    });
+    expect(response.body).toEqual({
+      status: "password_changed"
+    });
+  });
+
+  it("PATCH /me/password rejects invalid payload", async () => {
+    vi.mocked(verifyAccessToken).mockReturnValue({
+      userId: "user-2",
+      companyId: "company-1",
+      role: "EMPLOYEE",
+      email: "employee@example.com",
+      type: "access"
+    });
+    vi.mocked(findUserProfileForCompany).mockResolvedValue({
+      userId: "user-2",
+      email: "employee@example.com",
+      fullName: "Employee User",
+      role: "EMPLOYEE"
+    });
+
+    const response = await request(app)
+      .patch("/me/password")
+      .set("Authorization", "Bearer employee-token")
+      .send({
+        currentPassword: "",
+        newPassword: "court"
+      });
+
+    expect(response.status).toBe(400);
+    expect(changeOwnPassword).not.toHaveBeenCalled();
   });
 });

@@ -4,7 +4,7 @@ export type CompanyProfile = {
   id: string;
   name: string;
   code: string;
-  legalName: string | null;
+  légalName: string | null;
   registrationNumber: string | null;
   taxId: string | null;
   email: string | null;
@@ -48,7 +48,7 @@ export type AdminCompanySingleResponse = {
 export type CreateCompanyInput = {
   name: string;
   code: string;
-  legalName?: string;
+  légalName?: string;
   registrationNumber?: string;
   taxId?: string;
   email?: string;
@@ -67,7 +67,7 @@ export type CreateCompanyInput = {
 
 export type UpdateCompanyInput = {
   name?: string;
-  legalName?: string;
+  légalName?: string;
   registrationNumber?: string;
   taxId?: string;
   email?: string;
