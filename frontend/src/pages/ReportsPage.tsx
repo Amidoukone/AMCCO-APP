@@ -27,16 +27,14 @@ type ReportPeriodQuery = {
 
 type ExportTarget =
   | "overview-pdf"
-  | "transactions-csv"
   | "transactions-xlsx"
-  | "tasks-csv"
   | "tasks-xlsx";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Chargement impossible. Verifie la connexion backend.";
+  return "Chargement impossible. Vérifiez la connexion backend.";
 }
 
 function formatDateTime(value: string): string {
@@ -51,9 +49,9 @@ function financeStatusLabel(status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECT
     return "Soumise";
   }
   if (status === "APPROVED") {
-    return "Approuvee";
+    return "Approuvée";
   }
-  return "Rejetee";
+  return "Rejetée";
 }
 
 function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
@@ -75,8 +73,8 @@ function accountScopeLabel(account: ReportsOverview["financeAccounts"][number]):
   }
   if (account.scopeType === "DEDICATED") {
     return account.primaryActivityCode
-      ? `Dedie: ${getBusinessActivityLabel(account.primaryActivityCode)}`
-      : "Dedie";
+      ? `Dédié: ${getBusinessActivityLabel(account.primaryActivityCode)}`
+      : "Dédié";
   }
   return account.allowedActivityCodes.length > 0
     ? `Restreint: ${account.allowedActivityCodes
@@ -118,7 +116,7 @@ function normalizePeriodQuery(form: PeriodFormState): ReportPeriodQuery {
 
 function buildExportFileName(
   kind: "overview" | "transactions" | "tasks",
-  format: "csv" | "xlsx" | "pdf",
+  format: "xlsx" | "pdf",
   form: PeriodFormState
 ): string {
   const stamp = new Date().toISOString().slice(0, 10);
@@ -130,8 +128,8 @@ function buildExportFileName(
 function formatAppliedRange(overview: ReportsOverview): string {
   if (!overview.filters.dateFrom && !overview.filters.dateTo) {
     return overview.filters.activityCode
-      ? `Toutes periodes | ${getBusinessActivityLabel(overview.filters.activityCode)}`
-      : "Toutes periodes";
+      ? `Toutes périodes | ${getBusinessActivityLabel(overview.filters.activityCode)}`
+      : "Toutes périodes";
   }
 
   const fromLabel = overview.filters.dateFrom
@@ -180,7 +178,7 @@ export function ReportsPage(): JSX.Element {
         }
         const refreshed = await refreshSession();
         if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshed);
       }
@@ -229,14 +227,14 @@ export function ReportsPage(): JSX.Element {
 
     return [
       {
-        title: "Transactions consolidees",
+        title: "Transactions consolidées",
         value: String(financeCount),
         note: `${overview.financeByType.length} ligne(s) devise/type sur ${formatAppliedRange(overview)}`
       },
       {
         title: "Tâches consolidées",
         value: String(taskCount),
-        note: `${blockedCount} tache(s) bloquee(s) sur la periode`
+        note: `${blockedCount} tâche(s) bloquée(s) sur la période`
       },
       {
         title: "Comptes compatibles",
@@ -256,7 +254,7 @@ export function ReportsPage(): JSX.Element {
   function handleApplyFilters(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (periodForm.dateFrom && periodForm.dateTo && periodForm.dateFrom > periodForm.dateTo) {
-      setErrorMessage("La date de debut doit etre inferieure ou egale a la date de fin.");
+      setErrorMessage("La date de début doit être inférieure ou égale à la date de fin.");
       return;
     }
 
@@ -283,7 +281,7 @@ export function ReportsPage(): JSX.Element {
 
   async function handleExport(
     kind: "overview" | "transactions" | "tasks",
-    format: "csv" | "xlsx" | "pdf"
+    format: "xlsx" | "pdf"
   ): Promise<void> {
     const exportTarget = `${kind}-${format}` as ExportTarget;
     setBusyExport(exportTarget);
@@ -301,15 +299,13 @@ export function ReportsPage(): JSX.Element {
       triggerBlobDownload(blob, buildExportFileName(kind, format, appliedPeriod));
 
       if (kind === "overview") {
-        setSuccessMessage("Export PDF du rapport genere pour la periode appliquee.");
+        setSuccessMessage("Export PDF du rapport généré pour la période appliquée.");
       } else if (kind === "transactions" && format === "xlsx") {
-        setSuccessMessage("Export Excel des transactions genere pour la periode appliquee.");
+        setSuccessMessage("Export Excel des transactions généré pour la période appliquée.");
       } else if (kind === "tasks" && format === "xlsx") {
         setSuccessMessage("Export Excel des tâches généré pour la période appliquée.");
       } else if (kind === "transactions") {
-        setSuccessMessage("Export CSV des transactions genere pour la periode appliquee.");
-      } else {
-        setSuccessMessage("Export CSV des tâches généré pour la période appliquée.");
+        setSuccessMessage("Export Excel des tâches généré pour la période appliquée.");
       }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -323,13 +319,13 @@ export function ReportsPage(): JSX.Element {
       <header className="section-header">
         <h2>Rapports et exports</h2>
         <p>
-          Consolidation finance et operations, avec un cadrage par secteur et des exports
-          immediats.
+          Consolidation finance et opérations, avec un cadrage par secteur et des exports
+          immédiats.
         </p>
       </header>
 
       <section className="panel">
-        <h3>Periode</h3>
+        <h3>Période</h3>
         <form className="reports-filter-form" onSubmit={handleApplyFilters}>
           <input
             type="date"
@@ -360,7 +356,7 @@ export function ReportsPage(): JSX.Element {
               }))
             }
           >
-            <option value="ALL">Toutes les activites</option>
+            <option value="ALL">Toutes les activités</option>
             {activities.map((activity) => (
               <option key={activity.code} value={activity.code}>
                 {activity.label}
@@ -368,17 +364,17 @@ export function ReportsPage(): JSX.Element {
               </option>
             ))}
           </select>
-          <button type="submit">Mettre a jour</button>
+          <button type="submit">Mettre à jour</button>
           <button type="button" className="secondary-btn" onClick={handleResetFilters}>
-            Reinitialiser les filtres
+            Réinitialiser les filtres
           </button>
         </form>
         <p className="hint">
           Secteur actif: {selectedActivity?.label ?? "Tous les secteurs"}.
         </p>
         <p className="hint">
-          Les transactions suivent leur date d'operation. Les taches et la charge equipe sont
-          basees sur la derniere activite enregistree. La repartition des roles reflete
+          Les transactions suivent leur date d'opération. Les tâches et la charge équipe sont
+          basées sur la dernière activité enregistrée. La répartition des rôles reflète
           l'organisation actuelle.
         </p>
       </section>
@@ -396,10 +392,10 @@ export function ReportsPage(): JSX.Element {
                   <p className="sidebar-section-label">Profil sectoriel</p>
                   <h3>{overview.activityProfile.label}</h3>
                   <p className="hint">
-                    {overview.activityProfile.operationsModel} | Regles: {overview.sectorRulesVersion}
+                    {overview.activityProfile.operationsModel} | Règles: {overview.sectorRulesVersion}
                   </p>
                   <p className="hint">
-                    Priorite de suivi: {overview.activityProfile.reporting.focusArea}
+                    Priorité de suivi: {overview.activityProfile.reporting.focusArea}
                   </p>
                 </div>
               </div>
@@ -432,7 +428,7 @@ export function ReportsPage(): JSX.Element {
               <div>
                 <h3>Exports</h3>
                 <p className="hint">
-                  Derniere consolidation: {formatDateTime(overview.generatedAt)} | Periode:{" "}
+                  Dernière consolidation: {formatDateTime(overview.generatedAt)} | Période:{" "}
                   {formatAppliedRange(overview)}
                 </p>
               </div>
@@ -448,26 +444,10 @@ export function ReportsPage(): JSX.Element {
                 <button
                   type="button"
                   className="secondary-btn"
-                  onClick={() => void handleExport("transactions", "csv")}
-                  disabled={busyExport !== null}
-                >
-                  {busyExport === "transactions-csv" ? "Préparation..." : "Transactions CSV"}
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn"
                   onClick={() => void handleExport("transactions", "xlsx")}
                   disabled={busyExport !== null}
                 >
                   {busyExport === "transactions-xlsx" ? "Préparation..." : "Transactions Excel"}
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => void handleExport("tasks", "csv")}
-                  disabled={busyExport !== null}
-                >
-                  {busyExport === "tasks-csv" ? "Préparation..." : "Tâches CSV"}
                 </button>
                 <button
                   type="button"
@@ -496,7 +476,7 @@ export function ReportsPage(): JSX.Element {
                 <tbody>
                   {overview.financeByStatus.length === 0 ? (
                     <tr>
-                      <td colSpan={4}>Aucune transaction consolidee sur cette periode.</td>
+                      <td colSpan={4}>Aucune transaction consolidée sur cette période.</td>
                     </tr>
                   ) : (
                     overview.financeByStatus.map((item) => (
@@ -525,13 +505,13 @@ export function ReportsPage(): JSX.Element {
                     <th>Devise</th>
                     <th>Nombre</th>
                     <th>Montant total</th>
-                    <th>Montant approuve</th>
+                    <th>Montant approuvé</th>
                   </tr>
                 </thead>
                 <tbody>
                   {overview.financeByType.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>Aucune transaction consolidee sur cette periode.</td>
+                      <td colSpan={5}>Aucune transaction consolidée sur cette période.</td>
                     </tr>
                   ) : (
                     overview.financeByType.map((item) => (
@@ -554,21 +534,21 @@ export function ReportsPage(): JSX.Element {
           </section>
 
           <section className="panel">
-            <h3>Transactions par activite</h3>
+            <h3>Transactions par activité</h3>
             <div className="table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Activite</th>
+                    <th>Activité</th>
                     <th>Nombre</th>
                     <th>Montant total</th>
-                    <th>Montant approuve</th>
+                    <th>Montant approuvé</th>
                   </tr>
                 </thead>
                 <tbody>
                   {overview.financeByActivity.length === 0 ? (
                     <tr>
-                      <td colSpan={4}>Aucune transaction consolidee sur cette periode.</td>
+                      <td colSpan={4}>Aucune transaction consolidée sur cette période.</td>
                     </tr>
                   ) : (
                     overview.financeByActivity.map((item) => (
@@ -602,7 +582,7 @@ export function ReportsPage(): JSX.Element {
                 <span>{overview.financeAccountsSummary.globalCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Dedies</strong>
+                <strong>Dédiés</strong>
                 <span>{overview.financeAccountsSummary.dedicatedCount}</span>
               </article>
               <article className="dashboard-kpi-card">
@@ -620,7 +600,7 @@ export function ReportsPage(): JSX.Element {
                 <span>{overview.financeAccountsSummary.incompatibleCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Dedies au secteur</strong>
+                <strong>Dédiés au secteur</strong>
                 <span>{overview.financeAccountsSummary.dedicatedToSelectedActivityCount}</span>
               </article>
               <article className="dashboard-kpi-card">
@@ -634,7 +614,7 @@ export function ReportsPage(): JSX.Element {
                   <tr>
                     <th>Compte</th>
                     <th>Reference</th>
-                    <th>Portee</th>
+                    <th>Portée</th>
                     <th>Compatibilite</th>
                     <th>Solde initial / courant</th>
                   </tr>
@@ -642,7 +622,7 @@ export function ReportsPage(): JSX.Element {
                 <tbody>
                   {overview.financeAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>Aucun compte financier configure.</td>
+                      <td colSpan={5}>Aucun compte financier configuré.</td>
                     </tr>
                   ) : (
                     overview.financeAccounts.map((item) => (
@@ -661,7 +641,7 @@ export function ReportsPage(): JSX.Element {
           </section>
 
           <section className="panel">
-            <h3>Taches par statut</h3>
+            <h3>Tâches par statut</h3>
             <div className="table-wrap">
               <table className="admin-table">
                 <thead>
@@ -673,7 +653,7 @@ export function ReportsPage(): JSX.Element {
                 <tbody>
                   {overview.taskByStatus.length === 0 ? (
                     <tr>
-                      <td colSpan={2}>Aucune tache consolidee sur cette periode.</td>
+                      <td colSpan={2}>Aucune tâche consolidée sur cette période.</td>
                     </tr>
                   ) : (
                     overview.taskByStatus.map((item) => (
@@ -689,12 +669,12 @@ export function ReportsPage(): JSX.Element {
           </section>
 
           <section className="panel">
-            <h3>Taches par activite</h3>
+            <h3>Tâches par activité</h3>
             <div className="table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Activite</th>
+                    <th>Activité</th>
                     <th>Total</th>
                     <th>Ouvertes</th>
                     <th>Bloquées</th>
@@ -704,7 +684,7 @@ export function ReportsPage(): JSX.Element {
                 <tbody>
                   {overview.taskByActivity.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>Aucune tache consolidee sur cette periode.</td>
+                      <td colSpan={5}>Aucune tâche consolidée sur cette période.</td>
                     </tr>
                   ) : (
                     overview.taskByActivity.map((item) => (
@@ -728,7 +708,7 @@ export function ReportsPage(): JSX.Element {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Role</th>
+                    <th>Rôle</th>
                     <th>Effectif</th>
                   </tr>
                 </thead>
@@ -750,27 +730,6 @@ export function ReportsPage(): JSX.Element {
             </div>
           </section>
 
-          <section className="panel">
-            <h3>Top charge d'assignation</h3>
-            <div className="operations-member-grid">
-              {overview.topAssignees.length === 0 ? (
-                <p className="hint">Aucune charge equipe disponible sur cette periode.</p>
-              ) : (
-                overview.topAssignees.map((item) => (
-                  <article key={item.userId} className="operations-member-card">
-                    <h4>{item.fullName}</h4>
-                    <p className="hint">{ROLE_LABELS[item.role]}</p>
-                    <p className="hint">
-                      Ouvertes: {item.openTasksCount} | En cours: {item.inProgressTasksCount}
-                    </p>
-                    <p className="hint">
-                      Bloquées: {item.blockedTasksCount} | Terminées: {item.doneTasksCount}
-                    </p>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
         </>
       ) : null}
     </>

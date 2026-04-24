@@ -16,26 +16,26 @@ type AuditDisplayItem = AuditLogItem & {
 
 const auditActionLabels: Record<string, string> = {
   AUTH_LOGIN: "Connexion",
-  AUTH_REFRESH: "Rafraichissement de session",
-  AUTH_LOGOUT: "Deconnexion",
+  AUTH_REFRESH: "Rafraîchissement de session",
+  AUTH_LOGOUT: "Déconnexion",
   COMPANY_CREATED: "Entreprise créée",
   COMPANY_UPDATED: "Entreprise modifiée",
   COMPANY_DELETED: "Entreprise supprimée",
-  ADMIN_USER_CREATED: "Creation utilisateur",
+  ADMIN_USER_CREATED: "Création utilisateur",
   ADMIN_USER_UPDATED: "Mise à jour utilisateur",
   ADMIN_USER_ROLE_UPDATED: "Rôle utilisateur modifié",
-  ADMIN_USER_ACTIVATED: "Utilisateur active",
+  ADMIN_USER_ACTIVATED: "Utilisateur activé",
   ADMIN_USER_DEACTIVATED: "Utilisateur désactivé",
   FINANCE_ACCOUNT_CREATED: "Compte financier créé",
   FINANCE_ACCOUNT_UPDATED: "Compte financier modifié",
-  FINANCE_ACCOUNT_DELETED: "Compte financier supprime",
+  FINANCE_ACCOUNT_DELETED: "Compte financier supprimé",
   FINANCE_SALARY_CREATED: "Salaire créé",
   FINANCE_SALARY_UPDATED: "Salaire modifié",
-  FINANCE_SALARY_DELETED: "Salaire supprime",
-  FINANCE_SALARY_SUBMITTED: "Salaire soumis a confirmation",
-  FINANCE_SALARY_RECEIPT_CONFIRMED: "Reception salaire confirmee",
+  FINANCE_SALARY_DELETED: "Salaire supprimé",
+  FINANCE_SALARY_SUBMITTED: "Salaire soumis à confirmation",
+  FINANCE_SALARY_RECEIPT_CONFIRMED: "Réception salaire confirmée",
   FINANCE_SALARY_APPROVED: "Salaire approuvé",
-  FINANCE_SALARY_REJECTED: "Salaire rejete",
+  FINANCE_SALARY_REJECTED: "Salaire rejeté",
   FINANCE_TRANSACTION_CREATED: "Transaction créée",
   FINANCE_TRANSACTION_UPDATED: "Transaction modifiée",
   FINANCE_TRANSACTION_DELETED: "Transaction supprimée",
@@ -48,9 +48,9 @@ const auditActionLabels: Record<string, string> = {
   TASK_ASSIGNED: "Tâche assignée",
   TASK_UNASSIGNED: "Tâche désassignée",
   TASK_STATUS_CHANGED: "Statut de tâche modifié",
-  TASK_COMMENT_ADDED: "Commentaire ajoute",
+  TASK_COMMENT_ADDED: "Commentaire ajouté",
   COMPANY_ACTIVITY_UPDATED: "Secteur mis à jour",
-  COMPANY_ACTIVITY_RECLASSIFIED: "Donnees reclassees"
+  COMPANY_ACTIVITY_RECLASSIFIED: "Données reclassées"
 };
 
 const entityTypeLabels: Record<string, string> = {
@@ -133,7 +133,7 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
 
   const root = asObject(metadata);
   if (action === "AUTH_LOGOUT") {
-    return "Session fermee.";
+    return "Session fermée.";
   }
 
   if (!root) {
@@ -176,7 +176,7 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
 
   if (action === "TASK_COMMENT_ADDED") {
     const bodyPreview = asText(root.bodyPreview);
-    return bodyPreview ? `Commentaire: ${truncateText(bodyPreview, 100)}` : "Commentaire ajoute.";
+    return bodyPreview ? `Commentaire: ${truncateText(bodyPreview, 100)}` : "Commentaire ajouté.";
   }
 
   const compact = truncateText(financeSummary !== "-" ? financeSummary : JSON.stringify(metadata));
@@ -269,7 +269,7 @@ export function SecuritySettingsPage(): JSX.Element {
         }
         const refreshed = await refreshSession();
         if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshed);
       }
@@ -337,7 +337,7 @@ export function SecuritySettingsPage(): JSX.Element {
   if (!canAccess) {
     return (
       <section className="panel">
-        <h2>Securite et acces</h2>
+        <h2>Sécurité et accès</h2>
         <p>Votre rôle ne permet pas d'accéder au journal d'audit.</p>
       </section>
     );
@@ -346,7 +346,7 @@ export function SecuritySettingsPage(): JSX.Element {
   return (
     <>
       <header className="section-header">
-        <h2>Securite et acces</h2>
+        <h2>Sécurité et accès</h2>
         <p>Journal d'audit des actions sensibles sur l'entreprise.</p>
       </header>
 
@@ -355,7 +355,7 @@ export function SecuritySettingsPage(): JSX.Element {
         <form className="audit-filter-form" onSubmit={handleFilterSubmit}>
           <input
             type="text"
-            placeholder="Action (ex: creation utilisateur)"
+            placeholder="Action (ex: création utilisateur)"
             value={query.action}
             onChange={(event) =>
               setQuery((prev) => ({
@@ -377,7 +377,7 @@ export function SecuritySettingsPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="Type d'entite"
+            placeholder="Type d'entité"
             value={query.entityType}
             onChange={(event) =>
               setQuery((prev) => ({
@@ -388,7 +388,7 @@ export function SecuritySettingsPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="Identifiant entite"
+            placeholder="Identifiant entité"
             value={query.entityId}
             onChange={(event) =>
               setQuery((prev) => ({
@@ -417,9 +417,9 @@ export function SecuritySettingsPage(): JSX.Element {
       {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
 
       <section className="panel">
-        <h3>Historique recent</h3>
+        <h3>Historique récent</h3>
         {isLoading ? <p>Chargement...</p> : null}
-        {!isLoading && displayItems.length === 0 ? <p>Aucune entree pour ces filtres.</p> : null}
+        {!isLoading && displayItems.length === 0 ? <p>Aucune entrée pour ces filtres.</p> : null}
         {!isLoading && displayItems.length > 0 ? (
           <div className="table-wrap">
             <table className="admin-table">
@@ -472,7 +472,7 @@ export function SecuritySettingsPage(): JSX.Element {
                           <span>{metadataSummary}</span>
                           {metadataDetails && metadataDetails !== metadataSummary ? (
                             <details className="audit-metadata-details">
-                              <summary>Voir les details</summary>
+                              <summary>Voir les détails</summary>
                               <pre>{metadataDetails}</pre>
                             </details>
                           ) : null}

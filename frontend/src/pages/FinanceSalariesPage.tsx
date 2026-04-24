@@ -33,7 +33,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Operation impossible. Verifie la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function statusLabel(status: SalaryTransaction["status"]): string {
@@ -44,9 +44,9 @@ function statusLabel(status: SalaryTransaction["status"]): string {
     return "Soumise";
   }
   if (status === "APPROVED") {
-    return "Approuvee";
+    return "Approuvée";
   }
-  return "Rejetee";
+  return "Rejetée";
 }
 
 function salaryPaymentMethodLabel(method: SalaryPaymentMethod): string {
@@ -57,9 +57,9 @@ function salaryPaymentMethodLabel(method: SalaryPaymentMethod): string {
     return "Mobile money";
   }
   if (method === "CHEQUE") {
-    return "Cheque";
+    return "Chèque";
   }
-  return "Especes";
+  return "Espèces";
 }
 
 function formatFileSize(bytes: number): string {
@@ -124,10 +124,10 @@ function salaryConfirmationLabel(
     return "Non envoye";
   }
   if (confirmationStatus === "CONFIRMED") {
-    return "Confirmee";
+    return "Confirmée";
   }
   if (confirmationStatus === "PENDING") {
-    return "En attente employe";
+    return "En attente employé";
   }
   return "Non requise";
 }
@@ -199,7 +199,7 @@ export function FinanceSalariesPage(): JSX.Element {
         }
         const refreshed = await refreshSession();
         if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshed);
       }
@@ -238,19 +238,19 @@ export function FinanceSalariesPage(): JSX.Element {
     if (canManageSalaries) {
       return [
         {
-          title: "Salaires de la periode",
+          title: "Salaires de la période",
           value: String(salaryItems.length),
           note: formatPayPeriod(salaryFilters.payPeriod)
         },
         {
           title: "Net total",
           value: salarySummary?.totalNetAmount ?? "0.00",
-          note: "Montant net cumule"
+          note: "Montant net cumulé"
         },
         {
-          title: "En attente employe",
+          title: "En attente employé",
           value: String(pendingEmployeeCount),
-          note: "Reception a confirmer"
+          note: "Réception à confirmer"
         },
         {
           title: "Prêts à approuver",
@@ -264,15 +264,15 @@ export function FinanceSalariesPage(): JSX.Element {
       {
         title: "Mes salaires",
         value: String(salaryItems.length),
-        note: "Elements visibles sur la periode"
+        note: "Éléments visibles sur la période"
       },
       {
         title: "En attente de moi",
         value: String(pendingEmployeeCount),
-        note: "Reception a confirmer"
+        note: "Réception à confirmer"
       },
       {
-        title: "Approuves",
+        title: "Approuvés",
         value: String(salaryItems.filter((item) => item.status === "APPROVED").length),
         note: "Salaires finalisés"
       }
@@ -554,7 +554,7 @@ export function FinanceSalariesPage(): JSX.Element {
   async function handleAddProof(transactionId: string): Promise<void> {
     const selectedFile = proofFiles[transactionId];
     if (!selectedFile) {
-      setErrorMessage("Selectionne un fichier de preuve.");
+      setErrorMessage("Sélectionnez un fichier de preuve.");
       return;
     }
 
@@ -582,7 +582,7 @@ export function FinanceSalariesPage(): JSX.Element {
         });
 
         if (!uploadResponse.ok) {
-          throw new ApiError(uploadResponse.status, "Echec de l'upload sur ImageKit.");
+          throw new ApiError(uploadResponse.status, "Échec de l'upload sur ImageKit.");
         }
 
         const uploaded = (await uploadResponse.json()) as {
@@ -602,7 +602,7 @@ export function FinanceSalariesPage(): JSX.Element {
         });
       });
 
-      setSuccessMessage("Preuve ajoutee.");
+      setSuccessMessage("Preuve ajoutée.");
       setProofFiles((prev) => ({ ...prev, [transactionId]: null }));
       setProofsByTransaction((prev) => ({
         ...prev,
@@ -623,7 +623,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => submitFinanceTransactionRequest(accessToken, transactionId));
-      setSuccessMessage("Salaire soumis a l'employe pour confirmation.");
+      setSuccessMessage("Salaire soumis à l'employé pour confirmation.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -640,7 +640,7 @@ export function FinanceSalariesPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         confirmFinanceSalaryReceiptRequest(accessToken, transactionId)
       );
-      setSuccessMessage("Reception du salaire confirmee.");
+      setSuccessMessage("Réception du salaire confirmée.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -675,7 +675,7 @@ export function FinanceSalariesPage(): JSX.Element {
         <h2>Salaires</h2>
         <p>
           Espace dédié au cycle de paie: préparation comptable, confirmation de réception par
-          l'employe, puis approbation finale.
+          l'employé, puis approbation finale.
         </p>
       </header>
 
@@ -738,10 +738,10 @@ export function FinanceSalariesPage(): JSX.Element {
             <option value="ALL">Tous les statuts</option>
             <option value="DRAFT">Brouillon</option>
             <option value="SUBMITTED">Soumise</option>
-            <option value="APPROVED">Approuvee</option>
-            <option value="REJECTED">Rejetee</option>
+            <option value="APPROVED">Approuvée</option>
+            <option value="REJECTED">Rejetée</option>
           </select>
-          <button type="submit">Mettre a jour</button>
+          <button type="submit">Mettre à jour</button>
         </form>
       </section>
 
@@ -752,7 +752,7 @@ export function FinanceSalariesPage(): JSX.Element {
               <h3>{editingSalaryId ? "Modifier un salaire" : "Enregistrer un salaire"}</h3>
               <p className="hint">
                 {editingSalaryId
-                  ? "Toute modification remet le salaire en brouillon et reinitialise la confirmation employe."
+                  ? "Toute modification remet le salaire en brouillon et réinitialise la confirmation employé."
                   : "Le salaire est créé en brouillon. Le comptable le vérifie, le soumet à l'employé, puis l'approuve seulement après confirmation de réception."}
               </p>
             </div>
@@ -819,8 +819,8 @@ export function FinanceSalariesPage(): JSX.Element {
             >
               <option value="BANK_TRANSFER">Virement bancaire</option>
               <option value="MOBILE_MONEY">Mobile money</option>
-              <option value="CASH">Especes</option>
-              <option value="CHEQUE">Cheque</option>
+              <option value="CASH">Espèces</option>
+              <option value="CHEQUE">Chèque</option>
             </select>
             <div className="salary-amount-group">
               <label className="salary-amount-field">
@@ -842,7 +842,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 <span className="salary-amount-label is-positive">+ Prime</span>
                 <input
                   type="text"
-                  placeholder="Montant ajoute"
+                  placeholder="Montant ajouté"
                   value={salaryForm.bonusAmount}
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
@@ -856,7 +856,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 <span className="salary-amount-label is-negative">- Retenue</span>
                 <input
                   type="text"
-                  placeholder="Montant deduit"
+                  placeholder="Montant déduit"
                   value={salaryForm.deductionAmount}
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
@@ -878,7 +878,7 @@ export function FinanceSalariesPage(): JSX.Element {
               }
             />
             <div className="scope-field">
-              <span className="scope-field-label">Net a payer</span>
+              <span className="scope-field-label">Net à payer</span>
               <strong>
                 {formatNetSalary(salaryForm.grossAmount, salaryForm.bonusAmount, salaryForm.deductionAmount)}{" "}
                 {salaryForm.currency}
@@ -929,7 +929,7 @@ export function FinanceSalariesPage(): JSX.Element {
         <section className="panel">
           <div className="dashboard-panel-header">
             <div>
-              <h3>Synthese de la periode</h3>
+              <h3>Synthèse de la période</h3>
               <p className="hint">
                 Brut {salarySummary.totalGrossAmount} | Primes {salarySummary.totalBonusAmount} |
                 Retenues {salarySummary.totalDeductionAmount}
@@ -969,7 +969,7 @@ export function FinanceSalariesPage(): JSX.Element {
               <tbody>
                 {salarySummary.byStatus.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>Aucun element de salaire sur cette periode.</td>
+                    <td colSpan={6}>Aucun élément de salaire sur cette période.</td>
                   </tr>
                 ) : (
                   salarySummary.byStatus.map((item) => (
@@ -995,17 +995,17 @@ export function FinanceSalariesPage(): JSX.Element {
       <section className="panel">
         <h3>Liste des salaires</h3>
         {isLoading ? <p>Chargement...</p> : null}
-        {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette periode.</p> : null}
+        {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette période.</p> : null}
         {!isLoading && salaryItems.length > 0 ? (
           <div className="table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Periode</th>
+                  <th>Période</th>
                   <th>Collaborateur</th>
                   <th>Net</th>
                   <th>Statut</th>
-                  <th>Reception employe</th>
+                  <th>Réception employé</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1047,7 +1047,7 @@ export function FinanceSalariesPage(): JSX.Element {
                             className="secondary-btn"
                             onClick={() => handleOpenSalaryDetails(item.id)}
                           >
-                            Voir le detail
+                            Voir le détail
                           </button>
                           {canEditSalary ? (
                             <button
@@ -1076,7 +1076,7 @@ export function FinanceSalariesPage(): JSX.Element {
                               onClick={() => void handleSubmitSalary(item.id)}
                               disabled={isBusy}
                             >
-                              Soumettre a l'employe
+                              Soumettre à l'employé
                             </button>
                           ) : null}
                           {canConfirmReceipt ? (
@@ -1134,12 +1134,12 @@ export function FinanceSalariesPage(): JSX.Element {
                               <strong>Retenue:</strong> {item.deductionAmount} {item.currency}
                             </p>
                             <p className="hint">
-                              <strong>Reception:</strong>{" "}
+                              <strong>Réception:</strong>{" "}
                               {salaryConfirmationLabel(item.status, item.salaryConfirmation.status)}
                             </p>
                             {item.salaryConfirmation.confirmedAt ? (
                               <p className="hint">
-                                <strong>Confirmee le:</strong>{" "}
+                                <strong>Confirmée le:</strong>{" "}
                                 {new Date(item.salaryConfirmation.confirmedAt).toLocaleString("fr-FR")}
                               </p>
                             ) : null}
@@ -1252,7 +1252,7 @@ export function FinanceSalariesPage(): JSX.Element {
               {ROLE_LABELS[selectedSalary.employeeRole as keyof typeof ROLE_LABELS] ?? selectedSalary.employeeRole}
             </p>
             <p>
-              <strong>Periode:</strong> {formatPayPeriod(selectedSalary.payPeriod)}
+              <strong>Période:</strong> {formatPayPeriod(selectedSalary.payPeriod)}
             </p>
             <p>
               <strong>Compte:</strong> {selectedSalary.accountName}
@@ -1276,7 +1276,7 @@ export function FinanceSalariesPage(): JSX.Element {
               <strong>Statut:</strong> {statusLabel(selectedSalary.status)}
             </p>
             <p>
-              <strong>Reception employe:</strong>{" "}
+              <strong>Réception employé:</strong>{" "}
               {salaryConfirmationLabel(selectedSalary.status, selectedSalary.salaryConfirmation.status)}
             </p>
             <p>
@@ -1284,7 +1284,7 @@ export function FinanceSalariesPage(): JSX.Element {
               {selectedSalary.salaryConfirmation.confirmedByEmail ?? "En attente"}
             </p>
             <p>
-              <strong>Confirmee le:</strong>{" "}
+              <strong>Confirmée le:</strong>{" "}
               {selectedSalary.salaryConfirmation.confirmedAt
                 ? new Date(selectedSalary.salaryConfirmation.confirmedAt).toLocaleString("fr-FR")
                 : "En attente"}

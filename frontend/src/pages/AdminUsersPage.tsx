@@ -24,7 +24,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Operation impossible. Verifie la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 export function AdminUsersPage(): JSX.Element {
@@ -77,7 +77,7 @@ export function AdminUsersPage(): JSX.Element {
 
         const refreshedAccessToken = await refreshSession();
         if (!refreshedAccessToken) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshedAccessToken);
       }
@@ -260,7 +260,7 @@ export function AdminUsersPage(): JSX.Element {
       </header>
 
       <section className="panel">
-        <h3>Creer un utilisateur</h3>
+        <h3>Créer un utilisateur</h3>
         <form className="admin-form" onSubmit={handleCreateUser}>
           <input
             type="text"
@@ -433,7 +433,7 @@ export function AdminUsersPage(): JSX.Element {
                             onClick={() => void handleChangeRole(item.userId)}
                             disabled={isBusy}
                           >
-                            Mettre a jour le role
+                            Mettre à jour le rôle
                           </button>
                           <button
                             type="button"

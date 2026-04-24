@@ -9,7 +9,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Chargement impossible. Verifie la connexion backend.";
+  return "Chargement impossible. Vérifiez la connexion backend.";
 }
 
 function formatDateTime(value: string | null): string {
@@ -31,9 +31,9 @@ function financeStatusLabel(status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECT
     return "Soumise";
   }
   if (status === "APPROVED") {
-    return "Approuvee";
+    return "Approuvée";
   }
-  return "Rejetee";
+  return "Rejetée";
 }
 
 function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
@@ -69,7 +69,7 @@ export function DashboardPage(): JSX.Element {
         }
         const refreshed = await refreshSession();
         if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshed);
       }
@@ -174,7 +174,7 @@ export function DashboardPage(): JSX.Element {
                 <p className="hint">{selectedActivity.description}</p>
                 {selectedProfile ? (
                   <p className="hint">
-                    Mode operatoire: {selectedProfile.operationsModel} | Regles:{" "}
+                    Mode opératoire: {selectedProfile.operationsModel} | Règles:{" "}
                     {summary.sectorRulesVersion}
                   </p>
                 ) : null}
@@ -185,15 +185,15 @@ export function DashboardPage(): JSX.Element {
                   <span>{selectedActivitySummary.transactionsCount}</span>
                 </article>
                 <article className="dashboard-kpi-card">
-                  <strong>Transactions a revoir</strong>
+                  <strong>Transactions à revoir</strong>
                   <span>{selectedActivitySummary.submittedTransactionsCount}</span>
                 </article>
                 <article className="dashboard-kpi-card">
-                  <strong>Taches ouvertes</strong>
+                  <strong>Tâches ouvertes</strong>
                   <span>{selectedActivitySummary.openTasksCount}</span>
                 </article>
                 <article className="dashboard-kpi-card">
-                  <strong>Taches bloquees</strong>
+                  <strong>Tâches bloquées</strong>
                   <span>{selectedActivitySummary.blockedTasksCount}</span>
                 </article>
               </div>
@@ -230,7 +230,7 @@ export function DashboardPage(): JSX.Element {
               <div>
                 <h3>Contexte entreprise</h3>
                 <p className="hint">
-                  {summary.company.companyName} ({summary.company.companyCode}) | Mise a jour{" "}
+                  {summary.company.companyName} ({summary.company.companyCode}) | Mise à jour{" "}
                   {formatDateTime(summary.generatedAt)}
                 </p>
                 <p className="hint">
@@ -245,25 +245,25 @@ export function DashboardPage(): JSX.Element {
                 <span>{summary.company.unreadAlertsCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Activite audit 7 jours</strong>
+                <strong>Activité audit 7 jours</strong>
                 <span>{summary.company.auditEventsLast7Days}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Transactions a revoir</strong>
+                <strong>Transactions à revoir</strong>
                 <span>{summary.finance.submittedCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Taches non assignees</strong>
+                <strong>Tâches non assignées</strong>
                 <span>{summary.operations.unassignedCount}</span>
               </article>
             </div>
           </section>
 
           <section className="panel">
-            <h3>Activites AMCCO</h3>
+            <h3>Activités AMCCO</h3>
             <p className="hint">
-              Vue sectorielle des neuf activites du cahier des charges, pour relier finance et
-              execution terrain.
+              Vue sectorielle des neuf activités du cahier des charges, pour relier finance et
+              exécution terrain.
             </p>
             <div className="activity-grid">
               {summary.activitySummary.map((item) => (
@@ -280,9 +280,9 @@ export function DashboardPage(): JSX.Element {
                     Transactions: {item.transactionsCount} | A revoir: {item.submittedTransactionsCount}
                   </p>
                   <p className="activity-card-stat">
-                    Taches: {item.totalTasksCount} | Ouvertes: {item.openTasksCount}
+                    Tâches: {item.totalTasksCount} | Ouvertes: {item.openTasksCount}
                   </p>
-                  <p className="activity-card-stat">Bloquees: {item.blockedTasksCount}</p>
+                  <p className="activity-card-stat">Bloquées: {item.blockedTasksCount}</p>
                 </article>
               ))}
             </div>
@@ -300,11 +300,11 @@ export function DashboardPage(): JSX.Element {
                 <span>{summary.finance.submittedCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Approuvees</strong>
+                <strong>Approuvées</strong>
                 <span>{summary.finance.approvedCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Rejetees</strong>
+                <strong>Rejetées</strong>
                 <span>{summary.finance.rejectedCount}</span>
               </article>
             </div>
@@ -319,7 +319,7 @@ export function DashboardPage(): JSX.Element {
                 <span>{summary.finance.accountsSummary.globalCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Dedies</strong>
+                <strong>Dédiés</strong>
                 <span>{summary.finance.accountsSummary.dedicatedCount}</span>
               </article>
               <article className="dashboard-kpi-card">
@@ -341,9 +341,9 @@ export function DashboardPage(): JSX.Element {
                 summary.finance.totalsByCurrency.map((item) => (
                   <article key={item.currency} className="dashboard-currency-card">
                     <h4>{item.currency}</h4>
-                    <p>Entrees approuvees: {formatAmount(item.approvedCashInTotal, item.currency)}</p>
-                    <p>Sorties approuvees: {formatAmount(item.approvedCashOutTotal, item.currency)}</p>
-                    <p>Net approuve: {formatAmount(item.netApprovedTotal, item.currency)}</p>
+                    <p>Entrées approuvées: {formatAmount(item.approvedCashInTotal, item.currency)}</p>
+                    <p>Sorties approuvées: {formatAmount(item.approvedCashOutTotal, item.currency)}</p>
+                    <p>Net approuvé: {formatAmount(item.netApprovedTotal, item.currency)}</p>
                   </article>
                 ))
               )}
@@ -354,7 +354,7 @@ export function DashboardPage(): JSX.Element {
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Activite</th>
+                    <th>Activité</th>
                     <th>Compte</th>
                     <th>Type</th>
                     <th>Montant</th>
@@ -364,7 +364,7 @@ export function DashboardPage(): JSX.Element {
                 <tbody>
                   {summary.recentTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={6}>Aucune transaction recente.</td>
+                      <td colSpan={6}>Aucune transaction récente.</td>
                     </tr>
                   ) : (
                     summary.recentTransactions.map((item) => (
@@ -384,10 +384,10 @@ export function DashboardPage(): JSX.Element {
           </section>
 
           <section className="panel">
-            <h3>Operations</h3>
+            <h3>Opérations</h3>
             <div className="dashboard-kpi-grid">
               <article className="dashboard-kpi-card">
-                <strong>A faire</strong>
+                <strong>À faire</strong>
                 <span>{summary.operations.todoCount}</span>
               </article>
               <article className="dashboard-kpi-card">
@@ -395,11 +395,11 @@ export function DashboardPage(): JSX.Element {
                 <span>{summary.operations.inProgressCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Bloquees</strong>
+                <strong>Bloquées</strong>
                 <span>{summary.operations.blockedCount}</span>
               </article>
               <article className="dashboard-kpi-card">
-                <strong>Terminees</strong>
+                <strong>Terminées</strong>
                 <span>{summary.operations.doneCount}</span>
               </article>
             </div>
@@ -408,18 +408,18 @@ export function DashboardPage(): JSX.Element {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Tache</th>
-                    <th>Activite</th>
+                    <th>Tâche</th>
+                    <th>Activité</th>
                     <th>Statut</th>
-                    <th>Assigne</th>
-                    <th>Echeance</th>
-                    <th>Mise a jour</th>
+                    <th>Assigné</th>
+                    <th>Échéance</th>
+                    <th>Mise à jour</th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.recentTasks.length === 0 ? (
                     <tr>
-                      <td colSpan={6}>Aucune tache recente.</td>
+                      <td colSpan={6}>Aucune tâche récente.</td>
                     </tr>
                   ) : (
                     summary.recentTasks.map((item) => (
@@ -427,7 +427,7 @@ export function DashboardPage(): JSX.Element {
                         <td>{item.title}</td>
                         <td>{getBusinessActivityLabel(item.activityCode)}</td>
                         <td>{taskStatusLabel(item.status)}</td>
-                        <td>{item.assignedToFullName ?? "Non assignee"}</td>
+                        <td>{item.assignedToFullName ?? "Non assignée"}</td>
                         <td>{formatDateTime(item.dueDate)}</td>
                         <td>{formatDateTime(item.updatedAt)}</td>
                       </tr>
@@ -440,7 +440,7 @@ export function DashboardPage(): JSX.Element {
 
           {canSeeWorkload ? (
             <section className="panel">
-              <h3>Charge equipe</h3>
+              <h3>Charge équipe</h3>
               <div className="operations-member-grid">
                 {summary.workload.length === 0 ? (
                   <p className="hint">Aucun membre assignable disponible.</p>
@@ -453,7 +453,7 @@ export function DashboardPage(): JSX.Element {
                         Ouvertes: {item.openTasksCount} | En cours: {item.inProgressTasksCount}
                       </p>
                       <p className="hint">
-                        Bloquees: {item.blockedTasksCount} | Terminees: {item.doneTasksCount}
+                        Bloquées: {item.blockedTasksCount} | Terminées: {item.doneTasksCount}
                       </p>
                     </article>
                   ))

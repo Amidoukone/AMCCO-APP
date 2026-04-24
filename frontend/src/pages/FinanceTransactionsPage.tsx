@@ -44,7 +44,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Operation impossible. Verifie la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function statusLabel(status: FinancialTransaction["status"]): string {
@@ -55,9 +55,9 @@ function statusLabel(status: FinancialTransaction["status"]): string {
     return "Soumise";
   }
   if (status === "APPROVED") {
-    return "Approuvee";
+    return "Approuvée";
   }
-  return "Rejetee";
+  return "Rejetée";
 }
 
 function formatFileSize(bytes: number): string {
@@ -124,7 +124,7 @@ function sameAccountForm(
 
 function getLockedAccountMessage(account: FinancialAccount): string | null {
   if (account.transactionsCount > 0) {
-    return "Ce compte financier est deja utilise par des transactions et ne peut pas etre supprime.";
+    return "Ce compte financier est déjà utilisé par des transactions et ne peut pas être supprimé.";
   }
 
   return null;
@@ -330,7 +330,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         }
         const refreshed = await refreshSession();
         if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshed);
       }
@@ -769,7 +769,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         });
 
         if (!uploadResponse.ok) {
-          let detail = "Echec de l'upload sur ImageKit.";
+          let detail = "Échec de l'upload sur ImageKit.";
           try {
             const payload = (await uploadResponse.json()) as { message?: string };
             if (payload.message) {
@@ -900,7 +900,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   return (
     <>
       <header className="section-header">
-        <h2>Transactions financieres</h2>
+        <h2>Transactions financières</h2>
         <p>
           Saisie terrain, preuves et validation comptable pour le secteur{" "}
           <strong>{selectedActivity?.label ?? "aucun secteur actif"}</strong>.
@@ -909,7 +909,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       {!selectedActivityCode && !isLoadingActivities ? (
         <p className="error-box">
-          Aucun secteur actif n'est disponible. Activez d'abord un secteur d'activite dans
+          Aucun secteur actif n'est disponible. Activez d'abord un secteur d'activité dans
           l'administration.
         </p>
       ) : null}
@@ -950,7 +950,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             />
             <input
               type="text"
-              placeholder="Reference (optionnel)"
+              placeholder="Référence (optionnel)"
               value={accountForm.accountRef}
               onChange={(event) =>
                 setAccountForm((prev) => ({
@@ -983,12 +983,12 @@ export function FinanceTransactionsPage(): JSX.Element {
               {canManageGlobalAccounts ? (
                 <option value="GLOBAL">Compte global entreprise</option>
               ) : null}
-              <option value="DEDICATED">Compte dedie a un secteur</option>
-              <option value="RESTRICTED">Compte partage sur secteurs choisis</option>
+              <option value="DEDICATED">Compte dédié à un secteur</option>
+              <option value="RESTRICTED">Compte partagé sur secteurs choisis</option>
             </select>
             {!canManageGlobalAccounts ? (
               <p className="hint">
-                Les comptes globaux entreprise sont reserves au proprietaire et a l'admin systeme.
+                Les comptes globaux entreprise sont réservés au propriétaire et à l'admin système.
               </p>
             ) : null}
             {accountForm.scopeType === "DEDICATED" ? (
@@ -1003,7 +1003,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 required
               >
                 <option value="" disabled>
-                  Selectionner le secteur dedie
+                  Sélectionner le secteur dédié
                 </option>
                 {enabledActivities.map((activity) => (
                   <option key={activity.code} value={activity.code}>
@@ -1068,7 +1068,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             <div>
               <h3>Salaires</h3>
               <p className="hint">
-                La paie est geree sur une page dediee pour separer les controles de salaire des
+                La paie est gérée sur une page dédiée pour séparer les contrôles de salaire des
                 transactions courantes.
               </p>
             </div>
@@ -1104,8 +1104,8 @@ export function FinanceTransactionsPage(): JSX.Element {
             <option value="ALL">Tous les statuts</option>
             <option value="DRAFT">Brouillon</option>
             <option value="SUBMITTED">Soumise</option>
-            <option value="APPROVED">Approuvee</option>
-            <option value="REJECTED">Rejetee</option>
+            <option value="APPROVED">Approuvée</option>
+            <option value="REJECTED">Rejetée</option>
           </select>
           <select
             value={filters.type}
@@ -1140,7 +1140,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           {accounts.length === 0 ? (
             <p className="hint">
               Aucun compte financier n'est disponible pour le secteur actif. Contactez le
-              proprietaire, l'admin systeme ou le comptable.
+              propriétaire, l'admin système ou le comptable.
             </p>
           ) : null}
           <form className="finance-transaction-form" onSubmit={handleSaveTransaction}>
@@ -1364,7 +1364,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                             className="secondary-btn"
                             onClick={() => handleOpenTransactionDetails(tx.id, tx.activityCode)}
                           >
-                            Voir le detail
+                            Voir le détail
                           </button>
                           {canEditTransaction ? (
                             <button
@@ -1426,7 +1426,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           <summary className="table-inline-summary">Voir plus</summary>
                           <div className="table-inline-content">
                             <p className="hint">
-                              <strong>Portee du compte:</strong>{" "}
+                              <strong>Portée du compte:</strong>{" "}
                               {formatAccountScopeLabel({
                                 scopeType: tx.accountScopeType,
                                 primaryActivityCode: tx.accountPrimaryActivityCode,
@@ -1573,7 +1573,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               <strong>Validation:</strong> {selectedTransaction.validatedByEmail ?? "En attente"}
             </p>
             <p>
-              <strong>Operation:</strong>{" "}
+              <strong>Opération:</strong>{" "}
               {new Date(selectedTransaction.occurredAt).toLocaleString("fr-FR")}
             </p>
             <p>
@@ -1608,7 +1608,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
           <div className="metadata-detail-list">
             <p className="hint">
-              <strong>Contexte metier</strong>
+              <strong>Contexte métier</strong>
             </p>
             <p className="hint">{formatMetadataSummary(selectedTransaction.metadata, financeMetadataFields)}</p>
           </div>
@@ -1757,7 +1757,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                     </p>
                     {isLockedAccount ? (
                       <p className="hint">
-                        Ce compte est deja utilise. La modification et la suppression sont bloquees.
+                        Ce compte est déjà utilisé. La modification et la suppression sont bloquées.
                       </p>
                     ) : null}
                     {canEditAccount ? (
@@ -1769,7 +1769,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           disabled={isBusy}
                           title={
                             isLockedAccount
-                              ? "Compte deja utilise par des transactions."
+                              ? "Compte déjà utilisé par des transactions."
                               : undefined
                           }
                         >
@@ -1782,7 +1782,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           disabled={isBusy}
                           title={
                             isLockedAccount
-                              ? "Compte deja utilise par des transactions."
+                              ? "Compte déjà utilisé par des transactions."
                               : undefined
                           }
                         >

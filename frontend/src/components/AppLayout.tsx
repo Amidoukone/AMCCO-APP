@@ -142,12 +142,12 @@ export function AppLayout(): JSX.Element {
             <p className="sidebar-section-label">Mode initialisation</p>
             <strong>Aucune entreprise active</strong>
             <p className="hint">
-              Cree d'abord une entreprise pour debloquer le tableau de bord, les transactions,
-              les taches et les rapports.
+              Crée d'abord une entreprise pour débloquer le tableau de bord, les transactions,
+              les tâches et les rapports.
             </p>
             <p className="sidebar-sector-note">
               L'application reste accessible, mais seules les fonctions d'administration des
-              entreprises sont ouvertes tant que l'initialisation n'est pas terminee.
+              entreprises sont ouvertes tant que l'initialisation n'est pas terminée.
             </p>
           </section>
         ) : (
@@ -177,7 +177,7 @@ export function AppLayout(): JSX.Element {
               ))}
             </select>
             <p className="sidebar-sector-note">
-              Le tableau de bord, les transactions, les taches et les rapports suivent ce secteur.
+              Le tableau de bord, les transactions, les tâches et les rapports suivent ce secteur.
             </p>
             {activityErrorMessage ? <p className="sidebar-error">{activityErrorMessage}</p> : null}
           </section>

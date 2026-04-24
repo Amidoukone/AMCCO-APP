@@ -34,7 +34,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Operation impossible. Verifie la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function formatCompanyAddress(item: AdminCompanyItem): string {
@@ -109,7 +109,7 @@ export function AdminCompaniesPage(): JSX.Element {
         }
         const refreshedAccessToken = await refreshSession();
         if (!refreshedAccessToken) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshedAccessToken);
       }
@@ -160,7 +160,7 @@ export function AdminCompaniesPage(): JSX.Element {
 
   function getCompanyDeleteLockMessage(item: AdminCompanyItem): string | null {
     if (!item.company.isActive) {
-      return "Cette entreprise est deja inactive.";
+      return "Cette entreprise est déjà inactive.";
     }
 
     if (item.role !== "OWNER") {
@@ -204,11 +204,11 @@ export function AdminCompaniesPage(): JSX.Element {
         if (!activeCompany) {
           await switchCompany(response.item.company.id);
           setSuccessMessage(
-            `Entreprise ${response.item.company.name} creee et activee. L'application est maintenant initialisee.`
+            `Entreprise ${response.item.company.name} créée et activée. L'application est maintenant initialisée.`
           );
         } else {
           setSuccessMessage(
-            `Entreprise ${response.item.company.name} creee. Elle est maintenant disponible dans votre liste.`
+            `Entreprise ${response.item.company.name} créée. Elle est maintenant disponible dans votre liste.`
           );
           await reloadProfile();
         }
@@ -381,7 +381,7 @@ export function AdminCompaniesPage(): JSX.Element {
 
                   {!item.company.isActive ? (
                     <p className="hint">
-                      Cette entreprise est inactive. Elle ne peut plus etre utilisee tant qu'elle
+                      Cette entreprise est inactive. Elle ne peut plus être utilisée tant qu'elle
                       n'est pas reactualisee en base.
                     </p>
                   ) : null}
@@ -431,7 +431,7 @@ export function AdminCompaniesPage(): JSX.Element {
         <p className="hint">
           {isEditingCompany
             ? "Le code reste immuable après création pour protéger le routage multi-entreprises."
-            : "Formulaire simplifie avec les informations essentielles. La creation reste compatible avec la structure multi-sectorielle deja en place."}
+            : "Formulaire simplifié avec les informations essentielles. La création reste compatible avec la structure multi-sectorielle déjà en place."}
         </p>
         <div className="company-admin-form">
           <input

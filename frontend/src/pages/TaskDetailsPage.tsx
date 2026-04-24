@@ -25,7 +25,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Operation impossible. Verifie la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function statusLabel(status: TaskStatus): string {
@@ -137,7 +137,7 @@ function timelineContextLines(event: OperationTaskTimelineEvent): string[] {
 
   const dueDate = typeof metadata.dueDate === "string" ? metadata.dueDate : null;
   if (dueDate) {
-    lines.push(`Echeance: ${formatDate(dueDate)}`);
+    lines.push(`Échéance: ${formatDate(dueDate)}`);
   }
 
   const taskWorkflow = Array.isArray(metadata.taskWorkflow)
@@ -150,7 +150,7 @@ function timelineContextLines(event: OperationTaskTimelineEvent): string[] {
   const bodyPreview =
     typeof metadata.bodyPreview === "string" ? metadata.bodyPreview.trim() : "";
   if (bodyPreview) {
-    lines.push(`Apercu: ${bodyPreview}`);
+    lines.push(`Aperçu: ${bodyPreview}`);
   }
 
   return lines;
@@ -204,7 +204,7 @@ export function TaskDetailsPage(): JSX.Element {
         }
         const refreshed = await refreshSession();
         if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshed);
       }
@@ -382,10 +382,10 @@ export function TaskDetailsPage(): JSX.Element {
       <header className="section-header">
         <p>
           <Link to="/operations/tasks" className="task-back-link">
-            Retour a la liste des taches
+            Retour à la liste des tâches
           </Link>
         </p>
-        <h2>Detail de la tache</h2>
+        <h2>Détail de la tâche</h2>
         {task ? (
           <p>
             Cette fiche est rattachée au secteur <strong>{getBusinessActivityLabel(task.activityCode)}</strong>.
@@ -406,7 +406,7 @@ export function TaskDetailsPage(): JSX.Element {
           </div>
           <div className={`task-status-hero status-tone-${statusToneClass(task.status)}`}>
             <div className="task-status-hero-main">
-              <span className="task-status-hero-label">Etat actuel</span>
+              <span className="task-status-hero-label">État actuel</span>
               <strong>{statusLabel(task.status)}</strong>
             </div>
             <p className="task-status-hero-text">{statusDescription(task.status)}</p>
@@ -415,23 +415,23 @@ export function TaskDetailsPage(): JSX.Element {
 
           <div className="operations-task-meta">
             <p>
-              <strong>Activite:</strong> {getBusinessActivityLabel(task.activityCode)}
+              <strong>Activité:</strong> {getBusinessActivityLabel(task.activityCode)}
             </p>
             <p>
-              <strong>Assigne:</strong>{" "}
-              {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignee"}
+              <strong>Assigné:</strong>{" "}
+              {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignée"}
             </p>
             <p>
-              <strong>Createur:</strong> {task.createdByFullName} ({task.createdByEmail})
+              <strong>Créateur:</strong> {task.createdByFullName} ({task.createdByEmail})
             </p>
             <p>
-              <strong>Echeance:</strong> {formatDate(task.dueDate)}
+              <strong>Échéance:</strong> {formatDate(task.dueDate)}
             </p>
             <p>
-              <strong>Creee le:</strong> {formatDate(task.createdAt)}
+              <strong>Créée le:</strong> {formatDate(task.createdAt)}
             </p>
             <p>
-              <strong>Derniere MAJ:</strong> {formatDate(task.updatedAt)}
+              <strong>Dernière mise à jour:</strong> {formatDate(task.updatedAt)}
             </p>
           </div>
 
@@ -447,8 +447,8 @@ export function TaskDetailsPage(): JSX.Element {
 
           {isTaskCompleted ? (
             <div className="task-detail-closed-note">
-              <strong>Tache terminee</strong>
-              <p>Cette tache est cloturee. Les actions de statut et d'assignation sont masquees.</p>
+              <strong>Tâche terminée</strong>
+              <p>Cette tâche est clôturée. Les actions de statut et d'assignation sont masquées.</p>
             </div>
           ) : (
             <div className="task-detail-actions">
@@ -473,13 +473,13 @@ export function TaskDetailsPage(): JSX.Element {
               {canManageTasks ? (
                 <div className="operations-assign-card">
                   <div className="operations-inline-group">
-                    <label>Assigner a</label>
+                    <label>Assigner à</label>
                     <select
                       value={assignment}
                       onChange={(event) => setAssignment(event.target.value)}
                       disabled={isSaving}
                     >
-                      <option value="">Non assignee</option>
+                      <option value="">Non assignée</option>
                       {members.map((member) => (
                         <option key={member.userId} value={member.userId}>
                           {member.fullName} ({member.role})

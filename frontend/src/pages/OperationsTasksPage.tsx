@@ -32,7 +32,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Operation impossible. Verifie la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function statusLabel(status: TaskStatus): string {
@@ -76,13 +76,13 @@ function statusToneClass(status: TaskStatus): string {
 
 function statusShortMetric(status: TaskStatus): string {
   if (status === "TODO") {
-    return "A lancer";
+    return "À lancer";
   }
   if (status === "IN_PROGRESS") {
-    return "En execution";
+    return "En exécution";
   }
   if (status === "DONE") {
-    return "Cloturees";
+    return "Clôturées";
   }
   return "À débloquer";
 }
@@ -93,12 +93,12 @@ function memberLabel(member: OperationTaskMember): string {
 
 function workloadLabel(openTasksCount: number): string {
   if (openTasksCount >= 12) {
-    return "Charge elevee";
+    return "Charge élevée";
   }
   if (openTasksCount >= 6) {
     return "Charge moyenne";
   }
-  return "Charge legere";
+  return "Charge légère";
 }
 
 function formatDate(value: string | null): string {
@@ -252,7 +252,7 @@ export function OperationsTasksPage(): JSX.Element {
         }
         const refreshed = await refreshSession();
         if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
+          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
         }
         return action(refreshed);
       }
@@ -431,7 +431,7 @@ export function OperationsTasksPage(): JSX.Element {
       return;
     }
 
-    if (!window.confirm(`Confirmer la suppression de la tache ${task.title} ?`)) {
+    if (!window.confirm(`Confirmer la suppression de la tâche ${task.title} ?`)) {
       return;
     }
 
@@ -502,7 +502,7 @@ export function OperationsTasksPage(): JSX.Element {
           note: bulkAssignForm.note.trim() || undefined
         })
       );
-      setSuccessMessage(`${response.items.length} tache(s) mises a jour en lot.`);
+      setSuccessMessage(`${response.items.length} tâche(s) mises à jour en lot.`);
       setSelectedTasks({});
       setBulkAssignForm({
         assignedToId: "",
@@ -562,16 +562,16 @@ export function OperationsTasksPage(): JSX.Element {
   return (
     <>
       <header className="section-header">
-        <h2>Suivi des taches</h2>
+        <h2>Suivi des tâches</h2>
         <p>
-          Planification, assignation et suivi de l'execution terrain pour le secteur{" "}
+          Planification, assignation et suivi de l'exécution terrain pour le secteur{" "}
           <strong>{selectedActivity?.label ?? "aucun secteur actif"}</strong>.
         </p>
       </header>
 
       {!selectedActivityCode && !isLoadingActivities ? (
         <p className="error-box">
-          Aucun secteur actif n'est disponible. Activez d'abord un secteur d'activite dans
+          Aucun secteur actif n'est disponible. Activez d'abord un secteur d'activité dans
           l'administration.
         </p>
       ) : null}
@@ -611,13 +611,13 @@ export function OperationsTasksPage(): JSX.Element {
                 }))
               }
             >
-              <option value="ALL">Toutes les taches</option>
-              <option value="MINE">Mes taches (creees + assignees)</option>
-              <option value="ASSIGNED_TO_ME">Assignees a moi</option>
+              <option value="ALL">Toutes les tâches</option>
+              <option value="MINE">Mes tâches (créées + assignées)</option>
+              <option value="ASSIGNED_TO_ME">Assignées à moi</option>
               <option value="CREATED_BY_ME">Creees par moi</option>
             </select>
           ) : (
-            <p className="hint">Vue collaborateur: taches qui vous sont assignees.</p>
+            <p className="hint">Vue collaborateur: tâches qui vous sont assignées.</p>
           )}
 
           {canAssignTasks ? (
@@ -632,7 +632,7 @@ export function OperationsTasksPage(): JSX.Element {
                   }))
                 }
               />
-              <span>Non assignees uniquement</span>
+              <span>Non assignées uniquement</span>
             </label>
           ) : null}
 
@@ -653,7 +653,7 @@ export function OperationsTasksPage(): JSX.Element {
           </div>
           <div className="operations-status-panel-note">
             <strong>{tasks.length}</strong>
-            <span>tache(s) visibles dans cette vue</span>
+            <span>tâche(s) visibles dans cette vue</span>
           </div>
         </div>
         <div className="operations-status-grid">
@@ -734,7 +734,7 @@ export function OperationsTasksPage(): JSX.Element {
                   }))
                 }
               >
-                <option value="">Non assignee</option>
+                <option value="">Non assignée</option>
                 {members.map((member) => (
                   <option key={member.userId} value={member.userId}>
                     {memberLabel(member)}
@@ -744,7 +744,7 @@ export function OperationsTasksPage(): JSX.Element {
             ) : (
               <div className="scope-field">
                 <span className="scope-field-label">Assignation initiale</span>
-                <strong>Cette tache sera assignee a votre compte.</strong>
+                <strong>Cette tâche sera assignée à votre compte.</strong>
               </div>
             )}
             {taskMetadataFields.map((field) => (
@@ -803,7 +803,7 @@ export function OperationsTasksPage(): JSX.Element {
 
       {canAssignTasks && members.length > 0 ? (
         <section className="panel">
-          <h3>Charge equipe</h3>
+          <h3>Charge équipe</h3>
           <p className="hint">
             Vue d'ensemble calculee pour le secteur actif:{" "}
             {selectedActivity?.label ?? "aucun secteur actif"}.
@@ -839,7 +839,7 @@ export function OperationsTasksPage(): JSX.Element {
               }
               disabled={isBulkAssigning}
             >
-              <option value="">Non assignee</option>
+              <option value="">Non assignée</option>
               {members.map((member) => (
                 <option key={member.userId} value={member.userId}>
                   {memberLabel(member)}
@@ -863,11 +863,11 @@ export function OperationsTasksPage(): JSX.Element {
               onClick={() => void handleBulkAssign()}
               disabled={isBulkAssigning || selectedTaskIds.length === 0}
             >
-              Mettre a jour {selectedTaskIds.length} tache(s)
+              Mettre à jour {selectedTaskIds.length} tâche(s)
             </button>
           </div>
           <p className="hint">
-            Les taches terminees ne peuvent plus etre reassignees. Les taches a faire passent
+            Les tâches terminées ne peuvent plus être réassignées. Les tâches à faire passent
             automatiquement En cours lors de l'assignation.
           </p>
         </section>
@@ -890,12 +890,12 @@ export function OperationsTasksPage(): JSX.Element {
                   )
                 }
               />
-              <span>Tout selectionner</span>
+              <span>Tout sélectionner</span>
             </label>
           ) : null}
         </div>
         {isLoading ? <p>Chargement...</p> : null}
-        {!isLoading && tasks.length === 0 ? <p>Aucune tache.</p> : null}
+        {!isLoading && tasks.length === 0 ? <p>Aucune tâche.</p> : null}
         {!isLoading && tasks.length > 0 ? (
           <div className="operations-task-list">
             {tasks.map((task) => {
@@ -957,20 +957,20 @@ export function OperationsTasksPage(): JSX.Element {
 
                   <div className="operations-task-meta">
                     <p>
-                      <strong>Activite:</strong> {getBusinessActivityLabel(task.activityCode)}
+                      <strong>Activité:</strong> {getBusinessActivityLabel(task.activityCode)}
                     </p>
                     <p>
-                      <strong>Assigne:</strong>{" "}
-                      {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignee"}
+                      <strong>Assigné:</strong>{" "}
+                      {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignée"}
                     </p>
                     <p>
-                      <strong>Createur:</strong> {task.createdByFullName} ({task.createdByEmail})
+                      <strong>Créateur:</strong> {task.createdByFullName} ({task.createdByEmail})
                     </p>
                     <p>
-                      <strong>Echeance:</strong> {formatDate(task.dueDate)}
+                      <strong>Échéance:</strong> {formatDate(task.dueDate)}
                     </p>
                     <p>
-                      <strong>Mise a jour:</strong> {formatDate(task.updatedAt)}
+                      <strong>Mise à jour:</strong> {formatDate(task.updatedAt)}
                     </p>
                     {Object.keys(task.metadata).length > 0 ? (
                       <p className="operations-task-metadata">
@@ -1007,7 +1007,7 @@ export function OperationsTasksPage(): JSX.Element {
 
                     {isCompleted ? (
                       <div className="operations-task-closed-note">
-                        Tache terminee: statut, modification et assignation verrouilles.
+                        Tâche terminée: statut, modification et assignation verrouillés.
                       </div>
                     ) : (
                       <>
@@ -1034,7 +1034,7 @@ export function OperationsTasksPage(): JSX.Element {
                         {canAssignTasks ? (
                           <div className="operations-assign-card">
                             <div className="operations-inline-group">
-                              <label>Assigner a</label>
+                              <label>Assigner à</label>
                               <select
                                 value={selectedAssignee}
                                 onChange={(event) =>
@@ -1045,7 +1045,7 @@ export function OperationsTasksPage(): JSX.Element {
                                 }
                                 disabled={isBusy || isBulkAssigning}
                               >
-                                <option value="">Non assignee</option>
+                                <option value="">Non assignée</option>
                                 {members.map((member) => (
                                   <option key={member.userId} value={member.userId}>
                                     {memberLabel(member)}
