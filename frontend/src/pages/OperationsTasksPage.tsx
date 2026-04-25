@@ -10,6 +10,10 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import {
+  buildPersistedViewStorageKey,
+  usePersistedViewState
+} from "../lib/usePersistedViewState";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   ApiError,
@@ -159,7 +163,7 @@ function createDefaultTaskForm(): {
 
 export function OperationsTasksPage(): JSX.Element {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const {
     isLoading: isLoadingActivities,
@@ -178,15 +182,18 @@ export function OperationsTasksPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const [filters, setFilters] = useState<{
-    status: "ALL" | TaskStatus;
-    scope: TaskScope;
-    unassignedOnly: boolean;
-  }>({
-    status: "ALL",
-    scope: "ALL",
-    unassignedOnly: false
-  });
+  const tasksViewStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("operations-tasks", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
+  const initialFilters = useMemo(
+    () => ({
+      status: "ALL" as "ALL" | TaskStatus,
+      scope: "ALL" as TaskScope,
+      unassignedOnly: false
+    }),
+    []
+  );
+  const [filters, setFilters] = usePersistedViewState(tasksViewStorageKey, initialFilters);
 
   const [createForm, setCreateForm] = useState(createDefaultTaskForm);
 
@@ -622,6 +629,73 @@ export function OperationsTasksPage(): JSX.Element {
             void loadData();
           }}
         >
+          <div className="view-preset-strip">
+            <button
+              type="button"
+              className={
+                filters.status === "ALL" &&
+                (canAssignTasks ? filters.scope === "ALL" : true) &&
+                !filters.unassignedOnly
+                  ? "view-preset-btn is-active"
+                  : "view-preset-btn"
+              }
+              onClick={() =>
+                setFilters({
+                  status: "ALL",
+                  scope: canAssignTasks ? "ALL" : "ASSIGNED_TO_ME",
+                  unassignedOnly: false
+                })
+              }
+            >
+              Vue complete
+            </button>
+            <button
+              type="button"
+              className={
+                filters.status === "ALL" && filters.scope === "ASSIGNED_TO_ME" && !filters.unassignedOnly
+                  ? "view-preset-btn is-active"
+                  : "view-preset-btn"
+              }
+              onClick={() =>
+                setFilters({
+                  status: "ALL",
+                  scope: "ASSIGNED_TO_ME",
+                  unassignedOnly: false
+                })
+              }
+            >
+              Mes taches
+            </button>
+            <button
+              type="button"
+              className={filters.status === "BLOCKED" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: "BLOCKED",
+                  unassignedOnly: false
+                }))
+              }
+            >
+              Bloquees
+            </button>
+            {canAssignTasks ? (
+              <button
+                type="button"
+                className={filters.unassignedOnly ? "view-preset-btn is-active" : "view-preset-btn"}
+                onClick={() =>
+                  setFilters({
+                    status: "ALL",
+                    scope: "ALL",
+                    unassignedOnly: true
+                  })
+                }
+              >
+                Non assignees
+              </button>
+            ) : null}
+          </div>
+
           <select
             value={filters.status}
             onChange={(event) =>

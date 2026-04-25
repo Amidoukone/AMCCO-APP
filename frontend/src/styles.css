@@ -190,6 +190,41 @@ a {
   cursor: pointer;
 }
 
+.view-preset-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.view-preset-btn {
+  appearance: none;
+  border: 1px solid #d9e2ec;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #486581;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.view-preset-btn:hover {
+  border-color: #9fb3c8;
+  background: #eef5ff;
+  color: #102a43;
+}
+
+.view-preset-btn.is-active {
+  border-color: #1565c0;
+  background: #e8f1ff;
+  color: #1565c0;
+}
+
 .company-manage-link {
   display: inline-flex;
   align-items: center;

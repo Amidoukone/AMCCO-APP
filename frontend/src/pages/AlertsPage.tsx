@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { useAuth } from "../context/AuthContext";
 import {
   ApiError,
   listAlertsRequest,
   markAlertReadRequest,
   markAllAlertsReadRequest
 } from "../lib/api";
+import {
+  buildPersistedViewStorageKey,
+  usePersistedViewState
+} from "../lib/usePersistedViewState";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { AlertItem, AlertSeverity } from "../types/alerts";
 import {
@@ -47,6 +52,7 @@ function notifyAlertsChanged(): void {
 
 export function AlertsPage(): JSX.Element {
   const navigate = useNavigate();
+  const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AlertItem[]>([]);
@@ -58,17 +64,19 @@ export function AlertsPage(): JSX.Element {
   const [hasMoreItems, setHasMoreItems] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [filters, setFilters] = useState<{
-    unreadOnly: boolean;
-    severity: "" | AlertSeverity;
-    entityType: string;
-    entityId: string;
-  }>({
-    unreadOnly: false,
-    severity: "",
-    entityType: searchParams.get("entityType") ?? "",
-    entityId: searchParams.get("entityId") ?? ""
-  });
+  const alertsViewStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("alerts", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
+  const initialFilters = useMemo(
+    () => ({
+      unreadOnly: false,
+      severity: "" as "" | AlertSeverity,
+      entityType: searchParams.get("entityType") ?? "",
+      entityId: searchParams.get("entityId") ?? ""
+    }),
+    [searchParams]
+  );
+  const [filters, setFilters] = usePersistedViewState(alertsViewStorageKey, initialFilters);
 
   useEffect(() => {
     setFilters((prev) => ({
@@ -173,6 +181,20 @@ export function AlertsPage(): JSX.Element {
     void loadData();
   }
 
+  function applyQuickFilter(
+    nextFilters: Partial<{
+      unreadOnly: boolean;
+      severity: "" | AlertSeverity;
+      entityType: string;
+      entityId: string;
+    }>
+  ): void {
+    setFilters((prev) => ({
+      ...prev,
+      ...nextFilters
+    }));
+  }
+
   async function handleLoadMore(): Promise<void> {
     if (isLoading || isLoadingMore || !hasMoreItems) {
       return;
@@ -207,6 +229,30 @@ export function AlertsPage(): JSX.Element {
         </div>
 
         <form className="alerts-filter-form" onSubmit={handleFilterSubmit}>
+          <div className="view-preset-strip">
+            <button
+              type="button"
+              className={!filters.unreadOnly && filters.severity === "" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() => applyQuickFilter({ unreadOnly: false, severity: "" })}
+            >
+              Vue complete
+            </button>
+            <button
+              type="button"
+              className={filters.unreadOnly && filters.severity === "" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() => applyQuickFilter({ unreadOnly: true, severity: "" })}
+            >
+              Non lues
+            </button>
+            <button
+              type="button"
+              className={!filters.unreadOnly && filters.severity === "CRITICAL" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() => applyQuickFilter({ unreadOnly: false, severity: "CRITICAL" })}
+            >
+              Critiques
+            </button>
+          </div>
+
           <label className="inline-checkbox">
             <input
               type="checkbox"

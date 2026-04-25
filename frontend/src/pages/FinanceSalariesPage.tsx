@@ -4,6 +4,10 @@ import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
+  buildPersistedViewStorageKey,
+  usePersistedViewState
+} from "../lib/usePersistedViewState";
+import {
   addFinanceTransactionProofRequest,
   ApiError,
   confirmFinanceSalaryReceiptRequest,
@@ -140,7 +144,7 @@ function salaryConfirmationLabel(
 export function FinanceSalariesPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const [salaryAccounts, setSalaryAccounts] = useState<FinancialAccount[]>([]);
   const [salaryMembers, setSalaryMembers] = useState<SalaryMember[]>([]);
@@ -155,15 +159,21 @@ export function FinanceSalariesPage(): JSX.Element {
   const [hasMoreSalaries, setHasMoreSalaries] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [salaryFilters, setSalaryFilters] = useState<{
-    status: "ALL" | SalaryTransaction["status"];
-    payPeriod: string;
-    employeeUserId: string;
-  }>({
-    status: "ALL",
-    payPeriod: new Date().toISOString().slice(0, 7),
-    employeeUserId: ""
-  });
+  const salariesViewStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("finance-salaries", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
+  const initialSalaryFilters = useMemo(
+    () => ({
+      status: "ALL" as "ALL" | SalaryTransaction["status"],
+      payPeriod: new Date().toISOString().slice(0, 7),
+      employeeUserId: ""
+    }),
+    []
+  );
+  const [salaryFilters, setSalaryFilters] = usePersistedViewState(
+    salariesViewStorageKey,
+    initialSalaryFilters
+  );
   const [salaryForm, setSalaryForm] = useState({
     accountId: "",
     employeeUserId: "",
@@ -753,6 +763,65 @@ export function FinanceSalariesPage(): JSX.Element {
             void loadData();
           }}
         >
+          <div className="view-preset-strip">
+            <button
+              type="button"
+              className={
+                salaryFilters.status === "ALL" &&
+                salaryFilters.payPeriod === new Date().toISOString().slice(0, 7) &&
+                salaryFilters.employeeUserId === ""
+                  ? "view-preset-btn is-active"
+                  : "view-preset-btn"
+              }
+              onClick={() =>
+                setSalaryFilters({
+                  status: "ALL",
+                  payPeriod: new Date().toISOString().slice(0, 7),
+                  employeeUserId: ""
+                })
+              }
+            >
+              Cette periode
+            </button>
+            <button
+              type="button"
+              className={salaryFilters.status === "SUBMITTED" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setSalaryFilters((prev) => ({
+                  ...prev,
+                  status: "SUBMITTED"
+                }))
+              }
+            >
+              A finaliser
+            </button>
+            <button
+              type="button"
+              className={salaryFilters.status === "DRAFT" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setSalaryFilters((prev) => ({
+                  ...prev,
+                  status: "DRAFT"
+                }))
+              }
+            >
+              Brouillons
+            </button>
+            <button
+              type="button"
+              className={salaryFilters.status === "ALL" && salaryFilters.employeeUserId === "" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setSalaryFilters((prev) => ({
+                  ...prev,
+                  status: "ALL",
+                  employeeUserId: ""
+                }))
+              }
+            >
+              Tous
+            </button>
+          </div>
+
           <input
             type="month"
             value={salaryFilters.payPeriod}

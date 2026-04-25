@@ -4,6 +4,10 @@ import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
+  buildPersistedViewStorageKey,
+  usePersistedViewState
+} from "../lib/usePersistedViewState";
+import {
   addFinanceTransactionProofRequest,
   ApiError,
   createFinanceAccountRequest,
@@ -225,7 +229,7 @@ function isAccountVisibleForSelectedActivity(
 export function FinanceTransactionsPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const {
     enabledActivities,
@@ -284,13 +288,18 @@ export function FinanceTransactionsPage(): JSX.Element {
       user?.role === "OWNER" || user?.role === "SYS_ADMIN"
     )
   );
-  const [filters, setFilters] = useState<{
-    status: "ALL" | FinancialTransaction["status"];
-    type: "ALL" | FinancialTransaction["type"];
-  }>({
-    status: "ALL",
-    type: "ALL"
-  });
+  const transactionsViewStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("finance-transactions", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
+  const initialFilters = useMemo(
+    () =>
+      ({
+        status: "ALL" as "ALL" | FinancialTransaction["status"],
+        type: "ALL" as "ALL" | FinancialTransaction["type"]
+      }),
+    []
+  );
+  const [filters, setFilters] = usePersistedViewState(transactionsViewStorageKey, initialFilters);
 
   const [transactionForm, setTransactionForm] = useState({
     accountId: "",
@@ -1151,6 +1160,57 @@ export function FinanceTransactionsPage(): JSX.Element {
             void loadData();
           }}
         >
+          <div className="view-preset-strip">
+            <button
+              type="button"
+              className={filters.status === "ALL" && filters.type === "ALL" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setFilters({
+                  status: "ALL",
+                  type: "ALL"
+                })
+              }
+            >
+              Vue complete
+            </button>
+            <button
+              type="button"
+              className={filters.status === "SUBMITTED" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: "SUBMITTED"
+                }))
+              }
+            >
+              A finaliser
+            </button>
+            <button
+              type="button"
+              className={filters.status === "DRAFT" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: "DRAFT"
+                }))
+              }
+            >
+              Brouillons
+            </button>
+            <button
+              type="button"
+              className={filters.type === "CASH_OUT" && filters.status === "ALL" ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setFilters({
+                  status: "ALL",
+                  type: "CASH_OUT"
+                })
+              }
+            >
+              Sorties
+            </button>
+          </div>
+
           <select
             value={filters.status}
             onChange={(event) =>
