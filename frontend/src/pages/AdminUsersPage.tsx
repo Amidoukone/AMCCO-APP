@@ -9,6 +9,8 @@ import {
   updateAdminUserRequest
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { AdminUserItem } from "../types/admin-users";
 import { ROLE_CODES, type RoleCode } from "../types/role";
 import { ROLE_LABELS } from "../config/permissions";
@@ -28,7 +30,8 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function AdminUsersPage(): JSX.Element {
-  const { session, refreshSession, user } = useAuth();
+  const { user } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
 
   const [items, setItems] = useState<AdminUserItem[]>([]);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
@@ -61,29 +64,6 @@ export function AdminUsersPage(): JSX.Element {
     }
     setDrafts(nextDrafts);
   }, []);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-
-        const refreshedAccessToken = await refreshSession();
-        if (!refreshedAccessToken) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshedAccessToken);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true);
@@ -319,12 +299,14 @@ export function AdminUsersPage(): JSX.Element {
         </form>
       </section>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       <section className="panel">
         <h3>Utilisateurs de l'entreprise</h3>
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading && items.length === 0 ? <p>Aucun utilisateur.</p> : null}
 
         {!isLoading && items.length > 0 ? (

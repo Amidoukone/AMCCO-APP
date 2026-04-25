@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
 import {
   ApiError,
   listAlertsRequest,
   markAlertReadRequest,
   markAllAlertsReadRequest
 } from "../lib/api";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { AlertItem, AlertSeverity } from "../types/alerts";
 import {
   buildFinanceTransactionPath,
@@ -44,7 +45,7 @@ function notifyAlertsChanged(): void {
 
 export function AlertsPage(): JSX.Element {
   const navigate = useNavigate();
-  const { refreshSession, session } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AlertItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -72,27 +73,6 @@ export function AlertsPage(): JSX.Element {
       entityId: searchParams.get("entityId") ?? ""
     }));
   }, [searchParams]);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -258,12 +238,14 @@ export function AlertsPage(): JSX.Element {
         </form>
       </section>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       <section className="panel">
         <h3>Liste</h3>
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond à ces filtres.</p> : null}
         {!isLoading && items.length > 0 ? (
           <div className="alerts-list">

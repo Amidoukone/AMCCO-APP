@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -18,6 +20,7 @@ import {
   submitFinanceTransactionRequest,
   updateFinanceSalaryRequest
 } from "../lib/api";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import type {
   FinancialAccount,
   SalaryConfirmationStatus,
@@ -135,7 +138,8 @@ function salaryConfirmationLabel(
 export function FinanceSalariesPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { refreshSession, session, user } = useAuth();
+  const { user } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const [salaryAccounts, setSalaryAccounts] = useState<FinancialAccount[]>([]);
   const [salaryMembers, setSalaryMembers] = useState<SalaryMember[]>([]);
   const [salaryItems, setSalaryItems] = useState<SalaryTransaction[]>([]);
@@ -172,6 +176,7 @@ export function FinanceSalariesPage(): JSX.Element {
   const [proofsByTransaction, setProofsByTransaction] = useState<Record<string, TransactionProof[]>>(
     {}
   );
+  const [salaryPendingDelete, setSalaryPendingDelete] = useState<SalaryTransaction | null>(null);
   const [openProofs, setOpenProofs] = useState<Record<string, boolean>>({});
   const [loadingProofsByTransaction, setLoadingProofsByTransaction] = useState<Record<string, boolean>>(
     {}
@@ -185,27 +190,6 @@ export function FinanceSalariesPage(): JSX.Element {
   const canAccessAudit = user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   const canDeleteApprovedSalaries = user?.role === "SYS_ADMIN";
   const requestedTransactionId = searchParams.get("transactionId");
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const selectedSalary = useMemo(
     () => salaryItems.find((item) => item.id === selectedSalaryId) ?? null,
@@ -466,12 +450,15 @@ export function FinanceSalariesPage(): JSX.Element {
   }
 
   async function handleDeleteSalary(item: SalaryTransaction): Promise<void> {
+    setSalaryPendingDelete(item);
+    return;
+
     const isApproved = item.status === "APPROVED";
     const confirmationMessage = isApproved
       ? "Ce salaire est déjà approuvé. Confirmer sa suppression définitive ?"
       : "Confirmer la suppression de ce salaire ?";
 
-    if (!window.confirm(confirmationMessage)) {
+    if (false) {
       return;
     }
 
@@ -491,6 +478,38 @@ export function FinanceSalariesPage(): JSX.Element {
           ? "Salaire approuvé supprimé par l'admin système."
           : "Salaire supprime."
       );
+      await loadData();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyTransactionId(null);
+    }
+  }
+
+  async function handleConfirmDeleteSalary(): Promise<void> {
+    if (!salaryPendingDelete) {
+      return;
+    }
+
+    const item = salaryPendingDelete;
+    const isApproved = item.status === "APPROVED";
+    setBusyTransactionId(item.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteFinanceSalaryRequest(accessToken, item.id));
+      if (selectedSalaryId === item.id) {
+        handleCloseSalaryDetails();
+      }
+      if (editingSalaryId === item.id) {
+        resetSalaryForm();
+      }
+      setSuccessMessage(
+        isApproved
+          ? "Salaire approuvé supprimé par l'admin système."
+          : "Salaire supprimé."
+      );
+      setSalaryPendingDelete(null);
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -989,12 +1008,14 @@ export function FinanceSalariesPage(): JSX.Element {
         </section>
       ) : null}
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       <section className="panel">
         <h3>Liste des salaires</h3>
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette période.</p> : null}
         {!isLoading && salaryItems.length > 0 ? (
           <div className="table-wrap">
@@ -1393,6 +1414,31 @@ export function FinanceSalariesPage(): JSX.Element {
           ) : null}
         </section>
       ) : null}
+
+      <ConfirmDialog
+        open={salaryPendingDelete !== null}
+        title="Confirmer la suppression du salaire"
+        description="Cette action supprime l'élément de paie sélectionné de la liste salariale."
+        objectLabel="Salaire concerné"
+        objectName={
+          salaryPendingDelete
+            ? `${salaryPendingDelete.employeeFullName} | ${formatPayPeriod(salaryPendingDelete.payPeriod)}`
+            : ""
+        }
+        impactText={
+          salaryPendingDelete?.status === "APPROVED"
+            ? "Ce salaire est déjà approuvé. Sa suppression doit rester exceptionnelle et justifiée."
+            : "Le collaborateur et les équipes de contrôle ne pourront plus suivre ce salaire dans cet écran."
+        }
+        isConfirming={busyTransactionId === salaryPendingDelete?.id}
+        onCancel={() => {
+          if (busyTransactionId) {
+            return;
+          }
+          setSalaryPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteSalary()}
+      />
     </>
   );
 }

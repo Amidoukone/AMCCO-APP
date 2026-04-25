@@ -2,20 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import type { BusinessActivityCode } from "../config/businessActivities";
 import { ApiError, getAlertsSummaryRequest } from "../lib/api";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getNavigationForRole, ROLE_LABELS } from "../config/permissions";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 
 export function AppLayout(): JSX.Element {
-  const {
-    activeCompany,
-    memberships,
-    user,
-    logout,
-    refreshSession,
-    session,
-    switchCompany
-  } = useAuth();
+  const { activeCompany, memberships, user, logout, switchCompany } = useAuth();
   const {
     enabledActivities,
     errorMessage: activityErrorMessage,
@@ -28,6 +21,7 @@ export function AppLayout(): JSX.Element {
   const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
   const [companySwitchError, setCompanySwitchError] = useState<string | null>(null);
+  const withAuthorizedToken = useAuthorizedRequest();
   const canManageCompanies = user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   const isBootstrapMode = !activeCompany;
   const navigation = useMemo(
@@ -47,27 +41,6 @@ export function AppLayout(): JSX.Element {
       return groups;
     }, {});
   }, [visibleNavigation]);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw error;
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   useEffect(() => {
     if (isBootstrapMode) {

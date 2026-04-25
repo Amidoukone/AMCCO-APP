@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -24,6 +26,7 @@ import {
   type BusinessActivityCode
 } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
 import type {
   FinancialAccount,
@@ -221,7 +224,8 @@ function isAccountVisibleForSelectedActivity(
 export function FinanceTransactionsPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { session, refreshSession, user } = useAuth();
+  const { user } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const {
     enabledActivities,
     isLoading: isLoadingActivities,
@@ -299,6 +303,10 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [proofsByTransaction, setProofsByTransaction] = useState<Record<string, TransactionProof[]>>(
     {}
   );
+  const [accountPendingDelete, setAccountPendingDelete] = useState<FinancialAccount | null>(null);
+  const [transactionPendingDelete, setTransactionPendingDelete] = useState<FinancialTransaction | null>(
+    null
+  );
   const [openProofs, setOpenProofs] = useState<Record<string, boolean>>({});
   const [loadingProofsByTransaction, setLoadingProofsByTransaction] = useState<Record<string, boolean>>(
     {}
@@ -316,27 +324,6 @@ export function FinanceTransactionsPage(): JSX.Element {
     const activityCode = searchParams.get("activityCode");
     return activityCode && isBusinessActivityCode(activityCode) ? activityCode : null;
   }, [searchParams]);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const selectedTransaction = useMemo(
     () => transactions.find((item) => item.id === selectedTransactionId) ?? null,
@@ -613,7 +600,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     resetAccountForm();
   }
 
-  async function handleDeleteAccount(account: FinancialAccount): Promise<void> {
+  function handleDeleteAccount(account: FinancialAccount): void {
     const lockedMessage = getLockedAccountMessage(account);
     if (lockedMessage) {
       setErrorMessage(lockedMessage);
@@ -621,10 +608,15 @@ export function FinanceTransactionsPage(): JSX.Element {
       return;
     }
 
-    if (!window.confirm(`Confirmer la suppression du compte ${account.name} ?`)) {
+    setAccountPendingDelete(account);
+  }
+
+  async function handleConfirmDeleteAccount(): Promise<void> {
+    if (!accountPendingDelete) {
       return;
     }
 
+    const account = accountPendingDelete;
     setBusyAccountId(account.id);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -633,7 +625,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       if (editingAccountId === account.id) {
         resetAccountForm();
       }
-      setSuccessMessage("Compte financier supprime.");
+      setSuccessMessage("Compte financier supprimé.");
+      setAccountPendingDelete(null);
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -708,9 +701,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       ? "Cette transaction est déjà approuvée. Confirmer sa suppression définitive ?"
       : "Confirmer la suppression de cette transaction ?";
 
-    if (!window.confirm(confirmationMessage)) {
-      return;
-    }
+    setTransactionPendingDelete(transaction);
+    return;
 
     setBusyTransactionId(transaction.id);
     setErrorMessage(null);
@@ -730,6 +722,40 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? "Transaction approuvée supprimée par l'admin système."
           : "Transaction supprimée."
       );
+      await loadData();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyTransactionId(null);
+    }
+  }
+
+  async function handleConfirmDeleteTransaction(): Promise<void> {
+    if (!transactionPendingDelete) {
+      return;
+    }
+
+    const transaction = transactionPendingDelete;
+    const isApproved = transaction.status === "APPROVED";
+    setBusyTransactionId(transaction.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) =>
+        deleteFinanceTransactionRequest(accessToken, transaction.id)
+      );
+      if (selectedTransactionId === transaction.id) {
+        handleCloseTransactionDetails();
+      }
+      if (editingTransactionId === transaction.id) {
+        resetTransactionForm();
+      }
+      setSuccessMessage(
+        isApproved
+          ? "Transaction approuvée supprimée par l'admin système."
+          : "Transaction supprimée."
+      );
+      setTransactionPendingDelete(null);
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -1303,12 +1329,14 @@ export function FinanceTransactionsPage(): JSX.Element {
         </details>
       </section>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       <section className="panel">
         <h3>Transactions</h3>
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading && transactions.length === 0 ? <p>Aucune transaction.</p> : null}
         {!isLoading && transactions.length > 0 ? (
           <div className="table-wrap">
@@ -1797,6 +1825,44 @@ export function FinanceTransactionsPage(): JSX.Element {
           </details>
         </section>
       ) : null}
+
+      <ConfirmDialog
+        open={accountPendingDelete !== null}
+        title="Confirmer la suppression du compte"
+        description="Cette action retire le compte financier de la liste des comptes disponibles."
+        objectLabel="Compte concerné"
+        objectName={accountPendingDelete?.name ?? ""}
+        impactText="Les comptes financiers ne doivent être supprimés que lorsqu'ils ne sont plus utiles au suivi opérationnel."
+        isConfirming={busyAccountId === accountPendingDelete?.id}
+        onCancel={() => {
+          if (busyAccountId) {
+            return;
+          }
+          setAccountPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteAccount()}
+      />
+
+      <ConfirmDialog
+        open={transactionPendingDelete !== null}
+        title="Confirmer la suppression de la transaction"
+        description="Cette action supprime la transaction sélectionnée de la vue financière."
+        objectLabel="Transaction concernée"
+        objectName={transactionPendingDelete?.description?.trim() || transactionPendingDelete?.id || ""}
+        impactText={
+          transactionPendingDelete?.status === "APPROVED"
+            ? "Cette transaction est déjà approuvée. Sa suppression doit rester exceptionnelle et assumée."
+            : "La transaction ne sera plus disponible pour la validation ni pour le suivi courant."
+        }
+        isConfirming={busyTransactionId === transactionPendingDelete?.id}
+        onCancel={() => {
+          if (busyTransactionId) {
+            return;
+          }
+          setTransactionPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteTransaction()}
+      />
     </>
   );
 }

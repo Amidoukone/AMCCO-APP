@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, getDashboardSummaryRequest } from "../lib/api";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { BUSINESS_ACTIVITY_LABELS, getBusinessActivityLabel } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import type { DashboardSummary } from "../types/reporting";
@@ -50,32 +51,12 @@ function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): s
 }
 
 export function DashboardPage(): JSX.Element {
-  const { refreshSession, session, user } = useAuth();
+  const { user } = useAuth();
   const { selectedActivity, selectedActivityCode, selectedProfile } = useBusinessActivity();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
+  const withAuthorizedToken = useAuthorizedRequest();
 
   const loadData = useCallback(async () => {
     setIsLoading(true);

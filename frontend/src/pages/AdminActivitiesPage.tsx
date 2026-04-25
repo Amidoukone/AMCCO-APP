@@ -5,7 +5,9 @@ import {
   updateAdminCompanyActivityRequest
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { CompanyActivityItem } from "../types/activities";
 import type { BusinessActivityCode } from "../config/businessActivities";
 
@@ -17,7 +19,8 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function AdminActivitiesPage(): JSX.Element {
-  const { session, refreshSession, user } = useAuth();
+  const { user } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const { reloadActivities } = useBusinessActivity();
   const [items, setItems] = useState<CompanyActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,29 +31,6 @@ export function AdminActivitiesPage(): JSX.Element {
   const canManageActivities = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-
-        const refreshedAccessToken = await refreshSession();
-        if (!refreshedAccessToken) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
-        }
-        return action(refreshedAccessToken);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -116,8 +96,11 @@ export function AdminActivitiesPage(): JSX.Element {
         <p>Activation des secteurs par entreprise.</p>
       </header>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       <section className="panel">
         <h3>Configuration des secteurs</h3>
@@ -125,7 +108,6 @@ export function AdminActivitiesPage(): JSX.Element {
           Un secteur désactivé n'est plus proposé pour les nouvelles transactions et tâches.
           L'historique reste accessible.
         </p>
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading ? (
           <div className="activity-admin-list">
             {items.map((item) => (

@@ -9,6 +9,8 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   ApiError,
   assignOperationsTaskRequest,
@@ -25,6 +27,7 @@ import {
   type BusinessActivityCode
 } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
 import type { OperationTask, OperationTaskMember, TaskScope, TaskStatus } from "../types/tasks";
 
@@ -154,7 +157,8 @@ function createDefaultTaskForm(): {
 
 export function OperationsTasksPage(): JSX.Element {
   const navigate = useNavigate();
-  const { session, refreshSession, user } = useAuth();
+  const { user } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const {
     isLoading: isLoadingActivities,
     selectedActivity,
@@ -189,6 +193,7 @@ export function OperationsTasksPage(): JSX.Element {
     assignedToId: "",
     note: ""
   });
+  const [taskPendingDelete, setTaskPendingDelete] = useState<OperationTask | null>(null);
 
   const canAssignTasks = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
@@ -238,27 +243,6 @@ export function OperationsTasksPage(): JSX.Element {
     }
     return tasks.every((task) => selectedTasks[task.id]);
   }, [selectedTasks, tasks]);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const loadData = useCallback(async () => {
     if (!selectedActivityCode) {
@@ -423,7 +407,7 @@ export function OperationsTasksPage(): JSX.Element {
     setSuccessMessage(null);
   }
 
-  async function handleDeleteTask(task: OperationTask): Promise<void> {
+  function handleDeleteTask(task: OperationTask): void {
     const lockMessage = getTaskDeleteLockMessage(task);
     if (lockMessage) {
       setErrorMessage(lockMessage);
@@ -431,10 +415,15 @@ export function OperationsTasksPage(): JSX.Element {
       return;
     }
 
-    if (!window.confirm(`Confirmer la suppression de la tâche ${task.title} ?`)) {
+    setTaskPendingDelete(task);
+  }
+
+  async function handleConfirmDeleteTask(): Promise<void> {
+    if (!taskPendingDelete) {
       return;
     }
 
+    const task = taskPendingDelete;
     setBusyTaskId(task.id);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -444,6 +433,7 @@ export function OperationsTasksPage(): JSX.Element {
         handleCancelEditTask();
       }
       setSuccessMessage("Tâche supprimée.");
+      setTaskPendingDelete(null);
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -873,8 +863,11 @@ export function OperationsTasksPage(): JSX.Element {
         </section>
       ) : null}
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       <section className="panel">
         <div className="operations-list-header">
@@ -894,7 +887,6 @@ export function OperationsTasksPage(): JSX.Element {
             </label>
           ) : null}
         </div>
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading && tasks.length === 0 ? <p>Aucune tâche.</p> : null}
         {!isLoading && tasks.length > 0 ? (
           <div className="operations-task-list">
@@ -1089,6 +1081,23 @@ export function OperationsTasksPage(): JSX.Element {
           </div>
         ) : null}
       </section>
+
+      <ConfirmDialog
+        open={taskPendingDelete !== null}
+        title="Confirmer la suppression"
+        description="Cette action retire définitivement la tâche de la vue opérationnelle."
+        objectLabel="Tâche concernée"
+        objectName={taskPendingDelete?.title ?? ""}
+        impactText="L'historique lié à cette tâche ne sera plus consultable depuis cet écran."
+        isConfirming={busyTaskId === taskPendingDelete?.id}
+        onCancel={() => {
+          if (busyTaskId) {
+            return;
+          }
+          setTaskPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteTask()}
+      />
     </>
   );
 }

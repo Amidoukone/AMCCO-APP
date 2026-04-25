@@ -12,6 +12,7 @@ import {
   type BusinessActivityCode
 } from "../config/businessActivities";
 import { ApiError, listCompanyActivitiesRequest } from "../lib/api";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { BusinessActivityProfile, CompanyActivityItem } from "../types/activities";
 import { useAuth } from "./AuthContext";
 
@@ -58,13 +59,14 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function BusinessActivityProvider({ children }: { children: ReactNode }): JSX.Element {
-  const { activeCompany, refreshSession, session, user } = useAuth();
+  const { activeCompany, user } = useAuth();
   const [activities, setActivities] = useState<CompanyActivityItem[]>([]);
   const [profiles, setProfiles] = useState<BusinessActivityProfile[]>([]);
   const [selectedActivityCode, setSelectedActivityCodeState] =
     useState<BusinessActivityCode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const withAuthorizedToken = useAuthorizedRequest();
 
   const syncSelectedActivity = useCallback(
     (items: CompanyActivityItem[], preferredCode: BusinessActivityCode | null = null) => {
@@ -85,29 +87,6 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       persistActivityCode(activeCompany.id, nextSelectedCode);
     },
     [activeCompany?.id]
-  );
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-
-        const refreshedAccessToken = await refreshSession();
-        if (!refreshedAccessToken) {
-          throw new ApiError(401, "Session expiree. Reconnecte-toi.");
-        }
-        return action(refreshedAccessToken);
-      }
-    },
-    [refreshSession, session?.accessToken]
   );
 
   const reloadActivities = useCallback(async () => {

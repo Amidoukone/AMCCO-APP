@@ -11,6 +11,7 @@ import {
   listTaskCommentsRequest,
   updateOperationsTaskStatusRequest
 } from "../lib/api";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getBusinessActivityLabel, type BusinessActivityCode } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import type {
@@ -173,7 +174,8 @@ type TimelineEntry =
 
 export function TaskDetailsPage(): JSX.Element {
   const { taskId } = useParams<{ taskId: string }>();
-  const { session, refreshSession, user } = useAuth();
+  const { user } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const { profiles, selectedActivityCode, setSelectedActivityCode } = useBusinessActivity();
   const [task, setTask] = useState<OperationTask | null>(null);
   const [timeline, setTimeline] = useState<OperationTaskTimelineEvent[]>([]);
@@ -190,27 +192,6 @@ export function TaskDetailsPage(): JSX.Element {
   const canManageTasks = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
   }, [user?.role]);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const loadData = useCallback(async () => {
     if (!taskId) {

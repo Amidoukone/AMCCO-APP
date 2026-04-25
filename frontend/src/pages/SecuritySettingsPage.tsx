@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
 import { ApiError, listAuditLogsRequest } from "../lib/api";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { AuditLogItem } from "../types/audit";
 import {
   buildFinanceTransactionPath,
@@ -224,7 +226,8 @@ function collapseAuditItems(items: AuditLogItem[]): AuditDisplayItem[] {
 
 export function SecuritySettingsPage(): JSX.Element {
   const navigate = useNavigate();
-  const { session, refreshSession, user } = useAuth();
+  const { user } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AuditLogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -254,27 +257,6 @@ export function SecuritySettingsPage(): JSX.Element {
         timeStyle: "medium"
       }),
     []
-  );
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
   );
 
   const loadAuditLogs = useCallback(async () => {
@@ -414,11 +396,10 @@ export function SecuritySettingsPage(): JSX.Element {
         </form>
       </section>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
+      <FeedbackBanner errorMessage={errorMessage} isLoading={isLoading} />
 
       <section className="panel">
         <h3>Historique récent</h3>
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading && displayItems.length === 0 ? <p>Aucune entrée pour ces filtres.</p> : null}
         {!isLoading && displayItems.length > 0 ? (
           <div className="table-wrap">

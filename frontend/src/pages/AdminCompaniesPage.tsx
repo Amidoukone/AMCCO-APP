@@ -9,6 +9,9 @@ import {
 } from "../lib/api";
 import type { AdminCompanyItem, CreateCompanyInput, UpdateCompanyInput } from "../types/companies";
 import { ROLE_LABELS } from "../config/permissions";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { FeedbackBanner } from "../components/FeedbackBanner";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 
 function createInitialFormState(): CreateCompanyInput {
   return {
@@ -74,12 +77,11 @@ export function AdminCompaniesPage(): JSX.Element {
   const {
     activeCompany,
     memberships,
-    refreshSession,
     reloadProfile,
-    session,
     switchCompany,
     user
   } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const [items, setItems] = useState<AdminCompanyItem[]>([]);
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,33 +91,13 @@ export function AdminCompaniesPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [form, setForm] = useState<CreateCompanyInput>(createInitialFormState);
+  const [companyPendingDelete, setCompanyPendingDelete] = useState<AdminCompanyItem | null>(null);
 
   const canManageCompanies = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
 
   const isEditingCompany = editingCompanyId !== null;
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshedAccessToken = await refreshSession();
-        if (!refreshedAccessToken) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshedAccessToken);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const loadCompanies = useCallback(async () => {
     if (!canManageCompanies) {
@@ -243,7 +225,7 @@ export function AdminCompaniesPage(): JSX.Element {
     resetCompanyForm();
   }
 
-  async function handleDeleteCompany(item: AdminCompanyItem): Promise<void> {
+  function handleDeleteCompany(item: AdminCompanyItem): void {
     const lockMessage = getCompanyDeleteLockMessage(item);
     if (lockMessage) {
       setErrorMessage(lockMessage);
@@ -251,21 +233,27 @@ export function AdminCompaniesPage(): JSX.Element {
       return;
     }
 
-    if (!window.confirm(`Confirmer la suppression de l'entreprise ${item.company.name} ?`)) {
+    setCompanyPendingDelete(item);
+  }
+
+  async function handleConfirmDeleteCompany(): Promise<void> {
+    if (!companyPendingDelete) {
       return;
     }
 
-    setBusyCompanyId(item.company.id);
+    const item = companyPendingDelete;
+    setBusyCompanyId(companyPendingDelete.company.id);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) =>
-        deleteAdminCompanyRequest(accessToken, item.company.id)
+        deleteAdminCompanyRequest(accessToken, companyPendingDelete.company.id)
       );
-      if (editingCompanyId === item.company.id) {
+      if (editingCompanyId === companyPendingDelete.company.id) {
         resetCompanyForm();
       }
       setSuccessMessage(`Entreprise ${item.company.name} désactivée.`);
+      setCompanyPendingDelete(null);
       await reloadProfile();
       await loadCompanies();
     } catch (error) {
@@ -309,8 +297,11 @@ export function AdminCompaniesPage(): JSX.Element {
         </p>
       </header>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       <section className="panel">
         <div className="company-admin-header">
@@ -325,7 +316,6 @@ export function AdminCompaniesPage(): JSX.Element {
           </div>
         </div>
 
-        {isLoading ? <p>Chargement...</p> : null}
         {!isLoading && items.length === 0 ? <p>Aucune entreprise disponible.</p> : null}
         {!isLoading && items.length > 0 ? (
           <div className="company-card-grid">
@@ -526,6 +516,23 @@ export function AdminCompaniesPage(): JSX.Element {
           ) : null}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={companyPendingDelete !== null}
+        title="Confirmer la suppression"
+        description="Cette action désactive l'entreprise dans l'interface et interrompt son usage courant."
+        objectLabel="Entreprise concernée"
+        objectName={companyPendingDelete?.company.name ?? ""}
+        impactText="Les utilisateurs ne pourront plus travailler sur cette entreprise tant qu'elle ne sera pas réactivée."
+        isConfirming={busyCompanyId === companyPendingDelete?.company.id}
+        onCancel={() => {
+          if (busyCompanyId) {
+            return;
+          }
+          setCompanyPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteCompany()}
+      />
     </>
   );
 }

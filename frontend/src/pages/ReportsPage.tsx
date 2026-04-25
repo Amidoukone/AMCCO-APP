@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { useAuth } from "../context/AuthContext";
+import { FeedbackBanner } from "../components/FeedbackBanner";
 import {
   ApiError,
   downloadReportExportRequest,
   getReportsOverviewRequest
 } from "../lib/api";
+import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   getBusinessActivityLabel,
   type BusinessActivityCode
@@ -147,7 +148,7 @@ function formatAppliedRange(overview: ReportsOverview): string {
 }
 
 export function ReportsPage(): JSX.Element {
-  const { refreshSession, session } = useAuth();
+  const withAuthorizedToken = useAuthorizedRequest();
   const { activities, selectedActivity, selectedActivityCode } = useBusinessActivity();
   const [overview, setOverview] = useState<ReportsOverview | null>(null);
   const [periodForm, setPeriodForm] = useState<PeriodFormState>({
@@ -164,27 +165,6 @@ export function ReportsPage(): JSX.Element {
   const [busyExport, setBusyExport] = useState<ExportTarget | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const withAuthorizedToken = useCallback(
-    async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
-        throw new ApiError(401, "Session absente");
-      }
-      try {
-        return await action(session.accessToken);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          throw error;
-        }
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          throw new ApiError(401, "Session expirée. Reconnectez-vous.");
-        }
-        return action(refreshed);
-      }
-    },
-    [refreshSession, session?.accessToken]
-  );
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -379,9 +359,11 @@ export function ReportsPage(): JSX.Element {
         </p>
       </section>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
-      {isLoading ? <p>Chargement...</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+      />
 
       {!isLoading && overview ? (
         <>
