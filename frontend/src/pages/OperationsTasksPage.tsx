@@ -14,6 +14,7 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
+import { matchesQuickSearch } from "../lib/quickSearch";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   ApiError,
@@ -185,6 +186,9 @@ export function OperationsTasksPage(): JSX.Element {
   const tasksViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("operations-tasks", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
+  const tasksSearchStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("operations-tasks-search", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
   const initialFilters = useMemo(
     () => ({
       status: "ALL" as "ALL" | TaskStatus,
@@ -194,6 +198,7 @@ export function OperationsTasksPage(): JSX.Element {
     []
   );
   const [filters, setFilters] = usePersistedViewState(tasksViewStorageKey, initialFilters);
+  const [searchQuery, setSearchQuery] = usePersistedViewState(tasksSearchStorageKey, "");
 
   const [createForm, setCreateForm] = useState(createDefaultTaskForm);
 
@@ -216,6 +221,21 @@ export function OperationsTasksPage(): JSX.Element {
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
   const taskWorkflow = selectedProfile?.tasks.workflow ?? [];
 
+  const displayTasks = useMemo(() => {
+    return tasks.filter((task) =>
+      matchesQuickSearch(searchQuery, [
+        task.title,
+        task.description,
+        task.createdByEmail,
+        task.createdByFullName,
+        task.assignedToEmail,
+        task.assignedToFullName,
+        task.activityCode ? getBusinessActivityLabel(task.activityCode) : "",
+        ...Object.values(task.metadata)
+      ])
+    );
+  }, [searchQuery, tasks]);
+
   const statusSummary = useMemo(() => {
     const counts: Record<TaskStatus, number> = {
       TODO: 0,
@@ -224,12 +244,12 @@ export function OperationsTasksPage(): JSX.Element {
       BLOCKED: 0
     };
 
-    for (const task of tasks) {
+    for (const task of displayTasks) {
       counts[task.status] += 1;
     }
 
     return counts;
-  }, [tasks]);
+  }, [displayTasks]);
 
   const statusCards = useMemo(
     () =>
@@ -245,15 +265,15 @@ export function OperationsTasksPage(): JSX.Element {
   );
 
   const selectedTaskIds = useMemo(() => {
-    return tasks.filter((task) => selectedTasks[task.id]).map((task) => task.id);
-  }, [selectedTasks, tasks]);
+    return displayTasks.filter((task) => selectedTasks[task.id]).map((task) => task.id);
+  }, [displayTasks, selectedTasks]);
 
   const allVisibleSelected = useMemo(() => {
-    if (tasks.length === 0) {
+    if (displayTasks.length === 0) {
       return false;
     }
-    return tasks.every((task) => selectedTasks[task.id]);
-  }, [selectedTasks, tasks]);
+    return displayTasks.every((task) => selectedTasks[task.id]);
+  }, [displayTasks, selectedTasks]);
 
   const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
     const offset = options?.offset ?? 0;
@@ -695,6 +715,13 @@ export function OperationsTasksPage(): JSX.Element {
               </button>
             ) : null}
           </div>
+          <input
+            type="search"
+            className="quick-search-input"
+            placeholder="Recherche rapide: tache, responsable, createur..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
 
           <select
             value={filters.status}
@@ -993,15 +1020,18 @@ export function OperationsTasksPage(): JSX.Element {
       <section className="panel">
         <div className="operations-list-header">
           <h3>Taches</h3>
-          {canAssignTasks && tasks.length > 0 ? (
+          {canAssignTasks && displayTasks.length > 0 ? (
             <label className="inline-checkbox">
               <input
                 type="checkbox"
                 checked={allVisibleSelected}
                 onChange={(event) =>
-                  setSelectedTasks(
-                    Object.fromEntries(tasks.map((task) => [task.id, event.target.checked]))
-                  )
+                  setSelectedTasks((prev) => ({
+                    ...prev,
+                    ...Object.fromEntries(
+                      displayTasks.map((task) => [task.id, event.target.checked])
+                    )
+                  }))
                 }
               />
               <span>Tout sélectionner</span>
@@ -1009,10 +1039,13 @@ export function OperationsTasksPage(): JSX.Element {
           ) : null}
         </div>
         {!isLoading && tasks.length === 0 ? <p>Aucune tâche.</p> : null}
-        {!isLoading && tasks.length > 0 ? (
+        {!isLoading && tasks.length > 0 && displayTasks.length === 0 ? (
+          <p>Aucune tÃ¢che ne correspond a la recherche.</p>
+        ) : null}
+        {!isLoading && displayTasks.length > 0 ? (
           <>
           <div className="operations-task-list">
-            {tasks.map((task) => {
+            {displayTasks.map((task) => {
               const isBusy = busyTaskId === task.id;
               const canUpdate = canUpdateTask(task);
               const isCompleted = task.status === "DONE";
@@ -1203,7 +1236,9 @@ export function OperationsTasksPage(): JSX.Element {
           </div>
           <div className="list-pagination">
             <p className="hint list-pagination-meta">
-              {tasks.length} tache(s) chargee(s){hasMoreTasks ? " sur plusieurs pages." : "."}
+              {displayTasks.length} tache(s) affichee(s)
+              {displayTasks.length !== tasks.length ? ` sur ${tasks.length} chargee(s)` : ""}
+              {hasMoreTasks ? " sur plusieurs pages." : "."}
             </p>
             {hasMoreTasks ? (
               <button

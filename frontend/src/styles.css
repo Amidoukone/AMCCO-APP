@@ -225,6 +225,14 @@ a {
   color: #1565c0;
 }
 
+.quick-search-input {
+  width: 100%;
+  border: 1px solid #bcccdc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
 .company-manage-link {
   display: inline-flex;
   align-items: center;

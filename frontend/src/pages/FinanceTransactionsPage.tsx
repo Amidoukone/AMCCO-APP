@@ -7,6 +7,7 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
+import { matchesQuickSearch } from "../lib/quickSearch";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -291,6 +292,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const transactionsViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("finance-transactions", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
+  const transactionsSearchStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("finance-transactions-search", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
   const initialFilters = useMemo(
     () =>
       ({
@@ -300,6 +304,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     []
   );
   const [filters, setFilters] = usePersistedViewState(transactionsViewStorageKey, initialFilters);
+  const [searchQuery, setSearchQuery] = usePersistedViewState(transactionsSearchStorageKey, "");
 
   const [transactionForm, setTransactionForm] = useState({
     accountId: "",
@@ -341,6 +346,22 @@ export function FinanceTransactionsPage(): JSX.Element {
     () => transactions.find((item) => item.id === selectedTransactionId) ?? null,
     [selectedTransactionId, transactions]
   );
+  const displayTransactions = useMemo(() => {
+    return transactions.filter((item) =>
+      matchesQuickSearch(searchQuery, [
+        item.accountName,
+        item.accountRef,
+        item.description,
+        item.createdByEmail,
+        item.validatedByEmail,
+        item.amount,
+        item.currency,
+        item.type === "CASH_IN" ? "Entree" : "Sortie",
+        item.activityCode ? getBusinessActivityLabel(item.activityCode) : "Charge transversale entreprise",
+        ...Object.values(item.metadata)
+      ])
+    );
+  }, [searchQuery, transactions]);
   const resetAccountForm = useCallback(() => {
     setEditingAccountId(null);
     setAccountForm(buildDefaultAccountForm(selectedActivityCode, canManageGlobalAccounts));
@@ -1239,6 +1260,13 @@ export function FinanceTransactionsPage(): JSX.Element {
             <option value="CASH_IN">Entrée</option>
             <option value="CASH_OUT">Sortie</option>
           </select>
+          <input
+            type="search"
+            className="quick-search-input"
+            placeholder="Recherche rapide: compte, reference, description..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
           <button type="submit">Filtrer</button>
         </form>
         <p className="hint">
@@ -1431,7 +1459,10 @@ export function FinanceTransactionsPage(): JSX.Element {
       <section className="panel">
         <h3>Transactions</h3>
         {!isLoading && transactions.length === 0 ? <p>Aucune transaction.</p> : null}
-        {!isLoading && transactions.length > 0 ? (
+        {!isLoading && transactions.length > 0 && displayTransactions.length === 0 ? (
+          <p>Aucune transaction ne correspond a la recherche.</p>
+        ) : null}
+        {!isLoading && displayTransactions.length > 0 ? (
           <>
           <div className="table-wrap">
             <table className="admin-table">
@@ -1446,7 +1477,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((tx) => {
+                {displayTransactions.map((tx) => {
                   const isBusy = busyTransactionId === tx.id;
                   const isProofsOpen = openProofs[tx.id] === true;
                   const proofs = proofsByTransaction[tx.id] ?? [];
@@ -1645,7 +1676,10 @@ export function FinanceTransactionsPage(): JSX.Element {
           </div>
           <div className="list-pagination">
             <p className="hint list-pagination-meta">
-              {transactions.length} transaction(s) chargee(s)
+              {displayTransactions.length} transaction(s) affichee(s)
+              {displayTransactions.length !== transactions.length
+                ? ` sur ${transactions.length} chargee(s)`
+                : ""}
               {hasMoreTransactions ? " sur plusieurs pages." : "."}
             </p>
             {hasMoreTransactions ? (

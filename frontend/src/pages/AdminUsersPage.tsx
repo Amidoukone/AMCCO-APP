@@ -11,6 +11,11 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
+import {
+  buildPersistedViewStorageKey,
+  usePersistedViewState
+} from "../lib/usePersistedViewState";
+import { matchesQuickSearch } from "../lib/quickSearch";
 import type { AdminUserItem } from "../types/admin-users";
 import { ROLE_CODES, type RoleCode } from "../types/role";
 import { ROLE_LABELS } from "../config/permissions";
@@ -30,7 +35,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function AdminUsersPage(): JSX.Element {
-  const { user } = useAuth();
+  const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
 
   const [items, setItems] = useState<AdminUserItem[]>([]);
@@ -51,6 +56,20 @@ export function AdminUsersPage(): JSX.Element {
   const canManageUser = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
+  const usersSearchStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("admin-users-search", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
+  const [searchQuery, setSearchQuery] = usePersistedViewState(usersSearchStorageKey, "");
+  const displayItems = useMemo(() => {
+    return items.filter((item) =>
+      matchesQuickSearch(searchQuery, [
+        item.fullName,
+        item.email,
+        item.role,
+        ROLE_LABELS[item.role]
+      ])
+    );
+  }, [items, searchQuery]);
 
   const setDraftsFromItems = useCallback((rows: AdminUserItem[]) => {
     const nextDrafts: Record<string, UserDraft> = {};
@@ -307,9 +326,19 @@ export function AdminUsersPage(): JSX.Element {
 
       <section className="panel">
         <h3>Utilisateurs de l'entreprise</h3>
+        <input
+          type="search"
+          className="quick-search-input"
+          placeholder="Recherche rapide: nom, email, role..."
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
         {!isLoading && items.length === 0 ? <p>Aucun utilisateur.</p> : null}
+        {!isLoading && items.length > 0 && displayItems.length === 0 ? (
+          <p>Aucun utilisateur ne correspond a la recherche.</p>
+        ) : null}
 
-        {!isLoading && items.length > 0 ? (
+        {!isLoading && displayItems.length > 0 ? (
           <div className="table-wrap">
             <table className="admin-table">
               <thead>
@@ -322,7 +351,7 @@ export function AdminUsersPage(): JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
+                {displayItems.map((item) => {
                   const draft = drafts[item.userId];
                   const isBusy = busyUserId === item.userId;
                   return (

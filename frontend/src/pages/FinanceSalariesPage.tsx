@@ -7,6 +7,7 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
+import { matchesQuickSearch } from "../lib/quickSearch";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -162,6 +163,9 @@ export function FinanceSalariesPage(): JSX.Element {
   const salariesViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("finance-salaries", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
+  const salariesSearchStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("finance-salaries-search", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
   const initialSalaryFilters = useMemo(
     () => ({
       status: "ALL" as "ALL" | SalaryTransaction["status"],
@@ -174,6 +178,7 @@ export function FinanceSalariesPage(): JSX.Element {
     salariesViewStorageKey,
     initialSalaryFilters
   );
+  const [searchQuery, setSearchQuery] = usePersistedViewState(salariesSearchStorageKey, "");
   const [salaryForm, setSalaryForm] = useState({
     accountId: "",
     employeeUserId: "",
@@ -209,6 +214,22 @@ export function FinanceSalariesPage(): JSX.Element {
     () => salaryItems.find((item) => item.id === selectedSalaryId) ?? null,
     [salaryItems, selectedSalaryId]
   );
+  const displaySalaryItems = useMemo(() => {
+    return salaryItems.filter((item) =>
+      matchesQuickSearch(searchQuery, [
+        item.employeeFullName,
+        item.employeeEmail,
+        item.accountName,
+        item.note,
+        item.payPeriod,
+        item.netAmount,
+        item.currency,
+        item.employeeRole,
+        salaryPaymentMethodLabel(item.paymentMethod),
+        salaryConfirmationLabel(item.status, item.salaryConfirmation.status)
+      ])
+    );
+  }, [salaryItems, searchQuery]);
   const resetSalaryForm = useCallback(() => {
     setEditingSalaryId(null);
     setSalaryForm({
@@ -823,6 +844,14 @@ export function FinanceSalariesPage(): JSX.Element {
           </div>
 
           <input
+            type="search"
+            className="quick-search-input"
+            placeholder="Recherche rapide: collaborateur, email, compte..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+
+          <input
             type="month"
             value={salaryFilters.payPeriod}
             onChange={(event) =>
@@ -1122,7 +1151,10 @@ export function FinanceSalariesPage(): JSX.Element {
       <section className="panel">
         <h3>Liste des salaires</h3>
         {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette période.</p> : null}
-        {!isLoading && salaryItems.length > 0 ? (
+        {!isLoading && salaryItems.length > 0 && displaySalaryItems.length === 0 ? (
+          <p>Aucun salaire ne correspond a la recherche.</p>
+        ) : null}
+        {!isLoading && displaySalaryItems.length > 0 ? (
           <>
           <div className="table-wrap">
             <table className="admin-table">
@@ -1137,7 +1169,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {salaryItems.map((item) => {
+                {displaySalaryItems.map((item) => {
                   const isBusy = busyTransactionId === item.id;
                   const canEditSalary = canManageSalaries && item.status !== "APPROVED";
                   const canDeleteSalary =
@@ -1355,7 +1387,11 @@ export function FinanceSalariesPage(): JSX.Element {
           </div>
           <div className="list-pagination">
             <p className="hint list-pagination-meta">
-              {salaryItems.length} salaire(s) charge(s){hasMoreSalaries ? " sur plusieurs pages." : "."}
+              {displaySalaryItems.length} salaire(s) affiche(s)
+              {displaySalaryItems.length !== salaryItems.length
+                ? ` sur ${salaryItems.length} charge(s)`
+                : ""}
+              {hasMoreSalaries ? " sur plusieurs pages." : "."}
             </p>
             {hasMoreSalaries ? (
               <button
