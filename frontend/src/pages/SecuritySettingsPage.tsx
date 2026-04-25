@@ -16,6 +16,8 @@ type AuditDisplayItem = AuditLogItem & {
   duplicateCount: number;
 };
 
+const AUDIT_PAGE_SIZE_DEFAULT = 50;
+
 const auditActionLabels: Record<string, string> = {
   AUTH_LOGIN: "Connexion",
   AUTH_REFRESH: "Rafraîchissement de session",
@@ -231,13 +233,15 @@ export function SecuritySettingsPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AuditLogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreItems, setHasMoreItems] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [query, setQuery] = useState({
     action: "",
     actorId: "",
     entityType: searchParams.get("entityType") ?? "",
     entityId: searchParams.get("entityId") ?? "",
-    limit: 50
+    limit: AUDIT_PAGE_SIZE_DEFAULT
   });
 
   useEffect(() => {
@@ -259,29 +263,41 @@ export function SecuritySettingsPage(): JSX.Element {
     []
   );
 
-  const loadAuditLogs = useCallback(async () => {
+  const loadAuditLogs = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+    const offset = options?.offset ?? 0;
+    const append = options?.append === true;
     if (!canAccess) {
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listAuditLogsRequest(accessToken, {
           limit: query.limit,
+          offset,
           action: query.action.trim() || undefined,
           actorId: query.actorId.trim() || undefined,
           entityType: query.entityType.trim() || undefined,
           entityId: query.entityId.trim() || undefined
         })
       );
-      setItems(response.items);
+      setItems((prev) => (append ? [...prev, ...response.items] : response.items));
+      setHasMoreItems(response.items.length === query.limit);
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsLoadingMore(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [
     canAccess,
@@ -314,6 +330,16 @@ export function SecuritySettingsPage(): JSX.Element {
       return next;
     });
     await loadAuditLogs();
+  }
+
+  async function handleLoadMore(): Promise<void> {
+    if (isLoading || isLoadingMore || !hasMoreItems) {
+      return;
+    }
+    await loadAuditLogs({
+      offset: items.length,
+      append: true
+    });
   }
 
   if (!canAccess) {
@@ -402,6 +428,7 @@ export function SecuritySettingsPage(): JSX.Element {
         <h3>Historique récent</h3>
         {!isLoading && displayItems.length === 0 ? <p>Aucune entrée pour ces filtres.</p> : null}
         {!isLoading && displayItems.length > 0 ? (
+          <>
           <div className="table-wrap">
             <table className="admin-table">
               <thead>
@@ -478,6 +505,22 @@ export function SecuritySettingsPage(): JSX.Element {
               </tbody>
             </table>
           </div>
+          <div className="list-pagination">
+            <p className="hint list-pagination-meta">
+              {items.length} entree(s) chargee(s){hasMoreItems ? " sur plusieurs pages." : "."}
+            </p>
+            {hasMoreItems ? (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleLoadMore()}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? "Chargement..." : "Charger plus"}
+              </button>
+            ) : null}
+          </div>
+          </>
         ) : null}
       </section>
     </>

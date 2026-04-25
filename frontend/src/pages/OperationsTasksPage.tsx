@@ -31,6 +31,8 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
 import type { OperationTask, OperationTaskMember, TaskScope, TaskStatus } from "../types/tasks";
 
+const TASKS_PAGE_SIZE = 200;
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -171,6 +173,8 @@ export function OperationsTasksPage(): JSX.Element {
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
+  const [hasMoreTasks, setHasMoreTasks] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -244,19 +248,27 @@ export function OperationsTasksPage(): JSX.Element {
     return tasks.every((task) => selectedTasks[task.id]);
   }, [selectedTasks, tasks]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+    const offset = options?.offset ?? 0;
+    const append = options?.append === true;
     if (!selectedActivityCode) {
       setTasks([]);
       setMembers([]);
+      setHasMoreTasks(false);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    if (append) {
+      setIsLoadingMoreTasks(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const query = {
-        limit: 200,
+        limit: TASKS_PAGE_SIZE,
+        offset,
         status: filters.status === "ALL" ? undefined : filters.status,
         activityCode: selectedActivityCode,
         scope: canAssignTasks ? filters.scope : ("ASSIGNED_TO_ME" as TaskScope),
@@ -266,16 +278,37 @@ export function OperationsTasksPage(): JSX.Element {
       const taskResponse = await withAuthorizedToken((accessToken) =>
         listOperationsTasksRequest(accessToken, query)
       );
-      setTasks(taskResponse.items);
-      setAssignments(Object.fromEntries(taskResponse.items.map((task) => [task.id, task.assignedToId ?? ""])));
-      setSelectedTasks((prev) =>
-        Object.fromEntries(taskResponse.items.map((task) => [task.id, prev[task.id] === true]))
-      );
-      setAssignmentNotes((prev) =>
-        Object.fromEntries(taskResponse.items.map((task) => [task.id, prev[task.id] ?? ""]))
-      );
+      setHasMoreTasks(taskResponse.items.length === TASKS_PAGE_SIZE);
+      setTasks((prev) => {
+        if (!append) {
+          return taskResponse.items;
+        }
+        const seen = new Set(prev.map((task) => task.id));
+        return [...prev, ...taskResponse.items.filter((task) => !seen.has(task.id))];
+      });
+      setAssignments((prev) => {
+        const next = append ? { ...prev } : {};
+        for (const task of taskResponse.items) {
+          next[task.id] = prev[task.id] ?? task.assignedToId ?? "";
+        }
+        return next;
+      });
+      setSelectedTasks((prev) => {
+        const next = append ? { ...prev } : {};
+        for (const task of taskResponse.items) {
+          next[task.id] = prev[task.id] === true;
+        }
+        return next;
+      });
+      setAssignmentNotes((prev) => {
+        const next = append ? { ...prev } : {};
+        for (const task of taskResponse.items) {
+          next[task.id] = prev[task.id] ?? "";
+        }
+        return next;
+      });
 
-      if (canAssignTasks) {
+      if (!append && canAssignTasks) {
         const membersResponse = await withAuthorizedToken((accessToken) =>
           listOperationsMembersRequest(accessToken, {
             activityCode: selectedActivityCode
@@ -288,7 +321,11 @@ export function OperationsTasksPage(): JSX.Element {
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsLoadingMoreTasks(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [
     canAssignTasks,
@@ -302,6 +339,16 @@ export function OperationsTasksPage(): JSX.Element {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  async function handleLoadMoreTasks(): Promise<void> {
+    if (isLoading || isLoadingMoreTasks || !hasMoreTasks) {
+      return;
+    }
+    await loadData({
+      offset: tasks.length,
+      append: true
+    });
+  }
 
   useEffect(() => {
     setCreateForm((prev) => ({
@@ -889,6 +936,7 @@ export function OperationsTasksPage(): JSX.Element {
         </div>
         {!isLoading && tasks.length === 0 ? <p>Aucune tâche.</p> : null}
         {!isLoading && tasks.length > 0 ? (
+          <>
           <div className="operations-task-list">
             {tasks.map((task) => {
               const isBusy = busyTaskId === task.id;
@@ -1079,6 +1127,22 @@ export function OperationsTasksPage(): JSX.Element {
               );
             })}
           </div>
+          <div className="list-pagination">
+            <p className="hint list-pagination-meta">
+              {tasks.length} tache(s) chargee(s){hasMoreTasks ? " sur plusieurs pages." : "."}
+            </p>
+            {hasMoreTasks ? (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleLoadMoreTasks()}
+                disabled={isLoadingMoreTasks}
+              >
+                {isLoadingMoreTasks ? "Chargement..." : "Charger plus"}
+              </button>
+            ) : null}
+          </div>
+          </>
         ) : null}
       </section>
 

@@ -32,6 +32,8 @@ import type {
 } from "../types/finance";
 import { ROLE_LABELS } from "../config/permissions";
 
+const SALARIES_PAGE_SIZE = 100;
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -149,6 +151,8 @@ export function FinanceSalariesPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
   const [busySalaryExport, setBusySalaryExport] = useState<"csv" | "xlsx" | null>(null);
+  const [isLoadingMoreSalaries, setIsLoadingMoreSalaries] = useState(false);
+  const [hasMoreSalaries, setHasMoreSalaries] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [salaryFilters, setSalaryFilters] = useState<{
@@ -293,13 +297,20 @@ export function FinanceSalariesPage(): JSX.Element {
     setSelectedSalaryId(requestedTransactionId);
   }, [requestedTransactionId]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+    const offset = options?.offset ?? 0;
+    const append = options?.append === true;
+    if (append) {
+      setIsLoadingMoreSalaries(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const payload = await withAuthorizedToken(async (accessToken) => {
         const salariesPromise = listFinanceSalariesRequest(accessToken, {
-          limit: 100,
+          limit: SALARIES_PAGE_SIZE,
+          offset,
           status: salaryFilters.status === "ALL" ? undefined : salaryFilters.status,
           employeeUserId: canManageSalaries ? salaryFilters.employeeUserId || undefined : undefined,
           payPeriod: salaryFilters.payPeriod || undefined
@@ -334,29 +345,40 @@ export function FinanceSalariesPage(): JSX.Element {
         };
       });
 
+      setHasMoreSalaries(payload.salaryItems.length === SALARIES_PAGE_SIZE);
       setSalaryAccounts(payload.salaryAccounts);
       setSalaryMembers(payload.salaryMembers);
       setSalarySummary(payload.salarySummary);
-      setSalaryItems(payload.salaryItems);
-      setEditingSalaryId((prev) => (prev && payload.salaryItems.some((item) => item.id === prev) ? prev : null));
-      setSelectedSalaryId((prev) => {
-        if (requestedTransactionId) {
-          return payload.salaryItems.some((item) => item.id === requestedTransactionId)
-            ? requestedTransactionId
-            : null;
+      setSalaryItems((prev) => {
+        if (!append) {
+          return payload.salaryItems;
         }
-        return payload.salaryItems.some((item) => item.id === prev) ? prev : (payload.salaryItems[0]?.id ?? null);
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...payload.salaryItems.filter((item) => !seen.has(item.id))];
       });
-      const salaryIds = new Set(payload.salaryItems.map((item) => item.id));
-      setProofsByTransaction((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([transactionId]) => salaryIds.has(transactionId)))
-      );
-      setOpenProofs((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([transactionId]) => salaryIds.has(transactionId)))
-      );
-      setLoadingProofsByTransaction((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([transactionId]) => salaryIds.has(transactionId)))
-      );
+      if (!append) {
+        setEditingSalaryId((prev) => (prev && payload.salaryItems.some((item) => item.id === prev) ? prev : null));
+        setSelectedSalaryId((prev) => {
+          if (requestedTransactionId) {
+            return payload.salaryItems.some((item) => item.id === requestedTransactionId)
+              ? requestedTransactionId
+              : null;
+          }
+          return payload.salaryItems.some((item) => item.id === prev)
+            ? prev
+            : (payload.salaryItems[0]?.id ?? null);
+        });
+        const salaryIds = new Set(payload.salaryItems.map((item) => item.id));
+        setProofsByTransaction((prev) =>
+          Object.fromEntries(Object.entries(prev).filter(([transactionId]) => salaryIds.has(transactionId)))
+        );
+        setOpenProofs((prev) =>
+          Object.fromEntries(Object.entries(prev).filter(([transactionId]) => salaryIds.has(transactionId)))
+        );
+        setLoadingProofsByTransaction((prev) =>
+          Object.fromEntries(Object.entries(prev).filter(([transactionId]) => salaryIds.has(transactionId)))
+        );
+      }
       setSalaryForm((prev) => ({
         ...prev,
         accountId:
@@ -371,7 +393,11 @@ export function FinanceSalariesPage(): JSX.Element {
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsLoadingMoreSalaries(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [
     canManageSalaries,
@@ -385,6 +411,16 @@ export function FinanceSalariesPage(): JSX.Element {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  async function handleLoadMoreSalaries(): Promise<void> {
+    if (isLoading || isLoadingMoreSalaries || !hasMoreSalaries) {
+      return;
+    }
+    await loadData({
+      offset: salaryItems.length,
+      append: true
+    });
+  }
 
   async function handleSaveSalary(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -1018,6 +1054,7 @@ export function FinanceSalariesPage(): JSX.Element {
         <h3>Liste des salaires</h3>
         {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette période.</p> : null}
         {!isLoading && salaryItems.length > 0 ? (
+          <>
           <div className="table-wrap">
             <table className="admin-table">
               <thead>
@@ -1247,6 +1284,22 @@ export function FinanceSalariesPage(): JSX.Element {
               </tbody>
             </table>
           </div>
+          <div className="list-pagination">
+            <p className="hint list-pagination-meta">
+              {salaryItems.length} salaire(s) charge(s){hasMoreSalaries ? " sur plusieurs pages." : "."}
+            </p>
+            {hasMoreSalaries ? (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleLoadMoreSalaries()}
+                disabled={isLoadingMoreSalaries}
+              >
+                {isLoadingMoreSalaries ? "Chargement..." : "Charger plus"}
+              </button>
+            ) : null}
+          </div>
+          </>
         ) : null}
       </section>
 

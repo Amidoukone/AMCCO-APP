@@ -15,6 +15,8 @@ import {
   getFinanceTransactionNavigationTarget
 } from "../utils/traceMetadata";
 
+const ALERTS_PAGE_SIZE = 100;
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -52,6 +54,8 @@ export function AlertsPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [busyAlertId, setBusyAlertId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreItems, setHasMoreItems] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [filters, setFilters] = useState<{
@@ -74,25 +78,37 @@ export function AlertsPage(): JSX.Element {
     }));
   }, [searchParams]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+    const offset = options?.offset ?? 0;
+    const append = options?.append === true;
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listAlertsRequest(accessToken, {
-          limit: 100,
+          limit: ALERTS_PAGE_SIZE,
+          offset,
           unreadOnly: filters.unreadOnly,
           severity: filters.severity || undefined,
           entityType: filters.entityType.trim() || undefined,
           entityId: filters.entityId.trim() || undefined
         })
       );
-      setItems(response.items);
+      setItems((prev) => (append ? [...prev, ...response.items] : response.items));
+      setHasMoreItems(response.items.length === ALERTS_PAGE_SIZE);
       setUnreadCount(response.unreadCount);
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsLoadingMore(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [
     filters.entityId,
@@ -155,6 +171,16 @@ export function AlertsPage(): JSX.Element {
       return next;
     });
     void loadData();
+  }
+
+  async function handleLoadMore(): Promise<void> {
+    if (isLoading || isLoadingMore || !hasMoreItems) {
+      return;
+    }
+    await loadData({
+      offset: items.length,
+      append: true
+    });
   }
 
   return (
@@ -248,6 +274,7 @@ export function AlertsPage(): JSX.Element {
         <h3>Liste</h3>
         {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond à ces filtres.</p> : null}
         {!isLoading && items.length > 0 ? (
+          <>
           <div className="alerts-list">
             {items.map((item) => {
               const isUnread = item.readAt === null;
@@ -313,6 +340,22 @@ export function AlertsPage(): JSX.Element {
               );
             })}
           </div>
+          <div className="list-pagination">
+            <p className="hint list-pagination-meta">
+              {items.length} alerte(s) chargee(s){hasMoreItems ? " sur plusieurs pages." : "."}
+            </p>
+            {hasMoreItems ? (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleLoadMore()}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? "Chargement..." : "Charger plus"}
+              </button>
+            ) : null}
+          </div>
+          </>
         ) : null}
       </section>
     </>

@@ -144,6 +144,19 @@ a {
   color: #334e68;
 }
 
+.list-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.list-pagination-meta {
+  margin: 0;
+}
+
 .hint {
   margin: 0 0 12px;
   color: #486581;

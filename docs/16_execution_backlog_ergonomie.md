@@ -193,6 +193,45 @@ Principe directeur:
 - Criteres d'acceptation:
   - Une checklist courte existe et peut etre suivie a chaque livraison.
 
+### Checklist de regression courte par lot UX
+
+Appliquer cette verification a la fin de chaque ticket ou lot UX, avant commit ou push.
+
+#### Controle interface
+
+- ouvrir la connexion et verifier qu'aucun texte ou composant principal n'est casse
+- ouvrir le `pilotage`
+- ouvrir le `centre d'alertes`
+- ouvrir `flux financiers`
+- ouvrir `operations`
+- ouvrir `rapports`
+
+#### Controle contexte
+
+- verifier le changement d'entreprise si disponible
+- verifier le changement de perimetre actif si l'ecran depend d'une activite
+- verifier que les compteurs, listes ou titres se recalculent correctement apres changement de contexte
+
+#### Controle interactions
+
+- verifier un retour utilisateur visible: succes, erreur ou chargement
+- verifier une action destructive si le lot en contient une
+- verifier qu'un bouton principal et un bouton secondaire restent fonctionnels
+
+#### Controle metier minimum
+
+- alertes: filtrer ou marquer comme lue
+- transactions: consulter la liste puis ouvrir un detail
+- taches: consulter la liste puis ouvrir un detail
+- rapports: ouvrir la page et verifier les actions d'export visibles
+- securite: ouvrir la page si le role le permet
+
+#### Validation technique
+
+- `frontend`: `npm.cmd run typecheck`
+- `frontend`: `npm.cmd run build`
+- si backend touche: lancer la verification minimale du lot backend avant livraison
+
 ## Sprint 2: Debit de travail quotidien et confort d'usage
 
 ### Ticket UX-007
@@ -520,4 +559,3 @@ Principe directeur:
 - Verification manuelle des navigations croisées
 - Verification manuelle des fils de traçabilité
 - Verification manuelle des écrans admin et sécurité
-

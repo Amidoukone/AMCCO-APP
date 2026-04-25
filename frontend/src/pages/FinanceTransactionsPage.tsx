@@ -42,6 +42,7 @@ import {
 
 const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
 const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
+const TRANSACTIONS_PAGE_SIZE = 100;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -242,6 +243,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [busyAccountId, setBusyAccountId] = useState<string | null>(null);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
+  const [isLoadingMoreTransactions, setIsLoadingMoreTransactions] = useState(false);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -421,8 +424,14 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSelectedTransactionId(requestedTransactionId);
   }, [requestedTransactionId]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+    const offset = options?.offset ?? 0;
+    const append = options?.append === true;
+    if (append) {
+      setIsLoadingMoreTransactions(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const payload = await withAuthorizedToken(async (accessToken) => {
@@ -438,7 +447,8 @@ export function FinanceTransactionsPage(): JSX.Element {
             activityCode: selectedActivityCode
           }),
           listFinanceTransactionsRequest(accessToken, {
-            limit: 100,
+            limit: TRANSACTIONS_PAGE_SIZE,
+            offset,
             status: filters.status === "ALL" ? undefined : filters.status,
             type: filters.type === "ALL" ? undefined : filters.type,
             activityCode: selectedActivityCode
@@ -448,32 +458,41 @@ export function FinanceTransactionsPage(): JSX.Element {
           transactions: transactionsResp.items
         }));
       });
+      setHasMoreTransactions(payload.transactions.length === TRANSACTIONS_PAGE_SIZE);
       setAccounts(payload.accounts);
-      setTransactions(payload.transactions);
-      setEditingAccountId((prev) => (prev && payload.accounts.some((item) => item.id === prev) ? prev : null));
-      setEditingTransactionId((prev) =>
-        prev && payload.transactions.some((item) => item.id === prev) ? prev : null
-      );
-      setSelectedTransactionId((prev) => {
-        if (requestedTransactionId) {
-          return payload.transactions.some((item) => item.id === requestedTransactionId)
-            ? requestedTransactionId
-            : null;
+      setTransactions((prev) => {
+        if (!append) {
+          return payload.transactions;
         }
-        return payload.transactions.some((item) => item.id === prev)
-          ? prev
-          : (payload.transactions[0]?.id ?? null);
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...payload.transactions.filter((item) => !seen.has(item.id))];
       });
-      const txIds = new Set(payload.transactions.map((item) => item.id));
-      setProofsByTransaction((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
-      );
-      setOpenProofs((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
-      );
-      setLoadingProofsByTransaction((prev) =>
-        Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
-      );
+      if (!append) {
+        setEditingAccountId((prev) => (prev && payload.accounts.some((item) => item.id === prev) ? prev : null));
+        setEditingTransactionId((prev) =>
+          prev && payload.transactions.some((item) => item.id === prev) ? prev : null
+        );
+        setSelectedTransactionId((prev) => {
+          if (requestedTransactionId) {
+            return payload.transactions.some((item) => item.id === requestedTransactionId)
+              ? requestedTransactionId
+              : null;
+          }
+          return payload.transactions.some((item) => item.id === prev)
+            ? prev
+            : (payload.transactions[0]?.id ?? null);
+        });
+        const txIds = new Set(payload.transactions.map((item) => item.id));
+        setProofsByTransaction((prev) =>
+          Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
+        );
+        setOpenProofs((prev) =>
+          Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
+        );
+        setLoadingProofsByTransaction((prev) =>
+          Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
+        );
+      }
       setTransactionForm((prev) => ({
         ...prev,
         accountId:
@@ -484,13 +503,27 @@ export function FinanceTransactionsPage(): JSX.Element {
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsLoadingMoreTransactions(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [filters.status, filters.type, requestedTransactionId, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  async function handleLoadMoreTransactions(): Promise<void> {
+    if (isLoading || isLoadingMoreTransactions || !hasMoreTransactions) {
+      return;
+    }
+    await loadData({
+      offset: transactions.length,
+      append: true
+    });
+  }
 
   useEffect(() => {
     setTransactionForm((prev) => {
@@ -1339,6 +1372,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         <h3>Transactions</h3>
         {!isLoading && transactions.length === 0 ? <p>Aucune transaction.</p> : null}
         {!isLoading && transactions.length > 0 ? (
+          <>
           <div className="table-wrap">
             <table className="admin-table">
               <thead>
@@ -1549,6 +1583,23 @@ export function FinanceTransactionsPage(): JSX.Element {
               </tbody>
             </table>
           </div>
+          <div className="list-pagination">
+            <p className="hint list-pagination-meta">
+              {transactions.length} transaction(s) chargee(s)
+              {hasMoreTransactions ? " sur plusieurs pages." : "."}
+            </p>
+            {hasMoreTransactions ? (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleLoadMoreTransactions()}
+                disabled={isLoadingMoreTransactions}
+              >
+                {isLoadingMoreTransactions ? "Chargement..." : "Charger plus"}
+              </button>
+            ) : null}
+          </div>
+          </>
         ) : null}
       </section>
 

@@ -22,6 +22,8 @@ import type {
   TaskStatus
 } from "../types/tasks";
 
+const TASK_DETAIL_PAGE_SIZE = 50;
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -183,6 +185,9 @@ export function TaskDetailsPage(): JSX.Element {
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingMoreTimeline, setIsLoadingMoreTimeline] = useState(false);
+  const [hasMoreTimeline, setHasMoreTimeline] = useState(false);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [assignment, setAssignment] = useState("");
@@ -193,21 +198,36 @@ export function TaskDetailsPage(): JSX.Element {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
   }, [user?.role]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options?: {
+    append?: boolean;
+    timelineOffset?: number;
+    commentsOffset?: number;
+  }) => {
+    const append = options?.append === true;
     if (!taskId) {
       return;
     }
-    setIsLoading(true);
+    if (append) {
+      setIsLoadingMoreTimeline(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const data = await withAuthorizedToken(async (accessToken) => {
         const [taskResponse, timelineResponse, commentsResponse] = await Promise.all([
           getOperationsTaskRequest(accessToken, taskId),
-          listOperationsTaskTimelineRequest(accessToken, taskId, { limit: 200 }),
-          listTaskCommentsRequest(accessToken, taskId, { limit: 200 })
+          listOperationsTaskTimelineRequest(accessToken, taskId, {
+            limit: TASK_DETAIL_PAGE_SIZE,
+            offset: options?.timelineOffset ?? 0
+          }),
+          listTaskCommentsRequest(accessToken, taskId, {
+            limit: TASK_DETAIL_PAGE_SIZE,
+            offset: options?.commentsOffset ?? 0
+          })
         ]);
         const membersResponse =
-          canManageTasks
+          !append && canManageTasks
             ? await listOperationsMembersRequest(accessToken, {
                 activityCode: taskResponse.item.activityCode ?? undefined
               })
@@ -220,9 +240,25 @@ export function TaskDetailsPage(): JSX.Element {
         };
       });
       setTask(data.task);
-      setTimeline(data.timeline);
-      setComments(data.comments);
-      setMembers(data.members);
+      setHasMoreTimeline(data.timeline.length === TASK_DETAIL_PAGE_SIZE);
+      setHasMoreComments(data.comments.length === TASK_DETAIL_PAGE_SIZE);
+      setTimeline((prev) => {
+        if (!append) {
+          return data.timeline;
+        }
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...data.timeline.filter((item) => !seen.has(item.id))];
+      });
+      setComments((prev) => {
+        if (!append) {
+          return data.comments;
+        }
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...data.comments.filter((item) => !seen.has(item.id))];
+      });
+      if (!append) {
+        setMembers(data.members);
+      }
       setAssignment(data.task.assignedToId ?? "");
       if (data.task.activityCode && data.task.activityCode !== selectedActivityCode) {
         setSelectedActivityCode(data.task.activityCode);
@@ -230,13 +266,28 @@ export function TaskDetailsPage(): JSX.Element {
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (append) {
+        setIsLoadingMoreTimeline(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [canManageTasks, selectedActivityCode, setSelectedActivityCode, taskId, withAuthorizedToken]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  async function handleLoadMoreTimeline(): Promise<void> {
+    if (isLoading || isLoadingMoreTimeline || (!hasMoreTimeline && !hasMoreComments)) {
+      return;
+    }
+    await loadData({
+      append: true,
+      timelineOffset: timeline.length,
+      commentsOffset: comments.length
+    });
+  }
 
   async function handleAssign(): Promise<void> {
     if (!taskId || !task || !canManageTasks) {
@@ -521,41 +572,59 @@ export function TaskDetailsPage(): JSX.Element {
           <h3>Timeline operationnelle</h3>
           {timelineEntries.length === 0 ? <p>Aucun evenement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
-            <ol className="task-timeline">
-              {timelineEntries.map((entry) => (
-                <li
-                  key={entry.id}
-                  className={entry.kind === "comment" ? "task-timeline-item is-comment" : "task-timeline-item"}
-                >
-                  {entry.kind === "event" ? (
-                    <>
-                      <p className="task-timeline-title">{timelineActionLabel(entry.event.action)}</p>
-                      <p className="task-timeline-meta">
-                        {new Date(entry.event.createdAt).toLocaleString("fr-FR")} | {entry.event.actorFullName} (
-                        {entry.event.actorEmail})
-                      </p>
-                      {timelineDetail(entry.event) ? (
-                        <p className="task-timeline-detail">{timelineDetail(entry.event)}</p>
-                      ) : null}
-                      {timelineContextLines(entry.event).map((line) => (
-                        <p key={`${entry.event.id}-${line}`} className="task-timeline-detail">
-                          {line}
+            <>
+              <ol className="task-timeline">
+                {timelineEntries.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className={entry.kind === "comment" ? "task-timeline-item is-comment" : "task-timeline-item"}
+                  >
+                    {entry.kind === "event" ? (
+                      <>
+                        <p className="task-timeline-title">{timelineActionLabel(entry.event.action)}</p>
+                        <p className="task-timeline-meta">
+                          {new Date(entry.event.createdAt).toLocaleString("fr-FR")} | {entry.event.actorFullName} (
+                          {entry.event.actorEmail})
                         </p>
-                      ))}
-                    </>
-                  ) : (
-                    <>
-                      <p className="task-timeline-title">Commentaire</p>
-                      <p className="task-timeline-meta">
-                        {new Date(entry.comment.createdAt).toLocaleString("fr-FR")} | {entry.comment.authorFullName} (
-                        {entry.comment.authorEmail})
-                      </p>
-                      <p className="task-timeline-comment-body">{entry.comment.body}</p>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ol>
+                        {timelineDetail(entry.event) ? (
+                          <p className="task-timeline-detail">{timelineDetail(entry.event)}</p>
+                        ) : null}
+                        {timelineContextLines(entry.event).map((line) => (
+                          <p key={`${entry.event.id}-${line}`} className="task-timeline-detail">
+                            {line}
+                          </p>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        <p className="task-timeline-title">Commentaire</p>
+                        <p className="task-timeline-meta">
+                          {new Date(entry.comment.createdAt).toLocaleString("fr-FR")} | {entry.comment.authorFullName} (
+                          {entry.comment.authorEmail})
+                        </p>
+                        <p className="task-timeline-comment-body">{entry.comment.body}</p>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              <div className="list-pagination">
+                <p className="hint list-pagination-meta">
+                  {timelineEntries.length} element(s) de suivi charge(s)
+                  {hasMoreTimeline || hasMoreComments ? " sur plusieurs pages." : "."}
+                </p>
+                {hasMoreTimeline || hasMoreComments ? (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => void handleLoadMoreTimeline()}
+                    disabled={isLoadingMoreTimeline}
+                  >
+                    {isLoadingMoreTimeline ? "Chargement..." : "Charger plus"}
+                  </button>
+                ) : null}
+              </div>
+            </>
           ) : null}
         </section>
       ) : null}
