@@ -1291,120 +1291,145 @@ export function FinanceTransactionsPage(): JSX.Element {
             </p>
           ) : null}
           <form className="finance-transaction-form" onSubmit={handleSaveTransaction}>
-          <select
-            value={transactionForm.accountId}
-            onChange={(event) =>
-              setTransactionForm((prev) => ({
-                ...prev,
-                accountId: event.target.value
-              }))
-            }
-            required
-          >
-            <option value="" disabled>
-              Choisir un compte
-            </option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} ({account.balance} {transactionForm.currency}) | {formatAccountScopeLabel(account)}
-              </option>
-            ))}
-          </select>
+          <div className="finance-transaction-form-quick">
+            <label className="operations-inline-group">
+              <span>Compte</span>
+              <select
+                value={transactionForm.accountId}
+                onChange={(event) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    accountId: event.target.value
+                  }))
+                }
+                required
+              >
+                <option value="" disabled>
+                  Choisir un compte
+                </option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} ({account.balance} {transactionForm.currency}) | {formatAccountScopeLabel(account)}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <select
-            value={transactionForm.type}
-            onChange={(event) =>
-              setTransactionForm((prev) => ({
-                ...prev,
-                type: event.target.value as "CASH_IN" | "CASH_OUT"
-              }))
-            }
-          >
-            <option value="CASH_IN">Entrée</option>
-            <option value="CASH_OUT">Sortie</option>
-          </select>
+            <label className="operations-inline-group">
+              <span>Type</span>
+              <select
+                value={transactionForm.type}
+                onChange={(event) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    type: event.target.value as "CASH_IN" | "CASH_OUT"
+                  }))
+                }
+              >
+                <option value="CASH_IN">Entrée</option>
+                <option value="CASH_OUT">Sortie</option>
+              </select>
+            </label>
 
-          <input
-            type="text"
-            placeholder="Montant"
-            value={transactionForm.amount}
-            onChange={(event) =>
-              setTransactionForm((prev) => ({
-                ...prev,
-                amount: event.target.value
-              }))
-            }
-            required
-          />
+            <label className="operations-inline-group">
+              <span>Montant</span>
+              <input
+                type="text"
+                placeholder="Montant"
+                value={transactionForm.amount}
+                onChange={(event) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    amount: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
 
-          <select
-            value={transactionForm.currency}
-            onChange={(event) =>
-              setTransactionForm((prev) => ({
-                ...prev,
-                currency: event.target.value
-              }))
-            }
-          >
-            {allowedCurrencies.map((currency) => (
-              <option key={currency} value={currency}>
-                {currency}
-              </option>
-            ))}
-          </select>
-
-          <div className="scope-field">
-            <span className="scope-field-label">Secteur de rattachement</span>
-            <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
+            <label className="operations-inline-group">
+              <span>Devise</span>
+              <select
+                value={transactionForm.currency}
+                onChange={(event) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    currency: event.target.value
+                  }))
+                }
+              >
+                {allowedCurrencies.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
-          <input
-            type="datetime-local"
-            value={transactionForm.occurredAt}
-            onChange={(event) =>
-              setTransactionForm((prev) => ({
-                ...prev,
-                occurredAt: event.target.value
-              }))
-            }
-            required
-          />
+          <div className="scope-field finance-transaction-form-context">
+            <span className="scope-field-label">Contexte de saisie</span>
+            <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
+            <span className="hint">
+              Compte et devise sont présélectionnés selon le contexte actif.
+            </span>
+          </div>
 
-          <input
-            type="text"
-            placeholder={
-              selectedProfile?.finance.requiresDescription
-                ? "Description requise"
-                : "Description (optionnelle)"
-            }
-            value={transactionForm.description}
-            onChange={(event) =>
-              setTransactionForm((prev) => ({
-                ...prev,
-                description: event.target.value
-              }))
-            }
-          />
-
-          {financeMetadataFields.map((field) => (
-            <input
-              key={field.key}
-              type="text"
-              placeholder={`${field.label}${field.required ? " *" : ""}`}
-              value={transactionForm.metadata[field.key] ?? ""}
-              onChange={(event) =>
-                setTransactionForm((prev) => ({
-                  ...prev,
-                  metadata: {
-                    ...prev.metadata,
-                    [field.key]: event.target.value
+          <details className="finance-transaction-form-options">
+            <summary>Contexte et justificatifs</summary>
+            <div className="finance-transaction-form-options-body">
+              <label className="operations-inline-group">
+                <span>Date et heure de l'opération</span>
+                <input
+                  type="datetime-local"
+                  value={transactionForm.occurredAt}
+                  onChange={(event) =>
+                    setTransactionForm((prev) => ({
+                      ...prev,
+                      occurredAt: event.target.value
+                    }))
                   }
-                }))
-              }
-              required={field.required}
-              title={field.helpText}
-            />
-          ))}
+                  required
+                />
+              </label>
+
+              <input
+                type="text"
+                placeholder={
+                  selectedProfile?.finance.requiresDescription
+                    ? "Description requise"
+                    : "Description (optionnelle)"
+                }
+                value={transactionForm.description}
+                onChange={(event) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    description: event.target.value
+                  }))
+                }
+              />
+
+              {financeMetadataFields.map((field) => (
+                <input
+                  key={field.key}
+                  type="text"
+                  placeholder={`${field.label}${field.required ? " *" : ""}`}
+                  value={transactionForm.metadata[field.key] ?? ""}
+                  onChange={(event) =>
+                    setTransactionForm((prev) => ({
+                      ...prev,
+                      metadata: {
+                        ...prev.metadata,
+                        [field.key]: event.target.value
+                      }
+                    }))
+                  }
+                  required={field.required}
+                  title={field.helpText}
+                />
+              ))}
+            </div>
+          </details>
 
           <button
             type="submit"

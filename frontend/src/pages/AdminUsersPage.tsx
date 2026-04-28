@@ -60,16 +60,31 @@ export function AdminUsersPage(): JSX.Element {
     return buildPersistedViewStorageKey("admin-users-search", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
   const [searchQuery, setSearchQuery] = usePersistedViewState(usersSearchStorageKey, "");
+  const [roleFilter, setRoleFilter] = useState<"ALL" | RoleCode>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const displayItems = useMemo(() => {
-    return items.filter((item) =>
-      matchesQuickSearch(searchQuery, [
-        item.fullName,
-        item.email,
-        item.role,
-        ROLE_LABELS[item.role]
-      ])
-    );
-  }, [items, searchQuery]);
+    return items
+      .filter((item) => {
+        if (roleFilter !== "ALL" && item.role !== roleFilter) {
+          return false;
+        }
+        if (statusFilter === "ACTIVE" && !item.isActive) {
+          return false;
+        }
+        if (statusFilter === "INACTIVE" && item.isActive) {
+          return false;
+        }
+        return true;
+      })
+      .filter((item) =>
+        matchesQuickSearch(searchQuery, [
+          item.fullName,
+          item.email,
+          item.role,
+          ROLE_LABELS[item.role]
+        ])
+      );
+  }, [items, roleFilter, searchQuery, statusFilter]);
 
   const setDraftsFromItems = useCallback((rows: AdminUserItem[]) => {
     const nextDrafts: Record<string, UserDraft> = {};
@@ -258,8 +273,11 @@ export function AdminUsersPage(): JSX.Element {
         <p>Gestion des comptes, activations, roles et appartenances.</p>
       </header>
 
-      <section className="panel">
+      <section className="panel admin-users-create-panel">
         <h3>Créer un utilisateur</h3>
+        <p className="hint">
+          Bloc dédié à la création. La gestion des comptes existants est séparée ci-dessous.
+        </p>
         <form className="admin-form" onSubmit={handleCreateUser}>
           <input
             type="text"
@@ -325,14 +343,40 @@ export function AdminUsersPage(): JSX.Element {
       />
 
       <section className="panel">
-        <h3>Utilisateurs de l'entreprise</h3>
-        <input
-          type="search"
-          className="quick-search-input"
-          placeholder="Recherche rapide: nom, email, role..."
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-        />
+        <div className="admin-users-management-header">
+          <h3>Utilisateurs de l'entreprise</h3>
+          <p className="hint">Filtrer puis gérer les comptes existants.</p>
+        </div>
+        <div className="admin-users-filters">
+          <input
+            type="search"
+            className="quick-search-input"
+            placeholder="Recherche rapide: nom, email, role..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as "ALL" | "ACTIVE" | "INACTIVE")
+            }
+          >
+            <option value="ALL">Tous les statuts</option>
+            <option value="ACTIVE">Actifs</option>
+            <option value="INACTIVE">Inactifs</option>
+          </select>
+          <select
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as "ALL" | RoleCode)}
+          >
+            <option value="ALL">Tous les rôles</option>
+            {ROLE_CODES.map((role) => (
+              <option key={role} value={role}>
+                {ROLE_LABELS[role]}
+              </option>
+            ))}
+          </select>
+        </div>
         {!isLoading && items.length === 0 ? <p>Aucun utilisateur.</p> : null}
         {!isLoading && items.length > 0 && displayItems.length === 0 ? (
           <p>Aucun utilisateur ne correspond a la recherche.</p>

@@ -31,6 +31,8 @@ type ExportTarget =
   | "transactions-xlsx"
   | "tasks-xlsx";
 
+type ReportPeriodPreset = "TODAY" | "LAST_7_DAYS" | "LAST_30_DAYS" | "THIS_MONTH";
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -105,6 +107,37 @@ function toStartOfDayIso(value: string): string {
 
 function toEndOfDayIso(value: string): string {
   return new Date(`${value}T23:59:59.999`).toISOString();
+}
+
+function toDateInputValue(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function resolvePresetPeriod(preset: ReportPeriodPreset): Pick<PeriodFormState, "dateFrom" | "dateTo"> {
+  const now = new Date();
+  const today = toDateInputValue(now);
+
+  if (preset === "TODAY") {
+    return { dateFrom: today, dateTo: today };
+  }
+
+  if (preset === "LAST_7_DAYS") {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 6);
+    return { dateFrom: toDateInputValue(start), dateTo: today };
+  }
+
+  if (preset === "LAST_30_DAYS") {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 29);
+    return { dateFrom: toDateInputValue(start), dateTo: today };
+  }
+
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { dateFrom: toDateInputValue(monthStart), dateTo: today };
 }
 
 function normalizePeriodQuery(form: PeriodFormState): ReportPeriodQuery {
@@ -259,6 +292,45 @@ export function ReportsPage(): JSX.Element {
     });
   }
 
+  function handleApplyPreset(preset: ReportPeriodPreset): void {
+    const period = resolvePresetPeriod(preset);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setPeriodForm((prev) => {
+      const next = { ...prev, ...period };
+      setAppliedPeriod(next);
+      return next;
+    });
+  }
+
+  const activePreset = useMemo<ReportPeriodPreset | null>(() => {
+    if (!periodForm.dateFrom || !periodForm.dateTo) {
+      return null;
+    }
+
+    const today = resolvePresetPeriod("TODAY");
+    if (periodForm.dateFrom === today.dateFrom && periodForm.dateTo === today.dateTo) {
+      return "TODAY";
+    }
+
+    const last7Days = resolvePresetPeriod("LAST_7_DAYS");
+    if (periodForm.dateFrom === last7Days.dateFrom && periodForm.dateTo === last7Days.dateTo) {
+      return "LAST_7_DAYS";
+    }
+
+    const last30Days = resolvePresetPeriod("LAST_30_DAYS");
+    if (periodForm.dateFrom === last30Days.dateFrom && periodForm.dateTo === last30Days.dateTo) {
+      return "LAST_30_DAYS";
+    }
+
+    const thisMonth = resolvePresetPeriod("THIS_MONTH");
+    if (periodForm.dateFrom === thisMonth.dateFrom && periodForm.dateTo === thisMonth.dateTo) {
+      return "THIS_MONTH";
+    }
+
+    return null;
+  }, [periodForm.dateFrom, periodForm.dateTo]);
+
   async function handleExport(
     kind: "overview" | "transactions" | "tasks",
     format: "xlsx" | "pdf"
@@ -306,6 +378,36 @@ export function ReportsPage(): JSX.Element {
 
       <section className="panel">
         <h3>Période</h3>
+        <div className="reports-period-presets">
+          <button
+            type="button"
+            className={activePreset === "TODAY" ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => handleApplyPreset("TODAY")}
+          >
+            Aujourd'hui
+          </button>
+          <button
+            type="button"
+            className={activePreset === "LAST_7_DAYS" ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => handleApplyPreset("LAST_7_DAYS")}
+          >
+            7 jours
+          </button>
+          <button
+            type="button"
+            className={activePreset === "LAST_30_DAYS" ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => handleApplyPreset("LAST_30_DAYS")}
+          >
+            30 jours
+          </button>
+          <button
+            type="button"
+            className={activePreset === "THIS_MONTH" ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => handleApplyPreset("THIS_MONTH")}
+          >
+            Ce mois
+          </button>
+        </div>
         <form className="reports-filter-form" onSubmit={handleApplyFilters}>
           <input
             type="date"

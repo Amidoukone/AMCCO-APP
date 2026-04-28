@@ -267,6 +267,9 @@ export function OperationsTasksPage(): JSX.Element {
   const selectedTaskIds = useMemo(() => {
     return displayTasks.filter((task) => selectedTasks[task.id]).map((task) => task.id);
   }, [displayTasks, selectedTasks]);
+  const selectedTotalCount = useMemo(() => {
+    return Object.values(selectedTasks).filter((isSelected) => isSelected === true).length;
+  }, [selectedTasks]);
 
   const allVisibleSelected = useMemo(() => {
     if (displayTasks.length === 0) {
@@ -321,9 +324,11 @@ export function OperationsTasksPage(): JSX.Element {
         return next;
       });
       setSelectedTasks((prev) => {
-        const next = append ? { ...prev } : {};
+        const next = { ...prev };
         for (const task of taskResponse.items) {
-          next[task.id] = prev[task.id] === true;
+          if (next[task.id] === undefined) {
+            next[task.id] = false;
+          }
         }
         return next;
       });
@@ -821,89 +826,107 @@ export function OperationsTasksPage(): JSX.Element {
         <section className="panel">
           <h3>{editingTaskId ? "Modifier une tâche" : "Nouvelle tâche"}</h3>
           <form className="operations-task-form" onSubmit={handleCreateTask}>
-            <input
-              type="text"
-              placeholder="Titre de la tâche"
-              value={createForm.title}
-              onChange={(event) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  title: event.target.value
-                }))
-              }
-              required
-            />
-            <input
-              type="text"
-              placeholder={
-                selectedProfile?.tasks.requiresDescription
-                  ? "Description requise"
-                  : "Description (optionnelle)"
-              }
-              value={createForm.description}
-              onChange={(event) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  description: event.target.value
-                }))
-              }
-            />
+            <div className="operations-task-form-primary">
+              <input
+                type="text"
+                placeholder="Titre de la tâche"
+                value={createForm.title}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    title: event.target.value
+                  }))
+                }
+                required
+              />
+              <input
+                type="text"
+                placeholder={
+                  selectedProfile?.tasks.requiresDescription
+                    ? "Description requise"
+                    : "Description (optionnelle)"
+                }
+                value={createForm.description}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    description: event.target.value
+                  }))
+                }
+              />
+            </div>
             <div className="scope-field">
               <span className="scope-field-label">Secteur de rattachement</span>
               <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
             </div>
-            <input
-              type="datetime-local"
-              value={createForm.dueDate}
-              onChange={(event) =>
-                setCreateForm((prev) => ({
-                  ...prev,
-                  dueDate: event.target.value
-                }))
-              }
-            />
-            {canAssignTasks ? (
-              <select
-                value={createForm.assignedToId}
+            <label className="operations-inline-group">
+              <span>Échéance (optionnelle)</span>
+              <input
+                type="datetime-local"
+                value={createForm.dueDate}
                 onChange={(event) =>
                   setCreateForm((prev) => ({
                     ...prev,
-                    assignedToId: event.target.value
+                    dueDate: event.target.value
                   }))
                 }
-              >
-                <option value="">Non assignée</option>
-                {members.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {memberLabel(member)}
-                  </option>
-                ))}
-              </select>
+              />
+            </label>
+            {canAssignTasks ? (
+              <div className="scope-field">
+                <span className="scope-field-label">Assignation initiale</span>
+                <label className="operations-inline-group">
+                  <span>Responsable au démarrage</span>
+                  <select
+                    value={createForm.assignedToId}
+                    onChange={(event) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        assignedToId: event.target.value
+                      }))
+                    }
+                  >
+                    <option value="">Non assignée</option>
+                    {members.map((member) => (
+                      <option key={member.userId} value={member.userId}>
+                        {memberLabel(member)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             ) : (
               <div className="scope-field">
                 <span className="scope-field-label">Assignation initiale</span>
                 <strong>Cette tâche sera assignée à votre compte.</strong>
               </div>
             )}
-            {taskMetadataFields.map((field) => (
-              <input
-                key={field.key}
-                type="text"
-                placeholder={`${field.label}${field.required ? " *" : ""}`}
-                value={createForm.metadata[field.key] ?? ""}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    metadata: {
-                      ...prev.metadata,
-                      [field.key]: event.target.value
-                    }
-                  }))
-                }
-                required={field.required}
-                title={field.helpText}
-              />
-            ))}
+            {taskMetadataFields.length > 0 ? (
+              <details className="operations-task-form-options">
+                <summary>Champs avancés</summary>
+                <div className="operations-task-form-options-body">
+                  {taskMetadataFields.map((field) => (
+                    <input
+                      key={field.key}
+                      type="text"
+                      placeholder={`${field.label}${field.required ? " *" : ""}`}
+                      value={createForm.metadata[field.key] ?? ""}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          metadata: {
+                            ...prev.metadata,
+                            [field.key]: event.target.value
+                          }
+                        }))
+                      }
+                      required={field.required}
+                      title={field.helpText}
+                    />
+                  ))}
+                </div>
+              </details>
+            ) : null}
             <button
               type="submit"
               disabled={!selectedActivityCode || isLoadingActivities}
@@ -964,8 +987,16 @@ export function OperationsTasksPage(): JSX.Element {
       ) : null}
 
       {canAssignTasks ? (
-        <section className="panel">
-          <h3>Assignation en lot</h3>
+        <section className="panel operations-bulk-bar">
+          <div className="operations-bulk-bar-header">
+            <h3>Assignation en lot</h3>
+            <p className="hint">
+              {selectedTaskIds.length} selectionnee(s) sur {displayTasks.length} visible(s)
+              {selectedTotalCount !== selectedTaskIds.length
+                ? ` (${selectedTotalCount} au total)`
+                : ""}
+            </p>
+          </div>
           <div className="operations-bulk-form">
             <select
               value={bulkAssignForm.assignedToId}
