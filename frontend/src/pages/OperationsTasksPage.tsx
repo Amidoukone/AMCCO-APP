@@ -1131,7 +1131,14 @@ export function OperationsTasksPage(): JSX.Element {
                     onClick={preventCardNavigation}
                     onKeyDown={preventCardKeyboardNavigation}
                   >
-                    <div className="actions-inline">
+                    <div className="operations-actions-primary">
+                      <button
+                        type="button"
+                        className="secondary-btn operations-primary-action"
+                        onClick={() => openTaskDetails(task.id)}
+                      >
+                        Voir
+                      </button>
                       <button
                         type="button"
                         className="secondary-btn"
@@ -1141,15 +1148,6 @@ export function OperationsTasksPage(): JSX.Element {
                       >
                         Modifier
                       </button>
-                      <button
-                        type="button"
-                        className="danger-btn"
-                        onClick={() => void handleDeleteTask(task)}
-                        disabled={isBusy}
-                        title={deleteLockMessage ?? undefined}
-                      >
-                        Supprimer
-                      </button>
                     </div>
 
                     {isCompleted ? (
@@ -1157,7 +1155,9 @@ export function OperationsTasksPage(): JSX.Element {
                         Tâche terminée: statut, modification et assignation verrouillés.
                       </div>
                     ) : (
-                      <>
+                      <details className="operations-actions-secondary">
+                        <summary>Plus d'actions</summary>
+                        <div className="operations-actions-secondary-content">
                         <div className="operations-inline-group">
                           <label>Statut</label>
                           {canUpdate ? (
@@ -1227,7 +1227,17 @@ export function OperationsTasksPage(): JSX.Element {
                             </button>
                           </div>
                         ) : null}
-                      </>
+                          <button
+                            type="button"
+                            className="danger-btn"
+                            onClick={() => void handleDeleteTask(task)}
+                            disabled={isBusy}
+                            title={deleteLockMessage ?? undefined}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </details>
                     )}
                   </div>
                 </article>
