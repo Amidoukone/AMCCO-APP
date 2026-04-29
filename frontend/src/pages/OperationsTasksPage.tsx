@@ -10,6 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { EmptyState } from "../components/EmptyState";
 import {
   buildPersistedViewStorageKey,
   usePersistedViewState
@@ -984,9 +985,28 @@ export function OperationsTasksPage(): JSX.Element {
             </label>
           ) : null}
         </div>
-        {!isLoading && tasks.length === 0 ? <p>Aucune tâche.</p> : null}
+        {!isLoading && tasks.length === 0 ? (
+          <EmptyState
+            title="Aucune tâche dans cette vue"
+            description="Créez la première tâche du secteur actif ou changez les filtres pour retrouver les actions existantes."
+            actionLabel={canCreateTasks ? "Préparer une tâche" : undefined}
+            onAction={canCreateTasks ? () => window.scrollTo({ top: 0, behavior: "smooth" }) : undefined}
+          />
+        ) : null}
         {!isLoading && tasks.length > 0 && displayTasks.length === 0 ? (
-          <p>Aucune tÃ¢che ne correspond a la recherche.</p>
+          <EmptyState
+            title="Aucun résultat"
+            description="Aucune tâche ne correspond à la recherche ou aux filtres appliqués."
+            actionLabel="Réinitialiser les filtres"
+            onAction={() => {
+              setSearchQuery("");
+              setFilters({
+                status: "ALL",
+                scope: canAssignTasks ? "ALL" : "ASSIGNED_TO_ME",
+                unassignedOnly: false
+              });
+            }}
+          />
         ) : null}
         {!isLoading && displayTasks.length > 0 ? (
           <>

@@ -15,6 +15,7 @@ import { FinanceSalariesPage } from "./pages/FinanceSalariesPage";
 import { FinanceTransactionsPage } from "./pages/FinanceTransactionsPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MyWorkPage } from "./pages/MyWorkPage";
 import { OperationsTasksPage } from "./pages/OperationsTasksPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SecuritySettingsPage } from "./pages/SecuritySettingsPage";
@@ -67,6 +68,14 @@ export function App(): JSX.Element {
           element={
             <RoleGuard feature="alerts">
               <AlertsPage />
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="/my-work"
+          element={
+            <RoleGuard feature="myWork">
+              <MyWorkPage />
             </RoleGuard>
           }
         />

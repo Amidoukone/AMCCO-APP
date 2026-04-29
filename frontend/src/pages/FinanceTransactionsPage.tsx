@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { EmptyState } from "../components/EmptyState";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   buildPersistedViewStorageKey,
@@ -1446,9 +1447,27 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       <section className="panel finance-page-panel">
         <h3>Transactions</h3>
-        {!isLoading && transactions.length === 0 ? <p>Aucune transaction.</p> : null}
+        {!isLoading && transactions.length === 0 ? (
+          <EmptyState
+            title="Aucune transaction dans cette vue"
+            description="Enregistrez une premiere entree ou sortie, ou changez les filtres pour retrouver les transactions existantes."
+            actionLabel={canManageTransactions ? "Préparer une transaction" : undefined}
+            onAction={canManageTransactions ? () => window.scrollTo({ top: 0, behavior: "smooth" }) : undefined}
+          />
+        ) : null}
         {!isLoading && transactions.length > 0 && displayTransactions.length === 0 ? (
-          <p>Aucune transaction ne correspond a la recherche.</p>
+          <EmptyState
+            title="Aucun résultat"
+            description="Aucune transaction ne correspond à la recherche ou aux filtres appliqués."
+            actionLabel="Réinitialiser les filtres"
+            onAction={() => {
+              setSearchQuery("");
+              setFilters({
+                status: "ALL",
+                type: "ALL"
+              });
+            }}
+          />
         ) : null}
         {!isLoading && displayTransactions.length > 0 ? (
           <>

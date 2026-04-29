@@ -56,8 +56,8 @@ export function buildDailyActionCards(
       title: "Travail du jour",
       value: String(summary.operations.myOpenTasksCount),
       note: "Reprenez vos actions ouvertes.",
-      actionLabel: "Ouvrir les opérations",
-      href: "/operations/tasks",
+      actionLabel: "Ouvrir mon travail",
+      href: "/my-work",
       tone: "neutral"
     },
     {

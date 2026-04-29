@@ -2,6 +2,7 @@ import type { RoleCode } from "../types/role";
 
 export type FeatureKey =
   | "dashboard"
+  | "myWork"
   | "alerts"
   | "adminCompanies"
   | "adminUsers"
@@ -29,6 +30,7 @@ export const ROLE_LABELS: Record<RoleCode, string> = {
 
 const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
   dashboard: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
+  myWork: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   alerts: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   adminCompanies: ["OWNER", "SYS_ADMIN"],
   adminUsers: ["OWNER", "SYS_ADMIN"],
@@ -42,6 +44,7 @@ const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
 
 const NAVIGATION_ITEMS: NavigationItem[] = [
   { key: "dashboard", label: "Tableau de bord", to: "/dashboard", section: "Pilotage" },
+  { key: "myWork", label: "Mon travail", to: "/my-work", section: "Pilotage" },
   { key: "alerts", label: "Alertes", to: "/alerts", section: "Pilotage" },
   { key: "reports", label: "Rapports", to: "/reports", section: "Pilotage" },
   {

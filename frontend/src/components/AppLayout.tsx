@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Breadcrumbs } from "./Breadcrumbs";
+import { GlobalSearch } from "./GlobalSearch";
+import { QuickActions } from "./QuickActions";
 import type { BusinessActivityCode } from "../config/businessActivities";
 import { ApiError, getAlertsSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
@@ -195,6 +198,12 @@ export function AppLayout(): JSX.Element {
             </p>
             {companySwitchError ? <p className="header-switch-error">{companySwitchError}</p> : null}
           </div>
+          {!isBootstrapMode ? (
+            <GlobalSearch
+              navigation={visibleNavigation}
+              selectedActivityCode={selectedActivityCode}
+            />
+          ) : null}
           <div className="header-actions">
             {activeCompany ? (
               <div className="company-switcher">
@@ -224,6 +233,16 @@ export function AppLayout(): JSX.Element {
           </div>
         </header>
         <section className="app-content">
+          {!isBootstrapMode ? (
+            <div className="workspace-toolbar">
+              <Breadcrumbs />
+              <QuickActions
+                role={user.role}
+                selectedActivityCode={selectedActivityCode}
+                navigation={visibleNavigation}
+              />
+            </div>
+          ) : null}
           <Outlet />
         </section>
       </div>

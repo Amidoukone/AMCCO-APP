@@ -40,7 +40,7 @@ export function LoginPage(): JSX.Element {
       <section className="card login-card">
         <div className="login-brand">
           <h1>AMCCO</h1>
-          <p>Connexion securisee</p>
+          <p>Connexion sécurisée</p>
         </div>
         <form className="form" onSubmit={handleSubmit}>
           <label htmlFor="email">Email</label>
@@ -68,9 +68,6 @@ export function LoginPage(): JSX.Element {
             {isSubmitting ? "Connexion..." : "Se connecter"}
           </button>
         </form>
-        <p className="hint login-hint">
-          Apres connexion, vous pourrez choisir l'entreprise sur laquelle travailler.
-        </p>
       </section>
     </main>
   );
