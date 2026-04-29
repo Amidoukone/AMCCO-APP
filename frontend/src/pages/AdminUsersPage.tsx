@@ -157,6 +157,7 @@ export function AdminUsersPage(): JSX.Element {
     if (!draft) {
       return;
     }
+    const currentUser = items.find((item) => item.userId === userId);
 
     setBusyUserId(userId);
     setErrorMessage(null);
@@ -168,31 +169,14 @@ export function AdminUsersPage(): JSX.Element {
           isActive: draft.isActive
         })
       );
+      if (currentUser && currentUser.role !== draft.role) {
+        await withAuthorizedToken((accessToken) =>
+          changeAdminUserRoleRequest(accessToken, userId, {
+            role: draft.role
+          })
+        );
+      }
       setSuccessMessage("Profil utilisateur mis a jour.");
-      await loadUsers();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyUserId(null);
-    }
-  }
-
-  async function handleChangeRole(userId: string): Promise<void> {
-    const draft = drafts[userId];
-    if (!draft) {
-      return;
-    }
-
-    setBusyUserId(userId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) =>
-        changeAdminUserRoleRequest(accessToken, userId, {
-          role: draft.role
-        })
-      );
-      setSuccessMessage("Role mis a jour.");
       await loadUsers();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -270,15 +254,11 @@ export function AdminUsersPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Administration utilisateurs</h2>
-        <p>Gestion des comptes, activations, roles et appartenances.</p>
       </header>
 
       <section className="panel admin-users-create-panel">
         <h3>Créer un utilisateur</h3>
-        <p className="hint">
-          Bloc dédié à la création. La gestion des comptes existants est séparée ci-dessous.
-        </p>
-        <form className="admin-form" onSubmit={handleCreateUser}>
+        <form className="admin-form admin-users-create-form" onSubmit={handleCreateUser}>
           <input
             type="text"
             placeholder="Nom complet"
@@ -342,10 +322,9 @@ export function AdminUsersPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className="panel">
+      <section className="panel admin-users-panel">
         <div className="admin-users-management-header">
           <h3>Utilisateurs de l'entreprise</h3>
-          <p className="hint">Filtrer puis gérer les comptes existants.</p>
         </div>
         <div className="admin-users-filters">
           <input
@@ -383,7 +362,7 @@ export function AdminUsersPage(): JSX.Element {
         ) : null}
 
         {!isLoading && displayItems.length > 0 ? (
-          <div className="table-wrap">
+          <div className="table-wrap admin-users-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -422,7 +401,8 @@ export function AdminUsersPage(): JSX.Element {
                         />
                       </td>
                       <td>{item.email}</td>
-                      <td>
+                      <td className="admin-user-role-cell">
+                        <span className="admin-user-role-badge">{ROLE_LABELS[draft?.role ?? item.role]}</span>
                         <select
                           value={draft?.role ?? item.role}
                           onChange={(event) =>
@@ -472,8 +452,8 @@ export function AdminUsersPage(): JSX.Element {
                           <span>{(draft?.isActive ?? item.isActive) ? "Oui" : "Non"}</span>
                         </label>
                       </td>
-                      <td>
-                        <div className="actions-inline">
+                      <td className="admin-user-actions-cell">
+                        <div className="actions-inline admin-user-actions-row">
                           <button
                             type="button"
                             className="secondary-btn"
@@ -484,14 +464,6 @@ export function AdminUsersPage(): JSX.Element {
                           </button>
                           <button
                             type="button"
-                            className="secondary-btn"
-                            onClick={() => void handleChangeRole(item.userId)}
-                            disabled={isBusy}
-                          >
-                            Mettre à jour le rôle
-                          </button>
-                          <button
-                            type="button"
                             className="danger-btn"
                             onClick={() => void handleDeleteMembership(item.userId)}
                             disabled={isBusy}
@@ -499,36 +471,39 @@ export function AdminUsersPage(): JSX.Element {
                             Supprimer
                           </button>
                         </div>
-                        <div className="password-reset-inline">
-                          <input
-                            type="password"
-                            placeholder="Nouveau mot de passe"
-                            value={draft?.newPassword ?? ""}
-                            onChange={(event) =>
-                              setDrafts((prev) => ({
-                                ...prev,
-                                [item.userId]: {
-                                  ...(prev[item.userId] ?? {
-                                    fullName: item.fullName,
-                                    isActive: item.isActive,
-                                    role: item.role,
-                                    newPassword: ""
-                                  }),
-                                  newPassword: event.target.value
-                                }
-                              }))
-                            }
-                            disabled={isBusy}
-                          />
-                          <button
-                            type="button"
-                            className="secondary-btn"
-                            onClick={() => void handleResetPassword(item.userId)}
-                            disabled={isBusy}
-                          >
-                            Reinitialiser le mot de passe
-                          </button>
-                        </div>
+                        <details className="admin-user-security-toggle">
+                          <summary>Sécurité</summary>
+                          <div className="password-reset-inline admin-user-password-row">
+                            <input
+                              type="password"
+                              placeholder="Nouveau mot de passe"
+                              value={draft?.newPassword ?? ""}
+                              onChange={(event) =>
+                                setDrafts((prev) => ({
+                                  ...prev,
+                                  [item.userId]: {
+                                    ...(prev[item.userId] ?? {
+                                      fullName: item.fullName,
+                                      isActive: item.isActive,
+                                      role: item.role,
+                                      newPassword: ""
+                                    }),
+                                    newPassword: event.target.value
+                                  }
+                                }))
+                              }
+                              disabled={isBusy}
+                            />
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() => void handleResetPassword(item.userId)}
+                              disabled={isBusy}
+                            >
+                              Réinitialiser le mot de passe
+                            </button>
+                          </div>
+                        </details>
                       </td>
                     </tr>
                   );

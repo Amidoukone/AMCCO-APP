@@ -58,19 +58,6 @@ function statusLabel(status: TaskStatus): string {
   return "Bloquée";
 }
 
-function statusDescription(status: TaskStatus): string {
-  if (status === "TODO") {
-    return "Tâche en attente de démarrage ou de reprise.";
-  }
-  if (status === "IN_PROGRESS") {
-    return "Exécution en cours sur le terrain ou au bureau.";
-  }
-  if (status === "DONE") {
-    return "Exécution terminée et tâche clôturée.";
-  }
-  return "Blocage actif, arbitrage ou action de debloquage requis.";
-}
-
 function statusToneClass(status: TaskStatus): string {
   if (status === "TODO") {
     return "todo";
@@ -99,16 +86,6 @@ function statusShortMetric(status: TaskStatus): string {
 
 function memberLabel(member: OperationTaskMember): string {
   return `${member.fullName} (${member.role})`;
-}
-
-function workloadLabel(openTasksCount: number): string {
-  if (openTasksCount >= 12) {
-    return "Charge élevée";
-  }
-  if (openTasksCount >= 6) {
-    return "Charge moyenne";
-  }
-  return "Charge légère";
 }
 
 function formatDate(value: string | null): string {
@@ -219,8 +196,6 @@ export function OperationsTasksPage(): JSX.Element {
   }, [user]);
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
-  const taskWorkflow = selectedProfile?.tasks.workflow ?? [];
-
   const displayTasks = useMemo(() => {
     return tasks.filter((task) =>
       matchesQuickSearch(searchQuery, [
@@ -256,7 +231,6 @@ export function OperationsTasksPage(): JSX.Element {
       (["TODO", "IN_PROGRESS", "BLOCKED", "DONE"] as TaskStatus[]).map((status) => ({
         status,
         label: statusLabel(status),
-        description: statusDescription(status),
         metricLabel: statusShortMetric(status),
         total: statusSummary[status],
         isActiveFilter: filters.status === status
@@ -632,10 +606,6 @@ export function OperationsTasksPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Suivi des tâches</h2>
-        <p>
-          Planification, assignation et suivi de l'exécution terrain pour le secteur{" "}
-          <strong>{selectedActivity?.label ?? "aucun secteur actif"}</strong>.
-        </p>
       </header>
 
       {!selectedActivityCode && !isLoadingActivities ? (
@@ -760,7 +730,7 @@ export function OperationsTasksPage(): JSX.Element {
               <option value="CREATED_BY_ME">Creees par moi</option>
             </select>
           ) : (
-            <p className="hint">Vue collaborateur: tâches qui vous sont assignées.</p>
+            <></>
           )}
 
           {canAssignTasks ? (
@@ -781,18 +751,12 @@ export function OperationsTasksPage(): JSX.Element {
 
           <button type="submit">Filtrer</button>
         </form>
-        <p className="hint">
-          La liste suit le secteur actif: {selectedActivity?.label ?? "aucun secteur actif"}.
-        </p>
       </section>
 
       <section className="panel operations-status-panel">
         <div className="operations-status-panel-header">
           <div>
             <h3>Pilotage des statuts</h3>
-            <p className="hint">
-              Lecture rapide du flux de traitement pour le secteur actif.
-            </p>
           </div>
           <div className="operations-status-panel-note">
             <strong>{tasks.length}</strong>
@@ -816,7 +780,6 @@ export function OperationsTasksPage(): JSX.Element {
                 <strong>{card.total}</strong>
               </div>
               <p className="operations-status-card-metric">{card.metricLabel}</p>
-              <p className="operations-status-card-description">{card.description}</p>
             </article>
           ))}
         </div>
@@ -939,50 +902,6 @@ export function OperationsTasksPage(): JSX.Element {
               </button>
             ) : null}
           </form>
-          <div className="sector-form-guidance">
-            {taskMetadataFields.length > 0 ? (
-              <div className="metadata-field-list">
-                {taskMetadataFields.map((field) => (
-                  <p key={field.key} className="hint">
-                    <strong>{field.label}</strong>: {field.helpText}
-                  </p>
-                ))}
-              </div>
-            ) : null}
-            {taskWorkflow.length > 0 ? (
-              <div className="workflow-chip-list">
-                {taskWorkflow.map((step) => (
-                  <span key={step.code} className="workflow-chip" title={step.description}>
-                    {step.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      {canAssignTasks && members.length > 0 ? (
-        <section className="panel">
-          <h3>Charge équipe</h3>
-          <p className="hint">
-            Vue d'ensemble calculee pour le secteur actif:{" "}
-            {selectedActivity?.label ?? "aucun secteur actif"}.
-          </p>
-          <div className="operations-member-grid">
-            {members.map((member) => (
-              <article key={member.userId} className="operations-member-card">
-                <h4>{member.fullName}</h4>
-                <p className="hint">
-                  {member.role} | {workloadLabel(member.openTasksCount)}
-                </p>
-                <p className="hint">
-                  Ouvertes: {member.openTasksCount} | En cours: {member.inProgressTasksCount} | Bloquees:{" "}
-                  {member.blockedTasksCount}
-                </p>
-              </article>
-            ))}
-          </div>
         </section>
       ) : null}
 
@@ -1035,10 +954,6 @@ export function OperationsTasksPage(): JSX.Element {
               Mettre à jour {selectedTaskIds.length} tâche(s)
             </button>
           </div>
-          <p className="hint">
-            Les tâches terminées ne peuvent plus être réassignées. Les tâches à faire passent
-            automatiquement En cours lors de l'assignation.
-          </p>
         </section>
       ) : null}
 
@@ -1124,14 +1039,6 @@ export function OperationsTasksPage(): JSX.Element {
                   <p className="operations-task-description">
                     {task.description?.trim() || "Aucune description fournie."}
                   </p>
-
-                  <div className="operations-task-status-band">
-                    <div className="operations-task-status-main">
-                      <span className="operations-task-status-label">Statut operationnel</span>
-                      <strong>{statusLabel(task.status)}</strong>
-                    </div>
-                    <p className="operations-task-status-text">{statusDescription(task.status)}</p>
-                  </div>
 
                   <div className="operations-task-meta">
                     <p>

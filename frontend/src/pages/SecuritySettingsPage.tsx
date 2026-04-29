@@ -6,10 +6,13 @@ import { ApiError, listAuditLogsRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { AuditLogItem } from "../types/audit";
 import {
+  buildTaskPath,
   buildFinanceTransactionPath,
   formatMetadataForDisplay,
   getFinanceTraceLines,
-  getFinanceTransactionNavigationTarget
+  getFinanceTransactionNavigationTarget,
+  getTaskNavigationTarget,
+  getTaskTraceLines
 } from "../utils/traceMetadata";
 
 type AuditDisplayItem = AuditLogItem & {
@@ -130,6 +133,11 @@ function formatEntityTypeLabel(entityType: string): string {
 }
 
 function buildMetadataSummary(action: string, metadata: unknown): string {
+  const taskLines = getTaskTraceLines(action, metadata);
+  if (taskLines.length > 0) {
+    return truncateText(taskLines.join(" | "));
+  }
+
   const financeSummary = formatMetadataForDisplay(metadata);
   if (getFinanceTraceLines(metadata).length > 0) {
     return truncateText(financeSummary);
@@ -187,16 +195,32 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
   return compact || "-";
 }
 
-function formatMetadataDetails(metadata: unknown): string | null {
-  if (metadata == null) {
-    return null;
+function buildMetadataHighlights(action: string, metadata: unknown): string[] {
+  const taskLines = getTaskTraceLines(action, metadata);
+  if (taskLines.length > 0) {
+    return taskLines.slice(0, 3);
   }
 
-  if (typeof metadata === "string") {
-    return metadata;
+  const financeLines = getFinanceTraceLines(metadata);
+  if (financeLines.length > 0) {
+    return financeLines.slice(0, 3);
   }
 
-  return JSON.stringify(metadata, null, 2);
+  const root = asObject(metadata);
+  if (!root) {
+    return [];
+  }
+
+  const lines: string[] = [];
+  const ipAddress = asText(root.ipAddress);
+  const userAgent = asText(root.userAgent);
+  if (ipAddress) {
+    lines.push(`IP: ${ipAddress}`);
+  }
+  if (userAgent) {
+    lines.push(`Navigateur: ${summarizeUserAgent(userAgent)}`);
+  }
+  return lines.slice(0, 3);
 }
 
 function collapseAuditItems(items: AuditLogItem[]): AuditDisplayItem[] {
@@ -342,6 +366,13 @@ export function SecuritySettingsPage(): JSX.Element {
     });
   }
 
+  function applyQuickFilter(next: Partial<typeof query>): void {
+    setQuery((prev) => ({
+      ...prev,
+      ...next
+    }));
+  }
+
   if (!canAccess) {
     return (
       <section className="panel">
@@ -355,11 +386,40 @@ export function SecuritySettingsPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Sécurité et accès</h2>
-        <p>Journal d'audit des actions sensibles sur l'entreprise.</p>
       </header>
 
       <section className="panel">
         <h3>Filtres</h3>
+        <div className="security-quick-filters">
+          <button
+            type="button"
+            className={!query.action && !query.entityType ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => applyQuickFilter({ action: "", entityType: "", entityId: "" })}
+          >
+            Vue complète
+          </button>
+          <button
+            type="button"
+            className={query.action === "AUTH_LOGIN" ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => applyQuickFilter({ action: "AUTH_LOGIN", entityType: "", entityId: "" })}
+          >
+            Connexions
+          </button>
+          <button
+            type="button"
+            className={query.entityType === "TASK" ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => applyQuickFilter({ action: "", entityType: "TASK", entityId: "" })}
+          >
+            Tâches
+          </button>
+          <button
+            type="button"
+            className={query.entityType === "TRANSACTION" ? "view-preset-btn is-active" : "view-preset-btn"}
+            onClick={() => applyQuickFilter({ action: "", entityType: "TRANSACTION", entityId: "" })}
+          >
+            Transactions
+          </button>
+        </div>
         <form className="audit-filter-form" onSubmit={handleFilterSubmit}>
           <input
             type="text"
@@ -443,13 +503,18 @@ export function SecuritySettingsPage(): JSX.Element {
               </thead>
               <tbody>
                 {displayItems.map((item) => {
+                  const taskTarget = getTaskNavigationTarget(
+                    item.entityType,
+                    item.entityId,
+                    item.metadata
+                  );
                   const financeTarget = getFinanceTransactionNavigationTarget(
                     item.entityType,
                     item.entityId,
                     item.metadata
                   );
                   const metadataSummary = buildMetadataSummary(item.action, item.metadata);
-                  const metadataDetails = formatMetadataDetails(item.metadata);
+                  const metadataHighlights = buildMetadataHighlights(item.action, item.metadata);
 
                   return (
                     <tr key={item.id}>
@@ -457,7 +522,6 @@ export function SecuritySettingsPage(): JSX.Element {
                       <td>
                         <div className="audit-cell-stack">
                           <strong>{formatAuditActionLabel(item.action)}</strong>
-                          <small>{item.action}</small>
                           {item.duplicateCount > 1 ? (
                             <span className="audit-duplicate-badge">x{item.duplicateCount}</span>
                           ) : null}
@@ -478,22 +542,33 @@ export function SecuritySettingsPage(): JSX.Element {
                       <td className="audit-metadata-cell">
                         <div className="audit-cell-stack">
                           <span>{metadataSummary}</span>
-                          {metadataDetails && metadataDetails !== metadataSummary ? (
-                            <details className="audit-metadata-details">
-                              <summary>Voir les détails</summary>
-                              <pre>{metadataDetails}</pre>
-                            </details>
+                          {metadataHighlights.length > 0 ? (
+                            <div className="audit-highlight-lines">
+                              {metadataHighlights.map((line) => (
+                                <p key={`${item.id}-${line}`} className="hint">
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
                           ) : null}
                         </div>
                       </td>
                       <td>
-                        {financeTarget ? (
+                        {taskTarget ? (
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => navigate(buildTaskPath(taskTarget))}
+                          >
+                            Voir tâche
+                          </button>
+                        ) : financeTarget ? (
                           <button
                             type="button"
                             className="secondary-btn"
                             onClick={() => navigate(buildFinanceTransactionPath(financeTarget))}
                           >
-                            {financeTarget.kind === "salary" ? "Voir le salaire" : "Voir la transaction"}
+                            {financeTarget.kind === "salary" ? "Voir salaire" : "Voir transaction"}
                           </button>
                         ) : (
                           <span className="hint">-</span>

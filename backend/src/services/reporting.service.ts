@@ -992,25 +992,14 @@ export async function exportCompanyReportsPdf(
       doc.fontSize(10).text(`Mode operatoire: ${overview.activityProfile.operationsModel}`);
     }
 
-    if (overview.activityHighlights.length > 0) {
-      writePdfSectionTitle(doc, "Indicateurs sectoriels");
-      writePdfList(
-        doc,
-        overview.activityHighlights.map(
-          (item) => `${item.label} | ${item.value} | ${item.emphasis} | ${item.description}`
-        ),
-        "Aucun indicateur sectoriel disponible."
-      );
-    }
-
-    writePdfSectionTitle(doc, "Transactions par statut et devise");
+    writePdfSectionTitle(doc, "Synthese consolidee");
     writePdfList(
       doc,
-      overview.financeByStatus.map(
-        (item) =>
-          `${item.status} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency}`
-      ),
-      "Aucune transaction consolidee sur cette periode."
+      [
+        `Transactions consolidees: ${overview.financeByStatus.reduce((sum, item) => sum + item.count, 0)}`,
+        `Taches consolidees: ${overview.taskByStatus.reduce((sum, item) => sum + item.count, 0)}`
+      ],
+      "Aucune synthese disponible."
     );
 
     writePdfSectionTitle(doc, "Transactions par type et devise");
@@ -1023,34 +1012,6 @@ export async function exportCompanyReportsPdf(
       "Aucune transaction consolidee sur cette periode."
     );
 
-    writePdfSectionTitle(doc, "Transactions par activite");
-    writePdfList(
-      doc,
-      overview.financeByActivity.map(
-        (item) =>
-          `${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.count} transaction(s) | total ${item.totalAmount} | approuve ${item.approvedAmount}`
-      ),
-      "Aucune transaction consolidee par activite sur cette periode."
-    );
-
-    writePdfSectionTitle(doc, "Gouvernance des comptes financiers");
-    writePdfList(
-      doc,
-      [
-        `Total ${overview.financeAccountsSummary.totalCount} | compatibles ${overview.financeAccountsSummary.compatibleCount} | incompatibles ${overview.financeAccountsSummary.incompatibleCount}`,
-        `Globaux ${overview.financeAccountsSummary.globalCount} | dedies ${overview.financeAccountsSummary.dedicatedCount} | restreints ${overview.financeAccountsSummary.restrictedCount}`
-      ],
-      "Aucune synthese comptes disponible."
-    );
-    writePdfList(
-      doc,
-      overview.financeAccounts.map(
-        (item) =>
-          `${item.name} | ${toDisplayAccountScopeLabel(item)} | ${toDisplayAccountCompatibilityLabel(item.isCompatibleWithSelectedActivity)} | ref ${item.accountRef ?? "-"} | solde ${item.balance}`
-      ),
-      "Aucun compte financier configure."
-    );
-
     writePdfSectionTitle(doc, "Taches par statut");
     writePdfList(
       doc,
@@ -1058,32 +1019,7 @@ export async function exportCompanyReportsPdf(
       "Aucune tache consolidee sur cette periode."
     );
 
-    writePdfSectionTitle(doc, "Taches par activite");
-    writePdfList(
-      doc,
-      overview.taskByActivity.map(
-        (item) =>
-          `${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | total ${item.totalCount} | ouvertes ${item.openCount} | bloquees ${item.blockedCount} | terminees ${item.doneCount}`
-      ),
-      "Aucune tache consolidee par activite sur cette periode."
-    );
-
-    writePdfSectionTitle(doc, "Repartition des roles");
-    writePdfList(
-      doc,
-      overview.roleDistribution.map((item) => `${item.role} | ${item.count} membre(s)`),
-      "Aucun membre actif."
-    );
-
-    writePdfSectionTitle(doc, "Top charge d'assignation");
-    writePdfList(
-      doc,
-      overview.topAssignees.map(
-        (item) =>
-          `${item.fullName} (${item.role}) | ouvertes ${item.openTasksCount} | en cours ${item.inProgressTasksCount} | bloquees ${item.blockedTasksCount} | terminees ${item.doneTasksCount}`
-      ),
-      "Aucune charge equipe disponible sur cette periode."
-    );
+    
   }, (doc, pageNumber, totalPages) => {
     drawPdfBrandingFrame(doc, pageNumber, totalPages, periodLabel);
   });

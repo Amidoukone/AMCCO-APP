@@ -15,9 +15,11 @@ import {
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { AlertItem, AlertSeverity } from "../types/alerts";
 import {
+  buildTaskPath,
   buildFinanceTransactionPath,
   getFinanceTraceLines,
-  getFinanceTransactionNavigationTarget
+  getFinanceTransactionNavigationTarget,
+  getTaskNavigationTarget
 } from "../utils/traceMetadata";
 
 const ALERTS_PAGE_SIZE = 100;
@@ -209,13 +211,12 @@ export function AlertsPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Alertes</h2>
-        <p>Centre de suivi des alertes liees aux transactions et aux taches.</p>
       </header>
 
       <section className="panel">
         <div className="alerts-header">
           <div>
-            <h3>Vue utilisateur</h3>
+            <h3>Alertes</h3>
             <p className="hint">{unreadCount} alerte(s) a traiter.</p>
           </div>
           <button
@@ -330,6 +331,11 @@ export function AlertsPage(): JSX.Element {
                 item.entityId,
                 item.metadata
               );
+              const taskTarget = getTaskNavigationTarget(
+                item.entityType,
+                item.entityId,
+                item.metadata
+              );
               return (
                 <article
                   key={item.id}
@@ -340,18 +346,11 @@ export function AlertsPage(): JSX.Element {
                       <h4>{severityLabel(item.severity)}</h4>
                       <p className="hint">{formatDateTime(item.createdAt)}</p>
                     </div>
-                    <span className="task-status-chip">{isUnread ? "Non lue" : "Lue"}</span>
                   </div>
                   <p className="alert-message">{item.message}</p>
                   <div className="alert-meta">
                     <p>
-                      <strong>Code:</strong> {item.code}
-                    </p>
-                    <p>
                       <strong>Entite:</strong> {item.entityType ?? "-"} {item.entityId ?? ""}
-                    </p>
-                    <p>
-                      <strong>Lecture:</strong> {formatDateTime(item.readAt)}
                     </p>
                     {financeTraceLines.map((line) => (
                       <p key={`${item.id}-${line}`}>
@@ -359,15 +358,24 @@ export function AlertsPage(): JSX.Element {
                       </p>
                     ))}
                   </div>
-                  {isUnread || financeTarget ? (
+                  {isUnread || financeTarget || taskTarget ? (
                     <div className="actions-inline">
+                      {taskTarget ? (
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => navigate(buildTaskPath(taskTarget))}
+                        >
+                          Voir tâche
+                        </button>
+                      ) : null}
                       {financeTarget ? (
                         <button
                           type="button"
                           className="secondary-btn"
                           onClick={() => navigate(buildFinanceTransactionPath(financeTarget))}
                         >
-                          {financeTarget.kind === "salary" ? "Voir le salaire" : "Voir la transaction"}
+                          {financeTarget.kind === "salary" ? "Voir salaire" : "Voir transaction"}
                         </button>
                       ) : null}
                       {isUnread ? (

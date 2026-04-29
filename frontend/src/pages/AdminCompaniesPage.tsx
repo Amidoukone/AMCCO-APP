@@ -76,7 +76,6 @@ function createFormStateFromCompany(item: AdminCompanyItem): CreateCompanyInput 
 export function AdminCompaniesPage(): JSX.Element {
   const {
     activeCompany,
-    memberships,
     reloadProfile,
     switchCompany,
     user
@@ -290,11 +289,6 @@ export function AdminCompaniesPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Administration entreprises</h2>
-        <p>
-          {activeCompany
-            ? "AMCCO reste l'entreprise par défaut. Vous pouvez créer d'autres entreprises et basculer entre les sociétés auxquelles votre compte est rattaché."
-            : "Aucune entreprise active n'existe encore. Créez la première entreprise pour initialiser l'application et débloquer les modules métier."}
-        </p>
       </header>
 
       <FeedbackBanner
@@ -307,9 +301,6 @@ export function AdminCompaniesPage(): JSX.Element {
         <div className="company-admin-header">
           <div>
             <h3>Entreprises accessibles</h3>
-            <p className="hint">
-              {memberships.length} entreprise(s) rattachée(s) à votre compte.
-            </p>
           </div>
           <div className="company-active-badge">
             Entreprise active: <strong>{activeCompany?.name ?? "Non définie"}</strong>
@@ -369,46 +360,61 @@ export function AdminCompaniesPage(): JSX.Element {
                     </p>
                   </div>
 
-                  {!item.company.isActive ? (
+                  <div className="admin-impact-block">
                     <p className="hint">
-                      Cette entreprise est inactive. Elle ne peut plus être utilisée tant qu'elle
-                      n'est pas reactualisee en base.
+                      <strong>État:</strong>{" "}
+                      {item.company.isActive
+                        ? isActive
+                          ? "Entreprise active dans votre session."
+                          : "Entreprise disponible pour bascule."
+                        : "Entreprise désactivée (non utilisable en opération)."}
                     </p>
-                  ) : null}
-
-                  <div className="actions-inline">
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      onClick={() => handleStartEditCompany(item)}
-                      disabled={isBusy}
-                      title={updateLockMessage ?? undefined}
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      type="button"
-                      className="danger-btn"
-                      onClick={() => void handleDeleteCompany(item)}
-                      disabled={isBusy}
-                      title={deleteLockMessage ?? undefined}
-                    >
-                      Supprimer
-                    </button>
+                    <p className="hint">
+                      <strong>Impact:</strong>{" "}
+                      {item.company.isActive
+                        ? "Les utilisateurs peuvent continuer à créer et traiter des données."
+                        : "Plus aucune création ni exécution métier sur cette entreprise; seul l'historique reste consultable."}
+                    </p>
                   </div>
 
-                  {!isActive ? (
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      onClick={() => void handleSwitchCompany(item.company.id)}
-                      disabled={switchingCompanyId === item.company.id || !item.company.isActive}
-                    >
-                      {switchingCompanyId === item.company.id
-                        ? "Activation..."
-                        : "Utiliser cette entreprise"}
-                    </button>
-                  ) : null}
+                  <div className="admin-actions-block">
+                    <p className="hint">
+                      <strong>Actions</strong>
+                    </p>
+                    <div className="actions-inline">
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => handleStartEditCompany(item)}
+                        disabled={isBusy}
+                        title={updateLockMessage ?? undefined}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-btn"
+                        onClick={() => void handleDeleteCompany(item)}
+                        disabled={isBusy}
+                        title={deleteLockMessage ?? undefined}
+                      >
+                        Désactiver
+                      </button>
+                    </div>
+
+                    {!isActive ? (
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => void handleSwitchCompany(item.company.id)}
+                        disabled={switchingCompanyId === item.company.id || !item.company.isActive}
+                      >
+                        {switchingCompanyId === item.company.id
+                          ? "Activation..."
+                          : "Utiliser cette entreprise"}
+                      </button>
+                    ) : null}
+                  </div>
                 </article>
               );
             })}
@@ -418,11 +424,6 @@ export function AdminCompaniesPage(): JSX.Element {
 
       <section className="panel">
         <h3>{isEditingCompany ? "Modifier une entreprise" : "Créer une entreprise"}</h3>
-        <p className="hint">
-          {isEditingCompany
-            ? "Le code reste immuable après création pour protéger le routage multi-entreprises."
-            : "Formulaire simplifié avec les informations essentielles. La création reste compatible avec la structure multi-sectorielle déjà en place."}
-        </p>
         <div className="company-admin-form">
           <input
             type="text"

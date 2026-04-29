@@ -158,9 +158,10 @@ a {
 }
 
 .hint {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   color: #486581;
   font-size: 14px;
+  line-height: 1.45;
 }
 
 .login-hint {
@@ -517,23 +518,27 @@ a {
 }
 
 .section-header p {
-  margin: 6px 0 12px;
+  margin: 4px 0 10px;
   color: #627d98;
+  max-width: 72ch;
+  line-height: 1.45;
 }
 
 .panel {
   background: #ffffff;
   border: 1px solid #d9e2ec;
   border-radius: 12px;
-  padding: 16px;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
 }
 
 .panel h3 {
-  margin-top: 0;
+  margin: 0;
 }
 
 .panel + .panel {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .flat-list {
@@ -570,6 +575,21 @@ a {
   background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
 }
 
+.admin-users-create-form {
+  grid-template-columns: 2fr 2fr 1.5fr 1.2fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-users-create-form button {
+  width: fit-content;
+  padding: 10px 14px;
+}
+
+.admin-users-panel {
+  gap: 16px;
+}
+
 .admin-users-management-header {
   display: grid;
   gap: 4px;
@@ -584,10 +604,10 @@ a {
 }
 
 .admin-users-filters {
-  margin-top: 10px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: 2fr repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .admin-users-filters input,
@@ -606,14 +626,14 @@ a {
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .admin-table th,
 .admin-table td {
   text-align: left;
   border-bottom: 1px solid #d9e2ec;
-  padding: 10px 8px;
+  padding: 14px 12px;
   vertical-align: middle;
 }
 
@@ -625,6 +645,24 @@ a {
   padding: 8px;
 }
 
+.admin-user-role-cell {
+  min-width: 210px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-user-role-badge {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid #cfe0f2;
+  background: #eef5ff;
+  color: #1f4f8c;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .inline-checkbox {
   display: inline-flex;
   align-items: center;
@@ -634,6 +672,20 @@ a {
 .actions-inline {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-user-actions-cell {
+  min-width: 340px;
+}
+
+.admin-user-actions-row {
+  gap: 10px;
+}
+
+.admin-user-actions-row button {
+  white-space: nowrap;
 }
 
 .password-reset-inline {
@@ -642,8 +694,29 @@ a {
   gap: 8px;
 }
 
+.admin-user-password-row {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-user-security-toggle {
+  margin-top: 10px;
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 8px 10px;
+}
+
+.admin-user-security-toggle summary {
+  cursor: pointer;
+  color: #486581;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .password-reset-inline input {
   flex: 1;
+  min-width: 220px;
   border: 1px solid #bcccdc;
   border-radius: 8px;
   padding: 8px;
@@ -744,6 +817,17 @@ a {
   display: grid;
   grid-template-columns: 2fr 1.6fr 1fr auto;
   gap: 10px;
+}
+
+.security-personal-panel {
+  border: 1px solid #d9e2ec;
+  background: linear-gradient(180deg, #fbfdff 0%, #f7fbff 100%);
+}
+
+.security-quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .reports-filter-form {
@@ -1225,6 +1309,15 @@ a {
   overflow-wrap: anywhere;
 }
 
+.audit-highlight-lines {
+  display: grid;
+  gap: 2px;
+}
+
+.audit-highlight-lines .hint {
+  margin: 0;
+}
+
 .finance-account-form {
   margin-top: 10px;
   display: grid;
@@ -1268,6 +1361,8 @@ a {
   background: #0b5ed7;
   color: #ffffff;
   cursor: pointer;
+  justify-self: start;
+  width: fit-content;
 }
 
 .finance-transaction-form-quick {
@@ -1325,17 +1420,30 @@ a {
   overflow-wrap: anywhere;
 }
 
+.finance-summary-grid {
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.finance-page-panel {
+  padding: 20px;
+}
+
+.finance-page-panel h3 {
+  margin-bottom: 10px;
+}
+
 .finance-section-toggle {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .finance-section-summary {
   list-style: none;
   cursor: pointer;
   display: grid;
-  gap: 4px;
-  padding: 2px 0 10px;
+  gap: 6px;
+  padding: 6px 0 12px;
 }
 
 .finance-section-summary::-webkit-details-marker {
@@ -1356,8 +1464,8 @@ a {
 
 .finance-inline-section {
   display: grid;
-  gap: 10px;
-  padding-top: 4px;
+  gap: 12px;
+  padding-top: 6px;
 }
 
 .finance-inline-section-summary {
@@ -1385,7 +1493,12 @@ a {
 .table-inline-details {
   margin-top: 10px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.finance-transactions-filters .operations-filter-form {
+  gap: 12px;
+  align-items: end;
 }
 
 .table-inline-summary {
@@ -1702,6 +1815,8 @@ a {
   background: #0b5ed7;
   color: #ffffff;
   cursor: pointer;
+  width: fit-content;
+  justify-self: start;
 }
 
 .operations-list-header {
@@ -2246,6 +2361,32 @@ a {
   overflow-wrap: anywhere;
 }
 
+.admin-impact-block {
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fbff;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-impact-block .hint {
+  margin: 0;
+}
+
+.admin-actions-block {
+  border: 1px solid #e7eef5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-actions-block .hint {
+  margin: 0;
+}
+
 .company-admin-address {
   line-height: 1.5;
 }
@@ -2314,6 +2455,7 @@ a {
 
 .task-timeline-item {
   border: 1px solid #d9e2ec;
+  border-left: 4px solid #98b8de;
   background: #f9fbff;
   border-radius: 10px;
   padding: 10px 12px;
@@ -2324,6 +2466,7 @@ a {
 .task-timeline-item.is-comment {
   background: #eef6ff;
   border-color: #c4daf4;
+  border-left-color: #5b8cc9;
 }
 
 .task-timeline-title {
@@ -2373,6 +2516,37 @@ a {
 .finance-transaction-detail-panel {
   display: grid;
   gap: 12px;
+}
+
+.finance-decision-shortcuts {
+  border: 1px solid #cbdcf0;
+  border-radius: 10px;
+  padding: 12px;
+  background: linear-gradient(180deg, #f6faff 0%, #ffffff 100%);
+  display: grid;
+  gap: 10px;
+}
+
+.finance-transaction-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.finance-detail-block {
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fbfdff;
+}
+
+.finance-detail-block h4 {
+  margin: 0 0 6px;
+  color: #102a43;
+}
+
+.finance-detail-block .hint {
+  margin: 0;
 }
 
 .finance-transaction-detail-actions {

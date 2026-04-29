@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   addTaskCommentRequest,
@@ -14,6 +14,7 @@ import {
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getBusinessActivityLabel, type BusinessActivityCode } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
+import { getTaskTraceLines } from "../utils/traceMetadata";
 import type {
   OperationTask,
   OperationTaskMember,
@@ -42,19 +43,6 @@ function statusLabel(status: TaskStatus): string {
     return "Terminée";
   }
   return "Bloquée";
-}
-
-function statusDescription(status: TaskStatus): string {
-  if (status === "TODO") {
-    return "Tâche en attente de lancement ou de prise en charge.";
-  }
-  if (status === "IN_PROGRESS") {
-    return "Exécution active avec suivi opérationnel en cours.";
-  }
-  if (status === "DONE") {
-    return "Exécution finalisée. La tâche est considérée comme clôturée.";
-  }
-  return "Blocage actif. Une action de supervision ou de debloquage est attendue.";
 }
 
 function statusToneClass(status: TaskStatus): string {
@@ -125,16 +113,16 @@ function timelineDetail(event: OperationTaskTimelineEvent): string {
 
 function timelineContextLines(event: OperationTaskTimelineEvent): string[] {
   const metadata = asObject(event.metadata);
-  const lines: string[] = [];
+  const lines: string[] = getTaskTraceLines(event.action, metadata);
 
   const activityCode =
     typeof metadata.activityCode === "string" ? metadata.activityCode : null;
-  if (activityCode) {
+  if (activityCode && !lines.some((line) => line.startsWith("Secteur: "))) {
     lines.push(`Secteur: ${getBusinessActivityLabel(activityCode as BusinessActivityCode)}`);
   }
 
   const note = typeof metadata.note === "string" ? metadata.note.trim() : "";
-  if (note) {
+  if (note && !lines.some((line) => line.startsWith("Note: "))) {
     lines.push(`Note: ${note}`);
   }
 
@@ -152,7 +140,7 @@ function timelineContextLines(event: OperationTaskTimelineEvent): string[] {
 
   const bodyPreview =
     typeof metadata.bodyPreview === "string" ? metadata.bodyPreview.trim() : "";
-  if (bodyPreview) {
+  if (bodyPreview && !lines.some((line) => line.startsWith("Commentaire: "))) {
     lines.push(`Aperçu: ${bodyPreview}`);
   }
 
@@ -176,6 +164,7 @@ type TimelineEntry =
 
 export function TaskDetailsPage(): JSX.Element {
   const { taskId } = useParams<{ taskId: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const { profiles, selectedActivityCode, setSelectedActivityCode } = useBusinessActivity();
@@ -197,7 +186,6 @@ export function TaskDetailsPage(): JSX.Element {
   const canManageTasks = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
   }, [user?.role]);
-
   const loadData = useCallback(async (options?: {
     append?: boolean;
     timelineOffset?: number;
@@ -441,7 +429,17 @@ export function TaskDetailsPage(): JSX.Element {
               <span className="task-status-hero-label">État actuel</span>
               <strong>{statusLabel(task.status)}</strong>
             </div>
-            <p className="task-status-hero-text">{statusDescription(task.status)}</p>
+          </div>
+          <div className="actions-inline">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() =>
+                navigate(`/alerts?entityType=TASK&entityId=${encodeURIComponent(task.id)}`)
+              }
+            >
+              Voir alertes
+            </button>
           </div>
           <p className="operations-task-description">{task.description?.trim() || "Aucune description fournie."}</p>
 

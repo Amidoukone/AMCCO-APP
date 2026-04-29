@@ -63,6 +63,17 @@ export function getTransactionGovernanceLines(transaction: FinancialTransaction)
   });
 }
 
+export function getTransactionDecisionShortcuts(transactionId: string): {
+  alertsPath: string;
+  auditPath: string;
+} {
+  const encoded = encodeURIComponent(transactionId);
+  return {
+    alertsPath: `/alerts?entityType=TRANSACTION&entityId=${encoded}`,
+    auditPath: `/settings/security?entityType=TRANSACTION&entityId=${encoded}`
+  };
+}
+
 export function getAccountGovernanceLines(account: FinancialAccount): string[] {
   return formatAccountGovernanceDetails({
     scopeType: account.scopeType,

@@ -10,7 +10,6 @@ import {
   getBusinessActivityLabel,
   type BusinessActivityCode
 } from "../config/businessActivities";
-import { ROLE_LABELS } from "../config/permissions";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import type { ReportsOverview } from "../types/reporting";
 
@@ -28,8 +27,7 @@ type ReportPeriodQuery = {
 
 type ExportTarget =
   | "overview-pdf"
-  | "transactions-xlsx"
-  | "tasks-xlsx";
+  | "transactions-xlsx";
 
 type ReportPeriodPreset = "TODAY" | "LAST_7_DAYS" | "LAST_30_DAYS" | "THIS_MONTH";
 
@@ -44,19 +42,6 @@ function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("fr-FR");
 }
 
-function financeStatusLabel(status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED"): string {
-  if (status === "DRAFT") {
-    return "Brouillon";
-  }
-  if (status === "SUBMITTED") {
-    return "Soumise";
-  }
-  if (status === "APPROVED") {
-    return "Approuvée";
-  }
-  return "Rejetée";
-}
-
 function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
   if (status === "TODO") {
     return "À faire";
@@ -68,26 +53,6 @@ function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): s
     return "Terminée";
   }
   return "Bloquée";
-}
-
-function accountScopeLabel(account: ReportsOverview["financeAccounts"][number]): string {
-  if (account.scopeType === "GLOBAL") {
-    return "Global entreprise";
-  }
-  if (account.scopeType === "DEDICATED") {
-    return account.primaryActivityCode
-      ? `Dédié: ${getBusinessActivityLabel(account.primaryActivityCode)}`
-      : "Dédié";
-  }
-  return account.allowedActivityCodes.length > 0
-    ? `Restreint: ${account.allowedActivityCodes
-        .map((activityCode) => getBusinessActivityLabel(activityCode))
-        .join(", ")}`
-    : "Restreint";
-}
-
-function accountCompatibilityLabel(account: ReportsOverview["financeAccounts"][number]): string {
-  return account.isCompatibleWithSelectedActivity ? "Compatible" : "Hors secteur actif";
 }
 
 function triggerBlobDownload(blob: Blob, fileName: string): void {
@@ -228,42 +193,6 @@ export function ReportsPage(): JSX.Element {
     );
   }, [selectedActivityCode]);
 
-  const reportCards = useMemo(() => {
-    if (!overview) {
-      return [];
-    }
-    const financeCount = overview.financeByStatus.reduce((sum, item) => sum + item.count, 0);
-    const taskCount = overview.taskByStatus.reduce((sum, item) => sum + item.count, 0);
-    const memberCount = overview.roleDistribution.reduce((sum, item) => sum + item.count, 0);
-    const blockedCount =
-      overview.taskByStatus.find((item) => item.status === "BLOCKED")?.count ?? 0;
-
-    return [
-      {
-        title: "Transactions consolidées",
-        value: String(financeCount),
-        note: `${overview.financeByType.length} ligne(s) devise/type sur ${formatAppliedRange(overview)}`
-      },
-      {
-        title: "Tâches consolidées",
-        value: String(taskCount),
-        note: `${blockedCount} tâche(s) bloquée(s) sur la période`
-      },
-      {
-        title: "Comptes compatibles",
-        value: String(overview.financeAccountsSummary.compatibleCount),
-        note: overview.filters.activityCode
-          ? `${overview.financeAccountsSummary.incompatibleCount} hors ${getBusinessActivityLabel(overview.filters.activityCode)}`
-          : `${overview.financeAccountsSummary.totalCount} compte(s) entreprise`
-      },
-      {
-        title: "Effectif actif",
-        value: String(memberCount),
-        note: "Instantane actuel des memberships actifs"
-      }
-    ];
-  }, [overview]);
-
   function handleApplyFilters(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (periodForm.dateFrom && periodForm.dateTo && periodForm.dateFrom > periodForm.dateTo) {
@@ -332,7 +261,7 @@ export function ReportsPage(): JSX.Element {
   }, [periodForm.dateFrom, periodForm.dateTo]);
 
   async function handleExport(
-    kind: "overview" | "transactions" | "tasks",
+    kind: "overview" | "transactions",
     format: "xlsx" | "pdf"
   ): Promise<void> {
     const exportTarget = `${kind}-${format}` as ExportTarget;
@@ -354,10 +283,8 @@ export function ReportsPage(): JSX.Element {
         setSuccessMessage("Export PDF du rapport généré pour la période appliquée.");
       } else if (kind === "transactions" && format === "xlsx") {
         setSuccessMessage("Export Excel des transactions généré pour la période appliquée.");
-      } else if (kind === "tasks" && format === "xlsx") {
-        setSuccessMessage("Export Excel des tâches généré pour la période appliquée.");
       } else if (kind === "transactions") {
-        setSuccessMessage("Export Excel des tâches généré pour la période appliquée.");
+        setSuccessMessage("Export Excel des transactions généré pour la période appliquée.");
       }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -370,10 +297,7 @@ export function ReportsPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Rapports et exports</h2>
-        <p>
-          Consolidation finance et opérations, avec un cadrage par secteur et des exports
-          immédiats.
-        </p>
+        <p>Vue consolidée, rapide et exploitable.</p>
       </header>
 
       <section className="panel">
@@ -451,14 +375,7 @@ export function ReportsPage(): JSX.Element {
             Réinitialiser les filtres
           </button>
         </form>
-        <p className="hint">
-          Secteur actif: {selectedActivity?.label ?? "Tous les secteurs"}.
-        </p>
-        <p className="hint">
-          Les transactions suivent leur date d'opération. Les tâches et la charge équipe sont
-          basées sur la dernière activité enregistrée. La répartition des rôles reflète
-          l'organisation actuelle.
-        </p>
+        <p className="hint">Secteur actif: {selectedActivity?.label ?? "Tous les secteurs"}.</p>
       </section>
 
       <FeedbackBanner
@@ -469,44 +386,6 @@ export function ReportsPage(): JSX.Element {
 
       {!isLoading && overview ? (
         <>
-          {overview.activityProfile ? (
-            <section className="panel sector-focus-panel">
-              <div className="dashboard-panel-header">
-                <div>
-                  <p className="sidebar-section-label">Profil sectoriel</p>
-                  <h3>{overview.activityProfile.label}</h3>
-                  <p className="hint">
-                    {overview.activityProfile.operationsModel} | Règles: {overview.sectorRulesVersion}
-                  </p>
-                  <p className="hint">
-                    Priorité de suivi: {overview.activityProfile.reporting.focusArea}
-                  </p>
-                </div>
-              </div>
-              {overview.activityHighlights.length > 0 ? (
-                <div className="highlight-grid">
-                  {overview.activityHighlights.map((item) => (
-                    <article key={item.code} className={`highlight-card severity-${item.emphasis.toLowerCase()}`}>
-                      <p className="sidebar-section-label">{item.label}</p>
-                      <strong>{item.value}</strong>
-                      <p className="hint">{item.description}</p>
-                    </article>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          <section className="grid">
-            {reportCards.map((card) => (
-              <article key={card.title} className="metric-card">
-                <h2>{card.title}</h2>
-                <p className="metric-value">{card.value}</p>
-                <p className="metric-note">{card.note}</p>
-              </article>
-            ))}
-          </section>
-
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
@@ -533,49 +412,7 @@ export function ReportsPage(): JSX.Element {
                 >
                   {busyExport === "transactions-xlsx" ? "Préparation..." : "Transactions Excel"}
                 </button>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => void handleExport("tasks", "xlsx")}
-                  disabled={busyExport !== null}
-                >
-                  {busyExport === "tasks-xlsx" ? "Préparation..." : "Tâches Excel"}
-                </button>
               </div>
-            </div>
-          </section>
-
-          <section className="panel">
-            <h3>Transactions par statut et devise</h3>
-            <div className="table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Statut</th>
-                    <th>Devise</th>
-                    <th>Nombre</th>
-                    <th>Montant total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.financeByStatus.length === 0 ? (
-                    <tr>
-                      <td colSpan={4}>Aucune transaction consolidée sur cette période.</td>
-                    </tr>
-                  ) : (
-                    overview.financeByStatus.map((item) => (
-                      <tr key={`${item.status}-${item.currency}`}>
-                        <td>{financeStatusLabel(item.status)}</td>
-                        <td>{item.currency}</td>
-                        <td>{item.count}</td>
-                        <td>
-                          {item.totalAmount} {item.currency}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
             </div>
           </section>
 
@@ -618,113 +455,6 @@ export function ReportsPage(): JSX.Element {
           </section>
 
           <section className="panel">
-            <h3>Transactions par activité</h3>
-            <div className="table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Activité</th>
-                    <th>Nombre</th>
-                    <th>Montant total</th>
-                    <th>Montant approuvé</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.financeByActivity.length === 0 ? (
-                    <tr>
-                      <td colSpan={4}>Aucune transaction consolidée sur cette période.</td>
-                    </tr>
-                  ) : (
-                    overview.financeByActivity.map((item) => (
-                      <tr key={item.activityCode}>
-                        <td>{getBusinessActivityLabel(item.activityCode)}</td>
-                        <td>{item.count}</td>
-                        <td>{item.totalAmount}</td>
-                        <td>{item.approvedAmount}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="panel">
-            <h3>Gouvernance des comptes financiers</h3>
-            <p className="hint">
-              {overview.filters.activityCode
-                ? `Lecture de compatibilite sur le secteur ${getBusinessActivityLabel(overview.filters.activityCode)}.`
-                : "Sans filtre sectoriel, la gouvernance est lue au niveau entreprise."}
-            </p>
-            <div className="dashboard-kpi-grid">
-              <article className="dashboard-kpi-card">
-                <strong>Total</strong>
-                <span>{overview.financeAccountsSummary.totalCount}</span>
-              </article>
-              <article className="dashboard-kpi-card">
-                <strong>Globaux</strong>
-                <span>{overview.financeAccountsSummary.globalCount}</span>
-              </article>
-              <article className="dashboard-kpi-card">
-                <strong>Dédiés</strong>
-                <span>{overview.financeAccountsSummary.dedicatedCount}</span>
-              </article>
-              <article className="dashboard-kpi-card">
-                <strong>Restreints</strong>
-                <span>{overview.financeAccountsSummary.restrictedCount}</span>
-              </article>
-            </div>
-            <div className="dashboard-kpi-grid">
-              <article className="dashboard-kpi-card">
-                <strong>Compatibles</strong>
-                <span>{overview.financeAccountsSummary.compatibleCount}</span>
-              </article>
-              <article className="dashboard-kpi-card">
-                <strong>Incompatibles</strong>
-                <span>{overview.financeAccountsSummary.incompatibleCount}</span>
-              </article>
-              <article className="dashboard-kpi-card">
-                <strong>Dédiés au secteur</strong>
-                <span>{overview.financeAccountsSummary.dedicatedToSelectedActivityCount}</span>
-              </article>
-              <article className="dashboard-kpi-card">
-                <strong>Restreints incluant le secteur</strong>
-                <span>{overview.financeAccountsSummary.restrictedToSelectedActivityCount}</span>
-              </article>
-            </div>
-            <div className="table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Compte</th>
-                    <th>Reference</th>
-                    <th>Portée</th>
-                    <th>Compatibilite</th>
-                    <th>Solde initial / courant</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.financeAccounts.length === 0 ? (
-                    <tr>
-                      <td colSpan={5}>Aucun compte financier configuré.</td>
-                    </tr>
-                  ) : (
-                    overview.financeAccounts.map((item) => (
-                      <tr key={item.id}>
-                        <td>{item.name}</td>
-                        <td>{item.accountRef ?? "-"}</td>
-                        <td>{accountScopeLabel(item)}</td>
-                        <td>{accountCompatibilityLabel(item)}</td>
-                        <td>{item.balance}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="panel">
             <h3>Tâches par statut</h3>
             <div className="table-wrap">
               <table className="admin-table">
@@ -752,67 +482,6 @@ export function ReportsPage(): JSX.Element {
             </div>
           </section>
 
-          <section className="panel">
-            <h3>Tâches par activité</h3>
-            <div className="table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Activité</th>
-                    <th>Total</th>
-                    <th>Ouvertes</th>
-                    <th>Bloquées</th>
-                    <th>Terminées</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.taskByActivity.length === 0 ? (
-                    <tr>
-                      <td colSpan={5}>Aucune tâche consolidée sur cette période.</td>
-                    </tr>
-                  ) : (
-                    overview.taskByActivity.map((item) => (
-                      <tr key={item.activityCode}>
-                        <td>{getBusinessActivityLabel(item.activityCode)}</td>
-                        <td>{item.totalCount}</td>
-                        <td>{item.openCount}</td>
-                        <td>{item.blockedCount}</td>
-                        <td>{item.doneCount}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="panel">
-            <h3>Repartition des roles</h3>
-            <div className="table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Rôle</th>
-                    <th>Effectif</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.roleDistribution.length === 0 ? (
-                    <tr>
-                      <td colSpan={2}>Aucun membre actif.</td>
-                    </tr>
-                  ) : (
-                    overview.roleDistribution.map((item) => (
-                      <tr key={item.role}>
-                        <td>{ROLE_LABELS[item.role]}</td>
-                        <td>{item.count}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
 
         </>
       ) : null}

@@ -93,7 +93,6 @@ export function AdminActivitiesPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Administration secteurs</h2>
-        <p>Activation des secteurs par entreprise.</p>
       </header>
 
       <FeedbackBanner
@@ -104,33 +103,41 @@ export function AdminActivitiesPage(): JSX.Element {
 
       <section className="panel">
         <h3>Configuration des secteurs</h3>
-        <p className="hint">
-          Un secteur désactivé n'est plus proposé pour les nouvelles transactions et tâches.
-          L'historique reste accessible.
-        </p>
         {!isLoading ? (
           <div className="activity-admin-list">
             {items.map((item) => (
               <article key={item.code} className="activity-admin-card">
                 <div>
                   <h4>{item.label}</h4>
-                  <p className="hint">{item.description}</p>
-                  <p className="hint">
-                    Statut actuel: <strong>{item.isEnabled ? "Actif" : "Désactivé"}</strong>
-                  </p>
+                  <div className="admin-impact-block">
+                    <p className="hint">
+                      <strong>État:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
+                    </p>
+                    <p className="hint">
+                      <strong>Impact:</strong>{" "}
+                      {item.isEnabled
+                        ? "Le secteur reste disponible pour nouvelles tâches et transactions."
+                        : "Le secteur disparaît des créations; l'historique existant reste consultable."}
+                    </p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => void handleToggleActivity(item)}
-                  disabled={busyActivityCode === item.code}
-                >
-                  {busyActivityCode === item.code
-                    ? "Mise a jour..."
-                    : item.isEnabled
-                      ? "Désactiver"
-                      : "Activer"}
-                </button>
+                <div className="admin-actions-block">
+                  <p className="hint">
+                    <strong>Action</strong>
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => void handleToggleActivity(item)}
+                    disabled={busyActivityCode === item.code}
+                  >
+                    {busyActivityCode === item.code
+                      ? "Mise a jour..."
+                      : item.isEnabled
+                        ? "Désactiver"
+                        : "Activer"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

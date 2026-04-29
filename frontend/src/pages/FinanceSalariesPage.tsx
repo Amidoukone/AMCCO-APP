@@ -905,8 +905,8 @@ export function FinanceSalariesPage(): JSX.Element {
               <h3>{editingSalaryId ? "Modifier un salaire" : "Enregistrer un salaire"}</h3>
               <p className="hint">
                 {editingSalaryId
-                  ? "Toute modification remet le salaire en brouillon et réinitialise la confirmation employé."
-                  : "Le salaire est créé en brouillon. Le comptable le vérifie, le soumet à l'employé, puis l'approuve seulement après confirmation de réception."}
+                  ? "Modification du salaire en brouillon."
+                  : "Nouveau salaire à traiter."}
               </p>
             </div>
           </div>
@@ -1516,7 +1516,7 @@ export function FinanceSalariesPage(): JSX.Element {
                   navigate(`/alerts?entityType=SALARY&entityId=${encodeURIComponent(selectedSalary.id)}`)
                 }
               >
-                Voir les alertes
+                Voir alertes
               </button>
               {canAccessAudit ? (
                 <button
@@ -1528,7 +1528,7 @@ export function FinanceSalariesPage(): JSX.Element {
                     )
                   }
                 >
-                  Voir l'audit
+                  Voir audit
                 </button>
               ) : null}
             </div>

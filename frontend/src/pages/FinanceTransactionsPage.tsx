@@ -41,6 +41,7 @@ import type {
 } from "../types/finance";
 import {
   formatAccountScopeLabel,
+  getTransactionDecisionShortcuts,
   getAccountGovernanceLines,
   getTransactionGovernanceLines
 } from "../utils/governanceDisplay";
@@ -77,6 +78,11 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / 1024).toFixed(1)} Ko`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+function toAmountNumber(input: string): number {
+  const normalized = Number.parseFloat(input.replace(",", "."));
+  return Number.isFinite(normalized) ? normalized : 0;
 }
 
 function toDateTimeLocalInput(value: string): string {
@@ -279,10 +285,6 @@ export function FinanceTransactionsPage(): JSX.Element {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
-  const canAccessAudit = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
-  }, [user?.role]);
-
   const [accountForm, setAccountForm] = useState(() =>
     buildDefaultAccountForm(
       selectedActivityCode,
@@ -331,7 +333,6 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   const financeMetadataFields = selectedProfile?.finance.metadataFields ?? EMPTY_METADATA_FIELDS;
   const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
-  const financeWorkflow = selectedProfile?.finance.workflow ?? [];
   const enabledActivityCodes = useMemo(
     () => enabledActivities.map((item) => item.code),
     [enabledActivities]
@@ -390,30 +391,34 @@ export function FinanceTransactionsPage(): JSX.Element {
     [canManageAnyAccount]
   );
   const financePageCards = useMemo(() => {
-    const submittedTransactions = transactions.filter((item) => item.status === "SUBMITTED").length;
+    const cashInTotal = displayTransactions
+      .filter((item) => item.type === "CASH_IN")
+      .reduce((sum, item) => sum + toAmountNumber(item.amount), 0);
+    const cashOutTotal = displayTransactions
+      .filter((item) => item.type === "CASH_OUT")
+      .reduce((sum, item) => sum + toAmountNumber(item.amount), 0);
+    const netBalance = cashInTotal - cashOutTotal;
 
     const cards = [
       {
-        title: "Transactions chargees",
-        value: String(transactions.length),
-        note: selectedActivity
-          ? `Secteur actif: ${selectedActivity.label}`
-          : "Aucun secteur actif"
+        title: "Entrées",
+        value: cashInTotal.toFixed(2),
+        note: "Montant cumulé"
       },
       {
-        title: "Comptes visibles",
-        value: String(accounts.length),
-        note: "Comptes compatibles avec le contexte actuel"
+        title: "Sorties",
+        value: cashOutTotal.toFixed(2),
+        note: "Montant cumulé"
       },
       {
-        title: "Elements a valider",
-        value: String(submittedTransactions),
-        note: "Transactions soumises"
+        title: "Solde net",
+        value: netBalance.toFixed(2),
+        note: "Entrées - sorties"
       }
     ];
 
     return cards;
-  }, [accounts.length, selectedActivity, transactions]);
+  }, [displayTransactions, transactions]);
 
   const handleOpenTransactionDetails = useCallback(
     (transactionId: string, activityCode: BusinessActivityCode | null) => {
@@ -990,10 +995,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Transactions financières</h2>
-        <p>
-          Saisie terrain, preuves et validation comptable pour le secteur{" "}
-          <strong>{selectedActivity?.label ?? "aucun secteur actif"}</strong>.
-        </p>
+        <p>Suivi financier opérationnel.</p>
       </header>
 
       {!selectedActivityCode && !isLoadingActivities ? (
@@ -1003,7 +1005,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         </p>
       ) : null}
 
-      <section className="grid">
+      <section className="grid finance-summary-grid">
         {financePageCards.map((card) => (
           <article key={card.title} className="metric-card finance-overview-card">
             <h2>{card.title}</h2>
@@ -1014,14 +1016,14 @@ export function FinanceTransactionsPage(): JSX.Element {
       </section>
 
       {canCreateAccount ? (
-        <section className="panel">
+        <section className="panel finance-page-panel">
           <details className="finance-section-toggle">
             <summary className="finance-section-summary">
               <span>{editingAccountId ? "Modifier un compte financier" : "Créer un compte financier"}</span>
               <small>
                 {editingAccountId
-                  ? "Les comptes déjà utilisés restent verrouillés pour protéger l'historique."
-                  : "Ouvrir si vous devez ajouter une nouvelle caisse ou un nouveau compte."}
+                  ? "Modification d'un compte."
+                  : "Nouveau compte financier."}
               </small>
             </summary>
             <form className="finance-account-form" onSubmit={handleSaveAccount}>
@@ -1140,26 +1142,15 @@ export function FinanceTransactionsPage(): JSX.Element {
               </button>
             ) : null}
             </form>
-            <p className="hint">
-              {accountForm.scopeType === "GLOBAL"
-                ? "Le compte sera visible et utilisable dans tous les secteurs."
-                : accountForm.scopeType === "DEDICATED"
-                  ? "Le compte sera réservé à un seul secteur."
-                  : "Le compte sera partagé uniquement entre les secteurs sélectionnés."}
-            </p>
           </details>
         </section>
       ) : null}
 
       {canManageSalaries ? (
-        <section className="panel">
+        <section className="panel finance-page-panel">
           <div className="dashboard-panel-header">
             <div>
               <h3>Salaires</h3>
-              <p className="hint">
-                La paie est gérée sur une page dédiée pour séparer les contrôles de salaire des
-                transactions courantes.
-              </p>
             </div>
             <button
               type="button"
@@ -1172,7 +1163,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         </section>
       ) : null}
 
-      <section className="panel">
+      <section className="panel finance-page-panel finance-transactions-filters">
         <h3>Filtres</h3>
         <form
           className="operations-filter-form"
@@ -1269,19 +1260,16 @@ export function FinanceTransactionsPage(): JSX.Element {
           />
           <button type="submit">Filtrer</button>
         </form>
-        <p className="hint">
-          La liste suit le secteur actif: {selectedActivity?.label ?? "aucun secteur actif"}.
-        </p>
       </section>
 
-      <section className="panel">
+      <section className="panel finance-page-panel">
         <details className="finance-section-toggle" open>
           <summary className="finance-section-summary">
             <span>{editingTransactionId ? "Modifier une transaction" : "Enregistrer une transaction"}</span>
             <small>
               {editingTransactionId
-                ? "Toute modification remet la transaction en brouillon avant une nouvelle soumission."
-                : "Utilisez ce bloc pour la saisie courante sur le secteur actif."}
+                ? "Modification de transaction."
+                : "Nouvelle transaction."}
             </small>
           </summary>
           {accounts.length === 0 ? (
@@ -1447,31 +1435,6 @@ export function FinanceTransactionsPage(): JSX.Element {
             </button>
           ) : null}
           </form>
-          <div className="sector-form-guidance">
-            <p className="hint">
-              {selectedProfile?.finance.requiresProof
-                ? "La preuve est obligatoire avant soumission."
-                : "La preuve reste optionnelle pour ce secteur."}
-            </p>
-            {financeMetadataFields.length > 0 ? (
-              <div className="metadata-field-list">
-                {financeMetadataFields.map((field) => (
-                  <p key={field.key} className="hint">
-                    <strong>{field.label}</strong>: {field.helpText}
-                  </p>
-                ))}
-              </div>
-            ) : null}
-            {financeWorkflow.length > 0 ? (
-              <div className="workflow-chip-list">
-                {financeWorkflow.map((step) => (
-                  <span key={step.code} className="workflow-chip" title={step.description}>
-                    {step.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
         </details>
       </section>
 
@@ -1481,7 +1444,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className="panel">
+      <section className="panel finance-page-panel">
         <h3>Transactions</h3>
         {!isLoading && transactions.length === 0 ? <p>Aucune transaction.</p> : null}
         {!isLoading && transactions.length > 0 && displayTransactions.length === 0 ? (
@@ -1784,31 +1747,59 @@ export function FinanceTransactionsPage(): JSX.Element {
             </p>
           </div>
 
-          <div className="metadata-detail-list">
-            <p className="hint">
-              <strong>Gouvernance compte</strong>
-            </p>
-            {getTransactionGovernanceLines(selectedTransaction).map((line) => (
-              <p key={`${selectedTransaction.id}-${line}`} className="hint">
-                {line}
-              </p>
-            ))}
+          <div className="finance-decision-shortcuts">
+            <strong>Raccourcis décision</strong>
+            <div className="actions-inline">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() =>
+                  navigate(getTransactionDecisionShortcuts(selectedTransaction.id).alertsPath)
+                }
+              >
+                Voir alertes
+              </button>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleToggleProofs(selectedTransaction.id)}
+              >
+                {openProofs[selectedTransaction.id] ? "Masquer les preuves" : "Voir les preuves"}
+              </button>
+            </div>
           </div>
 
-          {selectedTransaction.description?.trim() ? (
-            <div className="metadata-detail-list">
-              <p className="hint">
-                <strong>Description</strong>
-              </p>
-              <p className="hint">{selectedTransaction.description}</p>
-            </div>
-          ) : null}
+          <div className="finance-transaction-detail-grid">
+            <article className="finance-detail-block">
+              <h4>Transaction</h4>
+              {selectedTransaction.description?.trim() ? (
+                <p className="hint">{selectedTransaction.description}</p>
+              ) : (
+                <p className="hint">Aucune description fournie.</p>
+              )}
+            </article>
 
-          <div className="metadata-detail-list">
-            <p className="hint">
-              <strong>Contexte métier</strong>
-            </p>
-            <p className="hint">{formatMetadataSummary(selectedTransaction.metadata, financeMetadataFields)}</p>
+            <article className="finance-detail-block">
+              <h4>Gouvernance</h4>
+              {getTransactionGovernanceLines(selectedTransaction).map((line) => (
+                <p key={`${selectedTransaction.id}-${line}`} className="hint">
+                  {line}
+                </p>
+              ))}
+            </article>
+
+            <article className="finance-detail-block">
+              <h4>Contexte métier</h4>
+              <p className="hint">{formatMetadataSummary(selectedTransaction.metadata, financeMetadataFields)}</p>
+            </article>
+
+            <article className="finance-detail-block">
+              <h4>Preuves</h4>
+              <p className="hint">
+                {selectedTransaction.proofsCount} preuve{selectedTransaction.proofsCount > 1 ? "s" : ""}
+                {selectedTransaction.requiresProof ? " (obligatoire)" : ""}
+              </p>
+            </article>
           </div>
 
           <div className="finance-transaction-detail-actions">
@@ -1835,38 +1826,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   Supprimer
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() =>
-                  navigate(
-                    `/alerts?entityType=TRANSACTION&entityId=${encodeURIComponent(selectedTransaction.id)}`
-                  )
-                }
-              >
-                Voir les alertes
-              </button>
-              {canAccessAudit ? (
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() =>
-                    navigate(
-                      `/settings/security?entityType=TRANSACTION&entityId=${encodeURIComponent(selectedTransaction.id)}`
-                    )
-                  }
-                >
-                  Voir l'audit
-                </button>
-              ) : null}
             </div>
-            <button
-              type="button"
-              className="secondary-btn"
-              onClick={() => void handleToggleProofs(selectedTransaction.id)}
-            >
-              {openProofs[selectedTransaction.id] ? "Masquer les preuves" : "Voir les preuves"}
-            </button>
             {(selectedTransaction.status === "DRAFT" || selectedTransaction.status === "SUBMITTED") ? (
               <div className="proof-inline-form">
                 <input
