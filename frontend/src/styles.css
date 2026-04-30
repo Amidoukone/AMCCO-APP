@@ -824,6 +824,23 @@ a {
   background: linear-gradient(180deg, #fbfdff 0%, #f7fbff 100%);
 }
 
+.security-password-form {
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+  align-items: end;
+}
+
+.security-password-form button {
+  min-height: 40px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.security-session-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
 .security-quick-filters {
   display: flex;
   flex-wrap: wrap;
@@ -3086,6 +3103,18 @@ a {
 
   .audit-filter-form {
     grid-template-columns: 1fr;
+  }
+
+  .security-password-form {
+    grid-template-columns: 1fr;
+  }
+
+  .security-session-actions {
+    justify-content: stretch;
+  }
+
+  .security-session-actions .secondary-btn {
+    width: 100%;
   }
 
   .reports-filter-form {

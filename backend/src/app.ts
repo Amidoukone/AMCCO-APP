@@ -6,6 +6,7 @@ import { env } from "./config/env.js";
 import { logger } from "./lib/logger.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
+import { requestIdMiddleware } from "./middleware/request-id.middleware.js";
 import { adminAuditRouter } from "./routes/admin-audit.route.js";
 import { adminCompaniesRouter } from "./routes/admin-companies.route.js";
 import { adminUsersRouter } from "./routes/admin-users.route.js";
@@ -20,9 +21,11 @@ import { tasksRouter } from "./routes/tasks.route.js";
 
 export const app = express();
 
+app.use(requestIdMiddleware);
 app.use(
   pinoHttp({
-    logger
+    logger,
+    genReqId: (req) => req.headers["x-request-id"]?.toString() ?? "unknown"
   })
 );
 

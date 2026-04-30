@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { HttpError } from "../errors/http-error.js";
+import { logger } from "../lib/logger.js";
 
 type ApiErrorPayload = {
   message: string;
@@ -32,6 +33,16 @@ export function errorMiddleware(
     res.status(err.statusCode).json({ requestId, error: payload });
     return;
   }
+
+  logger.error(
+    {
+      err,
+      requestId,
+      method: req.method,
+      path: req.originalUrl
+    },
+    "Unhandled request error"
+  );
 
   const payload: ApiErrorPayload = {
     message: "Erreur interne du serveur"

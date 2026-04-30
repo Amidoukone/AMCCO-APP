@@ -11,7 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 
 export function AppLayout(): JSX.Element {
-  const { activeCompany, memberships, user, logout, switchCompany } = useAuth();
+  const { activeCompany, memberships, user, switchCompany } = useAuth();
   const {
     enabledActivities,
     errorMessage: activityErrorMessage,
@@ -34,7 +34,7 @@ export function AppLayout(): JSX.Element {
   const visibleNavigation = useMemo(
     () =>
       isBootstrapMode
-        ? navigation.filter((item) => item.key === "adminCompanies")
+        ? navigation.filter((item) => item.key === "adminCompanies" || item.key === "settingsSecurity")
         : navigation,
     [isBootstrapMode, navigation]
   );
@@ -227,9 +227,6 @@ export function AppLayout(): JSX.Element {
                 {isBootstrapMode ? "Créer une entreprise" : "Gérer les entreprises"}
               </Link>
             ) : null}
-            <button className="secondary-btn" type="button" onClick={() => void logout()}>
-              Se deconnecter
-            </button>
           </div>
         </header>
         <section className="app-content">

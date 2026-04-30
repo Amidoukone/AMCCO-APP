@@ -45,6 +45,7 @@ describe("authRouter", () => {
       });
 
     expect(response.status).toBe(200);
+    expect(response.headers["x-request-id"]).toBeTruthy();
     expect(login).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "user@example.com",

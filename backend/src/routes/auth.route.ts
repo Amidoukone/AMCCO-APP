@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
+import { env } from "../config/env.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { createRateLimitMiddleware } from "../middleware/rate-limit.middleware.js";
 import { login, logout, refresh, switchCompany } from "../services/auth.service.js";
 
 const loginSchema = z.object({
@@ -30,9 +32,15 @@ function getRequestMeta(req: { ip?: string; get: (name: string) => string | unde
 }
 
 export const authRouter = Router();
+const authRateLimit = createRateLimitMiddleware({
+  maxAttempts: env.AUTH_RATE_LIMIT_MAX_ATTEMPTS,
+  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
+  message: "Trop de tentatives d'authentification. Réessayez dans quelques minutes."
+});
 
 authRouter.post(
   "/auth/login",
+  authRateLimit,
   asyncHandler(async (req, res) => {
     const body = loginSchema.parse(req.body);
     const result = await login({

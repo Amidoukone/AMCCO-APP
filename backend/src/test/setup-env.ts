@@ -11,6 +11,8 @@ process.env.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN ?? "30d"
 process.env.DATABASE_URL =
   process.env.DATABASE_URL ?? "mysql://root:root@localhost:3306/amcco_test";
 process.env.DB_POOL_LIMIT = process.env.DB_POOL_LIMIT ?? "2";
+process.env.AUTH_RATE_LIMIT_WINDOW_MS = process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? "900000";
+process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS = process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS ?? "10";
 
 afterEach(() => {
   vi.clearAllMocks();

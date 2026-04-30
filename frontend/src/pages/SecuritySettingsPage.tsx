@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
-import { ApiError, listAuditLogsRequest } from "../lib/api";
+import { ApiError, changeOwnPasswordRequest, listAuditLogsRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { AuditLogItem } from "../types/audit";
 import {
@@ -252,7 +252,7 @@ function collapseAuditItems(items: AuditLogItem[]): AuditDisplayItem[] {
 
 export function SecuritySettingsPage(): JSX.Element {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { logout, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AuditLogItem[]>([]);
@@ -260,6 +260,14 @@ export function SecuritySettingsPage(): JSX.Element {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreItems, setHasMoreItems] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
   const [query, setQuery] = useState({
     action: "",
     actorId: "",
@@ -373,13 +381,47 @@ export function SecuritySettingsPage(): JSX.Element {
     }));
   }
 
-  if (!canAccess) {
-    return (
-      <section className="panel">
-        <h2>Sécurité et accès</h2>
-        <p>Votre rôle ne permet pas d'accéder au journal d'audit.</p>
-      </section>
-    );
+  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setPasswordErrorMessage(null);
+    setPasswordSuccessMessage(null);
+
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordErrorMessage("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordErrorMessage("La confirmation ne correspond pas au nouveau mot de passe.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await withAuthorizedToken((accessToken) =>
+        changeOwnPasswordRequest(accessToken, {
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      );
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+      setPasswordSuccessMessage("Mot de passe mis à jour.");
+    } catch (error) {
+      setPasswordErrorMessage(
+        error instanceof ApiError ? error.message : "Impossible de modifier le mot de passe."
+      );
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
+  async function handleLogout(): Promise<void> {
+    await logout();
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -388,6 +430,70 @@ export function SecuritySettingsPage(): JSX.Element {
         <h2>Sécurité et accès</h2>
       </header>
 
+      <section className="panel security-personal-panel">
+        <h3>Sécurité personnelle</h3>
+        <p className="hint">
+          Gérez votre mot de passe et votre session active.
+        </p>
+        <FeedbackBanner
+          errorMessage={passwordErrorMessage}
+          successMessage={passwordSuccessMessage}
+          isLoading={isChangingPassword}
+        />
+        <form className="admin-form security-password-form" onSubmit={handlePasswordSubmit}>
+          <input
+            type="password"
+            placeholder="Mot de passe actuel"
+            value={passwordForm.currentPassword}
+            onChange={(event) =>
+              setPasswordForm((prev) => ({
+                ...prev,
+                currentPassword: event.target.value
+              }))
+            }
+            autoComplete="current-password"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Nouveau mot de passe"
+            value={passwordForm.newPassword}
+            onChange={(event) =>
+              setPasswordForm((prev) => ({
+                ...prev,
+                newPassword: event.target.value
+              }))
+            }
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Confirmer le mot de passe"
+            value={passwordForm.confirmPassword}
+            onChange={(event) =>
+              setPasswordForm((prev) => ({
+                ...prev,
+                confirmPassword: event.target.value
+              }))
+            }
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
+          <button type="submit" disabled={isChangingPassword}>
+            {isChangingPassword ? "Mise à jour..." : "Modifier le mot de passe"}
+          </button>
+        </form>
+        <div className="security-session-actions">
+          <button className="secondary-btn" type="button" onClick={() => void handleLogout()}>
+            Se déconnecter
+          </button>
+        </div>
+      </section>
+
+      {canAccess ? (
       <section className="panel">
         <h3>Filtres</h3>
         <div className="security-quick-filters">
@@ -481,9 +587,11 @@ export function SecuritySettingsPage(): JSX.Element {
           <button type="submit">Filtrer</button>
         </form>
       </section>
+      ) : null}
 
-      <FeedbackBanner errorMessage={errorMessage} isLoading={isLoading} />
+      {canAccess ? <FeedbackBanner errorMessage={errorMessage} isLoading={isLoading} /> : null}
 
+      {canAccess ? (
       <section className="panel">
         <h3>Historique récent</h3>
         {!isLoading && displayItems.length === 0 ? <p>Aucune entrée pour ces filtres.</p> : null}
@@ -598,6 +706,14 @@ export function SecuritySettingsPage(): JSX.Element {
           </>
         ) : null}
       </section>
+      ) : (
+        <section className="panel">
+          <h3>Journal d'audit</h3>
+          <p className="hint">
+            Le journal d'audit est réservé aux propriétaires et administrateurs système.
+          </p>
+        </section>
+      )}
     </>
   );
 }

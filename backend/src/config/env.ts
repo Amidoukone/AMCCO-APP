@@ -21,6 +21,8 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
   DATABASE_URL: z.string().startsWith("mysql://"),
   DB_POOL_LIMIT: z.coerce.number().int().min(1).max(100).default(10),
+  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(60000).default(900000),
+  AUTH_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(10),
   IMAGEKIT_PUBLIC_KEY: z.preprocess(emptyStringToUndefined, z.string().optional()),
   IMAGEKIT_PRIVATE_KEY: z.preprocess(emptyStringToUndefined, z.string().optional()),
   IMAGEKIT_URL_ENDPOINT: z.preprocess(emptyStringToUndefined, z.string().url().optional())

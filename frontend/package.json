@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint": "echo \"frontend lint not configured yet\"",
+    "lint": "tsc --noEmit --pretty false",
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {

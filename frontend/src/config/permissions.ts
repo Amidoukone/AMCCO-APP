@@ -17,7 +17,7 @@ export type NavigationItem = {
   key: FeatureKey;
   label: string;
   to: string;
-  section: "Pilotage" | "Exécution" | "Administration";
+  section: "Pilotage" | "Exécution" | "Administration" | "Compte";
 };
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
@@ -39,7 +39,7 @@ const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
   financeSalaries: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   operationsTasks: ["OWNER", "SYS_ADMIN", "SUPERVISOR", "EMPLOYEE"],
   reports: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"],
-  settingsSecurity: ["OWNER", "SYS_ADMIN"]
+  settingsSecurity: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"]
 };
 
 const NAVIGATION_ITEMS: NavigationItem[] = [
@@ -77,7 +77,7 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     key: "settingsSecurity",
     label: "Sécurité",
     to: "/settings/security",
-    section: "Administration"
+    section: "Compte"
   }
 ];
 
