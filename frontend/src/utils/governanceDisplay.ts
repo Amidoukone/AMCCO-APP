@@ -10,19 +10,8 @@ export function formatAccountScopeLabel(input: {
   primaryActivityCode: BusinessActivityCode | null;
   allowedActivityCodes: BusinessActivityCode[];
 }): string {
-  if (input.scopeType === "GLOBAL") {
-    return "Global entreprise";
-  }
-
-  if (input.scopeType === "DEDICATED") {
-    return input.primaryActivityCode
-      ? `Dedie: ${getBusinessActivityLabel(input.primaryActivityCode)}`
-      : "Dedie";
-  }
-
-  return input.allowedActivityCodes.length > 0
-    ? `Restreint: ${formatActivityList(input.allowedActivityCodes)}`
-    : "Restreint";
+  void input;
+  return "Tous les secteurs";
 }
 
 export function formatAccountGovernanceDetails(input: {
@@ -40,14 +29,6 @@ export function formatAccountGovernanceDetails(input: {
 
   if (input.activityCode) {
     lines.push(`Secteur transaction: ${getBusinessActivityLabel(input.activityCode)}`);
-  }
-
-  if (input.scopeType === "DEDICATED" && input.primaryActivityCode) {
-    lines.push(`Secteur compte: ${getBusinessActivityLabel(input.primaryActivityCode)}`);
-  }
-
-  if (input.scopeType === "RESTRICTED" && input.allowedActivityCodes.length > 0) {
-    lines.push(`Secteurs autorises: ${formatActivityList(input.allowedActivityCodes)}`);
   }
 
   return lines;

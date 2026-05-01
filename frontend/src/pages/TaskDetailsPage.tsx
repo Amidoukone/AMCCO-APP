@@ -482,9 +482,9 @@ export function TaskDetailsPage(): JSX.Element {
             </div>
           ) : (
             <div className="task-detail-actions">
-              <div className="operations-inline-group">
-                <label>Statut</label>
-                {canUpdateStatus ? (
+              {canUpdateStatus ? (
+                <div className="operations-inline-group">
+                  <label>Statut</label>
                   <select
                     value={task.status}
                     onChange={(event) => void handleStatusChange(event.target.value as TaskStatus)}
@@ -495,10 +495,8 @@ export function TaskDetailsPage(): JSX.Element {
                     <option value="DONE">Terminée</option>
                     <option value="BLOCKED">Bloquée</option>
                   </select>
-                ) : (
-                  <p className="hint">Vous ne pouvez pas modifier ce statut.</p>
-                )}
-              </div>
+                </div>
+              ) : null}
 
               {canManageTasks ? (
                 <div className="operations-assign-card">

@@ -156,7 +156,7 @@ function assertAccountCreationGovernance(
   if (scopeType === "GLOBAL" && role === "ACCOUNTANT") {
     throw new HttpError(
       403,
-      "Seuls le proprietaire ou l'admin systeme peuvent creer un compte global entreprise."
+      "Seuls le proprietaire ou l'admin systeme peuvent creer ce type de compte financier."
     );
   }
 }
@@ -199,18 +199,8 @@ function assertAccountSupportsActivity(
   },
   activityCode: BusinessActivityCode
 ): void {
-  const isAllowed =
-    account.scopeType === "GLOBAL" ||
-    account.primaryActivityCode === activityCode ||
-    account.allowedActivityCodes.includes(activityCode);
-
-  if (!isAllowed) {
-    const profile = getBusinessActivityProfile(activityCode);
-    throw new HttpError(
-      400,
-      `Le compte financier ${account.name} n'est pas autorise pour le secteur ${profile.label}.`
-    );
-  }
+  void account;
+  void activityCode;
 }
 
 function toActivityLabel(activityCode: BusinessActivityCode | null): string | null {
@@ -223,7 +213,7 @@ function toAccountScopeLabel(account: {
   allowedActivityCodes: BusinessActivityCode[];
 }): string {
   if (account.scopeType === "GLOBAL") {
-    return "Global entreprise";
+    return "Tous les secteurs";
   }
 
   if (account.scopeType === "DEDICATED") {
@@ -522,36 +512,10 @@ export async function createCompanyAccount(
     throw new HttpError(403, "Permissions insuffisantes pour creer un compte financier.");
   }
 
-  const scopeType = input.scopeType ?? "GLOBAL";
-  const primaryActivityCode = input.primaryActivityCode ?? null;
-  const allowedActivityCodes = normalizeActivityCodes(input.allowedActivityCodes);
-  assertAccountCreationGovernance(actor.role, scopeType);
-
-  if (scopeType === "DEDICATED" && !primaryActivityCode) {
-    throw new HttpError(400, "Selectionne un secteur principal pour un compte dedie.");
-  }
-
-  if (scopeType === "RESTRICTED" && allowedActivityCodes.length === 0) {
-    throw new HttpError(400, "Selectionne au moins un secteur autorise pour un compte restreint.");
-  }
-
-  const activityCodesToValidate =
-    scopeType === "DEDICATED"
-      ? (primaryActivityCode ? [primaryActivityCode] : [])
-      : scopeType === "RESTRICTED"
-        ? allowedActivityCodes
-        : [];
-
-  for (const activityCode of activityCodesToValidate) {
-    await ensureCompanyActivityEnabledOrThrow(actor.companyId, activityCode);
-  }
+  const scopeType: FinancialAccountScopeType = "GLOBAL";
+  const primaryActivityCode = null;
 
   const accountId = randomUUID();
-  const effectiveAllowedActivityCodes = getEffectiveAllowedActivityCodes({
-    scopeType,
-    primaryActivityCode,
-    allowedActivityCodes
-  });
   await createFinancialAccount({
     id: accountId,
     companyId: actor.companyId,
@@ -560,7 +524,7 @@ export async function createCompanyAccount(
     balance: input.openingBalance ?? "0.00",
     scopeType,
     primaryActivityCode,
-    allowedActivityCodes: scopeType === "RESTRICTED" ? effectiveAllowedActivityCodes : []
+    allowedActivityCodes: []
   });
 
   const created = await findFinancialAccountById(actor.companyId, accountId);
@@ -619,35 +583,9 @@ export async function updateCompanyAccount(
     );
   }
 
-  const scopeType = input.scopeType ?? existing.scopeType;
-  const primaryActivityCode = input.primaryActivityCode ?? null;
-  const allowedActivityCodes = normalizeActivityCodes(input.allowedActivityCodes);
+  const scopeType: FinancialAccountScopeType = "GLOBAL";
+  const primaryActivityCode = null;
   assertAccountManagementGovernance(actor.role, scopeType);
-
-  if (scopeType === "DEDICATED" && !primaryActivityCode) {
-    throw new HttpError(400, "Selectionne un secteur principal pour un compte dedie.");
-  }
-
-  if (scopeType === "RESTRICTED" && allowedActivityCodes.length === 0) {
-    throw new HttpError(400, "Selectionne au moins un secteur autorise pour un compte restreint.");
-  }
-
-  const activityCodesToValidate =
-    scopeType === "DEDICATED"
-      ? (primaryActivityCode ? [primaryActivityCode] : [])
-      : scopeType === "RESTRICTED"
-        ? allowedActivityCodes
-        : [];
-
-  for (const activityCode of activityCodesToValidate) {
-    await ensureCompanyActivityEnabledOrThrow(actor.companyId, activityCode);
-  }
-
-  const effectiveAllowedActivityCodes = getEffectiveAllowedActivityCodes({
-    scopeType,
-    primaryActivityCode,
-    allowedActivityCodes
-  });
   await updateFinancialAccount({
     companyId: actor.companyId,
     accountId: existing.id,
@@ -656,7 +594,7 @@ export async function updateCompanyAccount(
     balance: input.openingBalance ?? existing.balance,
     scopeType,
     primaryActivityCode,
-    allowedActivityCodes: scopeType === "RESTRICTED" ? effectiveAllowedActivityCodes : []
+    allowedActivityCodes: []
   });
 
   const updated = await findFinancialAccountById(actor.companyId, existing.id);
@@ -770,6 +708,10 @@ export async function createCompanyTransaction(
     occurredAt: new Date(input.occurredAt)
   });
 
+  await submitCompanyTransaction(actor, {
+    transactionId
+  });
+
   await createAuditLogRecord({
     auditId: randomUUID(),
     companyId: actor.companyId,
@@ -823,10 +765,6 @@ export async function updateCompanyTransaction(
     throw new HttpError(400, "Les salaires doivent etre geres depuis la page salaires.");
   }
 
-  if (existing.status === "APPROVED") {
-    throw new HttpError(403, "Une transaction approuvee ne peut plus etre modifiee.");
-  }
-
   const account = await findFinancialAccountById(actor.companyId, input.accountId);
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
@@ -861,6 +799,10 @@ export async function updateCompanyTransaction(
     metadata,
     requiresProof: profile.finance.requiresProof,
     occurredAt: new Date(input.occurredAt)
+  });
+
+  await submitCompanyTransaction(actor, {
+    transactionId: existing.id
   });
 
   await createAuditLogRecord({
@@ -1567,16 +1509,7 @@ export async function deleteCompanyTransaction(
     throw new HttpError(400, "Les salaires doivent etre geres depuis la page salaires.");
   }
 
-  if (existing.status === "APPROVED") {
-    if (!canDeleteApprovedTransaction(actor.role)) {
-      throw new HttpError(
-        403,
-        "Seul l'admin systeme peut supprimer une transaction deja approuvee."
-      );
-    }
-  } else {
-    ensureTransactionManagementAccess(actor.role);
-  }
+  ensureTransactionManagementAccess(actor.role);
 
   const account = await findFinancialAccountById(actor.companyId, existing.accountId);
   await deleteFinancialTransaction({
@@ -1736,7 +1669,7 @@ export async function addProofToTransaction(
     throw new HttpError(403, "Permissions insuffisantes pour ajouter une preuve.");
   }
 
-  if (transaction.status === "APPROVED" || transaction.status === "REJECTED") {
+  if (transaction.status === "REJECTED") {
     throw new HttpError(400, "Ajout de preuve impossible apres validation finale.");
   }
 
@@ -2105,7 +2038,7 @@ export async function getTransactionProofUploadAuth(
     throw new HttpError(403, "Permissions insuffisantes pour ajouter une preuve.");
   }
 
-  if (transaction.status === "APPROVED" || transaction.status === "REJECTED") {
+  if (transaction.status === "REJECTED") {
     throw new HttpError(400, "Ajout de preuve impossible apres validation finale.");
   }
 

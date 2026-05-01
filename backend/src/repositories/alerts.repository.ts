@@ -248,3 +248,40 @@ export async function markAllUserAlertsAsRead(input: {
     [input.companyId, input.userId]
   );
 }
+
+export async function deleteUserAlert(input: {
+  companyId: string;
+  userId: string;
+  alertId: string;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      DELETE FROM alerts
+      WHERE id = ?
+        AND company_id = ?
+        AND target_user_id = ?
+    `,
+    [input.alertId, input.companyId, input.userId]
+  );
+}
+
+export async function deleteManyUserAlerts(input: {
+  companyId: string;
+  userId: string;
+  alertIds: string[];
+}): Promise<void> {
+  if (input.alertIds.length === 0) {
+    return;
+  }
+
+  const placeholders = input.alertIds.map(() => "?").join(", ");
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      DELETE FROM alerts
+      WHERE company_id = ?
+        AND target_user_id = ?
+        AND id IN (${placeholders})
+    `,
+    [input.companyId, input.userId, ...input.alertIds]
+  );
+}

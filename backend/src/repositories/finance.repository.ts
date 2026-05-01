@@ -284,18 +284,6 @@ export async function listFinancialAccounts(input: {
   const filters: string[] = ["fa.company_id = ?"];
   const values: Array<string | number> = [input.companyId];
 
-  if (input.activityCode) {
-    filters.push(
-      `(fa.scope_type = 'GLOBAL' OR fa.primary_activity_code = ? OR EXISTS (
-        SELECT 1
-        FROM financial_account_activities faa_filter
-        WHERE faa_filter.account_id = fa.id
-          AND faa_filter.activity_code = ?
-      ))`
-    );
-    values.push(input.activityCode, input.activityCode);
-  }
-
   const rows = await queryRows<AccountRow[]>(
     `
       SELECT
@@ -582,7 +570,6 @@ export async function updateFinancialTransaction(input: {
           updated_at = CURRENT_TIMESTAMP
       WHERE company_id = ?
         AND id = ?
-        AND status <> 'APPROVED'
     `,
     [
       input.accountId,

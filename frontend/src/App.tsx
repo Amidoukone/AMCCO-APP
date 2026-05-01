@@ -17,7 +17,6 @@ import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MyWorkPage } from "./pages/MyWorkPage";
 import { OperationsTasksPage } from "./pages/OperationsTasksPage";
-import { ReportsPage } from "./pages/ReportsPage";
 import { SecuritySettingsPage } from "./pages/SecuritySettingsPage";
 import { TaskDetailsPage } from "./pages/TaskDetailsPage";
 
@@ -146,11 +145,7 @@ export function App(): JSX.Element {
 
         <Route
           path="/reports"
-          element={
-            <RoleGuard feature="reports">
-              <ReportsPage />
-            </RoleGuard>
-          }
+          element={<Navigate to="/dashboard" replace />}
         />
 
         <Route

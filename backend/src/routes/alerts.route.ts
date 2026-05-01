@@ -4,6 +4,8 @@ import { HttpError } from "../errors/http-error.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { authenticateAccessToken } from "../middleware/auth.middleware.js";
 import {
+  deleteCurrentUserAlert,
+  deleteManyCurrentUserAlerts,
   getCurrentUserAlertsSummary,
   listCurrentUserAlerts,
   markAllCurrentUserAlertsAsRead,
@@ -21,6 +23,10 @@ const listAlertsQuerySchema = z.object({
 
 const alertIdParamSchema = z.object({
   alertId: z.string().trim().min(8).max(64)
+});
+
+const deleteManyAlertsSchema = z.object({
+  alertIds: z.array(z.string().trim().min(8).max(64)).min(1).max(500)
 });
 
 export const alertsRouter = Router();
@@ -109,5 +115,51 @@ alertsRouter.patch(
     );
 
     res.status(200).json({ status: "read" });
+  })
+);
+
+alertsRouter.delete(
+  "/alerts/:alertId",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+
+    const params = alertIdParamSchema.parse(req.params);
+    await deleteCurrentUserAlert(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role
+      },
+      {
+        alertId: params.alertId
+      }
+    );
+
+    res.status(200).json({ status: "deleted" });
+  })
+);
+
+alertsRouter.post(
+  "/alerts/delete-many",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+
+    const body = deleteManyAlertsSchema.parse(req.body);
+    await deleteManyCurrentUserAlerts(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role
+      },
+      {
+        alertIds: body.alertIds
+      }
+    );
+
+    res.status(200).json({ status: "deleted-many" });
   })
 );

@@ -20,8 +20,6 @@ import {
   listFinanceAccountsRequest,
   listFinanceTransactionProofsRequest,
   listFinanceTransactionsRequest,
-  reviewFinanceTransactionRequest,
-  submitFinanceTransactionRequest,
   updateFinanceAccountRequest,
   updateFinanceTransactionRequest
 } from "../lib/api";
@@ -42,7 +40,6 @@ import type {
 } from "../types/finance";
 import {
   formatAccountScopeLabel,
-  getTransactionDecisionShortcuts,
   getAccountGovernanceLines,
   getTransactionGovernanceLines
 } from "../utils/governanceDisplay";
@@ -56,19 +53,6 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Opération impossible. Vérifiez la connexion backend.";
-}
-
-function statusLabel(status: FinancialTransaction["status"]): string {
-  if (status === "DRAFT") {
-    return "Brouillon";
-  }
-  if (status === "SUBMITTED") {
-    return "Soumise";
-  }
-  if (status === "APPROVED") {
-    return "Approuvée";
-  }
-  return "Rejetée";
 }
 
 function formatFileSize(bytes: number): string {
@@ -268,19 +252,11 @@ export function FinanceTransactionsPage(): JSX.Element {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
 
-  const canReview = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
-  }, [user?.role]);
-
   const canManageTransactions = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
   const canManageAnyAccount = canCreateAccount;
-
-  const canDeleteApprovedTransactions = useMemo(() => {
-    return user?.role === "SYS_ADMIN";
-  }, [user?.role]);
 
   const canManageSalaries = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
@@ -614,14 +590,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         const payload = {
           name: accountForm.name.trim(),
           accountRef: accountForm.accountRef.trim() || undefined,
-          openingBalance: accountForm.openingBalance.trim(),
-          scopeType: accountForm.scopeType,
-          primaryActivityCode:
-            accountForm.scopeType === "DEDICATED" && accountForm.primaryActivityCode
-              ? accountForm.primaryActivityCode
-              : undefined,
-          allowedActivityCodes:
-            accountForm.scopeType === "RESTRICTED" ? accountForm.allowedActivityCodes : undefined
+          openingBalance: accountForm.openingBalance.trim()
         };
 
         return editingAccountId
@@ -731,9 +700,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       });
       handleOpenTransactionDetails(response.item.id, response.item.activityCode);
       setSuccessMessage(
-        editingTransactionId
-          ? "Transaction modifiée. Elle repasse en brouillon avant nouvelle soumission."
-          : "Transaction créée en brouillon."
+        editingTransactionId ? "Transaction modifiée." : "Transaction enregistrée."
       );
       resetTransactionForm();
       await loadData();
@@ -957,41 +924,6 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
   }
 
-  async function handleSubmitTransaction(transactionId: string): Promise<void> {
-    setBusyTransactionId(transactionId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) => submitFinanceTransactionRequest(accessToken, transactionId));
-      setSuccessMessage("Transaction soumise pour validation.");
-      await loadData();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyTransactionId(null);
-    }
-  }
-
-  async function handleReviewTransaction(
-    transactionId: string,
-    decision: "APPROVED" | "REJECTED"
-  ): Promise<void> {
-    setBusyTransactionId(transactionId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) =>
-        reviewFinanceTransactionRequest(accessToken, transactionId, decision)
-      );
-      setSuccessMessage(decision === "APPROVED" ? "Transaction approuvée." : "Transaction rejetée.");
-      await loadData();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyTransactionId(null);
-    }
-  }
-
   return (
     <>
       <header className="section-header">
@@ -1063,22 +995,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               }
               required
             />
-            <select
-              value={accountForm.scopeType}
-              onChange={(event) =>
-                setAccountForm((prev) => ({
-                  ...prev,
-                  scopeType: event.target.value as FinancialAccountScopeType
-                }))
-              }
-            >
-              {canManageGlobalAccounts ? (
-                <option value="GLOBAL">Compte global entreprise</option>
-              ) : null}
-              <option value="DEDICATED">Compte dédié à un secteur</option>
-              <option value="RESTRICTED">Compte partagé sur secteurs choisis</option>
-            </select>
-            {!canManageGlobalAccounts ? (
+            {false ? (
               <p className="hint">
                 Les comptes globaux entreprise sont réservés au propriétaire et à l'admin système.
               </p>
@@ -1165,7 +1082,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       ) : null}
 
       <section className="panel finance-page-panel finance-transactions-filters">
-        <h3>Filtres</h3>
+        <h3>Recherche</h3>
         <form
           className="operations-filter-form"
           onSubmit={(event) => {
@@ -1173,72 +1090,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             void loadData();
           }}
         >
-          <div className="view-preset-strip">
-            <button
-              type="button"
-              className={filters.status === "ALL" && filters.type === "ALL" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() =>
-                setFilters({
-                  status: "ALL",
-                  type: "ALL"
-                })
-              }
-            >
-              Vue complete
-            </button>
-            <button
-              type="button"
-              className={filters.status === "SUBMITTED" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() =>
-                setFilters((prev) => ({
-                  ...prev,
-                  status: "SUBMITTED"
-                }))
-              }
-            >
-              A finaliser
-            </button>
-            <button
-              type="button"
-              className={filters.status === "DRAFT" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() =>
-                setFilters((prev) => ({
-                  ...prev,
-                  status: "DRAFT"
-                }))
-              }
-            >
-              Brouillons
-            </button>
-            <button
-              type="button"
-              className={filters.type === "CASH_OUT" && filters.status === "ALL" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() =>
-                setFilters({
-                  status: "ALL",
-                  type: "CASH_OUT"
-                })
-              }
-            >
-              Sorties
-            </button>
-          </div>
 
-          <select
-            value={filters.status}
-            onChange={(event) =>
-              setFilters((prev) => ({
-                ...prev,
-                status: event.target.value as "ALL" | FinancialTransaction["status"]
-              }))
-            }
-          >
-            <option value="ALL">Tous les statuts</option>
-            <option value="DRAFT">Brouillon</option>
-            <option value="SUBMITTED">Soumise</option>
-            <option value="APPROVED">Approuvée</option>
-            <option value="REJECTED">Rejetée</option>
-          </select>
           <select
             value={filters.type}
             onChange={(event) =>
@@ -1259,7 +1111,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
-          <button type="submit">Filtrer</button>
+          <button type="submit">Actualiser</button>
         </form>
       </section>
 
@@ -1478,8 +1330,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   <th>Date</th>
                   <th>Compte</th>
                   <th>Montant</th>
-                  <th>Statut</th>
-                  <th>Suivi</th>
+                  <th>Justificatifs</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1489,11 +1340,8 @@ export function FinanceTransactionsPage(): JSX.Element {
                   const isProofsOpen = openProofs[tx.id] === true;
                   const proofs = proofsByTransaction[tx.id] ?? [];
                   const isProofsLoading = loadingProofsByTransaction[tx.id] === true;
-                  const canEditTransaction = canManageTransactions && tx.status !== "APPROVED";
-                  const canDeleteTransaction =
-                    tx.status === "APPROVED"
-                      ? canDeleteApprovedTransactions
-                      : canManageTransactions;
+                  const canEditTransaction = canManageTransactions;
+                  const canDeleteTransaction = canManageTransactions;
 
                   return (
                     <tr key={tx.id}>
@@ -1510,7 +1358,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                       <td>
                         {tx.amount} {tx.currency}
                       </td>
-                      <td>{statusLabel(tx.status)}</td>
                       <td>
                         <div>
                           {tx.proofsCount} preuve{tx.proofsCount > 1 ? "s" : ""}
@@ -1545,41 +1392,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                             >
                               Supprimer
                             </button>
-                          ) : null}
-                          {tx.status === "DRAFT" ? (
-                            <button
-                              type="button"
-                              className="secondary-btn"
-                              onClick={() => void handleSubmitTransaction(tx.id)}
-                              disabled={isBusy || (tx.requiresProof && tx.proofsCount < 1)}
-                              title={
-                                tx.requiresProof && tx.proofsCount < 1
-                                  ? "Ajoute au moins une preuve avant soumission."
-                                  : undefined
-                              }
-                            >
-                              Soumettre
-                            </button>
-                          ) : null}
-                          {canReview && tx.status === "SUBMITTED" ? (
-                            <>
-                              <button
-                                type="button"
-                                className="secondary-btn"
-                                onClick={() => void handleReviewTransaction(tx.id, "APPROVED")}
-                                disabled={isBusy}
-                              >
-                                Approuver
-                              </button>
-                              <button
-                                type="button"
-                                className="danger-btn"
-                                onClick={() => void handleReviewTransaction(tx.id, "REJECTED")}
-                                disabled={isBusy}
-                              >
-                                Rejeter
-                              </button>
-                            </>
                           ) : null}
                         </div>
                         <details className="table-inline-details">
@@ -1649,29 +1461,27 @@ export function FinanceTransactionsPage(): JSX.Element {
                               </div>
                             ) : null}
 
-                            {(tx.status === "DRAFT" || tx.status === "SUBMITTED") ? (
-                              <div className="proof-inline-form">
-                                <input
-                                  type="file"
-                                  accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                                  onChange={(event) =>
-                                    setProofFiles((prev) => ({
-                                      ...prev,
-                                      [tx.id]: event.target.files?.[0] ?? null
-                                    }))
-                                  }
-                                  disabled={isBusy}
-                                />
-                                <button
-                                  type="button"
-                                  className="secondary-btn"
-                                  onClick={() => void handleAddProof(tx.id)}
-                                  disabled={isBusy}
-                                >
-                                  Ajouter une preuve
-                                </button>
-                              </div>
-                            ) : null}
+                            <div className="proof-inline-form">
+                              <input
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                                onChange={(event) =>
+                                  setProofFiles((prev) => ({
+                                    ...prev,
+                                    [tx.id]: event.target.files?.[0] ?? null
+                                  }))
+                                }
+                                disabled={isBusy}
+                              />
+                              <button
+                                type="button"
+                                className="secondary-btn"
+                                onClick={() => void handleAddProof(tx.id)}
+                                disabled={isBusy}
+                              >
+                                Ajouter une preuve
+                              </button>
+                            </div>
                           </div>
                         </details>
                       </td>
@@ -1740,9 +1550,6 @@ export function FinanceTransactionsPage(): JSX.Element {
               <strong>Montant:</strong> {selectedTransaction.amount} {selectedTransaction.currency}
             </p>
             <p>
-              <strong>Statut:</strong> {statusLabel(selectedTransaction.status)}
-            </p>
-            <p>
               <strong>Preuves:</strong> {selectedTransaction.proofsCount}
               {selectedTransaction.requiresProof ? " (obligatoire)" : ""}
             </p>
@@ -1767,17 +1574,8 @@ export function FinanceTransactionsPage(): JSX.Element {
           </div>
 
           <div className="finance-decision-shortcuts">
-            <strong>Raccourcis décision</strong>
+            <strong>Justificatifs</strong>
             <div className="actions-inline">
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() =>
-                  navigate(getTransactionDecisionShortcuts(selectedTransaction.id).alertsPath)
-                }
-              >
-                Voir alertes
-              </button>
               <button
                 type="button"
                 className="secondary-btn"
@@ -1823,7 +1621,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
           <div className="finance-transaction-detail-actions">
             <div className="actions-inline">
-              {canManageTransactions && selectedTransaction.status !== "APPROVED" ? (
+              {canManageTransactions ? (
                 <button
                   type="button"
                   className="secondary-btn"
@@ -1833,9 +1631,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   Modifier
                 </button>
               ) : null}
-              {(selectedTransaction.status === "APPROVED"
-                ? canDeleteApprovedTransactions
-                : canManageTransactions) ? (
+              {canManageTransactions ? (
                 <button
                   type="button"
                   className="danger-btn"
@@ -1846,29 +1642,27 @@ export function FinanceTransactionsPage(): JSX.Element {
                 </button>
               ) : null}
             </div>
-            {(selectedTransaction.status === "DRAFT" || selectedTransaction.status === "SUBMITTED") ? (
-              <div className="proof-inline-form">
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                  onChange={(event) =>
-                    setProofFiles((prev) => ({
-                      ...prev,
-                      [selectedTransaction.id]: event.target.files?.[0] ?? null
-                    }))
-                  }
-                  disabled={busyTransactionId === selectedTransaction.id}
-                />
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => void handleAddProof(selectedTransaction.id)}
-                  disabled={busyTransactionId === selectedTransaction.id}
-                >
-                  Ajouter une preuve
-                </button>
-              </div>
-            ) : null}
+            <div className="proof-inline-form">
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                onChange={(event) =>
+                  setProofFiles((prev) => ({
+                    ...prev,
+                    [selectedTransaction.id]: event.target.files?.[0] ?? null
+                  }))
+                }
+                disabled={busyTransactionId === selectedTransaction.id}
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleAddProof(selectedTransaction.id)}
+                disabled={busyTransactionId === selectedTransaction.id}
+              >
+                Ajouter une preuve
+              </button>
+            </div>
           </div>
 
           {openProofs[selectedTransaction.id] ? (

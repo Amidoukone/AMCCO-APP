@@ -118,15 +118,6 @@ export function DashboardPage(): JSX.Element {
               className="dashboard-inline-button"
               type="button"
               onClick={() => {
-                navigate("/reports");
-              }}
-            >
-              Ouvrir les rapports
-            </button>
-            <button
-              className="dashboard-inline-button"
-              type="button"
-              onClick={() => {
                 navigate("/settings/security");
               }}
             >

@@ -42,7 +42,7 @@ export function QuickActions({
       : null,
     canUse("alerts")
       ? {
-          label: "Alertes critiques",
+          label: "Alertes",
           to: "/alerts",
           tone: "neutral"
         }

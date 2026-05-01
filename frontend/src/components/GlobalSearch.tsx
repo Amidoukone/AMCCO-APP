@@ -47,10 +47,10 @@ function buildSearchItems(
       keywords: ["nouvelle transaction", "finance", "caisse", "dépense", "recette"]
     },
     {
-      label: "Alertes critiques",
+      label: "Alertes",
       description: "Consulter les notifications à traiter",
       to: "/alerts",
-      keywords: ["alerte", "critique", "notification", "risque"]
+      keywords: ["alerte", "notification", "risque"]
     }
   );
 

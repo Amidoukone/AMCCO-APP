@@ -706,14 +706,7 @@ export function SecuritySettingsPage(): JSX.Element {
           </>
         ) : null}
       </section>
-      ) : (
-        <section className="panel">
-          <h3>Journal d'audit</h3>
-          <p className="hint">
-            Le journal d'audit est réservé aux propriétaires et administrateurs système.
-          </p>
-        </section>
-      )}
+      ) : null}
     </>
   );
 }

@@ -1103,6 +1103,9 @@ a {
   background: #0b5ed7;
   color: #ffffff;
   cursor: pointer;
+  justify-self: start;
+  width: fit-content;
+  min-width: 120px;
 }
 
 .alerts-filter-form button.secondary-btn {

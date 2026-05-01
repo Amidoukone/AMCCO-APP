@@ -3,6 +3,8 @@ import { HttpError } from "../errors/http-error.js";
 import {
   countUserUnreadAlerts,
   createAlertRecords,
+  deleteManyUserAlerts,
+  deleteUserAlert,
   listCompanyActiveUserIdsByRoles,
   listUserAlerts,
   markAllUserAlertsAsRead,
@@ -144,5 +146,43 @@ export async function markAllCurrentUserAlertsAsRead(actor: ActorContext): Promi
   await markAllUserAlertsAsRead({
     companyId: actor.companyId,
     userId: actor.actorId
+  });
+}
+
+export async function deleteCurrentUserAlert(
+  actor: ActorContext,
+  input: {
+    alertId: string;
+  }
+): Promise<void> {
+  if (!input.alertId.trim()) {
+    throw new HttpError(400, "Identifiant d'alerte invalide.");
+  }
+
+  await deleteUserAlert({
+    companyId: actor.companyId,
+    userId: actor.actorId,
+    alertId: input.alertId
+  });
+}
+
+export async function deleteManyCurrentUserAlerts(
+  actor: ActorContext,
+  input: {
+    alertIds: string[];
+  }
+): Promise<void> {
+  const alertIds = Array.from(
+    new Set(input.alertIds.map((alertId) => alertId.trim()).filter(Boolean))
+  );
+
+  if (alertIds.length === 0) {
+    throw new HttpError(400, "Selectionne au moins une alerte a supprimer.");
+  }
+
+  await deleteManyUserAlerts({
+    companyId: actor.companyId,
+    userId: actor.actorId,
+    alertIds
   });
 }

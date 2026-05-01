@@ -233,6 +233,27 @@ export function markAllAlertsReadRequest(accessToken: string): Promise<{ status:
   });
 }
 
+export function deleteAlertRequest(
+  accessToken: string,
+  alertId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/alerts/${alertId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
+export function deleteManyAlertsRequest(
+  accessToken: string,
+  alertIds: string[]
+): Promise<{ status: string }> {
+  return request<{ status: string }>("/alerts/delete-many", {
+    method: "POST",
+    body: { alertIds },
+    accessToken
+  });
+}
+
 export function getDashboardSummaryRequest(
   accessToken: string,
   query: {

@@ -4,6 +4,8 @@ import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useAuth } from "../context/AuthContext";
 import {
   ApiError,
+  deleteAlertRequest,
+  deleteManyAlertsRequest,
   listAlertsRequest,
   markAlertReadRequest,
   markAllAlertsReadRequest
@@ -13,7 +15,7 @@ import {
   usePersistedViewState
 } from "../lib/usePersistedViewState";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
-import type { AlertItem, AlertSeverity } from "../types/alerts";
+import type { AlertItem } from "../types/alerts";
 import {
   buildTaskPath,
   buildFinanceTransactionPath,
@@ -29,16 +31,6 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Chargement impossible. Verifie la connexion backend.";
-}
-
-function severityLabel(severity: AlertSeverity): string {
-  if (severity === "INFO") {
-    return "Info";
-  }
-  if (severity === "WARNING") {
-    return "Attention";
-  }
-  return "Critique";
 }
 
 function formatDateTime(value: string | null): string {
@@ -62,19 +54,19 @@ export function AlertsPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [busyAlertId, setBusyAlertId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [isDeletingSelection, setIsDeletingSelection] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreItems, setHasMoreItems] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [selectedAlertIds, setSelectedAlertIds] = useState<string[]>([]);
   const alertsViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("alerts", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
   const initialFilters = useMemo(
     () => ({
       unreadOnly: false,
-      severity: "" as "" | AlertSeverity,
-      entityType: searchParams.get("entityType") ?? "",
-      entityId: searchParams.get("entityId") ?? ""
+      entityType: searchParams.get("entityType") ?? ""
     }),
     [searchParams]
   );
@@ -83,8 +75,7 @@ export function AlertsPage(): JSX.Element {
   useEffect(() => {
     setFilters((prev) => ({
       ...prev,
-      entityType: searchParams.get("entityType") ?? "",
-      entityId: searchParams.get("entityId") ?? ""
+      entityType: searchParams.get("entityType") ?? ""
     }));
   }, [searchParams]);
 
@@ -103,14 +94,17 @@ export function AlertsPage(): JSX.Element {
           limit: ALERTS_PAGE_SIZE,
           offset,
           unreadOnly: filters.unreadOnly,
-          severity: filters.severity || undefined,
-          entityType: filters.entityType.trim() || undefined,
-          entityId: filters.entityId.trim() || undefined
+          entityType: filters.entityType.trim() || undefined
         })
       );
       setItems((prev) => (append ? [...prev, ...response.items] : response.items));
       setHasMoreItems(response.items.length === ALERTS_PAGE_SIZE);
       setUnreadCount(response.unreadCount);
+      if (!append) {
+        setSelectedAlertIds((prev) =>
+          prev.filter((alertId) => response.items.some((item) => item.id === alertId))
+        );
+      }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -121,9 +115,7 @@ export function AlertsPage(): JSX.Element {
       }
     }
   }, [
-    filters.entityId,
     filters.entityType,
-    filters.severity,
     filters.unreadOnly,
     withAuthorizedToken
   ]);
@@ -164,6 +156,46 @@ export function AlertsPage(): JSX.Element {
     }
   }
 
+  async function handleDelete(alertId: string): Promise<void> {
+    setBusyAlertId(alertId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteAlertRequest(accessToken, alertId));
+      setSelectedAlertIds((prev) => prev.filter((item) => item !== alertId));
+      setSuccessMessage("Alerte supprimée.");
+      await loadData();
+      notifyAlertsChanged();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyAlertId(null);
+    }
+  }
+
+  async function handleDeleteSelection(): Promise<void> {
+    if (selectedAlertIds.length === 0) {
+      return;
+    }
+
+    setIsDeletingSelection(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) =>
+        deleteManyAlertsRequest(accessToken, selectedAlertIds)
+      );
+      setSelectedAlertIds([]);
+      setSuccessMessage("Alertes supprimées.");
+      await loadData();
+      notifyAlertsChanged();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsDeletingSelection(false);
+    }
+  }
+
   function handleFilterSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     setSearchParams((prev) => {
@@ -173,11 +205,6 @@ export function AlertsPage(): JSX.Element {
       } else {
         next.delete("entityType");
       }
-      if (filters.entityId.trim()) {
-        next.set("entityId", filters.entityId.trim());
-      } else {
-        next.delete("entityId");
-      }
       return next;
     });
     void loadData();
@@ -186,9 +213,7 @@ export function AlertsPage(): JSX.Element {
   function applyQuickFilter(
     nextFilters: Partial<{
       unreadOnly: boolean;
-      severity: "" | AlertSeverity;
       entityType: string;
-      entityId: string;
     }>
   ): void {
     setFilters((prev) => ({
@@ -207,6 +232,9 @@ export function AlertsPage(): JSX.Element {
     });
   }
 
+  const allVisibleSelected =
+    items.length > 0 && items.every((item) => selectedAlertIds.includes(item.id));
+
   return (
     <>
       <header className="section-header">
@@ -219,38 +247,41 @@ export function AlertsPage(): JSX.Element {
             <h3>Alertes</h3>
             <p className="hint">{unreadCount} alerte(s) a traiter.</p>
           </div>
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={() => void handleReadAll()}
-            disabled={isMarkingAll || unreadCount === 0}
-          >
-            Tout marquer comme lu
-          </button>
+          <div className="actions-inline">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => void handleReadAll()}
+              disabled={isMarkingAll || unreadCount === 0}
+            >
+              Tout marquer comme lu
+            </button>
+            <button
+              type="button"
+              className="danger-btn"
+              onClick={() => void handleDeleteSelection()}
+              disabled={isDeletingSelection || selectedAlertIds.length === 0}
+            >
+              Supprimer la sélection
+            </button>
+          </div>
         </div>
 
         <form className="alerts-filter-form" onSubmit={handleFilterSubmit}>
           <div className="view-preset-strip">
             <button
               type="button"
-              className={!filters.unreadOnly && filters.severity === "" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() => applyQuickFilter({ unreadOnly: false, severity: "" })}
+              className={!filters.unreadOnly ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() => applyQuickFilter({ unreadOnly: false })}
             >
               Vue complete
             </button>
             <button
               type="button"
-              className={filters.unreadOnly && filters.severity === "" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() => applyQuickFilter({ unreadOnly: true, severity: "" })}
+              className={filters.unreadOnly ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() => applyQuickFilter({ unreadOnly: true })}
             >
               Non lues
-            </button>
-            <button
-              type="button"
-              className={!filters.unreadOnly && filters.severity === "CRITICAL" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() => applyQuickFilter({ unreadOnly: false, severity: "CRITICAL" })}
-            >
-              Critiques
             </button>
           </div>
 
@@ -268,21 +299,6 @@ export function AlertsPage(): JSX.Element {
             <span>Non lues uniquement</span>
           </label>
 
-          <select
-            value={filters.severity}
-            onChange={(event) =>
-              setFilters((prev) => ({
-                ...prev,
-                severity: event.target.value as "" | AlertSeverity
-              }))
-            }
-          >
-            <option value="">Toutes les severites</option>
-            <option value="INFO">Info</option>
-            <option value="WARNING">Attention</option>
-            <option value="CRITICAL">Critique</option>
-          </select>
-
           <input
             type="text"
             placeholder="Type entite (ex: TRANSACTION)"
@@ -291,18 +307,6 @@ export function AlertsPage(): JSX.Element {
               setFilters((prev) => ({
                 ...prev,
                 entityType: event.target.value
-              }))
-            }
-          />
-
-          <input
-            type="text"
-            placeholder="ID entite"
-            value={filters.entityId}
-            onChange={(event) =>
-              setFilters((prev) => ({
-                ...prev,
-                entityId: event.target.value
               }))
             }
           />
@@ -319,12 +323,29 @@ export function AlertsPage(): JSX.Element {
 
       <section className="panel">
         <h3>Liste</h3>
+        {!isLoading && items.length > 0 ? (
+          <label className="inline-checkbox">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={(event) =>
+                setSelectedAlertIds((prev) =>
+                  event.target.checked
+                    ? Array.from(new Set([...prev, ...items.map((item) => item.id)]))
+                    : prev.filter((alertId) => !items.some((item) => item.id === alertId))
+                )
+              }
+            />
+            <span>Selectionner les alertes visibles</span>
+          </label>
+        ) : null}
         {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond à ces filtres.</p> : null}
         {!isLoading && items.length > 0 ? (
           <>
           <div className="alerts-list">
             {items.map((item) => {
               const isUnread = item.readAt === null;
+              const isSelected = selectedAlertIds.includes(item.id);
               const financeTraceLines = getFinanceTraceLines(item.metadata);
               const financeTarget = getFinanceTransactionNavigationTarget(
                 item.entityType,
@@ -339,13 +360,29 @@ export function AlertsPage(): JSX.Element {
               return (
                 <article
                   key={item.id}
-                  className={`alert-card severity-${item.severity.toLowerCase()} ${isUnread ? "is-unread" : ""}`}
+                  className={`alert-card ${isUnread ? "is-unread" : ""}`}
                 >
                   <div className="alert-card-top">
                     <div>
-                      <h4>{severityLabel(item.severity)}</h4>
+                      <h4>Alerte</h4>
                       <p className="hint">{formatDateTime(item.createdAt)}</p>
                     </div>
+                    <label className="inline-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(event) =>
+                          setSelectedAlertIds((prev) =>
+                            event.target.checked
+                              ? [...prev, item.id].filter(
+                                  (value, index, array) => array.indexOf(value) === index
+                                )
+                              : prev.filter((alertId) => alertId !== item.id)
+                          )
+                        }
+                      />
+                      <span>Selectionner</span>
+                    </label>
                   </div>
                   <p className="alert-message">{item.message}</p>
                   <div className="alert-meta">
@@ -358,8 +395,7 @@ export function AlertsPage(): JSX.Element {
                       </p>
                     ))}
                   </div>
-                  {isUnread || financeTarget || taskTarget ? (
-                    <div className="actions-inline">
+                  <div className="actions-inline">
                       {taskTarget ? (
                         <button
                           type="button"
@@ -388,8 +424,15 @@ export function AlertsPage(): JSX.Element {
                           Marquer comme lu
                         </button>
                       ) : null}
-                    </div>
-                  ) : null}
+                      <button
+                        type="button"
+                        className="danger-btn"
+                        onClick={() => void handleDelete(item.id)}
+                        disabled={busyAlertId === item.id || isDeletingSelection || isMarkingAll}
+                      >
+                        Supprimer
+                      </button>
+                  </div>
                 </article>
               );
             })}
