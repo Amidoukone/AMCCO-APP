@@ -604,7 +604,7 @@ export function SecuritySettingsPage(): JSX.Element {
                   <th>Date</th>
                   <th>Action</th>
                   <th>Acteur</th>
-                  <th>Entite</th>
+                  <th>Entité</th>
                   <th>Details</th>
                   <th>Navigation</th>
                 </tr>
@@ -676,7 +676,7 @@ export function SecuritySettingsPage(): JSX.Element {
                             className="secondary-btn"
                             onClick={() => navigate(buildFinanceTransactionPath(financeTarget))}
                           >
-                            {financeTarget.kind === "salary" ? "Voir salaire" : "Voir transaction"}
+                            {financeTarget.kind === "salary" ? "Voir le salaire" : "Voir la transaction"}
                           </button>
                         ) : (
                           <span className="hint">-</span>

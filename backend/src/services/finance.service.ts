@@ -1154,10 +1154,6 @@ export async function updateCompanySalaryTransaction(
     throw new HttpError(400, "Cette transaction n'est pas un salaire.");
   }
 
-  if (existing.status === "APPROVED") {
-    throw new HttpError(403, "Un salaire approuve ne peut plus etre modifie.");
-  }
-
   const account = await findFinancialAccountById(actor.companyId, input.accountId);
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");

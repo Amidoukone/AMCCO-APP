@@ -24,7 +24,7 @@ function toErrorMessage(error: unknown): string {
 export function MyWorkPage(): JSX.Element {
   const navigate = useNavigate();
   const withAuthorizedToken = useAuthorizedRequest();
-  const { selectedActivityCode, selectedActivity } = useBusinessActivity();
+  const { selectedActivityCode } = useBusinessActivity();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -76,16 +76,13 @@ export function MyWorkPage(): JSX.Element {
         <div>
           <p className="sidebar-section-label">Espace personnel</p>
           <h2>Mon travail</h2>
-          <p>
-            Les priorités à traiter maintenant pour {selectedActivity?.label ?? "tous les secteurs"}.
-          </p>
         </div>
         <div className="my-work-header-actions">
           <button type="button" className="dashboard-inline-button" onClick={() => navigate("/operations/tasks")}>
-            Ouvrir les tâches
+            Voir les tâches
           </button>
           <button type="button" className="dashboard-inline-button" onClick={() => navigate("/finance/transactions")}>
-            Ouvrir la finance
+            Voir les transactions
           </button>
         </div>
       </header>
@@ -99,22 +96,18 @@ export function MyWorkPage(): JSX.Element {
             <article className="metric-card">
               <h2>Mes tâches ouvertes</h2>
               <p className="metric-value">{summary.operations.myOpenTasksCount}</p>
-              <p className="metric-note">Travail directement rattaché à votre compte.</p>
             </article>
             <article className="metric-card">
               <h2>Bloquées</h2>
               <p className="metric-value">{summary.operations.blockedCount}</p>
-              <p className="metric-note">À débloquer ou escalader rapidement.</p>
             </article>
             <article className="metric-card">
               <h2>Échéances dépassées</h2>
               <p className="metric-value">{summary.operations.overdueCount}</p>
-              <p className="metric-note">Priorité haute pour la journée.</p>
             </article>
             <article className="metric-card">
               <h2>Transactions à valider</h2>
               <p className="metric-value">{summary.finance.submittedCount}</p>
-              <p className="metric-note">Pièces ou décisions en attente.</p>
             </article>
           </section>
 
@@ -126,15 +119,13 @@ export function MyWorkPage(): JSX.Element {
                   <h3>Tâches prioritaires</h3>
                 </div>
                 <button type="button" className="dashboard-inline-button" onClick={() => navigate("/operations/tasks")}>
-                  Tout voir
+                  Voir tout
                 </button>
               </div>
               {urgentTasks.length === 0 ? (
                 <EmptyState
                   title="Aucune tâche urgente"
-                  description="Les tâches récentes ne contiennent pas de blocage ou d'échéance critique."
-                  actionLabel="Créer une tâche"
-                  onAction={() => navigate("/operations/tasks")}
+                  description="Aucune priorité immédiate."
                 />
               ) : (
                 <div className="dashboard-priority-list">
@@ -171,15 +162,13 @@ export function MyWorkPage(): JSX.Element {
                   <h3>Transactions en attente</h3>
                 </div>
                 <button type="button" className="dashboard-inline-button" onClick={() => navigate("/finance/transactions")}>
-                  Tout voir
+                  Voir tout
                 </button>
               </div>
               {pendingTransactions.length === 0 ? (
                 <EmptyState
                   title="Aucune transaction en attente"
-                  description="Les transactions récentes sont traitées ou approuvées."
-                  actionLabel="Nouvelle transaction"
-                  onAction={() => navigate("/finance/transactions")}
+                  description="Aucune action en attente."
                 />
               ) : (
                 <div className="dashboard-priority-list">

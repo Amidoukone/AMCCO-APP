@@ -172,7 +172,7 @@ export async function createCompanyTask(
 
   await ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode);
   const metadata = normalizeActivityMetadata(input.metadata);
-  const requestedAssignedToId = actor.role === "EMPLOYEE" ? actor.actorId : input.assignedToId;
+  const requestedAssignedToId = canManageTasks(actor.role) ? input.assignedToId : actor.actorId;
   try {
     assertTaskInputMatchesActivityProfile(input.activityCode, {
       description: input.description,
@@ -186,7 +186,7 @@ export async function createCompanyTask(
   const profile = getBusinessActivityProfile(input.activityCode);
 
   let assignedToId: string | null = null;
-  if (actor.role === "EMPLOYEE") {
+  if (!canManageTasks(actor.role)) {
     assignedToId = actor.actorId;
   } else if (input.assignedToId) {
     const assignee = await findCompanyTaskAssigneeByUserId(actor.companyId, input.assignedToId);

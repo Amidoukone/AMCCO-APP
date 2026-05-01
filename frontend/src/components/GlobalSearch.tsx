@@ -36,13 +36,13 @@ function buildSearchItems(
     },
     {
       label: "Créer une tâche",
-      description: "Ouvrir le module opérations",
+      description: "Voir les tâches",
       to: `/operations/tasks${activityQuery}`,
       keywords: ["nouvelle tâche", "créer tâche", "assigner", "opération"]
     },
     {
       label: "Créer une transaction",
-      description: "Ouvrir le module finance",
+      description: "Voir les transactions",
       to: `/finance/transactions${activityQuery}`,
       keywords: ["nouvelle transaction", "finance", "caisse", "dépense", "recette"]
     },

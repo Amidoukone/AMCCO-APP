@@ -37,7 +37,7 @@ const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
   adminActivities: ["OWNER", "SYS_ADMIN"],
   financeTransactions: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   financeSalaries: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
-  operationsTasks: ["OWNER", "SYS_ADMIN", "SUPERVISOR", "EMPLOYEE"],
+  operationsTasks: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   reports: [],
   settingsSecurity: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"]
 };

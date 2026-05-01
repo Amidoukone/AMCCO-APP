@@ -45,13 +45,11 @@ export function DashboardPriorityPanels({
               );
             }}
           >
-            Ouvrir le module
+            Voir les transactions
           </button>
         </div>
 
-        {recentTransactions.length === 0 ? (
-          <p className="hint">Aucune transaction récente.</p>
-        ) : (
+        {recentTransactions.length > 0 ? (
           <div className="dashboard-priority-list">
             {recentTransactions.map((item) => (
               <button
@@ -82,7 +80,7 @@ export function DashboardPriorityPanels({
               </button>
             ))}
           </div>
-        )}
+        ) : null}
       </article>
 
       <article className="panel dashboard-priority-card">
@@ -97,7 +95,7 @@ export function DashboardPriorityPanels({
               onNavigate("/operations/tasks");
             }}
           >
-            Voir les opérations
+            Voir les tâches
           </button>
         </div>
 
@@ -120,9 +118,7 @@ export function DashboardPriorityPanels({
           </article>
         </div>
 
-        {priorityTasks.length === 0 ? (
-          <p className="hint">Aucun blocage immédiat détecté.</p>
-        ) : (
+        {priorityTasks.length > 0 ? (
           <div className="dashboard-priority-list">
             {priorityTasks.map((item) => (
               <button
@@ -149,7 +145,7 @@ export function DashboardPriorityPanels({
               </button>
             ))}
           </div>
-        )}
+        ) : null}
       </article>
     </section>
   );

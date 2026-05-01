@@ -406,7 +406,7 @@ export function TaskDetailsPage(): JSX.Element {
           </Link>
         </p>
         <h2>Détail de la tâche</h2>
-        {task ? (
+        {task && canManageTasks ? (
           <p>
             Cette fiche est rattachée au secteur <strong>{getBusinessActivityLabel(task.activityCode)}</strong>.
           </p>
@@ -430,17 +430,19 @@ export function TaskDetailsPage(): JSX.Element {
               <strong>{statusLabel(task.status)}</strong>
             </div>
           </div>
-          <div className="actions-inline">
-            <button
-              type="button"
-              className="secondary-btn"
-              onClick={() =>
-                navigate(`/alerts?entityType=TASK&entityId=${encodeURIComponent(task.id)}`)
-              }
-            >
-              Voir alertes
-            </button>
-          </div>
+          {canManageTasks ? (
+            <div className="actions-inline">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() =>
+                  navigate(`/alerts?entityType=TASK&entityId=${encodeURIComponent(task.id)}`)
+                }
+              >
+                Voir alertes
+              </button>
+            </div>
+          ) : null}
           <p className="operations-task-description">{task.description?.trim() || "Aucune description fournie."}</p>
 
           <div className="operations-task-meta">
@@ -564,8 +566,8 @@ export function TaskDetailsPage(): JSX.Element {
       ) : null}
 
       {!isLoading && task ? (
-        <section className="panel">
-          <h3>Timeline operationnelle</h3>
+        <section className={canManageTasks ? "panel" : "panel task-detail-lite-panel"}>
+          <h3>{canManageTasks ? "Timeline operationnelle" : "Historique"}</h3>
           {timelineEntries.length === 0 ? <p>Aucun evenement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
             <>

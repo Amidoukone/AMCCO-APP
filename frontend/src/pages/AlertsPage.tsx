@@ -210,18 +210,6 @@ export function AlertsPage(): JSX.Element {
     void loadData();
   }
 
-  function applyQuickFilter(
-    nextFilters: Partial<{
-      unreadOnly: boolean;
-      entityType: string;
-    }>
-  ): void {
-    setFilters((prev) => ({
-      ...prev,
-      ...nextFilters
-    }));
-  }
-
   async function handleLoadMore(): Promise<void> {
     if (isLoading || isLoadingMore || !hasMoreItems) {
       return;
@@ -245,7 +233,6 @@ export function AlertsPage(): JSX.Element {
         <div className="alerts-header">
           <div>
             <h3>Alertes</h3>
-            <p className="hint">{unreadCount} alerte(s) a traiter.</p>
           </div>
           <div className="actions-inline">
             <button
@@ -268,23 +255,6 @@ export function AlertsPage(): JSX.Element {
         </div>
 
         <form className="alerts-filter-form" onSubmit={handleFilterSubmit}>
-          <div className="view-preset-strip">
-            <button
-              type="button"
-              className={!filters.unreadOnly ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() => applyQuickFilter({ unreadOnly: false })}
-            >
-              Vue complete
-            </button>
-            <button
-              type="button"
-              className={filters.unreadOnly ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() => applyQuickFilter({ unreadOnly: true })}
-            >
-              Non lues
-            </button>
-          </div>
-
           <label className="inline-checkbox">
             <input
               type="checkbox"
@@ -311,7 +281,7 @@ export function AlertsPage(): JSX.Element {
             }
           />
 
-          <button type="submit">Filtrer</button>
+          <button type="submit">Actualiser</button>
         </form>
       </section>
 
@@ -336,7 +306,7 @@ export function AlertsPage(): JSX.Element {
                 )
               }
             />
-            <span>Selectionner les alertes visibles</span>
+            <span>Tout sélectionner</span>
           </label>
         ) : null}
         {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond à ces filtres.</p> : null}
@@ -381,13 +351,13 @@ export function AlertsPage(): JSX.Element {
                           )
                         }
                       />
-                      <span>Selectionner</span>
+                      <span>Sélectionner</span>
                     </label>
                   </div>
                   <p className="alert-message">{item.message}</p>
                   <div className="alert-meta">
                     <p>
-                      <strong>Entite:</strong> {item.entityType ?? "-"} {item.entityId ?? ""}
+                      <strong>Entité:</strong> {item.entityType ?? "-"} {item.entityId ?? ""}
                     </p>
                     {financeTraceLines.map((line) => (
                       <p key={`${item.id}-${line}`}>
@@ -411,7 +381,7 @@ export function AlertsPage(): JSX.Element {
                           className="secondary-btn"
                           onClick={() => navigate(buildFinanceTransactionPath(financeTarget))}
                         >
-                          {financeTarget.kind === "salary" ? "Voir salaire" : "Voir transaction"}
+                          {financeTarget.kind === "salary" ? "Voir le salaire" : "Voir la transaction"}
                         </button>
                       ) : null}
                       {isUnread ? (

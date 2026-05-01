@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+﻿import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -225,8 +225,7 @@ export function FinanceSalariesPage(): JSX.Element {
         item.netAmount,
         item.currency,
         item.employeeRole,
-        salaryPaymentMethodLabel(item.paymentMethod),
-        salaryConfirmationLabel(item.status, item.salaryConfirmation.status)
+        salaryPaymentMethodLabel(item.paymentMethod)
       ])
     );
   }, [salaryItems, searchQuery]);
@@ -342,7 +341,7 @@ export function FinanceSalariesPage(): JSX.Element {
         const salariesPromise = listFinanceSalariesRequest(accessToken, {
           limit: SALARIES_PAGE_SIZE,
           offset,
-          status: salaryFilters.status === "ALL" ? undefined : salaryFilters.status,
+          status: undefined,
           employeeUserId: canManageSalaries ? salaryFilters.employeeUserId || undefined : undefined,
           payPeriod: salaryFilters.payPeriod || undefined
         });
@@ -459,7 +458,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setSuccessMessage(null);
 
     try {
-      const response = await withAuthorizedToken((accessToken) => {
+      const response = (await withAuthorizedToken(async (accessToken) => {
         const payload = {
           accountId: salaryForm.accountId,
           employeeUserId: salaryForm.employeeUserId,
@@ -473,16 +472,20 @@ export function FinanceSalariesPage(): JSX.Element {
           occurredAt: new Date(salaryForm.occurredAt).toISOString()
         };
 
-        return editingSalaryId
-          ? updateFinanceSalaryRequest(accessToken, editingSalaryId, payload)
-          : createFinanceSalaryRequest(accessToken, payload);
-      });
+        const result = await (
+          editingSalaryId
+            ? updateFinanceSalaryRequest(accessToken, editingSalaryId, payload)
+            : createFinanceSalaryRequest(accessToken, payload)
+        );
+        await submitFinanceTransactionRequest(accessToken, result.item.id);
+        return result;
+      })) as { item: { id: string } };
 
       handleOpenSalaryDetails(response.item.id);
       setSuccessMessage(
         editingSalaryId
-          ? "Salaire modifié. Il repasse en brouillon et devra être soumis à nouveau."
-          : "Salaire enregistré en brouillon."
+          ? "Salaire mis à jour."
+          : "Salaire enregistré."
       );
       resetSalaryForm();
       await loadData();
@@ -543,7 +546,7 @@ export function FinanceSalariesPage(): JSX.Element {
       setSuccessMessage(
         isApproved
           ? "Salaire approuvé supprimé par l'admin système."
-          : "Salaire supprime."
+          : "Salaire supprimé."
       );
       await loadData();
     } catch (error) {
@@ -598,7 +601,7 @@ export function FinanceSalariesPage(): JSX.Element {
       );
       triggerBlobDownload(blob, `amcco-salaires-${salaryFilters.payPeriod}.${format}`);
       setSuccessMessage(
-        format === "xlsx" ? "Export Excel des salaires genere." : "Export CSV des salaires genere."
+        format === "xlsx" ? "Export Excel des salaires généré." : "Export CSV des salaires généré."
       );
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -709,7 +712,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => submitFinanceTransactionRequest(accessToken, transactionId));
-      setSuccessMessage("Salaire soumis à l'employé pour confirmation.");
+      setSuccessMessage("Salaire transmis à l'employé.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -757,7 +760,7 @@ export function FinanceSalariesPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header">
+      <header className="section-header salaries-page-header">
         <h2>Salaires</h2>
         <p>
           Espace dédié au cycle de paie: préparation comptable, confirmation de réception par
@@ -778,75 +781,16 @@ export function FinanceSalariesPage(): JSX.Element {
       <section className="panel">
         <h3>Filtres</h3>
         <form
-          className="operations-filter-form"
+          className="operations-filter-form salaries-filter-form"
           onSubmit={(event) => {
             event.preventDefault();
             void loadData();
           }}
         >
-          <div className="view-preset-strip">
-            <button
-              type="button"
-              className={
-                salaryFilters.status === "ALL" &&
-                salaryFilters.payPeriod === new Date().toISOString().slice(0, 7) &&
-                salaryFilters.employeeUserId === ""
-                  ? "view-preset-btn is-active"
-                  : "view-preset-btn"
-              }
-              onClick={() =>
-                setSalaryFilters({
-                  status: "ALL",
-                  payPeriod: new Date().toISOString().slice(0, 7),
-                  employeeUserId: ""
-                })
-              }
-            >
-              Cette periode
-            </button>
-            <button
-              type="button"
-              className={salaryFilters.status === "SUBMITTED" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() =>
-                setSalaryFilters((prev) => ({
-                  ...prev,
-                  status: "SUBMITTED"
-                }))
-              }
-            >
-              A finaliser
-            </button>
-            <button
-              type="button"
-              className={salaryFilters.status === "DRAFT" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() =>
-                setSalaryFilters((prev) => ({
-                  ...prev,
-                  status: "DRAFT"
-                }))
-              }
-            >
-              Brouillons
-            </button>
-            <button
-              type="button"
-              className={salaryFilters.status === "ALL" && salaryFilters.employeeUserId === "" ? "view-preset-btn is-active" : "view-preset-btn"}
-              onClick={() =>
-                setSalaryFilters((prev) => ({
-                  ...prev,
-                  status: "ALL",
-                  employeeUserId: ""
-                }))
-              }
-            >
-              Tous
-            </button>
-          </div>
-
           <input
             type="search"
             className="quick-search-input"
-            placeholder="Recherche rapide: collaborateur, email, compte..."
+            placeholder="Recherche rapide : collaborateur, email, compte..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -894,7 +838,7 @@ export function FinanceSalariesPage(): JSX.Element {
             <option value="APPROVED">Approuvée</option>
             <option value="REJECTED">Rejetée</option>
           </select>
-          <button type="submit">Mettre à jour</button>
+          <button type="submit">Actualiser</button>
         </form>
       </section>
 
@@ -911,7 +855,7 @@ export function FinanceSalariesPage(): JSX.Element {
             </div>
           </div>
 
-          <form className="finance-transaction-form" onSubmit={handleSaveSalary}>
+          <form className="finance-transaction-form finance-salary-form" onSubmit={handleSaveSalary}>
             <select
               value={salaryForm.employeeUserId}
               onChange={(event) =>
@@ -1019,17 +963,20 @@ export function FinanceSalariesPage(): JSX.Element {
                   }
                 />
               </label>
+              <label className="salary-amount-field salary-currency-field">
+                <span className="salary-amount-label">Devise</span>
+                <input
+                  type="text"
+                  value={salaryForm.currency}
+                  onChange={(event) =>
+                    setSalaryForm((prev) => ({
+                      ...prev,
+                      currency: event.target.value.toUpperCase()
+                    }))
+                  }
+                />
+              </label>
             </div>
-            <input
-              type="text"
-              value={salaryForm.currency}
-              onChange={(event) =>
-                setSalaryForm((prev) => ({
-                  ...prev,
-                  currency: event.target.value.toUpperCase()
-                }))
-              }
-            />
             <div className="scope-field">
               <span className="scope-field-label">Net à payer</span>
               <strong>
@@ -1082,13 +1029,13 @@ export function FinanceSalariesPage(): JSX.Element {
         <section className="panel">
           <div className="dashboard-panel-header">
             <div>
-              <h3>Synthèse de la période</h3>
+              <h3>Synthèse</h3>
               <p className="hint">
                 Brut {salarySummary.totalGrossAmount} | Primes {salarySummary.totalBonusAmount} |
                 Retenues {salarySummary.totalDeductionAmount}
               </p>
             </div>
-            <div className="topbar-actions">
+            <div className="topbar-actions salaries-summary-actions">
               <button
                 type="button"
                 className="secondary-btn"
@@ -1108,7 +1055,7 @@ export function FinanceSalariesPage(): JSX.Element {
             </div>
           </div>
           <div className="table-wrap">
-            <table className="admin-table">
+            <table className="admin-table salaries-table">
               <thead>
                 <tr>
                   <th>Statut</th>
@@ -1122,7 +1069,7 @@ export function FinanceSalariesPage(): JSX.Element {
               <tbody>
                 {salarySummary.byStatus.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>Aucun élément de salaire sur cette période.</td>
+                    <td colSpan={6}>Aucun salaire sur cette période.</td>
                   </tr>
                 ) : (
                   salarySummary.byStatus.map((item) => (
@@ -1152,7 +1099,7 @@ export function FinanceSalariesPage(): JSX.Element {
         <h3>Liste des salaires</h3>
         {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette période.</p> : null}
         {!isLoading && salaryItems.length > 0 && displaySalaryItems.length === 0 ? (
-          <p>Aucun salaire ne correspond a la recherche.</p>
+          <p>Aucun résultat pour cette recherche.</p>
         ) : null}
         {!isLoading && displaySalaryItems.length > 0 ? (
           <>
@@ -1171,7 +1118,7 @@ export function FinanceSalariesPage(): JSX.Element {
               <tbody>
                 {displaySalaryItems.map((item) => {
                   const isBusy = busyTransactionId === item.id;
-                  const canEditSalary = canManageSalaries && item.status !== "APPROVED";
+                  const canEditSalary = canManageSalaries;
                   const canDeleteSalary =
                     item.status === "APPROVED" ? canDeleteApprovedSalaries : canManageSalaries;
                   const canConfirmReceipt =
@@ -1206,7 +1153,7 @@ export function FinanceSalariesPage(): JSX.Element {
                             className="secondary-btn"
                             onClick={() => handleOpenSalaryDetails(item.id)}
                           >
-                            Voir le détail
+                            Voir le salaire
                           </button>
                           {canEditSalary ? (
                             <button
@@ -1228,27 +1175,27 @@ export function FinanceSalariesPage(): JSX.Element {
                               Supprimer
                             </button>
                           ) : null}
-                          {canManageSalaries && item.status === "DRAFT" ? (
+                          {false ? (
                             <button
                               type="button"
                               className="secondary-btn"
                               onClick={() => void handleSubmitSalary(item.id)}
                               disabled={isBusy}
                             >
-                              Soumettre à l'employé
+                              Publier
                             </button>
                           ) : null}
-                          {canConfirmReceipt ? (
+                          {false ? (
                             <button
                               type="button"
                               className="secondary-btn"
                               onClick={() => void handleConfirmReceipt(item.id)}
                               disabled={isBusy}
                             >
-                              Confirmer réception
+                              Confirmer
                             </button>
                           ) : null}
-                          {canReview && item.status === "SUBMITTED" ? (
+                          {false ? (
                             <>
                               <button
                                 type="button"
@@ -1329,7 +1276,7 @@ export function FinanceSalariesPage(): JSX.Element {
                                 {loadingProofsByTransaction[item.id] ? <p>Chargement des preuves...</p> : null}
                                 {!loadingProofsByTransaction[item.id] &&
                                 (proofsByTransaction[item.id] ?? []).length === 0 ? (
-                                  <p>Aucune preuve ajoutee.</p>
+                                  <p>Aucune preuve ajoutée.</p>
                                 ) : null}
                                 {!loadingProofsByTransaction[item.id] &&
                                 (proofsByTransaction[item.id] ?? []).length > 0 ? (
@@ -1387,9 +1334,9 @@ export function FinanceSalariesPage(): JSX.Element {
           </div>
           <div className="list-pagination">
             <p className="hint list-pagination-meta">
-              {displaySalaryItems.length} salaire(s) affiche(s)
+              {displaySalaryItems.length} salaire(s) affiché(s)
               {displaySalaryItems.length !== salaryItems.length
-                ? ` sur ${salaryItems.length} charge(s)`
+                ? ` sur ${salaryItems.length} chargé(s)`
                 : ""}
               {hasMoreSalaries ? " sur plusieurs pages." : "."}
             </p>
@@ -1409,10 +1356,10 @@ export function FinanceSalariesPage(): JSX.Element {
       </section>
 
       {selectedSalary ? (
-        <section className="panel finance-transaction-detail-panel">
+        <section className="panel finance-transaction-detail-panel salary-detail-panel">
           <div className="task-detail-header">
             <div>
-              <h3>Detail du salaire</h3>
+              <h3>Détail du salaire</h3>
               <p className="hint">
                 {selectedSalary.employeeFullName} | {formatPayPeriod(selectedSalary.payPeriod)}
               </p>
@@ -1427,7 +1374,7 @@ export function FinanceSalariesPage(): JSX.Element {
               <strong>Collaborateur:</strong> {selectedSalary.employeeFullName} ({selectedSalary.employeeEmail})
             </p>
             <p>
-              <strong>Role:</strong>{" "}
+              <strong>Rôle:</strong>{" "}
               {ROLE_LABELS[selectedSalary.employeeRole as keyof typeof ROLE_LABELS] ?? selectedSalary.employeeRole}
             </p>
             <p>
@@ -1469,7 +1416,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 : "En attente"}
             </p>
             <p>
-              <strong>Createur:</strong> {selectedSalary.createdByEmail}
+              <strong>Créateur:</strong> {selectedSalary.createdByEmail}
             </p>
             <p>
               <strong>Validation:</strong> {selectedSalary.validatedByEmail ?? "En attente"}
@@ -1487,7 +1434,7 @@ export function FinanceSalariesPage(): JSX.Element {
 
           <div className="finance-transaction-detail-actions">
             <div className="actions-inline">
-              {canManageSalaries && selectedSalary.status !== "APPROVED" ? (
+              {canManageSalaries ? (
                 <button
                   type="button"
                   className="secondary-btn"
@@ -1546,7 +1493,7 @@ export function FinanceSalariesPage(): JSX.Element {
               {loadingProofsByTransaction[selectedSalary.id] ? <p>Chargement des preuves...</p> : null}
               {!loadingProofsByTransaction[selectedSalary.id] &&
               (proofsByTransaction[selectedSalary.id] ?? []).length === 0 ? (
-                <p>Aucune preuve ajoutee.</p>
+                <p>Aucune preuve ajoutée.</p>
               ) : null}
               {!loadingProofsByTransaction[selectedSalary.id] &&
               (proofsByTransaction[selectedSalary.id] ?? []).length > 0 ? (
@@ -1600,3 +1547,7 @@ export function FinanceSalariesPage(): JSX.Element {
     </>
   );
 }
+
+
+
+

@@ -1482,6 +1482,45 @@ a {
   line-height: 1.5;
 }
 
+.finance-page-panel .finance-section-summary small {
+  display: none;
+}
+
+.finance-transaction-form-context .hint {
+  display: none;
+}
+
+.finance-page-panel .admin-table td:nth-child(4) > .hint {
+  display: none;
+}
+
+.salaries-filter-form select:last-of-type {
+  display: none;
+}
+
+.salaries-page-header p,
+.salaries-summary-actions {
+  display: none;
+}
+
+.salaries-table th:nth-child(4),
+.salaries-table th:nth-child(5),
+.salaries-table td:nth-child(4),
+.salaries-table td:nth-child(5) {
+  display: none;
+}
+
+.salary-detail-panel .operations-task-meta p:nth-child(10),
+.salary-detail-panel .operations-task-meta p:nth-child(11),
+.salary-detail-panel .operations-task-meta p:nth-child(12),
+.salary-detail-panel .operations-task-meta p:nth-child(13) {
+  display: none;
+}
+
+.task-detail-lite-panel .operations-task-meta p:nth-child(3) {
+  display: none;
+}
+
 .finance-inline-section {
   display: grid;
   gap: 12px;
@@ -1551,7 +1590,7 @@ a {
 .salary-amount-group {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 

@@ -63,7 +63,6 @@ export function DashboardPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Pilotage du jour</h2>
-        <p>Vue opérationnelle claire et actionnable.</p>
       </header>
 
       {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
@@ -86,7 +85,6 @@ export function DashboardPage(): JSX.Element {
               <div>
                 <p className="sidebar-section-label">Focus secteur</p>
                 <h3>{selectedActivity.label}</h3>
-                <p className="hint">{selectedActivity.description}</p>
               </div>
               <div className="dashboard-kpi-grid">
                 <article className="dashboard-kpi-card">
@@ -112,18 +110,6 @@ export function DashboardPage(): JSX.Element {
               navigate(href);
             }}
           />
-
-          <section className="dashboard-footer-actions">
-            <button
-              className="dashboard-inline-button"
-              type="button"
-              onClick={() => {
-                navigate("/settings/security");
-              }}
-            >
-              Consulter la sécurité
-            </button>
-          </section>
         </>
       ) : null}
     </>
