@@ -93,13 +93,16 @@ export function AdminCompaniesPage(): JSX.Element {
   const [companyPendingDelete, setCompanyPendingDelete] = useState<AdminCompanyItem | null>(null);
 
   const canManageCompanies = useMemo(() => {
+    return user?.role === "SYS_ADMIN";
+  }, [user?.role]);
+  const canViewCompanies = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
 
   const isEditingCompany = editingCompanyId !== null;
 
   const loadCompanies = useCallback(async () => {
-    if (!canManageCompanies) {
+    if (!canViewCompanies) {
       setIsLoading(false);
       return;
     }
@@ -116,7 +119,7 @@ export function AdminCompaniesPage(): JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [canManageCompanies, withAuthorizedToken]);
+  }, [canViewCompanies, withAuthorizedToken]);
 
   useEffect(() => {
     void loadCompanies();
@@ -132,7 +135,7 @@ export function AdminCompaniesPage(): JSX.Element {
       return "Cette entreprise est inactive et ne peut plus être modifiée.";
     }
 
-    if (item.role !== "OWNER" && item.role !== "SYS_ADMIN") {
+    if (user?.role !== "OWNER" && user?.role !== "SYS_ADMIN") {
       return "Permissions insuffisantes pour modifier cette entreprise.";
     }
 
@@ -140,15 +143,11 @@ export function AdminCompaniesPage(): JSX.Element {
   }
 
   function getCompanyDeleteLockMessage(item: AdminCompanyItem): string | null {
-    if (!item.company.isActive) {
-      return "Cette entreprise est déjà inactive.";
+    if (user?.role !== "OWNER" && user?.role !== "SYS_ADMIN") {
+      return "Permissions insuffisantes pour supprimer cette entreprise.";
     }
 
-    if (item.role !== "OWNER") {
-      return "Seul le propriétaire de cette entreprise peut la supprimer.";
-    }
-
-    if (activeCompany?.id === item.company.id) {
+    if (item.company.isActive && activeCompany?.id === item.company.id) {
       return "Change d'entreprise active avant de supprimer celle-ci.";
     }
 
@@ -276,7 +275,7 @@ export function AdminCompaniesPage(): JSX.Element {
     }
   }
 
-  if (!canManageCompanies) {
+  if (!canViewCompanies) {
     return (
       <section className="panel">
         <h2>Administration entreprises</h2>
@@ -323,9 +322,7 @@ export function AdminCompaniesPage(): JSX.Element {
                   <div className="company-admin-top">
                     <div>
                       <h4>{item.company.name}</h4>
-                      <p className="hint">
-                        {item.company.code} | {ROLE_LABELS[item.role]}
-                      </p>
+                      <p className="hint">{ROLE_LABELS[item.role]}</p>
                     </div>
                     <span
                       className={item.company.isActive ? "company-status-pill" : "company-status-pill is-inactive"}
@@ -381,7 +378,7 @@ export function AdminCompaniesPage(): JSX.Element {
                     <p className="hint">
                       <strong>Actions</strong>
                     </p>
-                    <div className="actions-inline">
+                    {canManageCompanies ? <div className="actions-inline">
                       <button
                         type="button"
                         className="secondary-btn"
@@ -398,9 +395,9 @@ export function AdminCompaniesPage(): JSX.Element {
                         disabled={isBusy}
                         title={deleteLockMessage ?? undefined}
                       >
-                        Désactiver
+                        {item.company.isActive ? "Désactiver" : "Supprimer définitivement"}
                       </button>
-                    </div>
+                    </div> : null}
 
                     {!isActive ? (
                       <button
@@ -422,7 +419,7 @@ export function AdminCompaniesPage(): JSX.Element {
         ) : null}
       </section>
 
-      <section className="panel">
+      {canManageCompanies ? <section className="panel">
         <h3>{isEditingCompany ? "Modifier une entreprise" : "Créer une entreprise"}</h3>
         <div className="company-admin-form">
           <input
@@ -433,7 +430,7 @@ export function AdminCompaniesPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="Code entreprise"
+            placeholder="Code entreprise (optionnel)"
             value={form.code ?? ""}
             onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
             disabled={isEditingCompany}
@@ -502,7 +499,7 @@ export function AdminCompaniesPage(): JSX.Element {
           <button
             type="button"
             onClick={() => void handleCreateCompany()}
-            disabled={isSubmitting || !form.name?.trim() || !form.code?.trim()}
+            disabled={isSubmitting || !form.name?.trim()}
           >
             {isSubmitting
               ? "Enregistrement..."
@@ -516,15 +513,23 @@ export function AdminCompaniesPage(): JSX.Element {
             </button>
           ) : null}
         </div>
-      </section>
+      </section> : null}
 
       <ConfirmDialog
         open={companyPendingDelete !== null}
         title="Confirmer la suppression"
-        description="Cette action désactive l'entreprise dans l'interface et interrompt son usage courant."
+        description={
+          companyPendingDelete?.company.isActive
+            ? "Cette action désactive l'entreprise dans l'interface et interrompt son usage courant."
+            : "Cette action supprime définitivement l'entreprise et ses données associées."
+        }
         objectLabel="Entreprise concernée"
         objectName={companyPendingDelete?.company.name ?? ""}
-        impactText="Les utilisateurs ne pourront plus travailler sur cette entreprise tant qu'elle ne sera pas réactivée."
+        impactText={
+          companyPendingDelete?.company.isActive
+            ? "Les utilisateurs ne pourront plus travailler sur cette entreprise tant qu'elle ne sera pas réactivée."
+            : "L'entreprise inactive sera retirée définitivement de l'application."
+        }
         isConfirming={busyCompanyId === companyPendingDelete?.company.id}
         onCancel={() => {
           if (busyCompanyId) {

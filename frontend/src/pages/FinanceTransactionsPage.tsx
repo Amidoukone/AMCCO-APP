@@ -243,29 +243,30 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const isReadOnlyOwner = user?.role === "OWNER";
 
   const canCreateAccount = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
+    return user?.role === "SYS_ADMIN";
   }, [user?.role]);
 
   const canManageGlobalAccounts = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
+    return user?.role === "SYS_ADMIN";
   }, [user?.role]);
 
   const canManageTransactions = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+    return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
   const canManageAnyAccount = canCreateAccount;
 
   const canManageSalaries = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+    return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
   const [accountForm, setAccountForm] = useState(() =>
     buildDefaultAccountForm(
       selectedActivityCode,
-      user?.role === "OWNER" || user?.role === "SYS_ADMIN"
+      user?.role === "SYS_ADMIN"
     )
   );
   const transactionsViewStorageKey = useMemo(() => {
@@ -292,7 +293,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     currency: "XOF",
     description: "",
     metadata: {} as Record<string, string>,
-    occurredAt: new Date().toISOString().slice(0, 16)
+    occurredAt: ""
   });
 
   const [proofFiles, setProofFiles] = useState<Record<string, File | null>>({});
@@ -354,7 +355,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       currency: allowedCurrencies[0] ?? "XOF",
       description: "",
       metadata: syncMetadataState({}, financeMetadataFields),
-      occurredAt: new Date().toISOString().slice(0, 16)
+      occurredAt: ""
     });
   }, [accounts, allowedCurrencies, financeMetadataFields]);
 
@@ -691,7 +692,9 @@ export function FinanceTransactionsPage(): JSX.Element {
           activityCode: selectedActivityCode as BusinessActivityCode,
           description: transactionForm.description.trim() || undefined,
           metadata: transactionForm.metadata,
-          occurredAt: new Date(transactionForm.occurredAt).toISOString()
+          occurredAt: transactionForm.occurredAt
+            ? new Date(transactionForm.occurredAt).toISOString()
+            : undefined
         };
 
         return editingTransactionId
@@ -926,7 +929,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header">
+      <header className={isReadOnlyOwner ? "section-header owner-lite-header" : "section-header"}>
         <h2>Transactions financières</h2>
         <p>Suivi financier opérationnel.</p>
       </header>
@@ -938,7 +941,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         </p>
       ) : null}
 
-      <section className="grid finance-summary-grid">
+      <section className={isReadOnlyOwner ? "grid finance-summary-grid owner-lite-metrics" : "grid finance-summary-grid"}>
         {financePageCards.map((card) => (
           <article key={card.title} className="metric-card finance-overview-card">
             <h2>{card.title}</h2>
@@ -1230,17 +1233,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                       occurredAt: event.target.value
                     }))
                   }
-                  required
                 />
               </label>
 
               <input
                 type="text"
-                placeholder={
-                  selectedProfile?.finance.requiresDescription
-                    ? "Description requise"
-                    : "Description (optionnelle)"
-                }
+                placeholder="Description (optionnelle)"
                 value={transactionForm.description}
                 onChange={(event) =>
                   setTransactionForm((prev) => ({
@@ -1254,7 +1252,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <input
                   key={field.key}
                   type="text"
-                  placeholder={`${field.label}${field.required ? " *" : ""}`}
+                  placeholder={field.label}
                   value={transactionForm.metadata[field.key] ?? ""}
                   onChange={(event) =>
                     setTransactionForm((prev) => ({
@@ -1265,7 +1263,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                       }
                     }))
                   }
-                  required={field.required}
                   title={field.helpText}
                 />
               ))}
@@ -1461,7 +1458,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                               </div>
                             ) : null}
 
-                            <div className="proof-inline-form">
+                            {canManageTransactions ? <div className="proof-inline-form">
                               <input
                                 type="file"
                                 accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
@@ -1481,7 +1478,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                               >
                                 Ajouter une preuve
                               </button>
-                            </div>
+                            </div> : null}
                           </div>
                         </details>
                       </td>
@@ -1642,7 +1639,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 </button>
               ) : null}
             </div>
-            <div className="proof-inline-form">
+            {canManageTransactions ? <div className="proof-inline-form">
               <input
                 type="file"
                 accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
@@ -1662,7 +1659,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               >
                 Ajouter une preuve
               </button>
-            </div>
+            </div> : null}
           </div>
 
           {openProofs[selectedTransaction.id] ? (

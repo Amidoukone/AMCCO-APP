@@ -73,7 +73,7 @@ companyActivitiesRouter.get(
 
 companyActivitiesRouter.patch(
   "/admin/activities/:activityCode",
-  authorizeRoles("OWNER", "SYS_ADMIN"),
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -100,7 +100,7 @@ companyActivitiesRouter.patch(
 
 companyActivitiesRouter.post(
   "/admin/activities/reclassify-legacy",
-  authorizeRoles("OWNER", "SYS_ADMIN"),
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");

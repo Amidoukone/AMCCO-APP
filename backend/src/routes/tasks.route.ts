@@ -204,6 +204,7 @@ tasksRouter.get(
 
 tasksRouter.post(
   "/operations/tasks/:taskId/comments",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -227,6 +228,7 @@ tasksRouter.post(
 
 tasksRouter.post(
   "/operations/tasks",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -253,6 +255,7 @@ tasksRouter.post(
 
 tasksRouter.patch(
   "/operations/tasks/:taskId",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -279,6 +282,7 @@ tasksRouter.patch(
 
 tasksRouter.delete(
   "/operations/tasks/:taskId",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -300,7 +304,7 @@ tasksRouter.delete(
 
 tasksRouter.patch(
   "/operations/tasks/:taskId/assign",
-  authorizeRoles("OWNER", "SYS_ADMIN", "SUPERVISOR"),
+  authorizeRoles("SYS_ADMIN", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -325,7 +329,7 @@ tasksRouter.patch(
 
 tasksRouter.patch(
   "/operations/tasks/assign-bulk",
-  authorizeRoles("OWNER", "SYS_ADMIN", "SUPERVISOR"),
+  authorizeRoles("SYS_ADMIN", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -349,6 +353,7 @@ tasksRouter.patch(
 
 tasksRouter.patch(
   "/operations/tasks/:taskId/status",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");

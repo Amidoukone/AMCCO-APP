@@ -29,6 +29,9 @@ export function AdminActivitiesPage(): JSX.Element {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const canManageActivities = useMemo(() => {
+    return user?.role === "SYS_ADMIN";
+  }, [user?.role]);
+  const canViewActivities = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
 
@@ -48,12 +51,12 @@ export function AdminActivitiesPage(): JSX.Element {
   }, [withAuthorizedToken]);
 
   useEffect(() => {
-    if (!canManageActivities) {
+    if (!canViewActivities) {
       setIsLoading(false);
       return;
     }
     void loadData();
-  }, [canManageActivities, loadData]);
+  }, [canViewActivities, loadData]);
 
   async function handleToggleActivity(item: CompanyActivityItem): Promise<void> {
     setBusyActivityCode(item.code);
@@ -80,7 +83,7 @@ export function AdminActivitiesPage(): JSX.Element {
     }
   }
 
-  if (!canManageActivities) {
+  if (!canViewActivities) {
     return (
       <section className="panel">
         <h2>Administration secteurs</h2>
@@ -121,7 +124,7 @@ export function AdminActivitiesPage(): JSX.Element {
                     </p>
                   </div>
                 </div>
-                <div className="admin-actions-block">
+                {canManageActivities ? <div className="admin-actions-block">
                   <p className="hint">
                     <strong>Action</strong>
                   </p>
@@ -137,7 +140,7 @@ export function AdminActivitiesPage(): JSX.Element {
                         ? "Désactiver"
                         : "Activer"}
                   </button>
-                </div>
+                </div> : null}
               </article>
             ))}
           </div>

@@ -184,12 +184,16 @@ export function OperationsTasksPage(): JSX.Element {
     note: ""
   });
   const [taskPendingDelete, setTaskPendingDelete] = useState<OperationTask | null>(null);
+  const isReadOnlyOwner = user?.role === "OWNER";
 
   const canAssignTasks = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
+    return user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
   }, [user?.role]);
+  const canViewAllTasks = useMemo(() => {
+    return user?.role === "OWNER" || canAssignTasks;
+  }, [canAssignTasks, user?.role]);
   const canCreateTasks = useMemo(() => {
-    return Boolean(user);
+    return Boolean(user) && user?.role !== "OWNER";
   }, [user]);
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
@@ -272,7 +276,7 @@ export function OperationsTasksPage(): JSX.Element {
         offset,
         status: filters.status === "ALL" ? undefined : filters.status,
         activityCode: selectedActivityCode,
-        scope: canAssignTasks ? ("ALL" as TaskScope) : ("ASSIGNED_TO_ME" as TaskScope)
+        scope: canViewAllTasks ? ("ALL" as TaskScope) : ("ASSIGNED_TO_ME" as TaskScope)
       };
 
       const taskResponse = await withAuthorizedToken((accessToken) =>
@@ -322,6 +326,7 @@ export function OperationsTasksPage(): JSX.Element {
     }
   }, [
     canAssignTasks,
+    canViewAllTasks,
     filters.status,
     selectedActivityCode,
     withAuthorizedToken
@@ -403,16 +408,20 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   function getTaskDeleteLockMessage(task: OperationTask): string | null {
+    if (user?.role === "SYS_ADMIN") {
+      return null;
+    }
     if (task.status === "DONE") {
       return "Une tâche terminée ne peut plus être supprimée.";
-    }
-    if (canAssignTasks) {
-      return null;
     }
     if (task.createdById !== user?.id) {
       return "Vous ne pouvez supprimer que les tâches que vous avez créées.";
     }
     return null;
+  }
+
+  function canDeleteTask(task: OperationTask): boolean {
+    return getTaskDeleteLockMessage(task) === null;
   }
 
   function handleStartEditTask(task: OperationTask): void {
@@ -537,6 +546,9 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   function canUpdateTask(task: OperationTask): boolean {
+    if (user?.role === "OWNER") {
+      return false;
+    }
     if (canAssignTasks) {
       return true;
     }
@@ -576,7 +588,7 @@ export function OperationsTasksPage(): JSX.Element {
       ) : null}
 
       <section className="panel">
-        <h3>Recherche</h3>
+        {!isReadOnlyOwner ? <h3>Recherche</h3> : null}
         <form
           className="operations-filter-form"
           onSubmit={(event) => {
@@ -727,7 +739,7 @@ export function OperationsTasksPage(): JSX.Element {
                     <input
                       key={field.key}
                       type="text"
-                      placeholder={`${field.label}${field.required ? " *" : ""}`}
+                      placeholder={field.label}
                       value={createForm.metadata[field.key] ?? ""}
                       onChange={(event) =>
                         setCreateForm((prev) => ({
@@ -738,7 +750,6 @@ export function OperationsTasksPage(): JSX.Element {
                           }
                         }))
                       }
-                      required={field.required}
                       title={field.helpText}
                     />
                   ))}
@@ -837,7 +848,7 @@ export function OperationsTasksPage(): JSX.Element {
               />
               <span>Tout sélectionner</span>
             </label>
-          ) : <p className="hint">{displayTasks.length} tâche(s) affichée(s)</p>}
+          ) : !isReadOnlyOwner ? <p className="hint">{displayTasks.length} tâche(s) affichée(s)</p> : null}
         </div>
         {!isLoading && tasks.length === 0 ? (
           <EmptyState
@@ -869,6 +880,7 @@ export function OperationsTasksPage(): JSX.Element {
               const isCompleted = task.status === "DONE";
               const editLockMessage = getTaskEditLockMessage(task);
               const deleteLockMessage = getTaskDeleteLockMessage(task);
+              const canDelete = canDeleteTask(task);
               const selectedAssignee = assignments[task.id] ?? "";
               const selectedOrNull = selectedAssignee || null;
               const assignmentChanged = task.assignedToId !== selectedOrNull;
@@ -948,8 +960,21 @@ export function OperationsTasksPage(): JSX.Element {
                     </div>
 
                     {isCompleted ? (
-                      <div className="operations-task-closed-note">
-                        Tâche terminée: statut, modification et assignation verrouillés.
+                      <div className="operations-actions-secondary-content">
+                        <div className="operations-task-closed-note">
+                          Tâche terminée: statut, modification et assignation verrouillés.
+                        </div>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="danger-btn"
+                            onClick={() => void handleDeleteTask(task)}
+                            disabled={isBusy}
+                            title={deleteLockMessage ?? undefined}
+                          >
+                            Supprimer
+                          </button>
+                        ) : null}
                       </div>
                     ) : !canAssignTasks ? (
                       <div className="operations-actions-secondary-content">
@@ -970,15 +995,17 @@ export function OperationsTasksPage(): JSX.Element {
                             </select>
                           </div>
                         ) : null}
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          onClick={() => void handleDeleteTask(task)}
-                          disabled={isBusy}
-                          title={deleteLockMessage ?? undefined}
-                        >
-                          Supprimer
-                        </button>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="danger-btn"
+                            onClick={() => void handleDeleteTask(task)}
+                            disabled={isBusy}
+                            title={deleteLockMessage ?? undefined}
+                          >
+                            Supprimer
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <details className="operations-actions-secondary">
@@ -1051,15 +1078,17 @@ export function OperationsTasksPage(): JSX.Element {
                             </button>
                           </div>
                         ) : null}
-                          <button
-                            type="button"
-                            className="danger-btn"
-                            onClick={() => void handleDeleteTask(task)}
-                            disabled={isBusy}
-                            title={deleteLockMessage ?? undefined}
-                          >
-                            Supprimer
-                          </button>
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              className="danger-btn"
+                              onClick={() => void handleDeleteTask(task)}
+                              disabled={isBusy}
+                              title={deleteLockMessage ?? undefined}
+                            >
+                              Supprimer
+                            </button>
+                          ) : null}
                         </div>
                       </details>
                     )}

@@ -13,6 +13,7 @@ import {
   findCompanyByCode,
   findUserCompanyMembership,
   listCompaniesForUser,
+  permanentlyDeleteCompany,
   updateCompanyProfile
 } from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
@@ -32,6 +33,7 @@ vi.mock("../repositories/companies.repository.js", () => ({
   findCompanyByCode: vi.fn(),
   findUserCompanyMembership: vi.fn(),
   listCompaniesForUser: vi.fn(),
+  permanentlyDeleteCompany: vi.fn(),
   updateCompanyProfile: vi.fn()
 }));
 
@@ -52,6 +54,7 @@ describe("companies.service", () => {
     vi.mocked(findCompanyByCode).mockReset();
     vi.mocked(findUserCompanyMembership).mockReset();
     vi.mocked(listCompaniesForUser).mockReset();
+    vi.mocked(permanentlyDeleteCompany).mockReset();
     vi.mocked(updateCompanyProfile).mockReset();
     vi.mocked(createAuditLogRecord).mockReset();
     vi.mocked(createRoleTargetedAlerts).mockReset();
@@ -304,6 +307,59 @@ describe("companies.service", () => {
         auditId: "audit-delete-1",
         companyId: "company-3",
         action: "COMPANY_DELETED"
+      })
+    );
+  });
+
+  it("permanently deletes an inactive company and logs the purge in the actor company", async () => {
+    vi.mocked(findUserCompanyMembership).mockResolvedValue({
+      company: {
+        id: "company-4",
+        name: "Filiale Archivee",
+        code: "FILIALE-ARCHIVEE",
+        legalName: null,
+        registrationNumber: null,
+        taxId: null,
+        email: null,
+        phone: null,
+        website: null,
+        addressLine1: null,
+        addressLine2: null,
+        city: null,
+        stateRegion: null,
+        postalCode: null,
+        country: "Mali",
+        businessSector: null,
+        contactFullName: null,
+        contactJobTitle: null,
+        isActive: false,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        updatedAt: "2026-04-22T00:00:00.000Z"
+      },
+      role: "SYS_ADMIN"
+    });
+    vi.mocked(randomUUID).mockReturnValueOnce("audit-purge-1");
+
+    await deleteCompanyForActor(
+      {
+        userId: "sysadmin-1",
+        companyId: "company-source",
+        role: "SYS_ADMIN",
+        email: "sysadmin@example.com"
+      },
+      {
+        companyId: "company-4"
+      }
+    );
+
+    expect(permanentlyDeleteCompany).toHaveBeenCalledWith("company-4");
+    expect(deactivateCompany).not.toHaveBeenCalled();
+    expect(createAuditLogRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auditId: "audit-purge-1",
+        companyId: "company-source",
+        action: "COMPANY_PURGED",
+        entityId: "company-4"
       })
     );
   });

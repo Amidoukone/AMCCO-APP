@@ -1,7 +1,9 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { isReadOnlyOwnerRole } from "../config/permissions";
 import { matchesQuickSearch } from "../lib/quickSearch";
 import type { NavigationItem } from "../config/permissions";
+import type { RoleCode } from "../types/role";
 
 type SearchItem = {
   label: string;
@@ -12,13 +14,16 @@ type SearchItem = {
 
 type GlobalSearchProps = {
   navigation: NavigationItem[];
+  role: RoleCode;
   selectedActivityCode: string | null;
 };
 
 function buildSearchItems(
   navigation: NavigationItem[],
+  role: RoleCode,
   selectedActivityCode: string | null
 ): SearchItem[] {
+  const isReadOnlyOwner = isReadOnlyOwnerRole(role);
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
   const items: SearchItem[] = navigation.map((item) => ({
     label: item.label,
@@ -30,25 +35,29 @@ function buildSearchItems(
   items.push(
     {
       label: "Mon travail",
-      description: "Tâches ouvertes, validations et échéances",
+      description: "Taches ouvertes, validations et echeances",
       to: "/my-work",
-      keywords: ["mon travail", "mes tâches", "à faire", "échéances", "urgent"]
+      keywords: ["mon travail", "mes taches", "a faire", "echeances", "urgent"]
     },
     {
-      label: "Créer une tâche",
-      description: "Voir les tâches",
+      label: isReadOnlyOwner ? "Voir les taches" : "Creer une tache",
+      description: "Voir les taches",
       to: `/operations/tasks${activityQuery}`,
-      keywords: ["nouvelle tâche", "créer tâche", "assigner", "opération"]
+      keywords: isReadOnlyOwner
+        ? ["taches", "operations", "suivi", "controle"]
+        : ["nouvelle tache", "creer tache", "assigner", "operation"]
     },
     {
-      label: "Créer une transaction",
+      label: isReadOnlyOwner ? "Voir les transactions" : "Creer une transaction",
       description: "Voir les transactions",
       to: `/finance/transactions${activityQuery}`,
-      keywords: ["nouvelle transaction", "finance", "caisse", "dépense", "recette"]
+      keywords: isReadOnlyOwner
+        ? ["transactions", "finance", "controle", "caisse"]
+        : ["nouvelle transaction", "finance", "caisse", "depense", "recette"]
     },
     {
       label: "Alertes",
-      description: "Consulter les notifications à traiter",
+      description: "Consulter les notifications a traiter",
       to: "/alerts",
       keywords: ["alerte", "notification", "risque"]
     }
@@ -59,14 +68,15 @@ function buildSearchItems(
 
 export function GlobalSearch({
   navigation,
+  role,
   selectedActivityCode
 }: GlobalSearchProps): JSX.Element {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const items = useMemo(
-    () => buildSearchItems(navigation, selectedActivityCode),
-    [navigation, selectedActivityCode]
+    () => buildSearchItems(navigation, role, selectedActivityCode),
+    [navigation, role, selectedActivityCode]
   );
   const results = useMemo(() => {
     if (!query.trim()) {
@@ -111,7 +121,7 @@ export function GlobalSearch({
       {isFocused ? (
         <div className="global-search-results">
           {results.length === 0 ? (
-            <p>Aucun raccourci trouvé.</p>
+            <p>Aucun raccourci trouve.</p>
           ) : (
             results.map((result) => (
               <button

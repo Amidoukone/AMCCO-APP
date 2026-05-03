@@ -49,9 +49,10 @@ type ActorContext = {
   fullName?: string;
 };
 
-const ACCOUNT_CREATE_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN"];
-const TRANSACTION_REVIEW_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT"];
-const SALARY_MANAGEMENT_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT"];
+const ACCOUNT_CREATE_ROLES: RoleCode[] = ["SYS_ADMIN"];
+const TRANSACTION_REVIEW_ROLES: RoleCode[] = ["SYS_ADMIN", "ACCOUNTANT"];
+const SALARY_VIEW_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT"];
+const SALARY_MANAGEMENT_ROLES: RoleCode[] = ["SYS_ADMIN", "ACCOUNTANT"];
 
 type SalarySnapshot = {
   employeeUserId: string;
@@ -121,9 +122,19 @@ function canManageSalary(role: RoleCode): boolean {
   return SALARY_MANAGEMENT_ROLES.includes(role);
 }
 
+function canViewAllSalaries(role: RoleCode): boolean {
+  return SALARY_VIEW_ROLES.includes(role);
+}
+
 function ensureSalaryManagementAccess(role: RoleCode): void {
   if (!canManageSalary(role)) {
     throw new HttpError(403, "Permissions insuffisantes pour gerer les salaires.");
+  }
+}
+
+function ensureSalaryViewAccess(role: RoleCode): void {
+  if (!canViewAllSalaries(role)) {
+    throw new HttpError(403, "Permissions insuffisantes pour consulter les salaires.");
   }
 }
 
@@ -138,7 +149,7 @@ function resolveSalaryAccessScope(input: {
   role: RoleCode;
   employeeUserId?: string;
 }): string | undefined {
-  if (canManageSalary(input.role)) {
+  if (canViewAllSalaries(input.role)) {
     return input.employeeUserId;
   }
 
@@ -662,7 +673,7 @@ export async function createCompanyTransaction(
     activityCode: BusinessActivityCode;
     description?: string;
     metadata?: Record<string, string>;
-    occurredAt: string;
+    occurredAt?: string;
   }
 ) {
   const account = await findFinancialAccountById(actor.companyId, input.accountId);
@@ -705,7 +716,7 @@ export async function createCompanyTransaction(
     metadata,
     requiresProof: profile.finance.requiresProof,
     createdById: actor.actorId,
-    occurredAt: new Date(input.occurredAt)
+    occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date()
   });
 
   await submitCompanyTransaction(actor, {
@@ -751,7 +762,7 @@ export async function updateCompanyTransaction(
     activityCode: BusinessActivityCode;
     description?: string;
     metadata?: Record<string, string>;
-    occurredAt: string;
+    occurredAt?: string;
   }
 ) {
   ensureTransactionManagementAccess(actor.role);
@@ -798,7 +809,7 @@ export async function updateCompanyTransaction(
     description: description || null,
     metadata,
     requiresProof: profile.finance.requiresProof,
-    occurredAt: new Date(input.occurredAt)
+    occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(existing.occurredAt)
   });
 
   await submitCompanyTransaction(actor, {
@@ -871,7 +882,7 @@ export async function listCompanySalaryTransactions(input: {
   employeeUserId?: string;
   payPeriod?: string;
 }) {
-  if (!canManageSalary(input.role) && input.status === "DRAFT") {
+  if (!canViewAllSalaries(input.role) && input.status === "DRAFT") {
     throw new HttpError(403, "Les brouillons de salaire sont reserves a la comptabilite.");
   }
 
@@ -904,7 +915,7 @@ export async function listCompanySalaryTransactions(input: {
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
-    .filter((item) => canManageSalary(input.role) || item.status !== "DRAFT");
+    .filter((item) => canViewAllSalaries(input.role) || item.status !== "DRAFT");
 }
 
 export async function getCompanySalarySummary(input: {
@@ -913,7 +924,7 @@ export async function getCompanySalarySummary(input: {
   payPeriod: string;
   employeeUserId?: string;
 }) {
-  ensureSalaryManagementAccess(input.role);
+  ensureSalaryViewAccess(input.role);
 
   const items = await listCompanySalaryTransactions({
     actorId: input.employeeUserId ?? "salary-summary",
@@ -1736,7 +1747,6 @@ export async function submitCompanyTransaction(
 
   const canSubmit =
     transaction.createdById === actor.actorId ||
-    actor.role === "OWNER" ||
     actor.role === "SYS_ADMIN" ||
     actor.role === "ACCOUNTANT" ||
     actor.role === "SUPERVISOR";

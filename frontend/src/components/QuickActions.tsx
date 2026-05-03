@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { NavigationItem } from "../config/permissions";
-import { canAccessFeature } from "../config/permissions";
+import { canAccessFeature, isReadOnlyOwnerRole } from "../config/permissions";
 import type { RoleCode } from "../types/role";
 
 type QuickActionsProps = {
@@ -16,19 +16,20 @@ export function QuickActions({
 }: QuickActionsProps): JSX.Element {
   const canUse = (key: NavigationItem["key"]): boolean =>
     navigation.some((item) => item.key === key) && canAccessFeature(role, key);
+  const isReadOnlyOwner = isReadOnlyOwnerRole(role);
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
 
   const actions = [
     canUse("operationsTasks")
       ? {
-          label: "Nouvelle tâche",
+          label: isReadOnlyOwner ? "Voir les taches" : "Nouvelle tache",
           to: `/operations/tasks${activityQuery}`,
           tone: "primary"
         }
       : null,
     canUse("financeTransactions")
       ? {
-          label: "Nouvelle transaction",
+          label: isReadOnlyOwner ? "Voir les transactions" : "Nouvelle transaction",
           to: `/finance/transactions${activityQuery}`,
           tone: "neutral"
         }

@@ -12,6 +12,7 @@ import {
   findUserCompanyMembership,
   listCompaniesForUser
   ,
+  permanentlyDeleteCompany,
   updateCompanyProfile
 } from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
@@ -51,7 +52,7 @@ async function getManagedCompanyForActor(actor: AuthContext, companyId: string) 
     throw new HttpError(404, "Entreprise introuvable ou inaccessible.");
   }
 
-  assertCompanyManagementGovernance(membership.role);
+  assertCompanyManagementGovernance(actor.role);
 
   return membership;
 }
@@ -60,7 +61,7 @@ export async function createCompanyForActor(
   actor: AuthContext,
   input: {
     name: string;
-    code: string;
+    code?: string;
     legalName?: string;
     registrationNumber?: string;
     taxId?: string;
@@ -291,7 +292,7 @@ export async function updateCompanyForActor(
     })
   });
 
-  if (managedCompany.role === "SYS_ADMIN") {
+  if (actor.role === "SYS_ADMIN") {
     await createRoleTargetedAlerts({
       companyId: updated.company.id,
       recipientRoles: ["OWNER"],
@@ -305,7 +306,7 @@ export async function updateCompanyForActor(
         companyId: updated.company.id,
         companyName: updated.company.name,
         companyCode: updated.company.code,
-        actorRole: managedCompany.role
+        actorRole: actor.role
       }
     });
   }
@@ -322,12 +323,8 @@ export async function deleteCompanyForActor(
   const managedCompany = await getManagedCompanyForActor(actor, input.companyId);
   const existing = managedCompany.company;
 
-  if (managedCompany.role !== "OWNER") {
-    throw new HttpError(403, "Seul le proprietaire de cette entreprise peut la supprimer.");
-  }
-
-  if (!existing.isActive) {
-    throw new HttpError(400, "Cette entreprise est deja inactive.");
+  if (actor.role !== "OWNER" && actor.role !== "SYS_ADMIN") {
+    throw new HttpError(403, "Permissions insuffisantes pour supprimer cette entreprise.");
   }
 
   if (existing.id === actor.companyId) {
@@ -338,35 +335,57 @@ export async function deleteCompanyForActor(
     throw new HttpError(400, "L'entreprise par defaut AMCCO ne peut pas etre supprimee.");
   }
 
-  await deactivateCompany(existing.id);
+  if (existing.isActive) {
+    await deactivateCompany(existing.id);
+
+    await createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: existing.id,
+      actorId: actor.userId,
+      action: "COMPANY_DELETED",
+      entityType: "COMPANY",
+      entityId: existing.id,
+      metadataJson: JSON.stringify({
+        name: existing.name,
+        code: existing.code,
+        legalName: existing.legalName,
+        registrationNumber: existing.registrationNumber,
+        taxId: existing.taxId,
+        email: existing.email,
+        phone: existing.phone,
+        website: existing.website,
+        addressLine1: existing.addressLine1,
+        addressLine2: existing.addressLine2,
+        city: existing.city,
+        stateRegion: existing.stateRegion,
+        postalCode: existing.postalCode,
+        country: existing.country,
+        businessSector: existing.businessSector,
+        contactFullName: existing.contactFullName,
+        contactJobTitle: existing.contactJobTitle,
+        deletedByRole: actor.role,
+        deletedAt: new Date().toISOString()
+      })
+    });
+
+    return;
+  }
 
   await createAuditLogRecord({
     auditId: randomUUID(),
-    companyId: existing.id,
+    companyId: actor.companyId,
     actorId: actor.userId,
-    action: "COMPANY_DELETED",
+    action: "COMPANY_PURGED",
     entityType: "COMPANY",
     entityId: existing.id,
     metadataJson: JSON.stringify({
-      name: existing.name,
-      code: existing.code,
-      legalName: existing.legalName,
-      registrationNumber: existing.registrationNumber,
-      taxId: existing.taxId,
-      email: existing.email,
-      phone: existing.phone,
-      website: existing.website,
-      addressLine1: existing.addressLine1,
-      addressLine2: existing.addressLine2,
-      city: existing.city,
-      stateRegion: existing.stateRegion,
-      postalCode: existing.postalCode,
-      country: existing.country,
-      businessSector: existing.businessSector,
-      contactFullName: existing.contactFullName,
-      contactJobTitle: existing.contactJobTitle,
-      deletedByRole: managedCompany.role,
-      deletedAt: new Date().toISOString()
+      deletedCompanyId: existing.id,
+      deletedCompanyName: existing.name,
+      deletedCompanyCode: existing.code,
+      deletedByRole: actor.role,
+      purgedAt: new Date().toISOString()
     })
   });
+
+  await permanentlyDeleteCompany(existing.id);
 }

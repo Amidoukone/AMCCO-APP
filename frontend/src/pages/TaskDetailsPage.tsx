@@ -113,29 +113,13 @@ function timelineDetail(event: OperationTaskTimelineEvent): string {
 
 function timelineContextLines(event: OperationTaskTimelineEvent): string[] {
   const metadata = asObject(event.metadata);
-  const lines: string[] = getTaskTraceLines(event.action, metadata);
-
-  const activityCode =
-    typeof metadata.activityCode === "string" ? metadata.activityCode : null;
-  if (activityCode && !lines.some((line) => line.startsWith("Secteur: "))) {
-    lines.push(`Secteur: ${getBusinessActivityLabel(activityCode as BusinessActivityCode)}`);
-  }
+  const lines: string[] = getTaskTraceLines(event.action, metadata).filter(
+    (line) => !line.startsWith("Secteur: ") && !line.startsWith("Échéance: ")
+  );
 
   const note = typeof metadata.note === "string" ? metadata.note.trim() : "";
   if (note && !lines.some((line) => line.startsWith("Note: "))) {
     lines.push(`Note: ${note}`);
-  }
-
-  const dueDate = typeof metadata.dueDate === "string" ? metadata.dueDate : null;
-  if (dueDate) {
-    lines.push(`Échéance: ${formatDate(dueDate)}`);
-  }
-
-  const taskWorkflow = Array.isArray(metadata.taskWorkflow)
-    ? metadata.taskWorkflow.filter((item): item is string => typeof item === "string")
-    : [];
-  if (taskWorkflow.length > 0) {
-    lines.push(`Workflow: ${taskWorkflow.join(" -> ")}`);
   }
 
   const bodyPreview =
@@ -184,8 +168,9 @@ export function TaskDetailsPage(): JSX.Element {
   const [newComment, setNewComment] = useState("");
 
   const canManageTasks = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
+    return user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
   }, [user?.role]);
+  const isReadOnlyOwner = user?.role === "OWNER";
   const loadData = useCallback(async (options?: {
     append?: boolean;
     timelineOffset?: number;
@@ -325,7 +310,7 @@ export function TaskDetailsPage(): JSX.Element {
   }
 
   async function handleAddComment(): Promise<void> {
-    if (!taskId) {
+    if (!taskId || isReadOnlyOwner) {
       return;
     }
     const body = newComment.trim();
@@ -351,6 +336,9 @@ export function TaskDetailsPage(): JSX.Element {
     if (!task || !user) {
       return false;
     }
+    if (isReadOnlyOwner) {
+      return false;
+    }
     if (task.status === "DONE") {
       return false;
     }
@@ -358,7 +346,7 @@ export function TaskDetailsPage(): JSX.Element {
       return true;
     }
     return task.assignedToId === user.id;
-  }, [canManageTasks, task, user]);
+  }, [canManageTasks, isReadOnlyOwner, task, user]);
 
   const isTaskCompleted = task?.status === "DONE";
 
@@ -418,7 +406,7 @@ export function TaskDetailsPage(): JSX.Element {
 
       {isLoading ? <p>Chargement...</p> : null}
 
-      {!isLoading && task ? (
+      {!isLoading && task && !isReadOnlyOwner ? (
         <section className="panel">
           <div className="task-detail-header">
             <h3>{task.title}</h3>
@@ -607,10 +595,6 @@ export function TaskDetailsPage(): JSX.Element {
                 ))}
               </ol>
               <div className="list-pagination">
-                <p className="hint list-pagination-meta">
-                  {timelineEntries.length} element(s) de suivi charge(s)
-                  {hasMoreTimeline || hasMoreComments ? " sur plusieurs pages." : "."}
-                </p>
                 {hasMoreTimeline || hasMoreComments ? (
                   <button
                     type="button"

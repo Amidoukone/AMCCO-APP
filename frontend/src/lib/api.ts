@@ -608,7 +608,7 @@ export function createFinanceTransactionRequest(
     activityCode: BusinessActivityCode;
     description?: string;
     metadata?: Record<string, string>;
-    occurredAt: string;
+    occurredAt?: string;
   }
 ): Promise<FinancialTransactionSingleResponse> {
   return request<FinancialTransactionSingleResponse>("/finance/transactions", {
@@ -639,7 +639,7 @@ export function updateFinanceTransactionRequest(
     activityCode: BusinessActivityCode;
     description?: string;
     metadata?: Record<string, string>;
-    occurredAt: string;
+    occurredAt?: string;
   }
 ): Promise<FinancialTransactionSingleResponse> {
   return request<FinancialTransactionSingleResponse>(`/finance/transactions/${transactionId}`, {

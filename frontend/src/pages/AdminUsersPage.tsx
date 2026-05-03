@@ -54,6 +54,9 @@ export function AdminUsersPage(): JSX.Element {
   });
 
   const canManageUser = useMemo(() => {
+    return user?.role === "SYS_ADMIN";
+  }, [user?.role]);
+  const canViewUsers = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
   const usersSearchStorageKey = useMemo(() => {
@@ -114,12 +117,12 @@ export function AdminUsersPage(): JSX.Element {
   }, [setDraftsFromItems, withAuthorizedToken]);
 
   useEffect(() => {
-    if (!canManageUser) {
+    if (!canViewUsers) {
       setIsLoading(false);
       return;
     }
     void loadUsers();
-  }, [canManageUser, loadUsers]);
+  }, [canViewUsers, loadUsers]);
 
   async function handleCreateUser(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -241,7 +244,7 @@ export function AdminUsersPage(): JSX.Element {
     }
   }
 
-  if (!canManageUser) {
+  if (!canViewUsers) {
     return (
       <section className="panel">
         <h2>Administration utilisateurs</h2>
@@ -256,7 +259,7 @@ export function AdminUsersPage(): JSX.Element {
         <h2>Administration utilisateurs</h2>
       </header>
 
-      <section className="panel admin-users-create-panel">
+      {canManageUser ? <section className="panel admin-users-create-panel">
         <h3>Créer un utilisateur</h3>
         <form className="admin-form admin-users-create-form" onSubmit={handleCreateUser}>
           <input
@@ -314,7 +317,7 @@ export function AdminUsersPage(): JSX.Element {
             {isSubmittingCreate ? "Enregistrement..." : "Ajouter l'utilisateur"}
           </button>
         </form>
-      </section>
+      </section> : null}
 
       <FeedbackBanner
         errorMessage={errorMessage}
@@ -322,7 +325,7 @@ export function AdminUsersPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className="panel admin-users-panel">
+      <section className={canManageUser ? "panel admin-users-panel" : "panel admin-users-panel admin-users-readonly"}>
         <div className="admin-users-management-header">
           <h3>Utilisateurs de l'entreprise</h3>
         </div>
@@ -397,7 +400,7 @@ export function AdminUsersPage(): JSX.Element {
                               }
                             }))
                           }
-                          disabled={isBusy}
+                          disabled={!canManageUser || isBusy}
                         />
                       </td>
                       <td>{item.email}</td>
@@ -419,7 +422,7 @@ export function AdminUsersPage(): JSX.Element {
                               }
                             }))
                           }
-                          disabled={isBusy}
+                          disabled={!canManageUser || isBusy}
                         >
                           {ROLE_CODES.map((role) => (
                             <option key={role} value={role}>
@@ -458,7 +461,7 @@ export function AdminUsersPage(): JSX.Element {
                             type="button"
                             className="secondary-btn"
                             onClick={() => void handleSaveProfile(item.userId)}
-                            disabled={isBusy}
+                            disabled={!canManageUser || isBusy}
                           >
                             Enregistrer
                           </button>
@@ -492,13 +495,13 @@ export function AdminUsersPage(): JSX.Element {
                                   }
                                 }))
                               }
-                              disabled={isBusy}
+                              disabled={!canManageUser || isBusy}
                             />
                             <button
                               type="button"
                               className="secondary-btn"
                               onClick={() => void handleResetPassword(item.userId)}
-                              disabled={isBusy}
+                              disabled={!canManageUser || isBusy}
                             >
                               Réinitialiser le mot de passe
                             </button>

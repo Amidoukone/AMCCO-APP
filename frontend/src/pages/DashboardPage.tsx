@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardHero } from "../components/dashboard/DashboardHero";
 import { DashboardPriorityPanels } from "../components/dashboard/DashboardPriorityPanels";
+import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ApiError, getDashboardSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
@@ -17,6 +18,7 @@ function toErrorMessage(error: unknown): string {
 
 export function DashboardPage(): JSX.Element {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { selectedActivity, selectedActivityCode } = useBusinessActivity();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,15 +51,19 @@ export function DashboardPage(): JSX.Element {
     return summary.activitySummary.find((item) => item.activityCode === selectedActivityCode) ?? null;
   }, [selectedActivityCode, summary]);
 
+  const isReadOnlyOwner = user?.role === "OWNER";
+
   const quickSummaryPills = useMemo(() => {
     if (!summary) return [];
+    if (isReadOnlyOwner) return [];
     return buildQuickSummaryPills(summary, selectedActivity?.label ?? null);
-  }, [selectedActivity?.label, summary]);
+  }, [isReadOnlyOwner, selectedActivity?.label, summary]);
 
   const dailyActionCards = useMemo(() => {
     if (!summary) return [];
+    if (isReadOnlyOwner) return [];
     return buildDailyActionCards(summary);
-  }, [summary]);
+  }, [isReadOnlyOwner, summary]);
 
   return (
     <>

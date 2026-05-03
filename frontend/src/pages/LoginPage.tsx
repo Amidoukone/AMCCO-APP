@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+﻿import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -28,7 +28,7 @@ export function LoginPage(): JSX.Element {
       if (error instanceof ApiError) {
         setErrorMessage(error.message);
       } else {
-        setErrorMessage("Connexion impossible. Vérifiez le backend.");
+        setErrorMessage("Connexion impossible. VÃ©rifiez le backend.");
       }
     } finally {
       setIsSubmitting(false);
@@ -39,8 +39,8 @@ export function LoginPage(): JSX.Element {
     <main className="page center">
       <section className="card login-card">
         <div className="login-brand">
-          <h1>AMCCO</h1>
-          <p>Connexion sécurisée</p>
+          <h1>GROUPE NIOUMALA DIADY</h1>
+          <p>AMCCO &amp; SND</p>
         </div>
         <form className="form" onSubmit={handleSubmit}>
           <label htmlFor="email">Email</label>
@@ -72,3 +72,4 @@ export function LoginPage(): JSX.Element {
     </main>
   );
 }
+

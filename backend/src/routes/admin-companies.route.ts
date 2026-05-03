@@ -17,7 +17,7 @@ const companyIdParamSchema = z.object({
 
 const createCompanySchema = z.object({
   name: z.string().trim().min(2).max(255),
-  code: z.string().trim().min(2).max(64),
+  code: z.string().trim().max(64).optional().or(z.literal("")),
   legalName: z.string().trim().max(255).optional(),
   registrationNumber: z.string().trim().max(128).optional(),
   taxId: z.string().trim().max(128).optional(),
@@ -80,6 +80,7 @@ adminCompaniesRouter.get(
 
 adminCompaniesRouter.post(
   "/admin/companies",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -93,6 +94,7 @@ adminCompaniesRouter.post(
 
 adminCompaniesRouter.patch(
   "/admin/companies/:companyId",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -111,6 +113,7 @@ adminCompaniesRouter.patch(
 
 adminCompaniesRouter.delete(
   "/admin/companies/:companyId",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");

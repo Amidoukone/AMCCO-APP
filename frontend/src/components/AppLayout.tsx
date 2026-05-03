@@ -25,7 +25,7 @@ export function AppLayout(): JSX.Element {
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
   const [companySwitchError, setCompanySwitchError] = useState<string | null>(null);
   const withAuthorizedToken = useAuthorizedRequest();
-  const canManageCompanies = user?.role === "OWNER" || user?.role === "SYS_ADMIN";
+  const canManageCompanies = user?.role === "SYS_ADMIN";
   const isBootstrapMode = !activeCompany;
   const navigation = useMemo(
     () => (user ? getNavigationForRole(user.role) : []),
@@ -38,6 +38,7 @@ export function AppLayout(): JSX.Element {
         : navigation,
     [isBootstrapMode, navigation]
   );
+  const outletKey = `${location.pathname}${location.search}:${selectedActivityCode ?? "no-activity"}`;
   const navigationSections = useMemo(() => {
     return visibleNavigation.reduce<Record<string, typeof visibleNavigation>>((groups, item) => {
       groups[item.section] = [...(groups[item.section] ?? []), item];
@@ -109,11 +110,12 @@ export function AppLayout(): JSX.Element {
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
-        <div className="brand-block">
-          <h1>AMCCO</h1>
+        <div className="app-sidebar-inner">
+          <div className="brand-block">
+          <h1>AMCCO &amp; SND</h1>
           <p>Pilotage multi-secteurs</p>
-        </div>
-        {isBootstrapMode ? (
+          </div>
+          {isBootstrapMode ? (
           <section className="sidebar-sector-card" aria-label="Mode initialisation">
             <p className="sidebar-section-label">Mode initialisation</p>
             <strong>Aucune entreprise active</strong>
@@ -157,9 +159,9 @@ export function AppLayout(): JSX.Element {
             </p>
             {activityErrorMessage ? <p className="sidebar-error">{activityErrorMessage}</p> : null}
           </section>
-        )}
+          )}
 
-        <nav aria-label="Navigation principale">
+          <nav className="sidebar-nav" aria-label="Navigation principale">
           {Object.entries(navigationSections).map(([section, items]) => (
             <div key={section} className="nav-section">
               <p className="sidebar-section-label">{section}</p>
@@ -179,7 +181,8 @@ export function AppLayout(): JSX.Element {
               </div>
             </div>
           ))}
-        </nav>
+          </nav>
+        </div>
       </aside>
 
       <div className="app-main">
@@ -189,18 +192,20 @@ export function AppLayout(): JSX.Element {
             <p className="header-meta">
               {ROLE_LABELS[user.role]} | {activeCompany?.name ?? "Mode initialisation"}
             </p>
-            <p className="header-company-code">
-              Entreprise active: {activeCompany?.code ?? "Aucune"}
-            </p>
-            <p className="header-scope">
-              Secteur de travail:{" "}
-              {isBootstrapMode ? "Initialisation en cours" : selectedActivity?.label ?? "Aucun secteur actif"}
-            </p>
+            <div className="header-context-row">
+              <p className="header-scope">
+                Secteur:{" "}
+                {isBootstrapMode
+                  ? "Initialisation en cours"
+                  : selectedActivity?.label ?? "Aucun secteur actif"}
+              </p>
+            </div>
             {companySwitchError ? <p className="header-switch-error">{companySwitchError}</p> : null}
           </div>
           {!isBootstrapMode ? (
             <GlobalSearch
               navigation={visibleNavigation}
+              role={user.role}
               selectedActivityCode={selectedActivityCode}
             />
           ) : null}
@@ -216,7 +221,7 @@ export function AppLayout(): JSX.Element {
                 >
                   {memberships.map((membership) => (
                     <option key={membership.companyId} value={membership.companyId}>
-                      {membership.companyName} ({membership.companyCode})
+                      {membership.companyName}
                     </option>
                   ))}
                 </select>
@@ -240,7 +245,7 @@ export function AppLayout(): JSX.Element {
               />
             </div>
           ) : null}
-          <Outlet />
+          <Outlet key={outletKey} />
         </section>
       </div>
     </div>

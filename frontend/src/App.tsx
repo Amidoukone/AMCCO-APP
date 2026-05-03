@@ -28,7 +28,9 @@ export function App(): JSX.Element {
       ? user
         ? getDefaultRouteForRole(user.role)
         : "/dashboard"
-      : "/admin/companies";
+      : user?.role === "SYS_ADMIN"
+        ? "/admin/companies"
+        : "/dashboard";
 
   return (
     <Routes>

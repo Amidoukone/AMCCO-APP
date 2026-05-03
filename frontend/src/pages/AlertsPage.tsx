@@ -47,6 +47,7 @@ function notifyAlertsChanged(): void {
 export function AlertsPage(): JSX.Element {
   const navigate = useNavigate();
   const { activeCompany, user } = useAuth();
+  const isReadOnlyOwner = user?.role === "OWNER";
   const withAuthorizedToken = useAuthorizedRequest();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AlertItem[]>([]);
@@ -235,14 +236,14 @@ export function AlertsPage(): JSX.Element {
             <h3>Alertes</h3>
           </div>
           <div className="actions-inline">
-            <button
+            {!isReadOnlyOwner ? <button
               type="button"
               className="secondary-btn"
               onClick={() => void handleReadAll()}
               disabled={isMarkingAll || unreadCount === 0}
             >
               Tout marquer comme lu
-            </button>
+            </button> : null}
             <button
               type="button"
               className="danger-btn"
@@ -269,7 +270,7 @@ export function AlertsPage(): JSX.Element {
             <span>Non lues uniquement</span>
           </label>
 
-          <input
+          {!isReadOnlyOwner ? <input
             type="text"
             placeholder="Type entite (ex: TRANSACTION)"
             value={filters.entityType}
@@ -279,7 +280,7 @@ export function AlertsPage(): JSX.Element {
                 entityType: event.target.value
               }))
             }
-          />
+          /> : null}
 
           <button type="submit">Actualiser</button>
         </form>
@@ -384,7 +385,7 @@ export function AlertsPage(): JSX.Element {
                           {financeTarget.kind === "salary" ? "Voir le salaire" : "Voir la transaction"}
                         </button>
                       ) : null}
-                      {isUnread ? (
+                      {!isReadOnlyOwner && isUnread ? (
                         <button
                           type="button"
                           className="secondary-btn"

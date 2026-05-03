@@ -30,11 +30,11 @@ export const ROLE_LABELS: Record<RoleCode, string> = {
 
 const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
   dashboard: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
-  myWork: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
+  myWork: ["SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   alerts: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
-  adminCompanies: ["OWNER", "SYS_ADMIN"],
-  adminUsers: ["OWNER", "SYS_ADMIN"],
-  adminActivities: ["OWNER", "SYS_ADMIN"],
+  adminCompanies: ["SYS_ADMIN"],
+  adminUsers: ["SYS_ADMIN"],
+  adminActivities: ["SYS_ADMIN"],
   financeTransactions: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   financeSalaries: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   operationsTasks: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
@@ -82,6 +82,10 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
 
 export function canAccessFeature(role: RoleCode, feature: FeatureKey): boolean {
   return FEATURE_ACCESS[feature].includes(role);
+}
+
+export function isReadOnlyOwnerRole(role: RoleCode): boolean {
+  return role === "OWNER";
 }
 
 export function getNavigationForRole(role: RoleCode): NavigationItem[] {

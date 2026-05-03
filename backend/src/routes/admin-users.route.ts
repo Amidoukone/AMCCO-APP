@@ -59,6 +59,7 @@ adminUsersRouter.get(
 
 adminUsersRouter.post(
   "/admin/users",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -84,6 +85,7 @@ adminUsersRouter.post(
 
 adminUsersRouter.patch(
   "/admin/users/:userId",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -110,6 +112,7 @@ adminUsersRouter.patch(
 
 adminUsersRouter.patch(
   "/admin/users/:userId/role",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -135,6 +138,7 @@ adminUsersRouter.patch(
 
 adminUsersRouter.patch(
   "/admin/users/:userId/password",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -160,6 +164,7 @@ adminUsersRouter.patch(
 
 adminUsersRouter.delete(
   "/admin/users/:userId",
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");

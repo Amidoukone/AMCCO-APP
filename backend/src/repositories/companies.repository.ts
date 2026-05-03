@@ -400,3 +400,136 @@ export async function deactivateCompany(companyId: string): Promise<void> {
     [companyId]
   );
 }
+
+export async function permanentlyDeleteCompany(companyId: string): Promise<void> {
+  const connection = await getDbPool().getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM task_comments
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM transaction_proofs
+        WHERE transaction_id IN (
+          SELECT id
+          FROM (
+            SELECT id
+            FROM transactions
+            WHERE company_id = ?
+          ) tx
+        )
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM tasks
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM alerts
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM audit_logs
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM refresh_sessions
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM transactions
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM financial_account_activities
+        WHERE account_id IN (
+          SELECT id
+          FROM (
+            SELECT id
+            FROM financial_accounts
+            WHERE company_id = ?
+          ) acc
+        )
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM financial_accounts
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM documents
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM company_activities
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM memberships
+        WHERE company_id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM companies
+        WHERE id = ?
+      `,
+      [companyId]
+    );
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}

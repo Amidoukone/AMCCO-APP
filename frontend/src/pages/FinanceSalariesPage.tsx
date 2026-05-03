@@ -200,9 +200,10 @@ export function FinanceSalariesPage(): JSX.Element {
   const [loadingProofsByTransaction, setLoadingProofsByTransaction] = useState<Record<string, boolean>>(
     {}
   );
+  const isReadOnlyOwner = user?.role === "OWNER";
 
   const canManageSalaries = useMemo(() => {
-    return user?.role === "OWNER" || user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+    return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
   const canReview = canManageSalaries;
@@ -1130,7 +1131,7 @@ export function FinanceSalariesPage(): JSX.Element {
                     item.status === "SUBMITTED" &&
                     item.salaryConfirmation.status === "CONFIRMED";
                   const canAddProof =
-                    canManageSalaries || item.createdById === user?.id;
+                    !isReadOnlyOwner && (canManageSalaries || item.createdById === user?.id);
 
                   return (
                     <tr key={item.id}>
@@ -1456,15 +1457,17 @@ export function FinanceSalariesPage(): JSX.Element {
                   Supprimer
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() =>
-                  navigate(`/alerts?entityType=SALARY&entityId=${encodeURIComponent(selectedSalary.id)}`)
-                }
-              >
-                Voir alertes
-              </button>
+              {!isReadOnlyOwner ? (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() =>
+                    navigate(`/alerts?entityType=SALARY&entityId=${encodeURIComponent(selectedSalary.id)}`)
+                  }
+                >
+                  Voir alertes
+                </button>
+              ) : null}
               {canAccessAudit ? (
                 <button
                   type="button"

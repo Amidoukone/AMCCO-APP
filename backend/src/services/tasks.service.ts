@@ -41,7 +41,7 @@ type ActorContext = {
 type TaskScope = "ALL" | "ASSIGNED_TO_ME" | "CREATED_BY_ME" | "MINE";
 
 const OPERATIONS_ACCESS_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"];
-const TASK_MANAGEMENT_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "SUPERVISOR"];
+const TASK_MANAGEMENT_ROLES: RoleCode[] = ["SYS_ADMIN", "SUPERVISOR"];
 const TASK_TIMELINE_ACTIONS = [
   "TASK_CREATED",
   "TASK_UPDATED",
@@ -61,7 +61,11 @@ function canManageTasks(role: RoleCode): boolean {
 }
 
 function canCreateTasks(role: RoleCode): boolean {
-  return OPERATIONS_ACCESS_ROLES.includes(role);
+  return role !== "OWNER" && OPERATIONS_ACCESS_ROLES.includes(role);
+}
+
+function isReadOnlyOwner(role: RoleCode): boolean {
+  return role === "OWNER";
 }
 
 function canEditTask(actor: ActorContext, task: { createdById: string }): boolean {
@@ -69,6 +73,9 @@ function canEditTask(actor: ActorContext, task: { createdById: string }): boolea
 }
 
 function canViewTask(actor: ActorContext, task: { createdById: string; assignedToId: string | null }): boolean {
+  if (isReadOnlyOwner(actor.role)) {
+    return true;
+  }
   if (canManageTasks(actor.role)) {
     return true;
   }
@@ -85,6 +92,9 @@ function computeListFilters(actor: ActorContext, scope: TaskScope | undefined): 
   }
 
   if (scope === "ASSIGNED_TO_ME") {
+    if (actor.role === "OWNER") {
+      return {};
+    }
     return { assignedToId: actor.actorId };
   }
 
@@ -469,6 +479,9 @@ export async function updateCompanyTask(
   }
 ) {
   ensureOperationsAccess(actor.role);
+  if (isReadOnlyOwner(actor.role)) {
+    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+  }
 
   const existing = await findOperationTaskById(actor.companyId, input.taskId);
   if (!existing) {
@@ -546,15 +559,19 @@ export async function deleteCompanyTask(
   }
 ): Promise<void> {
   ensureOperationsAccess(actor.role);
+  if (isReadOnlyOwner(actor.role)) {
+    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+  }
 
   const existing = await findOperationTaskById(actor.companyId, input.taskId);
   if (!existing) {
     throw new HttpError(404, "Tache introuvable.");
   }
-  if (!canEditTask(actor, existing)) {
+  const canDelete = actor.role === "SYS_ADMIN" || canEditTask(actor, existing);
+  if (!canDelete) {
     throw new HttpError(403, "Permissions insuffisantes pour supprimer cette tache.");
   }
-  if (existing.status === "DONE") {
+  if (existing.status === "DONE" && actor.role !== "SYS_ADMIN") {
     throw new HttpError(400, "Une tache terminee ne peut plus etre supprimee.");
   }
 
@@ -590,6 +607,9 @@ export async function updateCompanyTaskStatus(
   }
 ) {
   ensureOperationsAccess(actor.role);
+  if (isReadOnlyOwner(actor.role)) {
+    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+  }
 
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
@@ -739,6 +759,9 @@ export async function addCompanyTaskComment(
   }
 ) {
   ensureOperationsAccess(actor.role);
+  if (isReadOnlyOwner(actor.role)) {
+    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+  }
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
     throw new HttpError(404, "Tache introuvable.");

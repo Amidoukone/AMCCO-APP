@@ -791,18 +791,6 @@ export function assertTransactionInputMatchesActivityProfile(
       `Le secteur ${profile.label} n'autorise pas la devise ${currency}.`
     );
   }
-  if (profile.finance.requiresDescription && !input.description?.trim()) {
-    throw new Error(
-      `Le secteur ${profile.label} exige une description metier pour chaque transaction.`
-    );
-  }
-  for (const item of profile.finance.metadataFields ?? []) {
-    if (item.required && !input.metadata?.[item.key]?.trim()) {
-      throw new Error(
-        `Le secteur ${profile.label} exige le champ ${item.label.toLowerCase()} pour chaque transaction.`
-      );
-    }
-  }
 }
 
 export function assertTaskInputMatchesActivityProfile(
@@ -824,18 +812,6 @@ export function assertTaskInputMatchesActivityProfile(
     throw new Error(
       `Le secteur ${profile.label} exige qu'une tache soit assignee des sa creation.`
     );
-  }
-  if (profile.tasks.requiresDueDate && !input.dueDate) {
-    throw new Error(
-      `Le secteur ${profile.label} exige une echeance pour chaque tache.`
-    );
-  }
-  for (const item of profile.tasks.metadataFields ?? []) {
-    if (item.required && !input.metadata?.[item.key]?.trim()) {
-      throw new Error(
-        `Le secteur ${profile.label} exige le champ ${item.label.toLowerCase()} pour chaque tache.`
-      );
-    }
   }
 }
 

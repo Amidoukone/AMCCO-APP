@@ -124,6 +124,21 @@ function summarizeUserAgent(userAgent: string): string {
   return truncateText(userAgent, 48);
 }
 
+function formatAuditIpAddress(ipAddress: string): string {
+  const normalized = ipAddress.trim().toLowerCase();
+
+  if (
+    normalized === "::1" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::ffff:127.0.0.1" ||
+    normalized === "localhost"
+  ) {
+    return "Localhost";
+  }
+
+  return ipAddress.trim();
+}
+
 function formatAuditActionLabel(action: string): string {
   return auditActionLabels[action] ?? toSentenceCase(action);
 }
@@ -132,7 +147,88 @@ function formatEntityTypeLabel(entityType: string): string {
   return entityTypeLabels[entityType] ?? toSentenceCase(entityType);
 }
 
-function buildMetadataSummary(action: string, metadata: unknown): string {
+function toAdminMetadataLabel(key: string): string | null {
+  const labels: Record<string, string> = {
+    userId: "Utilisateur",
+    targetUserId: "Utilisateur cible",
+    email: "Email",
+    targetEmail: "Email cible",
+    fullName: "Nom",
+    targetFullName: "Nom cible",
+    role: "Role",
+    previousRole: "Role precedent",
+    nextRole: "Nouveau role",
+    isActive: "Actif",
+    name: "Nom",
+    code: "Code",
+    registrationNumber: "Immatriculation",
+    businessSector: "Secteur entreprise",
+    contactFullName: "Contact",
+    contactJobTitle: "Fonction contact",
+    fromCompanyId: "Entreprise source",
+    toCompanyId: "Entreprise cible",
+    activityLabel: "Secteur",
+    activityCode: "Code secteur",
+    scopeLabel: "Portee",
+    accountRef: "Reference compte",
+    decision: "Decision",
+    payPeriod: "Periode",
+    status: "Statut"
+  };
+
+  return labels[key] ?? null;
+}
+
+function buildAdminMetadataLines(metadata: unknown): string[] {
+  const root = asObject(metadata);
+  if (!root) {
+    return [];
+  }
+
+  const hasActivityLabel =
+    typeof root.activityLabel === "string" && root.activityLabel.trim().length > 0;
+  const lines: string[] = [];
+  for (const [key, rawValue] of Object.entries(root)) {
+    if (
+      key === "ipAddress" ||
+      key === "userAgent" ||
+      key === "account" ||
+      key === "reviewer" ||
+      key === "salary" ||
+      key === "salaryConfirmation" ||
+      key === "note" ||
+      key === "bodyPreview" ||
+      key === "title" ||
+      key === "nextTitle" ||
+      key === "previousStatus" ||
+      key === "nextStatus"
+    ) {
+      continue;
+    }
+
+    const label = toAdminMetadataLabel(key);
+    if (!label) {
+      continue;
+    }
+
+    if (key === "activityCode" && hasActivityLabel) {
+      continue;
+    }
+
+    if (typeof rawValue === "string" && rawValue.trim().length > 0) {
+      lines.push(`${label}: ${rawValue.trim()}`);
+      continue;
+    }
+
+    if (typeof rawValue === "number" || typeof rawValue === "boolean") {
+      lines.push(`${label}: ${String(rawValue)}`);
+    }
+  }
+
+  return lines;
+}
+
+function buildMetadataSummary(action: string, metadata: unknown, isSystemAdmin: boolean): string {
   const taskLines = getTaskTraceLines(action, metadata);
   if (taskLines.length > 0) {
     return truncateText(taskLines.join(" | "));
@@ -157,7 +253,7 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
   if (action === "AUTH_LOGIN" || action === "AUTH_REFRESH") {
     const parts = [];
     if (ipAddress) {
-      parts.push(`IP: ${ipAddress}`);
+      parts.push(`IP: ${formatAuditIpAddress(ipAddress)}`);
     }
     if (userAgent) {
       parts.push(`Navigateur: ${summarizeUserAgent(userAgent)}`);
@@ -191,19 +287,24 @@ function buildMetadataSummary(action: string, metadata: unknown): string {
     return bodyPreview ? `Commentaire: ${truncateText(bodyPreview, 100)}` : "Commentaire ajouté.";
   }
 
+  const adminLines = buildAdminMetadataLines(metadata);
+  if (isSystemAdmin && adminLines.length > 0) {
+    return truncateText(adminLines.slice(0, 2).join(" | "), 180);
+  }
+
   const compact = truncateText(financeSummary !== "-" ? financeSummary : JSON.stringify(metadata));
   return compact || "-";
 }
 
-function buildMetadataHighlights(action: string, metadata: unknown): string[] {
+function buildMetadataHighlights(action: string, metadata: unknown, isSystemAdmin: boolean): string[] {
   const taskLines = getTaskTraceLines(action, metadata);
   if (taskLines.length > 0) {
-    return taskLines.slice(0, 3);
+    return taskLines.slice(0, isSystemAdmin ? 5 : 3);
   }
 
   const financeLines = getFinanceTraceLines(metadata);
   if (financeLines.length > 0) {
-    return financeLines.slice(0, 3);
+    return financeLines.slice(0, isSystemAdmin ? 5 : 3);
   }
 
   const root = asObject(metadata);
@@ -211,16 +312,39 @@ function buildMetadataHighlights(action: string, metadata: unknown): string[] {
     return [];
   }
 
+  if (action === "AUTH_LOGIN" || action === "AUTH_REFRESH" || action === "AUTH_LOGOUT") {
+    return [];
+  }
+
+  if (isSystemAdmin) {
+    const adminLines = buildAdminMetadataLines(metadata);
+    if (adminLines.length > 0) {
+      return adminLines.slice(0, 6);
+    }
+  }
+
   const lines: string[] = [];
   const ipAddress = asText(root.ipAddress);
   const userAgent = asText(root.userAgent);
   if (ipAddress) {
-    lines.push(`IP: ${ipAddress}`);
+    lines.push(`IP: ${formatAuditIpAddress(ipAddress)}`);
   }
   if (userAgent) {
     lines.push(`Navigateur: ${summarizeUserAgent(userAgent)}`);
   }
   return lines.slice(0, 3);
+}
+
+function splitAuditLine(line: string): { label: string | null; value: string } {
+  const separatorIndex = line.indexOf(":");
+  if (separatorIndex <= 0) {
+    return { label: null, value: line.trim() };
+  }
+
+  return {
+    label: line.slice(0, separatorIndex).trim(),
+    value: line.slice(separatorIndex + 1).trim()
+  };
 }
 
 function collapseAuditItems(items: AuditLogItem[]): AuditDisplayItem[] {
@@ -253,6 +377,8 @@ function collapseAuditItems(items: AuditLogItem[]): AuditDisplayItem[] {
 export function SecuritySettingsPage(): JSX.Element {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const isReadOnlyOwner = user?.role === "OWNER";
+  const isSystemAdmin = user?.role === "SYS_ADMIN";
   const withAuthorizedToken = useAuthorizedRequest();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<AuditLogItem[]>([]);
@@ -284,7 +410,7 @@ export function SecuritySettingsPage(): JSX.Element {
     }));
   }, [searchParams]);
 
-  const canAccess = useMemo(() => user?.role === "OWNER" || user?.role === "SYS_ADMIN", [user?.role]);
+  const canAccess = useMemo(() => user?.role === "SYS_ADMIN", [user?.role]);
   const displayItems = useMemo(() => collapseAuditItems(items), [items]);
   const dateFormatter = useMemo(
     () =>
@@ -433,13 +559,16 @@ export function SecuritySettingsPage(): JSX.Element {
       <section className="panel security-personal-panel">
         <h3>Sécurité personnelle</h3>
         <p className="hint">
-          Gérez votre mot de passe et votre session active.
+          {isReadOnlyOwner
+            ? "Compte proprietaire en lecture seule."
+            : "Gérez votre mot de passe et votre session active."}
         </p>
         <FeedbackBanner
           errorMessage={passwordErrorMessage}
           successMessage={passwordSuccessMessage}
           isLoading={isChangingPassword}
         />
+        {!isReadOnlyOwner ? (
         <form className="admin-form security-password-form" onSubmit={handlePasswordSubmit}>
           <input
             type="password"
@@ -486,6 +615,7 @@ export function SecuritySettingsPage(): JSX.Element {
             {isChangingPassword ? "Mise à jour..." : "Modifier le mot de passe"}
           </button>
         </form>
+        ) : null}
         <div className="security-session-actions">
           <button className="secondary-btn" type="button" onClick={() => void handleLogout()}>
             Se déconnecter
@@ -598,7 +728,7 @@ export function SecuritySettingsPage(): JSX.Element {
         {!isLoading && displayItems.length > 0 ? (
           <>
           <div className="table-wrap">
-            <table className="admin-table">
+            <table className="admin-table audit-history-table">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -621,42 +751,69 @@ export function SecuritySettingsPage(): JSX.Element {
                     item.entityId,
                     item.metadata
                   );
-                  const metadataSummary = buildMetadataSummary(item.action, item.metadata);
-                  const metadataHighlights = buildMetadataHighlights(item.action, item.metadata);
+                  const metadataSummary = buildMetadataSummary(
+                    item.action,
+                    item.metadata,
+                    isSystemAdmin
+                  );
+                  const metadataHighlights = buildMetadataHighlights(
+                    item.action,
+                    item.metadata,
+                    isSystemAdmin
+                  );
 
                   return (
                     <tr key={item.id}>
-                      <td>{dateFormatter.format(new Date(item.createdAt))}</td>
-                      <td>
+                      <td className="audit-date-cell">
+                        <span className="audit-date-text">
+                          {dateFormatter.format(new Date(item.createdAt))}
+                        </span>
+                      </td>
+                      <td className="audit-action-cell">
                         <div className="audit-cell-stack">
-                          <strong>{formatAuditActionLabel(item.action)}</strong>
+                          <strong className="audit-primary-text audit-action-title">
+                            {formatAuditActionLabel(item.action)}
+                          </strong>
                           {item.duplicateCount > 1 ? (
                             <span className="audit-duplicate-badge">x{item.duplicateCount}</span>
                           ) : null}
                         </div>
                       </td>
-                      <td>
-                        <div className="audit-cell-stack">
-                          <strong>{item.actorFullName}</strong>
-                          <small>{item.actorEmail}</small>
+                      <td className="audit-actor-cell">
+                        <div className="audit-cell-stack audit-actor-stack">
+                          <strong className="audit-primary-text audit-actor-name">
+                            {item.actorFullName || "Utilisateur inconnu"}
+                          </strong>
+                          <small className="audit-secondary-text">{item.actorEmail}</small>
                         </div>
                       </td>
                       <td>
                         <div className="audit-cell-stack">
-                          <strong>{formatEntityTypeLabel(item.entityType)}</strong>
-                          <small>{item.entityId}</small>
+                          <strong className="audit-entity-badge">
+                            {formatEntityTypeLabel(item.entityType)}
+                          </strong>
+                          <small className="audit-secondary-text audit-entity-id">
+                            {item.entityId}
+                          </small>
                         </div>
                       </td>
                       <td className="audit-metadata-cell">
                         <div className="audit-cell-stack">
-                          <span>{metadataSummary}</span>
+                          <span className="audit-summary-text">{metadataSummary}</span>
                           {metadataHighlights.length > 0 ? (
                             <div className="audit-highlight-lines">
-                              {metadataHighlights.map((line) => (
-                                <p key={`${item.id}-${line}`} className="hint">
-                                  {line}
-                                </p>
-                              ))}
+                              {metadataHighlights.map((line) => {
+                                const { label, value } = splitAuditLine(line);
+
+                                return (
+                                  <div key={`${item.id}-${line}`} className="audit-highlight-row">
+                                    {label ? (
+                                      <strong className="audit-highlight-label">{label}:</strong>
+                                    ) : null}
+                                    <span className="audit-highlight-value">{value}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : null}
                         </div>

@@ -60,7 +60,7 @@ const createTransactionSchema = z.object({
   activityCode: z.enum(BUSINESS_ACTIVITY_CODES),
   description: z.string().trim().max(2000).optional(),
   metadata: z.record(z.string().trim().min(1).max(64), z.string().trim().max(500)).optional(),
-  occurredAt: z.string().datetime()
+  occurredAt: z.string().datetime().optional()
 });
 
 const salaryPaymentMethodSchema = z.enum(["BANK_TRANSFER", "CASH", "MOBILE_MONEY", "CHEQUE"]);
@@ -131,7 +131,7 @@ financeRouter.get(
 
 financeRouter.post(
   "/finance/accounts",
-  authorizeRoles("OWNER", "SYS_ADMIN"),
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -158,7 +158,7 @@ financeRouter.post(
 
 financeRouter.patch(
   "/finance/accounts/:accountId",
-  authorizeRoles("OWNER", "SYS_ADMIN"),
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -187,7 +187,7 @@ financeRouter.patch(
 
 financeRouter.delete(
   "/finance/accounts/:accountId",
-  authorizeRoles("OWNER", "SYS_ADMIN"),
+  authorizeRoles("SYS_ADMIN"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -261,7 +261,7 @@ financeRouter.get(
 
 financeRouter.post(
   "/finance/salaries",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -292,7 +292,7 @@ financeRouter.post(
 
 financeRouter.patch(
   "/finance/salaries/:transactionId",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -325,7 +325,7 @@ financeRouter.patch(
 
 financeRouter.delete(
   "/finance/salaries/:transactionId",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -435,6 +435,7 @@ financeRouter.get(
 
 financeRouter.post(
   "/finance/transactions",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -463,7 +464,7 @@ financeRouter.post(
 
 financeRouter.patch(
   "/finance/transactions/:transactionId",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -515,6 +516,7 @@ financeRouter.get(
 
 financeRouter.get(
   "/finance/transactions/:transactionId/proofs/upload-auth",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -536,6 +538,7 @@ financeRouter.get(
 
 financeRouter.post(
   "/finance/transactions/:transactionId/proofs",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -562,6 +565,7 @@ financeRouter.post(
 
 financeRouter.patch(
   "/finance/transactions/:transactionId/submit",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -585,7 +589,7 @@ financeRouter.patch(
 
 financeRouter.patch(
   "/finance/transactions/:transactionId/review",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -611,7 +615,7 @@ financeRouter.patch(
 
 financeRouter.delete(
   "/finance/transactions/:transactionId",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
