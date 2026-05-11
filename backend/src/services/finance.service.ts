@@ -646,7 +646,7 @@ export async function updateCompanyAccount(
       recipientRoles: ["OWNER"],
       excludeUserIds: [actor.actorId],
       code: "FINANCE_ACCOUNT_UPDATED",
-      message: `Le compte financier ${updated.name} a ete modifie par l'admin systeme.`,
+      message: `Le compte financier ${updated.name} a été modifié par l'admin système.`,
       severity: "WARNING",
       entityType: "FINANCIAL_ACCOUNT",
       entityId: updated.id,
@@ -853,7 +853,7 @@ export async function updateCompanyTransaction(
       recipientRoles: ["OWNER"],
       excludeUserIds: [actor.actorId],
       code: "FINANCE_TRANSACTION_UPDATED",
-      message: `La transaction ${profile.label} ${updated.amount} ${updated.currency} a ete modifiee par l'admin systeme.`,
+      message: `La transaction ${profile.label} ${updated.amount} ${updated.currency} a été modifiée par l'admin système.`,
       severity: "WARNING",
       entityType: "TRANSACTION",
       entityId: updated.id,
@@ -1260,7 +1260,7 @@ export async function updateCompanySalaryTransaction(
       recipientRoles: ["OWNER"],
       excludeUserIds: [actor.actorId],
       code: "FINANCE_SALARY_UPDATED",
-      message: `Le salaire ${toSalaryActionLabel(updatedSnapshot)} a ete modifie par l'admin systeme.`,
+      message: `Le salaire ${toSalaryActionLabel(updatedSnapshot)} a été modifié par l'admin système.`,
       severity: "WARNING",
       entityType: "SALARY",
       entityId: updated.id,
@@ -1486,7 +1486,7 @@ export async function deleteCompanyAccount(
       recipientRoles: ["OWNER"],
       excludeUserIds: [actor.actorId],
       code: "FINANCE_ACCOUNT_DELETED",
-      message: `Le compte financier ${existing.name} a ete supprime par l'admin systeme.`,
+      message: `Le compte financier ${existing.name} a été supprimé par l'admin système.`,
       severity: "WARNING",
       entityType: "FINANCIAL_ACCOUNT",
       entityId: existing.id,
@@ -1560,7 +1560,7 @@ export async function deleteCompanyTransaction(
       recipientRoles: ["OWNER"],
       excludeUserIds: [actor.actorId],
       code: "FINANCE_TRANSACTION_DELETED",
-      message: `La transaction ${activityLabel ?? "finance"} ${existing.amount} ${existing.currency} a ete supprimee par l'admin systeme.`,
+      message: `La transaction ${activityLabel ?? "finance"} ${existing.amount} ${existing.currency} a été supprimée par l'admin système.`,
       severity: "WARNING",
       entityType: "TRANSACTION",
       entityId: existing.id,
@@ -1635,7 +1635,7 @@ export async function deleteCompanySalaryTransaction(
       recipientRoles: ["OWNER"],
       excludeUserIds: [actor.actorId],
       code: "FINANCE_SALARY_DELETED",
-      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete supprime par l'admin systeme.`,
+      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a été supprimé par l'admin système.`,
       severity: "WARNING",
       entityType: "SALARY",
       entityId: existing.id,
@@ -1852,7 +1852,7 @@ export async function submitCompanyTransaction(
       recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
       excludeUserIds: [actor.actorId],
       code: actionCode,
-      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete finalise et est disponible dans le suivi de paie.`,
+      message: `Le salaire ${toSalaryActionLabel(salarySnapshot)} a été finalisé et est disponible dans le suivi de paie.`,
       severity: "INFO",
       entityType,
       entityId: transaction.id,
@@ -1866,7 +1866,7 @@ export async function submitCompanyTransaction(
       companyId: actor.companyId,
       recipientUserIds: [salarySnapshot.employeeUserId],
       code: actionCode,
-      message: `Votre salaire ${toSalaryActionLabel(salarySnapshot)} a ete enregistre par la comptabilite et est disponible dans votre suivi.`,
+      message: `Votre salaire ${toSalaryActionLabel(salarySnapshot)} a été enregistré par la comptabilité et est disponible dans votre suivi.`,
       severity: "INFO",
       entityType,
       entityId: transaction.id,
@@ -1884,7 +1884,7 @@ export async function submitCompanyTransaction(
     recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
     excludeUserIds: [actor.actorId],
     code: actionCode,
-    message: `Une transaction ${profile?.label ?? "finance"} a ete enregistree et est disponible dans le suivi financier.`,
+    message: `Une transaction ${profile?.label ?? "finance"} a été enregistrée et est disponible dans le suivi financier.`,
     severity: "INFO",
     entityType,
     entityId: transaction.id,
@@ -1999,11 +1999,11 @@ export async function reviewCompanyTransaction(
       message:
         salarySnapshot
           ? input.decision === "APPROVED"
-            ? `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete approuve${reviewerSuffix}.`
-            : `Le salaire ${toSalaryActionLabel(salarySnapshot)} a ete rejete${reviewerSuffix}.`
+            ? `Le salaire ${toSalaryActionLabel(salarySnapshot)} a été approuvé${reviewerSuffix}.`
+            : `Le salaire ${toSalaryActionLabel(salarySnapshot)} a été rejeté${reviewerSuffix}.`
           : input.decision === "APPROVED"
-            ? `Votre transaction${profile ? ` ${profile.label}` : ""} a ete approuvee${reviewerSuffix}.`
-            : `Votre transaction${profile ? ` ${profile.label}` : ""} a ete rejetee${reviewerSuffix}.`,
+            ? `Votre transaction${profile ? ` ${profile.label}` : ""} a été approuvée${reviewerSuffix}.`
+            : `Votre transaction${profile ? ` ${profile.label}` : ""} a été rejetée${reviewerSuffix}.`,
       severity: input.decision === "APPROVED" ? "INFO" : "WARNING",
       entityType,
       entityId: transaction.id,

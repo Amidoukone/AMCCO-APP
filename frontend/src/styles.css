@@ -157,6 +157,51 @@ a {
   margin: 0;
 }
 
+.finance-transactions-pagination,
+.list-view-pagination {
+  align-items: flex-start;
+}
+
+.finance-transactions-pagination-meta,
+.finance-transactions-pagination-actions,
+.list-view-pagination-meta,
+.list-view-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.finance-transactions-pagination-actions .secondary-btn,
+.list-view-pagination-actions .secondary-btn {
+  min-width: 112px;
+}
+
+.finance-transactions-page-size,
+.list-view-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #486581;
+  font-size: 14px;
+}
+
+.finance-transactions-page-size select,
+.list-view-page-size select {
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  background: #ffffff;
+}
+
+.finance-transactions-page-indicator,
+.list-view-page-indicator {
+  margin: 0;
+  min-width: 110px;
+  text-align: center;
+}
+
 .hint {
   margin: 0 0 10px;
   color: #486581;
@@ -184,11 +229,25 @@ a {
 }
 
 .secondary-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #bcccdc;
   border-radius: 8px;
   padding: 8px 12px;
   background: #ffffff;
   cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.secondary-btn:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
 }
 
 .view-preset-strip {
@@ -656,6 +715,27 @@ a {
 .table-wrap {
   width: 100%;
   overflow-x: auto;
+}
+
+.finance-transactions-table-wrap,
+.list-managed-table-wrap {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+}
+
+.finance-transactions-table-wrap .admin-table,
+.list-managed-table-wrap .admin-table {
+  margin-top: 0;
+}
+
+.finance-transactions-table-wrap .admin-table thead th,
+.list-managed-table-wrap .admin-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fbff;
 }
 
 .admin-table {
@@ -3831,7 +3911,9 @@ textarea,
 .task-comment-form textarea,
 .proof-inline-form input,
 .company-switcher select,
-.sidebar-sector-select {
+.sidebar-sector-select,
+.finance-transactions-page-size select,
+.list-view-page-size select {
   color: var(--theme-text);
   background: rgba(6, 9, 26, 0.78);
   border-color: var(--theme-border);
@@ -3875,6 +3957,7 @@ textarea:focus,
   color: var(--theme-text);
   background: rgba(23, 31, 74, 0.86);
   border-color: var(--theme-border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .secondary-btn:hover,
@@ -3882,6 +3965,23 @@ textarea:focus,
   color: #070a1b;
   background: linear-gradient(135deg, var(--theme-gold), var(--theme-gold-soft));
   border-color: transparent;
+}
+
+.secondary-btn:disabled,
+.dashboard-inline-button:disabled,
+.alerts-filter-form button.secondary-btn:disabled {
+  color: var(--theme-text-muted);
+  background: rgba(23, 31, 74, 0.56);
+  border-color: var(--theme-border);
+  box-shadow: none;
+}
+
+.secondary-btn:disabled:hover,
+.dashboard-inline-button:disabled:hover,
+.alerts-filter-form button.secondary-btn:disabled:hover {
+  color: var(--theme-text-muted);
+  background: rgba(23, 31, 74, 0.56);
+  border-color: var(--theme-border);
 }
 
 .danger-btn {
@@ -4556,6 +4656,31 @@ textarea:focus,
   background:
     linear-gradient(180deg, rgba(23, 31, 74, 0.9), rgba(8, 12, 34, 0.9));
   border-color: var(--theme-border);
+}
+
+.finance-transactions-table-wrap,
+.list-managed-table-wrap {
+  background:
+    linear-gradient(180deg, rgba(23, 31, 74, 0.94), rgba(8, 12, 34, 0.94));
+  border-color: var(--theme-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.finance-transactions-table-wrap .admin-table thead th,
+.list-managed-table-wrap .admin-table thead th {
+  color: var(--theme-text);
+  background:
+    linear-gradient(180deg, rgba(32, 41, 94, 0.98), rgba(18, 24, 58, 0.98));
+  border-bottom-color: var(--theme-border);
+}
+
+.finance-transactions-pagination .list-pagination-meta,
+.finance-transactions-page-size,
+.finance-transactions-page-indicator,
+.list-view-pagination .list-pagination-meta,
+.list-view-page-size,
+.list-view-page-indicator {
+  color: var(--theme-text-muted);
 }
 
 .scope-field strong,

@@ -10,7 +10,7 @@ import {
   findActiveUserAuthById,
   findActiveUserByEmail,
   findActiveUserById,
-  findPreferredAuthUserByEmail,
+  listActiveAuthUsersByEmail,
   findRefreshSessionById,
   findUserProfileForCompany,
   revokeRefreshSession,
@@ -20,6 +20,8 @@ import { findUserCompanyMembership } from "../repositories/companies.repository.
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import { updateUserPasswordHash } from "../repositories/admin-users.repository.js";
 import type { AuthContext } from "../types/auth.js";
+import type { AuthUserRecord } from "../repositories/auth.repository.js";
+import type { RoleCode } from "../types/role.js";
 
 export type ClientMeta = {
   ipAddress?: string | null;
@@ -28,6 +30,47 @@ export type ClientMeta = {
 
 function invalidCredentialsError(): HttpError {
   return new HttpError(401, "Identifiants invalides.");
+}
+
+function getRolePriority(role: RoleCode): number {
+  switch (role) {
+    case "OWNER":
+      return 0;
+    case "SYS_ADMIN":
+      return 1;
+    case "ACCOUNTANT":
+      return 2;
+    case "SUPERVISOR":
+      return 3;
+    case "EMPLOYEE":
+    default:
+      return 4;
+  }
+}
+
+export function pickPreferredAuthUser(
+  records: AuthUserRecord[],
+  preferredCompanyCode = "AMCCO"
+): AuthUserRecord | null {
+  if (records.length === 0) {
+    return null;
+  }
+
+  return [...records].sort((left, right) => {
+    const rolePriorityDiff = getRolePriority(left.role) - getRolePriority(right.role);
+    if (rolePriorityDiff !== 0) {
+      return rolePriorityDiff;
+    }
+
+    const preferredCompanyDiff =
+      Number(left.companyCode !== preferredCompanyCode) -
+      Number(right.companyCode !== preferredCompanyCode);
+    if (preferredCompanyDiff !== 0) {
+      return preferredCompanyDiff;
+    }
+
+    return left.companyCode.localeCompare(right.companyCode);
+  })[0];
 }
 
 async function safeCreateAuditLog(input: {
@@ -70,7 +113,8 @@ export async function login(input: {
     bootstrapMode: boolean;
   };
 }> {
-  const record = await findPreferredAuthUserByEmail(input.email, "AMCCO");
+  const authCandidates = await listActiveAuthUsersByEmail(input.email);
+  const record = pickPreferredAuthUser(authCandidates, "AMCCO");
   if (!record) {
     const activeCompaniesCount = await countActiveCompanies();
     if (activeCompaniesCount > 0) {

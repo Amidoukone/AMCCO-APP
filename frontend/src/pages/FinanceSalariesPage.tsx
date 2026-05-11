@@ -38,12 +38,14 @@ import type {
 import { ROLE_LABELS } from "../config/permissions";
 
 const SALARIES_PAGE_SIZE = 100;
+const SALARIES_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const DEFAULT_SALARIES_VISIBLE_PAGE_SIZE = 25;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Opération impossible. Vérifiez la connexion backend.";
+  return "Op?ration impossible. V?rifiez la connexion backend.";
 }
 
 function statusLabel(status: SalaryTransaction["status"]): string {
@@ -166,6 +168,9 @@ export function FinanceSalariesPage(): JSX.Element {
   const salariesSearchStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("finance-salaries-search", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
+  const salariesVisiblePageSizeStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("finance-salaries-visible-page-size", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
   const initialSalaryFilters = useMemo(
     () => ({
       status: "ALL" as "ALL" | SalaryTransaction["status"],
@@ -179,6 +184,11 @@ export function FinanceSalariesPage(): JSX.Element {
     initialSalaryFilters
   );
   const [searchQuery, setSearchQuery] = usePersistedViewState(salariesSearchStorageKey, "");
+  const [visibleSalariesPageSize, setVisibleSalariesPageSize] = usePersistedViewState(
+    salariesVisiblePageSizeStorageKey,
+    DEFAULT_SALARIES_VISIBLE_PAGE_SIZE
+  );
+  const [visibleSalariesPage, setVisibleSalariesPage] = useState(1);
   const [salaryForm, setSalaryForm] = useState({
     accountId: "",
     employeeUserId: "",
@@ -230,6 +240,22 @@ export function FinanceSalariesPage(): JSX.Element {
       ])
     );
   }, [salaryItems, searchQuery]);
+  const totalVisibleSalaryPages = useMemo(() => {
+    return Math.max(1, Math.ceil(displaySalaryItems.length / visibleSalariesPageSize));
+  }, [displaySalaryItems.length, visibleSalariesPageSize]);
+  const paginatedSalaryItems = useMemo(() => {
+    const startIndex = (visibleSalariesPage - 1) * visibleSalariesPageSize;
+    return displaySalaryItems.slice(startIndex, startIndex + visibleSalariesPageSize);
+  }, [displaySalaryItems, visibleSalariesPage, visibleSalariesPageSize]);
+  const visibleSalariesRange = useMemo(() => {
+    if (displaySalaryItems.length === 0) {
+      return { start: 0, end: 0 };
+    }
+
+    const start = (visibleSalariesPage - 1) * visibleSalariesPageSize + 1;
+    const end = Math.min(visibleSalariesPage * visibleSalariesPageSize, displaySalaryItems.length);
+    return { start, end };
+  }, [displaySalaryItems.length, visibleSalariesPage, visibleSalariesPageSize]);
   const resetSalaryForm = useCallback(() => {
     setEditingSalaryId(null);
     setSalaryForm({
@@ -327,6 +353,16 @@ export function FinanceSalariesPage(): JSX.Element {
 
     setSelectedSalaryId(requestedTransactionId);
   }, [requestedTransactionId]);
+
+  useEffect(() => {
+    setVisibleSalariesPage(1);
+  }, [searchQuery, salaryFilters.employeeUserId, salaryFilters.payPeriod, salaryFilters.status]);
+
+  useEffect(() => {
+    setVisibleSalariesPage((previousPage) =>
+      previousPage > totalVisibleSalaryPages ? totalVisibleSalaryPages : previousPage
+    );
+  }, [totalVisibleSalaryPages]);
 
   const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
     const offset = options?.offset ?? 0;
@@ -451,6 +487,64 @@ export function FinanceSalariesPage(): JSX.Element {
       offset: salaryItems.length,
       append: true
     });
+  }
+
+  function renderVisibleSalariesPagination(): JSX.Element | null {
+    if (displaySalaryItems.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="list-pagination list-view-pagination">
+        <div className="list-view-pagination-meta">
+          <p className="hint list-pagination-meta">
+            Salaires {visibleSalariesRange.start} à {visibleSalariesRange.end} sur {displaySalaryItems.length} affiché(s)
+            {displaySalaryItems.length !== salaryItems.length
+              ? ` (${salaryItems.length} chargé(s) localement)`
+              : ""}
+            {hasMoreSalaries ? " et d'autres pages serveur sont disponibles." : "."}
+          </p>
+          <label className="list-view-page-size">
+            <span>Lignes par page</span>
+            <select
+              value={visibleSalariesPageSize}
+              onChange={(event) => setVisibleSalariesPageSize(Number(event.target.value))}
+            >
+              {SALARIES_VISIBLE_PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="list-view-pagination-actions">
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => setVisibleSalariesPage((previousPage) => Math.max(1, previousPage - 1))}
+            disabled={visibleSalariesPage <= 1}
+          >
+            Précédent
+          </button>
+          <p className="hint list-view-page-indicator">
+            Page {visibleSalariesPage} sur {totalVisibleSalaryPages}
+          </p>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() =>
+              setVisibleSalariesPage((previousPage) =>
+                Math.min(totalVisibleSalaryPages, previousPage + 1)
+              )
+            }
+            disabled={visibleSalariesPage >= totalVisibleSalaryPages}
+          >
+            Suivant
+          </button>
+        </div>
+      </div>
+    );
   }
 
   async function handleSaveSalary(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -1104,7 +1198,8 @@ export function FinanceSalariesPage(): JSX.Element {
         ) : null}
         {!isLoading && displaySalaryItems.length > 0 ? (
           <>
-          <div className="table-wrap">
+          {renderVisibleSalariesPagination()}
+          <div className="table-wrap list-managed-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -1117,7 +1212,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {displaySalaryItems.map((item) => {
+                {paginatedSalaryItems.map((item) => {
                   const isBusy = busyTransactionId === item.id;
                   const canEditSalary = canManageSalaries;
                   const canDeleteSalary =

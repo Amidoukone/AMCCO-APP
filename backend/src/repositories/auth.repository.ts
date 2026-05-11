@@ -47,10 +47,7 @@ type CountRow = RowDataPacket & {
   total: number;
 };
 
-export async function findPreferredAuthUserByEmail(
-  email: string,
-  preferredCompanyCode = "AMCCO"
-): Promise<AuthUserRecord | null> {
+export async function listActiveAuthUsersByEmail(email: string): Promise<AuthUserRecord[]> {
   const rows = await queryRows<AuthUserRow[]>(
     `
       SELECT
@@ -70,20 +67,14 @@ export async function findPreferredAuthUserByEmail(
         AND u.is_active = 1
         AND c.is_active = 1
       ORDER BY
-        CASE WHEN c.code = ? THEN 0 ELSE 1 END,
-        CASE WHEN m.role = 'OWNER' THEN 0 WHEN m.role = 'SYS_ADMIN' THEN 1 ELSE 2 END,
         c.name ASC,
-        c.code ASC
-      LIMIT 1
+        c.code ASC,
+        u.email ASC
     `,
-    [email, preferredCompanyCode]
+    [email]
   );
 
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return rows[0];
+  return rows;
 }
 
 export async function countActiveCompanies(): Promise<number> {

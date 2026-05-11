@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
+const LOGIN_BACKEND_ERROR = "Connexion impossible. V\u00e9rifiez le backend.";
+
 export function LoginPage(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,7 +30,7 @@ export function LoginPage(): JSX.Element {
       if (error instanceof ApiError) {
         setErrorMessage(error.message);
       } else {
-        setErrorMessage("Connexion impossible. VÃ©rifiez le backend.");
+        setErrorMessage(LOGIN_BACKEND_ERROR);
       }
     } finally {
       setIsSubmitting(false);
@@ -72,4 +74,3 @@ export function LoginPage(): JSX.Element {
     </main>
   );
 }
-

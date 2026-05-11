@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { HttpError } from "../errors/http-error.js";
+import { isBootstrapCompanyId } from "../lib/bootstrap-auth.js";
 import { createRoleTargetedAlerts } from "./alerts.service.js";
 import {
   createMembershipIfMissing,
+  listCompanyUsers,
   listAllUsers
 } from "../repositories/admin-users.repository.js";
 import {
@@ -10,8 +12,7 @@ import {
   deactivateCompany,
   findCompanyByCode,
   findUserCompanyMembership,
-  listCompaniesForUser
-  ,
+  listCompaniesForUser,
   permanentlyDeleteCompany,
   updateCompanyProfile
 } from "../repositories/companies.repository.js";
@@ -120,13 +121,22 @@ export async function createCompanyForActor(
     contactJobTitle: normalizeOptional(input.contactJobTitle)
   });
 
-  const users = await listAllUsers();
-  for (const item of users) {
+  const sourceMembers = isBootstrapCompanyId(actor.companyId)
+    ? (await listAllUsers()).map((item) => ({
+        userId: item.userId,
+        role: item.userId === actor.userId ? actor.role : "EMPLOYEE" as const
+      }))
+    : (await listCompanyUsers(actor.companyId)).map((item) => ({
+        userId: item.userId,
+        role: item.role
+      }));
+
+  for (const item of sourceMembers) {
     await createMembershipIfMissing({
       membershipId: randomUUID(),
       companyId,
       userId: item.userId,
-      role: item.userId === actor.userId ? actor.role : "EMPLOYEE"
+      role: item.role
     });
   }
 
@@ -140,7 +150,7 @@ export async function createCompanyForActor(
     metadataJson: JSON.stringify({
       code,
       name,
-      inheritedUsersCount: users.length,
+      inheritedUsersCount: sourceMembers.length,
       legalName: normalizeOptional(input.legalName),
       registrationNumber: normalizeOptional(input.registrationNumber),
       taxId: normalizeOptional(input.taxId),
@@ -298,7 +308,7 @@ export async function updateCompanyForActor(
       recipientRoles: ["OWNER"],
       excludeUserIds: [actor.userId],
       code: "COMPANY_UPDATED",
-      message: `L'entreprise ${updated.company.name} a ete modifiee par l'admin systeme.`,
+      message: `L'entreprise ${updated.company.name} a été modifiée par l'admin système.`,
       severity: "WARNING",
       entityType: "COMPANY",
       entityId: updated.company.id,

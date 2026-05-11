@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { GlobalSearch } from "./GlobalSearch";
 import { QuickActions } from "./QuickActions";
-import type { BusinessActivityCode } from "../config/businessActivities";
+import { isBusinessActivityCode } from "../config/businessActivities";
 import { ApiError, getAlertsSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getNavigationForRole, ROLE_LABELS } from "../config/permissions";
@@ -38,7 +38,6 @@ export function AppLayout(): JSX.Element {
         : navigation,
     [isBootstrapMode, navigation]
   );
-  const outletKey = `${location.pathname}${location.search}:${selectedActivityCode ?? "no-activity"}`;
   const navigationSections = useMemo(() => {
     return visibleNavigation.reduce<Record<string, typeof visibleNavigation>>((groups, item) => {
       groups[item.section] = [...(groups[item.section] ?? []), item];
@@ -139,9 +138,10 @@ export function AppLayout(): JSX.Element {
             <select
               className="sidebar-sector-select"
               value={selectedActivityCode ?? ""}
-              onChange={(event) =>
-                setSelectedActivityCode(event.target.value as BusinessActivityCode)
-              }
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setSelectedActivityCode(isBusinessActivityCode(nextValue) ? nextValue : null);
+              }}
               disabled={isLoadingActivities || enabledActivities.length === 0}
               aria-label="Sélectionner le secteur actif"
             >
@@ -229,7 +229,7 @@ export function AppLayout(): JSX.Element {
             ) : null}
             {canManageCompanies ? (
               <Link to="/admin/companies" className="secondary-btn company-manage-link">
-                {isBootstrapMode ? "Créer une entreprise" : "Gérer les entreprises"}
+                {isBootstrapMode ? "Cr?er une entreprise" : "Gérer les entreprises"}
               </Link>
             ) : null}
           </div>
@@ -245,7 +245,7 @@ export function AppLayout(): JSX.Element {
               />
             </div>
           ) : null}
-          <Outlet key={outletKey} />
+          <Outlet />
         </section>
       </div>
     </div>

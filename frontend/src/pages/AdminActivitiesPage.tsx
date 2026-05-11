@@ -87,7 +87,7 @@ export function AdminActivitiesPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Administration secteurs</h2>
-        <p>Votre rôle ne permet pas d'administrer les secteurs d'activité.</p>
+        <p>Votre r?le ne permet pas d'administrer les secteurs d'activité.</p>
       </section>
     );
   }
@@ -114,7 +114,7 @@ export function AdminActivitiesPage(): JSX.Element {
                   <h4>{item.label}</h4>
                   <div className="admin-impact-block">
                     <p className="hint">
-                      <strong>État:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
+                      <strong>?tat:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
                     </p>
                     <p className="hint">
                       <strong>Impact:</strong>{" "}
@@ -137,7 +137,7 @@ export function AdminActivitiesPage(): JSX.Element {
                     {busyActivityCode === item.code
                       ? "Mise a jour..."
                       : item.isEnabled
-                        ? "Désactiver"
+                        ? "D?sactiver"
                         : "Activer"}
                   </button>
                 </div> : null}

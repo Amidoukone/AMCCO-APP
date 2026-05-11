@@ -6,7 +6,11 @@ import {
   updateCompanyForActor
 } from "./companies.service.js";
 import { createRoleTargetedAlerts } from "./alerts.service.js";
-import { createMembershipIfMissing, listAllUsers } from "../repositories/admin-users.repository.js";
+import {
+  createMembershipIfMissing,
+  listAllUsers,
+  listCompanyUsers
+} from "../repositories/admin-users.repository.js";
 import {
   createCompany,
   deactivateCompany,
@@ -24,6 +28,7 @@ vi.mock("node:crypto", () => ({
 
 vi.mock("../repositories/admin-users.repository.js", () => ({
   createMembershipIfMissing: vi.fn(),
+  listCompanyUsers: vi.fn(),
   listAllUsers: vi.fn()
 }));
 
@@ -48,6 +53,7 @@ vi.mock("./alerts.service.js", () => ({
 describe("companies.service", () => {
   beforeEach(() => {
     vi.mocked(createMembershipIfMissing).mockReset();
+    vi.mocked(listCompanyUsers).mockReset();
     vi.mocked(listAllUsers).mockReset();
     vi.mocked(createCompany).mockReset();
     vi.mocked(deactivateCompany).mockReset();
@@ -63,24 +69,33 @@ describe("companies.service", () => {
 
   it("creates the company and propagates memberships to all existing users", async () => {
     vi.mocked(findCompanyByCode).mockResolvedValue(null);
-    vi.mocked(listAllUsers).mockResolvedValue([
+    vi.mocked(listCompanyUsers).mockResolvedValue([
       {
+        membershipId: "membership-existing-1",
         userId: "owner-2",
         email: "owner2@example.com",
         fullName: "Owner 2",
         isActive: true,
+        role: "SYS_ADMIN",
+        membershipCreatedAt: "2026-04-22T00:00:00.000Z"
       },
       {
+        membershipId: "membership-existing-2",
         userId: "employee-1",
         email: "employee1@example.com",
         fullName: "Employee 1",
         isActive: true,
+        role: "ACCOUNTANT",
+        membershipCreatedAt: "2026-04-22T00:00:00.000Z"
       },
       {
+        membershipId: "membership-existing-3",
         userId: "owner-1",
         email: "owner1@example.com",
         fullName: "Owner 1",
         isActive: true,
+        role: "OWNER",
+        membershipCreatedAt: "2026-04-22T00:00:00.000Z"
       }
     ]);
     vi.mocked(listCompaniesForUser).mockResolvedValue([
@@ -133,7 +148,8 @@ describe("companies.service", () => {
       }
     );
 
-    expect(listAllUsers).toHaveBeenCalledTimes(1);
+    expect(listCompanyUsers).toHaveBeenCalledTimes(1);
+    expect(listCompanyUsers).toHaveBeenCalledWith("company-source");
     expect(createCompany).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "generated-company-id",
@@ -147,13 +163,13 @@ describe("companies.service", () => {
       membershipId: "membership-1",
       companyId: "generated-company-id",
       userId: "owner-2",
-      role: "EMPLOYEE"
+      role: "SYS_ADMIN"
     });
     expect(createMembershipIfMissing).toHaveBeenCalledWith({
       membershipId: "membership-2",
       companyId: "generated-company-id",
       userId: "employee-1",
-      role: "EMPLOYEE"
+      role: "ACCOUNTANT"
     });
     expect(createMembershipIfMissing).toHaveBeenCalledWith({
       membershipId: "membership-3",

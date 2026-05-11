@@ -19,13 +19,14 @@ import {
 import { clearSessionTokens, loadSessionTokens, saveSessionTokens } from "../lib/auth-storage";
 import type { LoginInput, LoginUser, SessionTokens } from "../types/auth";
 import type { CompanyMembershipSummary, CompanyProfile } from "../types/companies";
-import { isRoleCode } from "../types/role";
+import { isRoleCode, type RoleCode } from "../types/role";
 
 type AuthState = {
   isInitializing: boolean;
   isAuthenticated: boolean;
   user: LoginUser | null;
   session: SessionTokens | null;
+  getSession: () => SessionTokens | null;
   activeCompany: CompanyProfile | null;
   memberships: CompanyMembershipSummary[];
   login: (input: LoginInput) => Promise<void>;
@@ -37,8 +38,33 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function resolveRoleFromMemberships(
+  me: Awaited<ReturnType<typeof meRequest>>
+): RoleCode {
+  const activeCompanyId = me.company?.id;
+  if (activeCompanyId) {
+    const activeMembership = me.memberships.find(
+      (membership) => membership.companyId === activeCompanyId && isRoleCode(membership.role)
+    );
+    if (activeMembership) {
+      return activeMembership.role;
+    }
+  }
+
+  const firstKnownMembership = me.memberships.find((membership) => isRoleCode(membership.role));
+  if (firstKnownMembership) {
+    return firstKnownMembership.role;
+  }
+
+  if (me.bootstrapMode) {
+    return "OWNER";
+  }
+
+  throw new Error("Role utilisateur invalide pour la session active.");
+}
+
 function toLoginUser(me: Awaited<ReturnType<typeof meRequest>>): LoginUser {
-  const safeRole = isRoleCode(me.user.role) ? me.user.role : "EMPLOYEE";
+  const safeRole = isRoleCode(me.user.role) ? me.user.role : resolveRoleFromMemberships(me);
   return {
     id: me.user.id,
     email: me.user.email,
@@ -56,9 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   const [session, setSession] = useState<SessionTokens | null>(null);
   const [activeCompany, setActiveCompany] = useState<CompanyProfile | null>(null);
   const [memberships, setMemberships] = useState<CompanyMembershipSummary[]>([]);
+  const sessionRef = useRef<SessionTokens | null>(null);
   const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
 
   const resetAuth = useCallback(() => {
+    sessionRef.current = null;
     setUser(null);
     setSession(null);
     setActiveCompany(null);
@@ -75,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         companyId: me.company?.id
       };
 
+      sessionRef.current = normalizedTokens;
       setSession(normalizedTokens);
       setUser(toLoginUser(me));
       setActiveCompany(me.company ?? null);
@@ -83,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     },
     []
   );
+
+  const getSession = useCallback((): SessionTokens | null => sessionRef.current, []);
 
   const login = useCallback(async (input: LoginInput) => {
     const response = await loginRequest(input);
@@ -95,18 +126,20 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   }, [applyAuthenticatedState]);
 
   const logout = useCallback(async () => {
-    if (session?.refreshToken) {
+    const currentSession = sessionRef.current;
+    if (currentSession?.refreshToken) {
       try {
-        await logoutRequest(session.refreshToken);
+        await logoutRequest(currentSession.refreshToken);
       } catch {
         // no-op: local logout must still succeed
       }
     }
     resetAuth();
-  }, [resetAuth, session?.refreshToken]);
+  }, [resetAuth]);
 
   const refreshSession = useCallback(async (): Promise<string | null> => {
-    if (!session?.refreshToken) {
+    const currentSession = sessionRef.current;
+    if (!currentSession?.refreshToken) {
       resetAuth();
       return null;
     }
@@ -117,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
     const refreshPromise = (async (): Promise<string | null> => {
       try {
-        const refreshed = await refreshRequest(session.refreshToken);
+        const refreshed = await refreshRequest(currentSession.refreshToken);
         const nextTokens: SessionTokens = {
           accessToken: refreshed.accessToken,
           refreshToken: refreshed.refreshToken
@@ -136,11 +169,12 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
     refreshInFlightRef.current = refreshPromise;
     return refreshPromise;
-  }, [applyAuthenticatedState, resetAuth, session?.refreshToken]);
+  }, [applyAuthenticatedState, resetAuth]);
 
   const switchCompany = useCallback(
     async (companyId: string): Promise<void> => {
-      if (!session?.refreshToken) {
+      const currentSession = sessionRef.current;
+      if (!currentSession?.refreshToken) {
         resetAuth();
         return;
       }
@@ -148,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         return;
       }
 
-      const switched = await switchCompanyRequest(session.refreshToken, companyId);
+      const switched = await switchCompanyRequest(currentSession.refreshToken, companyId);
       const nextTokens: SessionTokens = {
         accessToken: switched.accessToken,
         refreshToken: switched.refreshToken
@@ -156,18 +190,19 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       const me = await meRequest(nextTokens.accessToken);
       applyAuthenticatedState(nextTokens, me);
     },
-    [activeCompany, applyAuthenticatedState, resetAuth, session?.refreshToken]
+    [activeCompany, applyAuthenticatedState, resetAuth]
   );
 
   const reloadProfile = useCallback(async (): Promise<void> => {
-    if (!session?.accessToken || !session.refreshToken) {
+    const currentSession = sessionRef.current;
+    if (!currentSession?.accessToken || !currentSession.refreshToken) {
       resetAuth();
       return;
     }
 
     try {
-      const me = await meRequest(session.accessToken);
-      applyAuthenticatedState(session, me);
+      const me = await meRequest(currentSession.accessToken);
+      applyAuthenticatedState(currentSession, me);
     } catch (error) {
       if (!(error instanceof ApiError) || error.statusCode !== 401) {
         throw error;
@@ -246,6 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       isAuthenticated: Boolean(session && user),
       user,
       session,
+      getSession,
       activeCompany,
       memberships,
       login,
@@ -256,6 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     }),
     [
       activeCompany,
+      getSession,
       isInitializing,
       login,
       logout,

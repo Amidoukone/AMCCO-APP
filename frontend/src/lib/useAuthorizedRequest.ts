@@ -5,16 +5,17 @@ import { ApiError } from "./api";
 export function useAuthorizedRequest(): <T>(
   action: (accessToken: string) => Promise<T>
 ) => Promise<T> {
-  const { refreshSession, session } = useAuth();
+  const { getSession, refreshSession } = useAuth();
 
   return useCallback(
     async <T,>(action: (accessToken: string) => Promise<T>): Promise<T> => {
-      if (!session?.accessToken) {
+      const currentSession = getSession();
+      if (!currentSession?.accessToken) {
         throw new ApiError(401, "Session absente.");
       }
 
       try {
-        return await action(session.accessToken);
+        return await action(currentSession.accessToken);
       } catch (error) {
         if (!(error instanceof ApiError) || error.statusCode !== 401) {
           throw error;
@@ -28,6 +29,6 @@ export function useAuthorizedRequest(): <T>(
         return action(refreshedAccessToken);
       }
     },
-    [refreshSession, session?.accessToken]
+    [getSession, refreshSession]
   );
 }

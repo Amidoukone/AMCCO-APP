@@ -5,13 +5,7 @@ import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ApiError, getDashboardSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { DashboardRecentTask, DashboardRecentTransaction, DashboardSummary } from "../types/reporting";
-import {
-  financeStatusLabel,
-  formatAmount,
-  formatDateTime,
-  isOverdue,
-  taskStatusLabel
-} from "../utils/dashboardDisplay";
+import { financeStatusLabel, formatAmount, formatDateTime, isOverdue, taskStatusLabel } from "../utils/dashboardDisplay";
 import { getBusinessActivityLabel } from "../config/businessActivities";
 
 function toErrorMessage(error: unknown): string {
@@ -63,11 +57,9 @@ export function MyWorkPage(): JSX.Element {
       .slice(0, 8);
   }, [summary]);
 
-  const pendingTransactions = useMemo<DashboardRecentTransaction[]>(() => {
+  const recentTransactions = useMemo<DashboardRecentTransaction[]>(() => {
     if (!summary) return [];
-    return summary.recentTransactions
-      .filter((transaction) => transaction.status === "SUBMITTED" || transaction.status === "DRAFT")
-      .slice(0, 6);
+    return summary.recentTransactions.slice(0, 6);
   }, [summary]);
 
   return (
@@ -104,10 +96,6 @@ export function MyWorkPage(): JSX.Element {
             <article className="metric-card">
               <h2>Échéances dépassées</h2>
               <p className="metric-value">{summary.operations.overdueCount}</p>
-            </article>
-            <article className="metric-card">
-              <h2>Transactions à valider</h2>
-              <p className="metric-value">{summary.finance.submittedCount}</p>
             </article>
           </section>
 
@@ -159,20 +147,20 @@ export function MyWorkPage(): JSX.Element {
               <div className="dashboard-panel-header">
                 <div>
                   <p className="sidebar-section-label">Finance</p>
-                  <h3>Transactions en attente</h3>
+                  <h3>Transactions récentes</h3>
                 </div>
                 <button type="button" className="dashboard-inline-button" onClick={() => navigate("/finance/transactions")}>
                   Voir tout
                 </button>
               </div>
-              {pendingTransactions.length === 0 ? (
+              {recentTransactions.length === 0 ? (
                 <EmptyState
-                  title="Aucune transaction en attente"
-                  description="Aucune action en attente."
+                  title="Aucune transaction récente"
+                  description="Aucune transaction disponible pour l’instant."
                 />
               ) : (
                 <div className="dashboard-priority-list">
-                  {pendingTransactions.map((transaction) => (
+                  {recentTransactions.map((transaction) => (
                     <button
                       key={transaction.id}
                       type="button"
@@ -188,7 +176,9 @@ export function MyWorkPage(): JSX.Element {
                       </div>
                       <div className="dashboard-priority-side">
                         <strong>{formatAmount(transaction.amount, transaction.currency)}</strong>
-                        <span>{financeStatusLabel(transaction.status)} | {formatDateTime(transaction.occurredAt)}</span>
+                        <span>
+                          {financeStatusLabel(transaction.status)} | {formatDateTime(transaction.occurredAt)}
+                        </span>
                       </div>
                     </button>
                   ))}

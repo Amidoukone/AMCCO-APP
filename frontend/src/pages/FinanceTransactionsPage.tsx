@@ -47,12 +47,14 @@ import {
 const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
 const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
 const TRANSACTIONS_PAGE_SIZE = 100;
+const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 25;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Opération impossible. Vérifiez la connexion backend.";
+  return "Op?ration impossible. V?rifiez la connexion backend.";
 }
 
 function formatFileSize(bytes: number): string {
@@ -275,6 +277,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const transactionsSearchStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("finance-transactions-search", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
+  const transactionsVisiblePageSizeStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("finance-transactions-visible-page-size", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
   const initialFilters = useMemo(
     () =>
       ({
@@ -285,6 +290,11 @@ export function FinanceTransactionsPage(): JSX.Element {
   );
   const [filters, setFilters] = usePersistedViewState(transactionsViewStorageKey, initialFilters);
   const [searchQuery, setSearchQuery] = usePersistedViewState(transactionsSearchStorageKey, "");
+  const [visibleTransactionsPageSize, setVisibleTransactionsPageSize] = usePersistedViewState(
+    transactionsVisiblePageSizeStorageKey,
+    DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE
+  );
+  const [visibleTransactionsPage, setVisibleTransactionsPage] = useState(1);
 
   const [transactionForm, setTransactionForm] = useState({
     accountId: "",
@@ -341,6 +351,22 @@ export function FinanceTransactionsPage(): JSX.Element {
       ])
     );
   }, [searchQuery, transactions]);
+  const totalVisibleTransactionPages = useMemo(() => {
+    return Math.max(1, Math.ceil(displayTransactions.length / visibleTransactionsPageSize));
+  }, [displayTransactions.length, visibleTransactionsPageSize]);
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (visibleTransactionsPage - 1) * visibleTransactionsPageSize;
+    return displayTransactions.slice(startIndex, startIndex + visibleTransactionsPageSize);
+  }, [displayTransactions, visibleTransactionsPage, visibleTransactionsPageSize]);
+  const visibleTransactionsRange = useMemo(() => {
+    if (displayTransactions.length === 0) {
+      return { start: 0, end: 0 };
+    }
+
+    const start = (visibleTransactionsPage - 1) * visibleTransactionsPageSize + 1;
+    const end = Math.min(visibleTransactionsPage * visibleTransactionsPageSize, displayTransactions.length);
+    return { start, end };
+  }, [displayTransactions.length, visibleTransactionsPage, visibleTransactionsPageSize]);
   const resetAccountForm = useCallback(() => {
     setEditingAccountId(null);
     setAccountForm(buildDefaultAccountForm(selectedActivityCode, canManageGlobalAccounts));
@@ -418,15 +444,16 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("transactionId");
+      next.delete("activityCode");
       return next;
     });
   }, [setSearchParams]);
 
   useEffect(() => {
-    if (requestedActivityCode && requestedActivityCode !== selectedActivityCode) {
+    if (requestedActivityCode) {
       setSelectedActivityCode(requestedActivityCode);
     }
-  }, [requestedActivityCode, selectedActivityCode, setSelectedActivityCode]);
+  }, [requestedActivityCode, setSelectedActivityCode]);
 
   useEffect(() => {
     if (!requestedTransactionId) {
@@ -436,6 +463,16 @@ export function FinanceTransactionsPage(): JSX.Element {
 
     setSelectedTransactionId(requestedTransactionId);
   }, [requestedTransactionId]);
+
+  useEffect(() => {
+    setVisibleTransactionsPage(1);
+  }, [searchQuery, filters.status, filters.type, selectedActivityCode]);
+
+  useEffect(() => {
+    setVisibleTransactionsPage((previousPage) =>
+      previousPage > totalVisibleTransactionPages ? totalVisibleTransactionPages : previousPage
+    );
+  }, [totalVisibleTransactionPages]);
 
   const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
     const offset = options?.offset ?? 0;
@@ -536,6 +573,65 @@ export function FinanceTransactionsPage(): JSX.Element {
       offset: transactions.length,
       append: true
     });
+  }
+
+  function renderVisibleTransactionsPagination(): JSX.Element | null {
+    if (displayTransactions.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="list-pagination finance-transactions-pagination">
+        <div className="finance-transactions-pagination-meta">
+          <p className="hint list-pagination-meta">
+            Transactions {visibleTransactionsRange.start} à {visibleTransactionsRange.end} sur{" "}
+            {displayTransactions.length} affichée(s)
+            {displayTransactions.length !== transactions.length
+              ? ` (${transactions.length} chargee(s) localement)`
+              : ""}
+            {hasMoreTransactions ? " et d'autres pages serveur sont disponibles." : "."}
+          </p>
+          <label className="finance-transactions-page-size">
+            <span>Lignes par page</span>
+            <select
+              value={visibleTransactionsPageSize}
+              onChange={(event) => setVisibleTransactionsPageSize(Number(event.target.value))}
+            >
+              {TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="finance-transactions-pagination-actions">
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => setVisibleTransactionsPage((previousPage) => Math.max(1, previousPage - 1))}
+            disabled={visibleTransactionsPage <= 1}
+          >
+            Précédent
+          </button>
+          <p className="hint finance-transactions-page-indicator">
+            Page {visibleTransactionsPage} sur {totalVisibleTransactionPages}
+          </p>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() =>
+              setVisibleTransactionsPage((previousPage) =>
+                Math.min(totalVisibleTransactionPages, previousPage + 1)
+              )
+            }
+            disabled={visibleTransactionsPage >= totalVisibleTransactionPages}
+          >
+            Suivant
+          </button>
+        </div>
+      </div>
+    );
   }
 
   useEffect(() => {
@@ -1320,7 +1416,8 @@ export function FinanceTransactionsPage(): JSX.Element {
         ) : null}
         {!isLoading && displayTransactions.length > 0 ? (
           <>
-          <div className="table-wrap">
+          {renderVisibleTransactionsPagination()}
+          <div className="table-wrap finance-transactions-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -1332,7 +1429,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 </tr>
               </thead>
               <tbody>
-                {displayTransactions.map((tx) => {
+                {paginatedTransactions.map((tx) => {
                   const isBusy = busyTransactionId === tx.id;
                   const isProofsOpen = openProofs[tx.id] === true;
                   const proofs = proofsByTransaction[tx.id] ?? [];
@@ -1490,7 +1587,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           </div>
           <div className="list-pagination">
             <p className="hint list-pagination-meta">
-              {displayTransactions.length} transaction(s) affichee(s)
+              {displayTransactions.length} transaction(s) filtrée(s)
               {displayTransactions.length !== transactions.length
                 ? ` sur ${transactions.length} chargee(s)`
                 : ""}

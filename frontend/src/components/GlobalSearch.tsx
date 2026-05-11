@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+﻿import { useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { isReadOnlyOwnerRole } from "../config/permissions";
 import { matchesQuickSearch } from "../lib/quickSearch";
@@ -35,29 +35,29 @@ function buildSearchItems(
   items.push(
     {
       label: "Mon travail",
-      description: "Taches ouvertes, validations et echeances",
+      description: "T\u00e2ches ouvertes, validations et \u00e9ch\u00e9ances",
       to: "/my-work",
-      keywords: ["mon travail", "mes taches", "a faire", "echeances", "urgent"]
+      keywords: ["mon travail", "mes t\u00e2ches", "\u00e0 faire", "\u00e9ch\u00e9ances", "urgent"]
     },
     {
-      label: isReadOnlyOwner ? "Voir les taches" : "Creer une tache",
-      description: "Voir les taches",
+      label: isReadOnlyOwner ? "Voir les t\u00e2ches" : "Cr\u00e9er une t\u00e2che",
+      description: "Voir les t\u00e2ches",
       to: `/operations/tasks${activityQuery}`,
       keywords: isReadOnlyOwner
-        ? ["taches", "operations", "suivi", "controle"]
-        : ["nouvelle tache", "creer tache", "assigner", "operation"]
+        ? ["t\u00e2ches", "op\u00e9rations", "suivi", "contr\u00f4le"]
+        : ["nouvelle t\u00e2che", "cr\u00e9er t\u00e2che", "assigner", "op\u00e9ration"]
     },
     {
-      label: isReadOnlyOwner ? "Voir les transactions" : "Creer une transaction",
+      label: isReadOnlyOwner ? "Voir les transactions" : "Cr\u00e9er une transaction",
       description: "Voir les transactions",
       to: `/finance/transactions${activityQuery}`,
       keywords: isReadOnlyOwner
-        ? ["transactions", "finance", "controle", "caisse"]
-        : ["nouvelle transaction", "finance", "caisse", "depense", "recette"]
+        ? ["transactions", "finance", "contr\u00f4le", "caisse"]
+        : ["nouvelle transaction", "finance", "caisse", "d\u00e9pense", "recette"]
     },
     {
       label: "Alertes",
-      description: "Consulter les notifications a traiter",
+      description: "Consulter les notifications \u00e0 traiter",
       to: "/alerts",
       keywords: ["alerte", "notification", "risque"]
     }
@@ -121,7 +121,7 @@ export function GlobalSearch({
       {isFocused ? (
         <div className="global-search-results">
           {results.length === 0 ? (
-            <p>Aucun raccourci trouve.</p>
+            <p>Aucun raccourci trouv\u00e9.</p>
           ) : (
             results.map((result) => (
               <button

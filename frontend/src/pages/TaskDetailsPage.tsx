@@ -29,7 +29,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Opération impossible. Vérifiez la connexion backend.";
+  return "Op?ration impossible. V?rifiez la connexion backend.";
 }
 
 function statusLabel(status: TaskStatus): string {
@@ -151,7 +151,7 @@ export function TaskDetailsPage(): JSX.Element {
   const navigate = useNavigate();
   const { user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
-  const { profiles, selectedActivityCode, setSelectedActivityCode } = useBusinessActivity();
+  const { profiles, setSelectedActivityCode } = useBusinessActivity();
   const [task, setTask] = useState<OperationTask | null>(null);
   const [timeline, setTimeline] = useState<OperationTaskTimelineEvent[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -233,7 +233,7 @@ export function TaskDetailsPage(): JSX.Element {
         setMembers(data.members);
       }
       setAssignment(data.task.assignedToId ?? "");
-      if (data.task.activityCode && data.task.activityCode !== selectedActivityCode) {
+      if (!append && data.task.activityCode) {
         setSelectedActivityCode(data.task.activityCode);
       }
     } catch (error) {
@@ -245,7 +245,7 @@ export function TaskDetailsPage(): JSX.Element {
         setIsLoading(false);
       }
     }
-  }, [canManageTasks, selectedActivityCode, setSelectedActivityCode, taskId, withAuthorizedToken]);
+  }, [canManageTasks, setSelectedActivityCode, taskId, withAuthorizedToken]);
 
   useEffect(() => {
     void loadData();
@@ -279,7 +279,7 @@ export function TaskDetailsPage(): JSX.Element {
         assignOperationsTaskRequest(accessToken, taskId, nextAssignedToId, assignmentNote.trim() || undefined)
       );
       setAssignmentNote("");
-      setSuccessMessage("Assignation mise à jour.");
+      setSuccessMessage("Assignation mise ? jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -451,7 +451,7 @@ export function TaskDetailsPage(): JSX.Element {
               <strong>Créée le:</strong> {formatDate(task.createdAt)}
             </p>
             <p>
-              <strong>Dernière mise à jour:</strong> {formatDate(task.updatedAt)}
+              <strong>Dernière mise ? jour:</strong> {formatDate(task.updatedAt)}
             </p>
           </div>
 
@@ -556,7 +556,7 @@ export function TaskDetailsPage(): JSX.Element {
       {!isLoading && task ? (
         <section className={canManageTasks ? "panel" : "panel task-detail-lite-panel"}>
           <h3>{canManageTasks ? "Timeline operationnelle" : "Historique"}</h3>
-          {timelineEntries.length === 0 ? <p>Aucun evenement pour le moment.</p> : null}
+          {timelineEntries.length === 0 ? <p>Aucun ?v?nement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
             <>
               <ol className="task-timeline">

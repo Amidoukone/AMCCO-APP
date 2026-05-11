@@ -83,9 +83,9 @@ async function parseErrorMessage(response: Response): Promise<string> {
       error?: { message?: string };
       message?: string;
     };
-    return data.error?.message ?? data.message ?? "La requete a echoue.";
+    return data.error?.message ?? data.message ?? "La requ?te a ?chou?.";
   } catch {
-    return "La requete a echoue.";
+    return "La requ?te a ?chou?.";
   }
 }
 

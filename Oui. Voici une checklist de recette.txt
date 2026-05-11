@@ -1,0 +1,190 @@
+Oui. Voici une checklist de recette staging courte, orientée production, à exécuter telle quelle.
+
+  Préparation
+
+  1. Lancer l’app staging:
+
+  powershell -ExecutionPolicy Bypass -File .\scripts\flutter-run-mobile-env.ps1 -Environment staging
+  -UseNativeFlavor -DeviceId 5aa0d832
+
+  2. Vérifier avant test:
+      - compte staging actif dans Firestore
+      - réseau stable puis test réseau faible
+      - utilisateur joueur
+      - utilisateur club ou recruteur
+  3. Nettoyer les états gênants:
+      - fermer complètement l’app
+      - relancer
+      - se reconnecter proprement
+
+  Parcours 1: Auth / session
+
+  1. Se connecter avec un compte actif.
+  2. Vérifier:
+      - arrivée sur /main
+      - pas de déconnexion automatique
+      - pas de message Compte desactive
+  3. Mettre l’app en arrière-plan 30 à 60 secondes, revenir.
+  4. Vérifier:
+      - session toujours active
+      - pas de retour forcé vers home si on était sur un autre écran
+
+  Parcours 2: Home / feed vidéo
+
+  1. Ouvrir Home.
+  2. Scroller plusieurs vidéos.
+  3. Vérifier:
+      - aucune page noire durable
+      - pas de crash au scroll
+      - reprise correcte après pause/reprise app
+  4. Ouvrir son profil depuis l’avatar puis revenir.
+  5. Vérifier:
+      - retour fluide au feed
+      - la lecture vidéo repart normalement
+
+  Parcours 3: Profil
+
+  1. Ouvrir son profil.
+  2. Vérifier:
+      - profil visible
+      - pas d’écran vide
+      - pas de retour automatique vers home
+  3. Ouvrir un profil tiers.
+  4. Vérifier:
+      - affichage correct
+      - profil privé correctement géré
+      - bouton message cohérent avec les permissions
+
+  Parcours 4: Followers / followings
+
+  1. Depuis un profil, ouvrir Abonnes puis Abonnements.
+  2. Tester S’abonner puis Se désabonner.
+  3. Vérifier:
+      - bouton ne reste pas bloqué en chargement
+      - état UI cohérent après action
+      - pas d’erreur silencieuse
+
+  Parcours 5: Offer
+
+  1. Ouvrir la liste des offres.
+  2. Vérifier:
+      - pas d’erreur OffreController not found
+      - filtres fonctionnels
+      - liste visible
+  3. Avec un joueur:
+      - postuler
+      - se désinscrire
+  4. Avec un club/recruteur/agent:
+      - créer une offre
+      - modifier statut
+      - ouvrir les candidats
+  5. Vérifier:
+      - aucun écran vide
+      - aucune redirection inattendue vers home
+
+  Parcours 6: Event
+
+  1. Ouvrir la liste des événements.
+  2. Vérifier:
+      - pas d’erreur EventController not found
+      - actions visibles sans débordement UI
+  3. Avec un joueur:
+      - s’inscrire
+      - se désinscrire
+      - ouvrir détail
+  4. Avec un organisateur:
+      - créer événement
+      - modifier
+      - revenir à la liste
+  5. Vérifier:
+      - pas de reset global vers /main
+      - détail event stable
+      - participants affichés correctement
+
+  Parcours 7: Chat
+
+  1. Ouvrir Conversations.
+  2. Ouvrir Nouvelle conversation.
+  3. Sélectionner un utilisateur.
+  4. Vérifier:
+      - liste utilisateurs visible
+      - pas de blocage si session transitoire
+  5. Envoyer un message.
+  6. Revenir, rouvrir la conversation.
+  7. Vérifier:
+      - messages visibles
+      - pas de crash
+      - pas de perte de session
+      - retour arrière propre
+
+  Parcours 8: Upload vidéo
+
+  1. Ouvrir Ajouter une vidéo.
+  2. Choisir une vidéo de test.
+  3. Remplir description + légende.
+  4. Lancer upload.
+  5. Vérifier:
+      - pas d’erreur d’injection contrôleur
+      - préparation OK
+      - progression visible
+      - retour au feed après succès
+  6. Vérifier ensuite:
+      - vidéo visible dans le feed ou en attente selon le flux
+      - pas de blocage UI après retour
+
+  Parcours 9: Settings
+
+  1. Ouvrir Paramètres.
+  2. Vérifier:
+      - écran charge correctement
+      - pas d’état incohérent
+  3. Changer:
+      - visibilité profil
+      - autorisation messages
+  4. Vérifier:
+      - sauvegarde OK
+      - effet visible sur profil/chat si applicable
+  5. Tester déconnexion.
+  6. Vérifier:
+      - retour vers login
+      - reconnexion OK
+
+  Tests de robustesse
+
+  1. Couper internet sur:
+      - profil
+      - offers/events
+      - chat
+      - upload
+  2. Vérifier:
+      - message d’erreur ou état vide propre
+      - pas d’écran blanc
+      - pas de logout abusif
+  3. Rétablir internet.
+  4. Vérifier:
+      - reprise normale sans redémarrage forcé
+
+  Critères de go/no-go
+  GO si:
+
+  - aucun écran vide bloquant
+  - aucune erreur Controller not found
+  - aucune déconnexion automatique invalide
+  - navigation stable entre home/profil/offer/event/chat
+  - upload vidéo fonctionne de bout en bout
+
+  NO-GO si:
+
+  - retour forcé récurrent vers home/login
+  - écran blanc reproductible
+  - chat, event, offer ou upload cassent sur un parcours nominal
+  - session instable après reprise app/réseau
+
+  À capturer si anomalie
+
+  - écran concerné
+  - rôle utilisateur
+  - heure exacte
+  - action faite juste avant
+  - log I/flutter complet autour de l’erreur
+  - si possible UID du compte de test

@@ -25,7 +25,7 @@ type BusinessActivityContextValue = {
   selectedActivityCode: BusinessActivityCode | null;
   isLoading: boolean;
   errorMessage: string | null;
-  setSelectedActivityCode: (activityCode: BusinessActivityCode) => void;
+  setSelectedActivityCode: (activityCode: BusinessActivityCode | null) => void;
   reloadActivities: () => Promise<void>;
 };
 
@@ -69,7 +69,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   const withAuthorizedToken = useAuthorizedRequest();
 
   const syncSelectedActivity = useCallback(
-    (items: CompanyActivityItem[], preferredCode: BusinessActivityCode | null = null) => {
+    (items: CompanyActivityItem[]) => {
       if (!activeCompany?.id) {
         setSelectedActivityCodeState(null);
         return;
@@ -77,14 +77,17 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
 
       const enabledItems = items.filter((item) => item.isEnabled);
       const persistedCode = readPersistedActivityCode(activeCompany.id);
-      const nextSelectedCode =
-        enabledItems.find((item) => item.code === preferredCode)?.code ??
-        enabledItems.find((item) => item.code === persistedCode)?.code ??
-        enabledItems[0]?.code ??
-        null;
 
-      setSelectedActivityCodeState(nextSelectedCode);
-      persistActivityCode(activeCompany.id, nextSelectedCode);
+      setSelectedActivityCodeState((currentCode) => {
+        const nextSelectedCode =
+          enabledItems.find((item) => item.code === currentCode)?.code ??
+          enabledItems.find((item) => item.code === persistedCode)?.code ??
+          enabledItems[0]?.code ??
+          null;
+
+        persistActivityCode(activeCompany.id as string, nextSelectedCode);
+        return nextSelectedCode;
+      });
     },
     [activeCompany?.id]
   );
@@ -108,7 +111,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       );
       setActivities(response.items);
       setProfiles(response.profiles);
-      syncSelectedActivity(response.items, selectedActivityCode);
+      syncSelectedActivity(response.items);
     } catch (error) {
       setActivities([]);
       setProfiles([]);
@@ -117,14 +120,14 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
     } finally {
       setIsLoading(false);
     }
-  }, [activeCompany, selectedActivityCode, syncSelectedActivity, user, withAuthorizedToken]);
+  }, [activeCompany, syncSelectedActivity, user, withAuthorizedToken]);
 
   useEffect(() => {
     void reloadActivities();
   }, [reloadActivities]);
 
   const setSelectedActivityCode = useCallback(
-    (activityCode: BusinessActivityCode) => {
+    (activityCode: BusinessActivityCode | null) => {
       setSelectedActivityCodeState(activityCode);
       if (activeCompany?.id) {
         persistActivityCode(activeCompany.id, activityCode);

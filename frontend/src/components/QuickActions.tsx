@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import type { NavigationItem } from "../config/permissions";
 import { canAccessFeature, isReadOnlyOwnerRole } from "../config/permissions";
 import type { RoleCode } from "../types/role";
@@ -22,7 +22,7 @@ export function QuickActions({
   const actions = [
     canUse("operationsTasks")
       ? {
-          label: isReadOnlyOwner ? "Voir les taches" : "Nouvelle tache",
+          label: isReadOnlyOwner ? "Voir les t\u00e2ches" : "Nouvelle t\u00e2che",
           to: `/operations/tasks${activityQuery}`,
           tone: "primary"
         }

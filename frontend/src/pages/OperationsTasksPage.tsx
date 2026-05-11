@@ -37,12 +37,14 @@ import type { ActivityFieldDefinition } from "../types/activities";
 import type { OperationTask, OperationTaskMember, TaskScope, TaskStatus } from "../types/tasks";
 
 const TASKS_PAGE_SIZE = 200;
+const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const DEFAULT_TASKS_VISIBLE_PAGE_SIZE = 25;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Opération impossible. Vérifiez la connexion backend.";
+  return "Op?ration impossible. V?rifiez la connexion backend.";
 }
 
 function statusLabel(status: TaskStatus): string {
@@ -165,6 +167,9 @@ export function OperationsTasksPage(): JSX.Element {
   const tasksSearchStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("operations-tasks-search", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
+  const tasksVisiblePageSizeStorageKey = useMemo(() => {
+    return buildPersistedViewStorageKey("operations-tasks-visible-page-size", activeCompany?.id, user?.id);
+  }, [activeCompany?.id, user?.id]);
   const initialFilters = useMemo(
     () => ({
       status: "ALL" as "ALL" | TaskStatus
@@ -173,6 +178,11 @@ export function OperationsTasksPage(): JSX.Element {
   );
   const [filters, setFilters] = usePersistedViewState(tasksViewStorageKey, initialFilters);
   const [searchQuery, setSearchQuery] = usePersistedViewState(tasksSearchStorageKey, "");
+  const [visibleTasksPageSize, setVisibleTasksPageSize] = usePersistedViewState(
+    tasksVisiblePageSizeStorageKey,
+    DEFAULT_TASKS_VISIBLE_PAGE_SIZE
+  );
+  const [visibleTasksPage, setVisibleTasksPage] = useState(1);
 
   const [createForm, setCreateForm] = useState(createDefaultTaskForm);
 
@@ -211,6 +221,22 @@ export function OperationsTasksPage(): JSX.Element {
       ])
     );
   }, [searchQuery, tasks]);
+  const totalVisibleTaskPages = useMemo(() => {
+    return Math.max(1, Math.ceil(displayTasks.length / visibleTasksPageSize));
+  }, [displayTasks.length, visibleTasksPageSize]);
+  const paginatedTasks = useMemo(() => {
+    const startIndex = (visibleTasksPage - 1) * visibleTasksPageSize;
+    return displayTasks.slice(startIndex, startIndex + visibleTasksPageSize);
+  }, [displayTasks, visibleTasksPage, visibleTasksPageSize]);
+  const visibleTasksRange = useMemo(() => {
+    if (displayTasks.length === 0) {
+      return { start: 0, end: 0 };
+    }
+
+    const start = (visibleTasksPage - 1) * visibleTasksPageSize + 1;
+    const end = Math.min(visibleTasksPage * visibleTasksPageSize, displayTasks.length);
+    return { start, end };
+  }, [displayTasks.length, visibleTasksPage, visibleTasksPageSize]);
 
   const selectedTaskIds = useMemo(() => {
     return displayTasks.filter((task) => selectedTasks[task.id]).map((task) => task.id);
@@ -336,6 +362,16 @@ export function OperationsTasksPage(): JSX.Element {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    setVisibleTasksPage(1);
+  }, [searchQuery, filters.status, selectedActivityCode]);
+
+  useEffect(() => {
+    setVisibleTasksPage((previousPage) =>
+      previousPage > totalVisibleTaskPages ? totalVisibleTaskPages : previousPage
+    );
+  }, [totalVisibleTaskPages]);
+
   async function handleLoadMoreTasks(): Promise<void> {
     if (isLoading || isLoadingMoreTasks || !hasMoreTasks) {
       return;
@@ -344,6 +380,60 @@ export function OperationsTasksPage(): JSX.Element {
       offset: tasks.length,
       append: true
     });
+  }
+
+  function renderVisibleTasksPagination(): JSX.Element | null {
+    if (displayTasks.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="list-pagination list-view-pagination">
+        <div className="list-view-pagination-meta">
+          <p className="hint list-pagination-meta">
+            Tâches {visibleTasksRange.start} à {visibleTasksRange.end} sur {displayTasks.length} affichée(s)
+            {displayTasks.length !== tasks.length ? ` (${tasks.length} chargée(s) localement)` : ""}
+            {hasMoreTasks ? " et d'autres pages serveur sont disponibles." : "."}
+          </p>
+          <label className="list-view-page-size">
+            <span>Cartes par page</span>
+            <select
+              value={visibleTasksPageSize}
+              onChange={(event) => setVisibleTasksPageSize(Number(event.target.value))}
+            >
+              {TASKS_VISIBLE_PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="list-view-pagination-actions">
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => setVisibleTasksPage((previousPage) => Math.max(1, previousPage - 1))}
+            disabled={visibleTasksPage <= 1}
+          >
+            Précédent
+          </button>
+          <p className="hint list-view-page-indicator">
+            Page {visibleTasksPage} sur {totalVisibleTaskPages}
+          </p>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() =>
+              setVisibleTasksPage((previousPage) => Math.min(totalVisibleTaskPages, previousPage + 1))
+            }
+            disabled={visibleTasksPage >= totalVisibleTaskPages}
+          >
+            Suivant
+          </button>
+        </div>
+      </div>
+    );
   }
 
   useEffect(() => {
@@ -396,7 +486,7 @@ export function OperationsTasksPage(): JSX.Element {
 
   function getTaskEditLockMessage(task: OperationTask): string | null {
     if (task.status === "DONE") {
-      return "Une tâche terminée ne peut plus être modifiée.";
+      return "Une tâche terminée ne peut plus ?tre modifi?e.";
     }
     if (canAssignTasks) {
       return null;
@@ -515,7 +605,7 @@ export function OperationsTasksPage(): JSX.Element {
           assignmentNotes[taskId]?.trim() || undefined
         )
       );
-      setSuccessMessage("Assignation mise à jour.");
+      setSuccessMessage("Assignation mise ? jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -848,7 +938,7 @@ export function OperationsTasksPage(): JSX.Element {
               />
               <span>Tout sélectionner</span>
             </label>
-          ) : !isReadOnlyOwner ? <p className="hint">{displayTasks.length} tâche(s) affichée(s)</p> : null}
+          ) : !isReadOnlyOwner ? <p className="hint">{displayTasks.length} tâche(s) filtrée(s)</p> : null}
         </div>
         {!isLoading && tasks.length === 0 ? (
           <EmptyState
@@ -873,8 +963,9 @@ export function OperationsTasksPage(): JSX.Element {
         ) : null}
         {!isLoading && displayTasks.length > 0 ? (
           <>
+          {renderVisibleTasksPagination()}
           <div className="operations-task-list">
-            {displayTasks.map((task) => {
+            {paginatedTasks.map((task) => {
               const isBusy = busyTaskId === task.id;
               const canUpdate = canUpdateTask(task);
               const isCompleted = task.status === "DONE";
