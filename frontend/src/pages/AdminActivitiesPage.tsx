@@ -15,7 +15,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Operation impossible. Verifie la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 export function AdminActivitiesPage(): JSX.Element {
@@ -71,7 +71,7 @@ export function AdminActivitiesPage(): JSX.Element {
       );
       setSuccessMessage(
         response.item.isEnabled
-          ? `Secteur ${response.item.label} active.`
+          ? `Secteur ${response.item.label} activé.`
           : `Secteur ${response.item.label} désactivé.`
       );
       await loadData();
@@ -87,7 +87,7 @@ export function AdminActivitiesPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Administration secteurs</h2>
-        <p>Votre r?le ne permet pas d'administrer les secteurs d'activité.</p>
+        <p>Votre rôle ne permet pas d'administrer les secteurs d'activité.</p>
       </section>
     );
   }
@@ -114,7 +114,7 @@ export function AdminActivitiesPage(): JSX.Element {
                   <h4>{item.label}</h4>
                   <div className="admin-impact-block">
                     <p className="hint">
-                      <strong>?tat:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
+                      <strong>État:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
                     </p>
                     <p className="hint">
                       <strong>Impact:</strong>{" "}
@@ -135,9 +135,9 @@ export function AdminActivitiesPage(): JSX.Element {
                     disabled={busyActivityCode === item.code}
                   >
                     {busyActivityCode === item.code
-                      ? "Mise a jour..."
+                      ? "Mise à jour..."
                       : item.isEnabled
-                        ? "D?sactiver"
+                        ? "Désactiver"
                         : "Activer"}
                   </button>
                 </div> : null}

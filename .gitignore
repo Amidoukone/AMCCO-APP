@@ -23,3 +23,6 @@ Thumbs.db
 
 .idea/
 .vscode/
+
+# Local notes and deployment drafts
+/*.txt

@@ -197,7 +197,7 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
     }
 
     if (scopeLabel) {
-      lines.push(`Port?e: ${scopeLabel}`);
+      lines.push(`Portée: ${scopeLabel}`);
     }
   }
 
@@ -220,7 +220,7 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
       lines.push(`Employe: ${employeeFullName}`);
     }
     if (payPeriod) {
-      lines.push(`P?riode: ${payPeriod}`);
+      lines.push(`Période: ${payPeriod}`);
     }
   }
 

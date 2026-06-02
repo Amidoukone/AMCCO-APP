@@ -31,7 +31,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Op?ration impossible. V?rifiez la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 export function AdminUsersPage(): JSX.Element {
@@ -248,7 +248,7 @@ export function AdminUsersPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Administration utilisateurs</h2>
-        <p>Votre r?le ne permet pas de gérer les utilisateurs.</p>
+        <p>Votre rôle ne permet pas de gérer les utilisateurs.</p>
       </section>
     );
   }

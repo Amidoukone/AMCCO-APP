@@ -229,7 +229,7 @@ export function AppLayout(): JSX.Element {
             ) : null}
             {canManageCompanies ? (
               <Link to="/admin/companies" className="secondary-btn company-manage-link">
-                {isBootstrapMode ? "Cr?er une entreprise" : "Gérer les entreprises"}
+                {isBootstrapMode ? "Créer une entreprise" : "Gérer les entreprises"}
               </Link>
             ) : null}
           </div>

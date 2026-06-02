@@ -44,7 +44,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Op?ration impossible. V?rifiez la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function statusLabel(status: TaskStatus): string {
@@ -486,7 +486,7 @@ export function OperationsTasksPage(): JSX.Element {
 
   function getTaskEditLockMessage(task: OperationTask): string | null {
     if (task.status === "DONE") {
-      return "Une tâche terminée ne peut plus ?tre modifi?e.";
+      return "Une tâche terminée ne peut plus être modifiée.";
     }
     if (canAssignTasks) {
       return null;
@@ -605,7 +605,7 @@ export function OperationsTasksPage(): JSX.Element {
           assignmentNotes[taskId]?.trim() || undefined
         )
       );
-      setSuccessMessage("Assignation mise ? jour.");
+      setSuccessMessage("Assignation mise à jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));

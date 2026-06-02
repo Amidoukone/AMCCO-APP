@@ -54,7 +54,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Op?ration impossible. V?rifiez la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function formatFileSize(bytes: number): string {

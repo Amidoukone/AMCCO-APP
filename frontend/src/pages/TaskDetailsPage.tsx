@@ -29,7 +29,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Op?ration impossible. V?rifiez la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function statusLabel(status: TaskStatus): string {
@@ -279,7 +279,7 @@ export function TaskDetailsPage(): JSX.Element {
         assignOperationsTaskRequest(accessToken, taskId, nextAssignedToId, assignmentNote.trim() || undefined)
       );
       setAssignmentNote("");
-      setSuccessMessage("Assignation mise ? jour.");
+      setSuccessMessage("Assignation mise à jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -451,7 +451,7 @@ export function TaskDetailsPage(): JSX.Element {
               <strong>Créée le:</strong> {formatDate(task.createdAt)}
             </p>
             <p>
-              <strong>Dernière mise ? jour:</strong> {formatDate(task.updatedAt)}
+              <strong>Dernière mise à jour:</strong> {formatDate(task.updatedAt)}
             </p>
           </div>
 
@@ -556,7 +556,7 @@ export function TaskDetailsPage(): JSX.Element {
       {!isLoading && task ? (
         <section className={canManageTasks ? "panel" : "panel task-detail-lite-panel"}>
           <h3>{canManageTasks ? "Timeline operationnelle" : "Historique"}</h3>
-          {timelineEntries.length === 0 ? <p>Aucun ?v?nement pour le moment.</p> : null}
+          {timelineEntries.length === 0 ? <p>Aucun événement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
             <>
               <ol className="task-timeline">
