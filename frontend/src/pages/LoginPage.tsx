@@ -38,35 +38,48 @@ export function LoginPage(): JSX.Element {
   }
 
   return (
-    <main className="page center">
-      <section className="card login-card">
+    <main className="page login-page">
+      <section className="login-card" aria-labelledby="login-title">
         <div className="login-brand">
-          <h1>GROUPE NIOUMALA DIADY</h1>
-          <p>AMCCO &amp; SND</p>
+          <div className="login-brand-mark" aria-hidden="true">
+            <span>A</span>
+          </div>
+          <p>GROUPE NIOUMALA DIADY</p>
+          <h1>AMCCO &amp; SND</h1>
         </div>
-        <form className="form" onSubmit={handleSubmit}>
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            placeholder="nom@entreprise.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            autoComplete="email"
-          />
-          <label htmlFor="password">Mot de passe</label>
-          <input
-            id="password"
-            type="password"
-            placeholder="********"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            autoComplete="current-password"
-          />
+
+        <div className="login-card-intro">
+          <h2 id="login-title">Connexion</h2>
+        </div>
+
+        <form className="form login-form" onSubmit={handleSubmit}>
+          <label className="login-field" htmlFor="email">
+            <span>Email</span>
+            <input
+              id="email"
+              type="email"
+              placeholder="nom@entreprise.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              autoComplete="email"
+              autoFocus
+            />
+          </label>
+          <label className="login-field" htmlFor="password">
+            <span>Mot de passe</span>
+            <input
+              id="password"
+              type="password"
+              placeholder="Votre mot de passe"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </label>
           {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-          <button type="submit" disabled={isSubmitting}>
+          <button className="login-submit" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Connexion..." : "Se connecter"}
           </button>
         </form>

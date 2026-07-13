@@ -130,11 +130,79 @@ function toDisplayAccountCompatibilityLabel(isCompatible: boolean): string {
   return isCompatible ? "Compatible" : "Hors secteur";
 }
 
-function buildWorkbookBuffer(sheets: Array<{ name: string; rows: Array<Record<string, unknown>> }>): Buffer {
+function resolveWorksheetColumns(
+  rows: Array<Record<string, unknown>>,
+  configuredColumns?: string[]
+): string[] {
+  if (configuredColumns && configuredColumns.length > 0) {
+    return configuredColumns;
+  }
+
+  const columns = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      columns.add(key);
+    }
+  }
+  return Array.from(columns);
+}
+
+function formatWorksheetForExport(
+  worksheet: XLSX.WorkSheet,
+  rows: Array<Record<string, unknown>>,
+  columns: string[]
+): void {
+  if (columns.length === 0) {
+    return;
+  }
+
+  const range = worksheet["!ref"]
+    ? XLSX.utils.decode_range(worksheet["!ref"])
+    : {
+        s: { c: 0, r: 0 },
+        e: { c: columns.length - 1, r: Math.max(rows.length, 0) }
+      };
+
+  worksheet["!autofilter"] = {
+    ref: XLSX.utils.encode_range({
+      s: { c: range.s.c, r: range.s.r },
+      e: { c: range.e.c, r: range.s.r }
+    })
+  };
+
+  worksheet["!cols"] = columns.map((column) => {
+    const maxContentLength = rows.reduce((max, row) => {
+      const value = row[column];
+      if (value === null || value === undefined) {
+        return max;
+      }
+      return Math.max(max, String(value).length);
+    }, column.length);
+
+    return {
+      wch: Math.min(Math.max(maxContentLength + 2, 12), 48)
+    };
+  });
+}
+
+function buildWorkbookBuffer(
+  sheets: Array<{
+    name: string;
+    rows: Array<Record<string, unknown>>;
+    columns?: string[];
+  }>
+): Buffer {
   const workbook = XLSX.utils.book_new();
 
   for (const sheet of sheets) {
-    const worksheet = XLSX.utils.json_to_sheet(sheet.rows);
+    const columns = resolveWorksheetColumns(sheet.rows, sheet.columns);
+    const worksheet =
+      sheet.rows.length > 0
+        ? XLSX.utils.json_to_sheet(sheet.rows, {
+            header: columns
+          })
+        : XLSX.utils.aoa_to_sheet([columns]);
+    formatWorksheetForExport(worksheet, sheet.rows, columns);
     XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
   }
 
@@ -149,6 +217,7 @@ function buildOverviewMetadataRows(filters: ReportPeriodFilter): Array<Record<st
     {
       generatedAt: new Date().toISOString(),
       period: toDisplayPeriodLabel(filters),
+      activity: toDisplayActivityLabel(filters.activityCode),
       dateFrom: filters.dateFrom ?? "",
       dateTo: filters.dateTo ?? ""
     }
@@ -210,6 +279,49 @@ function writePdfList(
   for (const row of rows) {
     doc.fontSize(10).text(`- ${row}`);
   }
+}
+
+function limitPdfRows(rows: string[], limit = 20): string[] {
+  if (rows.length <= limit) {
+    return rows;
+  }
+
+  return [
+    ...rows.slice(0, limit),
+    `${rows.length - limit} ligne(s) supplementaire(s) disponibles dans l'export Excel.`
+  ];
+}
+
+function toDisplayTransactionStatusLabel(
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED"
+): string {
+  if (status === "DRAFT") {
+    return "Brouillon";
+  }
+  if (status === "SUBMITTED") {
+    return "Soumise";
+  }
+  if (status === "APPROVED") {
+    return "Approuvee";
+  }
+  return "Rejetee";
+}
+
+function toDisplayTransactionTypeLabel(type: "CASH_IN" | "CASH_OUT"): string {
+  return type === "CASH_IN" ? "Entree" : "Sortie";
+}
+
+function toDisplayTaskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
+  if (status === "TODO") {
+    return "A faire";
+  }
+  if (status === "IN_PROGRESS") {
+    return "En cours";
+  }
+  if (status === "DONE") {
+    return "Terminee";
+  }
+  return "Bloquee";
 }
 
 function drawAmccoPdfLogo(doc: PDFKit.PDFDocument, x: number, y: number): void {
@@ -892,14 +1004,37 @@ export async function exportCompanyTransactionsExcel(
   return buildWorkbookBuffer([
     {
       name: "Resume",
-      rows: buildOverviewMetadataRows(filters)
+      rows: buildOverviewMetadataRows(filters),
+      columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
     },
     {
       name: "Synthese",
-      rows: buildOverviewSummaryRows(overview)
+      rows: buildOverviewSummaryRows(overview),
+      columns: ["category", "item", "label", "value", "extra"]
     },
     {
       name: "Transactions",
+      columns: [
+        "transactionId",
+        "occurredAt",
+        "status",
+        "type",
+        "amount",
+        "currency",
+        "activityCode",
+        "accountName",
+        "accountRef",
+        "accountScopeType",
+        "accountPrimaryActivityCode",
+        "accountAllowedActivityCodes",
+        "accountSupportsTransactionActivity",
+        "createdByEmail",
+        "validatedByEmail",
+        "proofsCount",
+        "description",
+        "createdAt",
+        "updatedAt"
+      ],
       rows: records.map((item) => ({
         transactionId: item.id,
         occurredAt: item.occurredAt,
@@ -938,14 +1073,30 @@ export async function exportCompanyTasksExcel(
   return buildWorkbookBuffer([
     {
       name: "Resume",
-      rows: buildOverviewMetadataRows(filters)
+      rows: buildOverviewMetadataRows(filters),
+      columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
     },
     {
       name: "Synthese",
-      rows: buildOverviewSummaryRows(overview)
+      rows: buildOverviewSummaryRows(overview),
+      columns: ["category", "item", "label", "value", "extra"]
     },
     {
       name: "Taches",
+      columns: [
+        "taskId",
+        "title",
+        "description",
+        "activityCode",
+        "status",
+        "createdByFullName",
+        "createdByEmail",
+        "assignedToFullName",
+        "assignedToEmail",
+        "dueDate",
+        "createdAt",
+        "updatedAt"
+      ],
       rows: records.map((item) => ({
         taskId: item.id,
         title: item.title,
@@ -1007,16 +1158,83 @@ export async function exportCompanyReportsPdf(
       doc,
       overview.financeByType.map(
         (item) =>
-          `${item.type} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | approuve ${item.approvedAmount} ${item.currency}`
+          `${toDisplayTransactionTypeLabel(item.type)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | approuve ${item.approvedAmount} ${item.currency}`
       ),
       "Aucune transaction consolidee sur cette periode."
+    );
+
+    writePdfSectionTitle(doc, "Transactions par statut");
+    writePdfList(
+      doc,
+      overview.financeByStatus.map(
+        (item) =>
+          `${toDisplayTransactionStatusLabel(item.status)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency}`
+      ),
+      "Aucune transaction par statut sur cette periode."
+    );
+
+    writePdfSectionTitle(doc, "Transactions par secteur");
+    writePdfList(
+      doc,
+      overview.financeByActivity
+        .filter((item) => item.count > 0)
+        .map(
+          (item) =>
+            `${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.count} transaction(s) | total ${item.totalAmount} | approuve ${item.approvedAmount}`
+        ),
+      "Aucune transaction sectorielle sur cette periode."
+    );
+
+    writePdfSectionTitle(doc, "Gouvernance des comptes");
+    writePdfList(
+      doc,
+      limitPdfRows(
+        overview.financeAccounts.map(
+          (item) =>
+            `${item.name} | ${toDisplayAccountScopeLabel(item)} | ${toDisplayAccountCompatibilityLabel(item.isCompatibleWithSelectedActivity)} | solde ${item.balance}`
+        )
+      ),
+      "Aucun compte financier disponible."
     );
 
     writePdfSectionTitle(doc, "Taches par statut");
     writePdfList(
       doc,
-      overview.taskByStatus.map((item) => `${item.status} | ${item.count} tache(s)`),
+      overview.taskByStatus.map(
+        (item) => `${toDisplayTaskStatusLabel(item.status)} | ${item.count} tache(s)`
+      ),
       "Aucune tache consolidee sur cette periode."
+    );
+
+    writePdfSectionTitle(doc, "Taches par secteur");
+    writePdfList(
+      doc,
+      overview.taskByActivity
+        .filter((item) => item.totalCount > 0)
+        .map(
+          (item) =>
+            `${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.totalCount} tache(s) | ouvertes ${item.openCount} | bloquees ${item.blockedCount} | terminees ${item.doneCount}`
+        ),
+      "Aucune tache sectorielle sur cette periode."
+    );
+
+    writePdfSectionTitle(doc, "Charge equipe");
+    writePdfList(
+      doc,
+      limitPdfRows(
+        overview.topAssignees.map(
+          (item) =>
+            `${item.fullName} (${item.role}) | ouvertes ${item.openTasksCount} | en cours ${item.inProgressTasksCount} | bloquees ${item.blockedTasksCount}`
+        )
+      ),
+      "Aucune charge d'assignation disponible."
+    );
+
+    writePdfSectionTitle(doc, "Roles actifs");
+    writePdfList(
+      doc,
+      overview.roleDistribution.map((item) => `${item.role} | ${item.count} utilisateur(s)`),
+      "Aucune repartition des roles disponible."
     );
 
     

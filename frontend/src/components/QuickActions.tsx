@@ -19,7 +19,38 @@ export function QuickActions({
   const isReadOnlyOwner = isReadOnlyOwnerRole(role);
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
 
-  const actions = [
+  const ownerActions = [
+    canUse("reports")
+      ? {
+          label: "Rapports",
+          to: "/reports",
+          tone: "primary"
+        }
+      : null,
+    canUse("financeTransactions")
+      ? {
+          label: "Contrôle finance",
+          to: `/finance/transactions${activityQuery}`,
+          tone: "neutral"
+        }
+      : null,
+    canUse("alerts")
+      ? {
+          label: "Alertes",
+          to: "/alerts",
+          tone: "neutral"
+        }
+      : null,
+    canUse("operationsTasks")
+      ? {
+          label: "Suivi tâches",
+          to: `/operations/tasks${activityQuery}`,
+          tone: "neutral"
+        }
+      : null
+  ];
+
+  const defaultActions = [
     canUse("operationsTasks")
       ? {
           label: isReadOnlyOwner ? "Voir les t\u00e2ches" : "Nouvelle t\u00e2che",
@@ -48,7 +79,10 @@ export function QuickActions({
           tone: "neutral"
         }
       : null
-  ].filter((item): item is { label: string; to: string; tone: string } => item !== null);
+  ];
+  const actions = (isReadOnlyOwner ? ownerActions : defaultActions).filter(
+    (item): item is { label: string; to: string; tone: string } => item !== null
+  );
 
   return (
     <div className="quick-actions" aria-label="Actions rapides">

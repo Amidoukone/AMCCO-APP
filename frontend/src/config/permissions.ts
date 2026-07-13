@@ -90,7 +90,23 @@ export function isReadOnlyOwnerRole(role: RoleCode): boolean {
 }
 
 export function getNavigationForRole(role: RoleCode): NavigationItem[] {
-  return NAVIGATION_ITEMS.filter((item) => canAccessFeature(role, item.key));
+  const items = NAVIGATION_ITEMS.filter((item) => canAccessFeature(role, item.key));
+  if (role !== "OWNER") {
+    return items;
+  }
+
+  return items.map((item) => {
+    if (item.key === "financeTransactions") {
+      return { ...item, label: "Contrôle finance" };
+    }
+    if (item.key === "financeSalaries") {
+      return { ...item, label: "Suivi salaires" };
+    }
+    if (item.key === "operationsTasks") {
+      return { ...item, label: "Suivi tâches" };
+    }
+    return item;
+  });
 }
 
 export function getDefaultRouteForRole(role: RoleCode): string {

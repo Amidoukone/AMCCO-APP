@@ -4,6 +4,11 @@ export const BUSINESS_ACTIVITY_CODES = [
   "FOOD",
   "RENTAL",
   "AGRICULTURE",
+  "BTP",
+  "FISH_FARMING",
+  "TRANSPORT",
+  "MONEY_TRANSFER",
+  "HOTEL_LODGING",
   "SERVICES",
   "MINING",
   "WATER",
@@ -42,7 +47,32 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "AGRICULTURE",
     label: "Activités agricoles",
-    description: "Production agricole et suivi terrain."
+    description: "Production agricole, types de champs, intrants, exploitation et suivi terrain."
+  },
+  {
+    code: "BTP",
+    label: "BTP",
+    description: "Chantiers, achats, main-d'oeuvre, avancement et suivi des travaux."
+  },
+  {
+    code: "FISH_FARMING",
+    label: "Pisciculture",
+    description: "Bassins, cycles d'elevage, alimentation, ventes et suivi sanitaire."
+  },
+  {
+    code: "TRANSPORT",
+    label: "Transport",
+    description: "Location et gestion de camions bennes, tracteurs et citernes."
+  },
+  {
+    code: "MONEY_TRANSFER",
+    label: "Transaction",
+    description: "Orange Money, Moov Money, Wave, Western Union, MoneyGram et Ria."
+  },
+  {
+    code: "HOTEL_LODGING",
+    label: "Hôtellerie / Auberge",
+    description: "Chambres, reservations, sejours, charges et exploitation d'auberge."
   },
   {
     code: "SERVICES",

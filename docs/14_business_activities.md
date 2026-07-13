@@ -9,6 +9,11 @@ Faire ressortir explicitement les activites du cahier des charges dans l'applica
 - Alimentation
 - Location immobiliere
 - Activites agricoles
+- BTP
+- Pisciculture
+- Transport
+- Transaction
+- Hotellerie / Auberge
 - Services divers
 - Exploitation miniere
 - Production d'eau potable
@@ -19,6 +24,7 @@ Faire ressortir explicitement les activites du cahier des charges dans l'applica
 - referentiel metier AMCCO v1 partage backend/frontend
 - rattachement des transactions financieres a une `activityCode`
 - rattachement des taches operationnelles a une `activityCode`
+- metadonnees sectorielles pour les sous-sections: type de champ agricole, chantier BTP, bassin piscicole, engin transport, reseau de transaction, reservation hotel
 - filtres par activite sur transactions, taches et rapports
 - synthese sectorielle dans le dashboard et les rapports
 - exports CSV / Excel / PDF enrichis avec l'activite
@@ -31,6 +37,7 @@ Faire ressortir explicitement les activites du cahier des charges dans l'applica
 - les rapports permettent une lecture par activite et un export aligne
 - l'admin peut maintenant activer/desactiver des activites par entreprise
 - l'admin peut reclasser les anciennes donnees `Non renseignee`
+- les secteurs Transport et Transaction disposent de champs de sous-section pour camion benne/tracteur/citerne et Orange Money/Moov Money/Wave/Western Union/MoneyGram/Ria
 
 ## Migration SQL
 
@@ -39,6 +46,7 @@ Appliquer:
 ```bash
 mysql -u root -p < backend/sql/006_add_business_activities.sql
 mysql -u root -p < backend/sql/007_add_company_activity_settings.sql
+mysql -u root -p < backend/sql/013_add_requested_business_activities.sql
 ```
 
 ## Limite actuelle

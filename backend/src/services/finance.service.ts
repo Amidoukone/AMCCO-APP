@@ -210,8 +210,22 @@ function assertAccountSupportsActivity(
   },
   activityCode: BusinessActivityCode
 ): void {
-  void account;
-  void activityCode;
+  if (account.scopeType === "GLOBAL") {
+    return;
+  }
+
+  if (account.scopeType === "DEDICATED" && account.primaryActivityCode === activityCode) {
+    return;
+  }
+
+  if (account.scopeType === "RESTRICTED" && account.allowedActivityCodes.includes(activityCode)) {
+    return;
+  }
+
+  throw new HttpError(
+    400,
+    `Le compte financier ${account.name} n'est pas autorise pour le secteur ${toActivityLabel(activityCode) ?? activityCode}.`
+  );
 }
 
 function toActivityLabel(activityCode: BusinessActivityCode | null): string | null {
@@ -523,8 +537,24 @@ export async function createCompanyAccount(
     throw new HttpError(403, "Permissions insuffisantes pour creer un compte financier.");
   }
 
-  const scopeType: FinancialAccountScopeType = "GLOBAL";
-  const primaryActivityCode = null;
+  const scopeType = input.scopeType ?? "GLOBAL";
+  const primaryActivityCode =
+    scopeType === "DEDICATED" ? (input.primaryActivityCode ?? null) : null;
+  const allowedActivityCodes = getEffectiveAllowedActivityCodes({
+    scopeType,
+    primaryActivityCode,
+    allowedActivityCodes: input.allowedActivityCodes ?? []
+  });
+
+  if (scopeType === "DEDICATED" && !primaryActivityCode) {
+    throw new HttpError(400, "Un compte dedie doit cibler un secteur.");
+  }
+
+  if (scopeType === "RESTRICTED" && allowedActivityCodes.length === 0) {
+    throw new HttpError(400, "Un compte restreint doit autoriser au moins un secteur.");
+  }
+
+  assertAccountCreationGovernance(actor.role, scopeType);
 
   const accountId = randomUUID();
   await createFinancialAccount({
@@ -535,7 +565,7 @@ export async function createCompanyAccount(
     balance: input.openingBalance ?? "0.00",
     scopeType,
     primaryActivityCode,
-    allowedActivityCodes: []
+    allowedActivityCodes
   });
 
   const created = await findFinancialAccountById(actor.companyId, accountId);
@@ -594,8 +624,25 @@ export async function updateCompanyAccount(
     );
   }
 
-  const scopeType: FinancialAccountScopeType = "GLOBAL";
-  const primaryActivityCode = null;
+  const scopeType = input.scopeType ?? existing.scopeType;
+  const primaryActivityCode =
+    scopeType === "DEDICATED"
+      ? (input.primaryActivityCode ?? existing.primaryActivityCode)
+      : null;
+  const allowedActivityCodes = getEffectiveAllowedActivityCodes({
+    scopeType,
+    primaryActivityCode,
+    allowedActivityCodes: input.allowedActivityCodes ?? existing.allowedActivityCodes
+  });
+
+  if (scopeType === "DEDICATED" && !primaryActivityCode) {
+    throw new HttpError(400, "Un compte dedie doit cibler un secteur.");
+  }
+
+  if (scopeType === "RESTRICTED" && allowedActivityCodes.length === 0) {
+    throw new HttpError(400, "Un compte restreint doit autoriser au moins un secteur.");
+  }
+
   assertAccountManagementGovernance(actor.role, scopeType);
   await updateFinancialAccount({
     companyId: actor.companyId,
@@ -605,7 +652,7 @@ export async function updateCompanyAccount(
     balance: input.openingBalance ?? existing.balance,
     scopeType,
     primaryActivityCode,
-    allowedActivityCodes: []
+    allowedActivityCodes
   });
 
   const updated = await findFinancialAccountById(actor.companyId, existing.id);

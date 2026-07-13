@@ -305,6 +305,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     metadata: {} as Record<string, string>,
     occurredAt: ""
   });
+  const [transactionProofFile, setTransactionProofFile] = useState<File | null>(null);
+  const [isSavingTransaction, setIsSavingTransaction] = useState(false);
 
   const [proofFiles, setProofFiles] = useState<Record<string, File | null>>({});
   const [proofsByTransaction, setProofsByTransaction] = useState<Record<string, TransactionProof[]>>(
@@ -320,6 +322,10 @@ export function FinanceTransactionsPage(): JSX.Element {
   );
 
   const financeMetadataFields = selectedProfile?.finance.metadataFields ?? EMPTY_METADATA_FIELDS;
+  const hasRequiredFinanceDetails = Boolean(
+    selectedProfile?.finance.requiresDescription ||
+      financeMetadataFields.some((field) => field.required)
+  );
   const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
   const enabledActivityCodes = useMemo(
     () => enabledActivities.map((item) => item.code),
@@ -374,6 +380,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   const resetTransactionForm = useCallback(() => {
     setEditingTransactionId(null);
+    setTransactionProofFile(null);
     setTransactionForm({
       accountId: accounts[0]?.id ?? "",
       type: "CASH_OUT",
@@ -775,8 +782,13 @@ export function FinanceTransactionsPage(): JSX.Element {
     if (!selectedActivityCode) {
       return;
     }
+    const proofFileToUpload = transactionProofFile;
+    const transactionSavedLabel = editingTransactionId
+      ? "Transaction modifiée"
+      : "Transaction enregistrée";
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingTransaction(true);
 
     try {
       const response = await withAuthorizedToken((accessToken) => {
@@ -797,20 +809,56 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateFinanceTransactionRequest(accessToken, editingTransactionId, payload)
           : createFinanceTransactionRequest(accessToken, payload);
       });
+      let proofUploadError: string | null = null;
+      if (proofFileToUpload) {
+        setBusyTransactionId(response.item.id);
+        try {
+          const proofItems = await uploadTransactionProof(response.item.id, proofFileToUpload);
+          setProofsByTransaction((prev) => ({
+            ...prev,
+            [response.item.id]: proofItems
+          }));
+          setOpenProofs((prev) => ({
+            ...prev,
+            [response.item.id]: true
+          }));
+        } catch (error) {
+          proofUploadError = toErrorMessage(error);
+        } finally {
+          setBusyTransactionId(null);
+        }
+      }
       handleOpenTransactionDetails(response.item.id, response.item.activityCode);
       setSuccessMessage(
         editingTransactionId ? "Transaction modifiée." : "Transaction enregistrée."
       );
       resetTransactionForm();
       await loadData();
+      if (proofUploadError) {
+        setErrorMessage(
+          `${transactionSavedLabel}, mais la preuve n'a pas pu être ajoutée. ${proofUploadError}`
+        );
+        setSuccessMessage(`${transactionSavedLabel}. Vous pouvez réessayer depuis le détail.`);
+        return;
+      }
+      if (proofFileToUpload) {
+        setSuccessMessage(
+          editingTransactionId
+            ? "Transaction modifiée et preuve ajoutée."
+            : "Transaction enregistrée avec preuve."
+        );
+      }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingTransaction(false);
     }
   }
 
   function handleStartEditTransaction(transaction: FinancialTransaction): void {
     setErrorMessage(null);
     setSuccessMessage(null);
+    setTransactionProofFile(null);
     setEditingTransactionId(transaction.id);
     setTransactionForm({
       accountId: transaction.accountId,
@@ -897,6 +945,62 @@ export function FinanceTransactionsPage(): JSX.Element {
     } finally {
       setBusyTransactionId(null);
     }
+  }
+
+  async function uploadTransactionProof(
+    transactionId: string,
+    selectedFile: File
+  ): Promise<TransactionProof[]> {
+    const proofResponse = await withAuthorizedToken(async (accessToken) => {
+      const authResp = await getFinanceProofUploadAuthRequest(accessToken, transactionId);
+      const auth = authResp.item;
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("fileName", selectedFile.name);
+      formData.append("useUniqueFileName", "true");
+      formData.append("folder", auth.folder);
+      formData.append("publicKey", auth.publicKey);
+      formData.append("token", auth.token);
+      formData.append("signature", auth.signature);
+      formData.append("expire", String(auth.expire));
+
+      const uploadResponse = await fetch(auth.uploadUrl, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        let detail = "Echec de l'upload sur ImageKit.";
+        try {
+          const payload = (await uploadResponse.json()) as { message?: string };
+          if (payload.message) {
+            detail = payload.message;
+          }
+        } catch {
+          // no-op
+        }
+        throw new ApiError(uploadResponse.status, detail);
+      }
+
+      const uploaded = (await uploadResponse.json()) as {
+        fileId?: string;
+        filePath?: string;
+        url?: string;
+        name?: string;
+        size?: number;
+        fileType?: string;
+      };
+
+      return addFinanceTransactionProofRequest(accessToken, transactionId, {
+        storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
+        fileName: uploaded.name ?? selectedFile.name,
+        mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
+        fileSize: uploaded.size ?? selectedFile.size
+      });
+    });
+
+    return proofResponse.items;
   }
 
   async function handleAddProof(transactionId: string): Promise<void> {
@@ -1059,66 +1163,79 @@ export function FinanceTransactionsPage(): JSX.Element {
               </small>
             </summary>
             <form className="finance-account-form" onSubmit={handleSaveAccount}>
-            <input
-              type="text"
-              placeholder="Nom du compte (ex: Caisse principale)"
-              value={accountForm.name}
-              onChange={(event) =>
-                setAccountForm((prev) => ({
-                  ...prev,
-                  name: event.target.value
-                }))
-              }
-              required
-            />
-            <input
-              type="text"
-              placeholder="Référence (optionnel)"
-              value={accountForm.accountRef}
-              onChange={(event) =>
-                setAccountForm((prev) => ({
-                  ...prev,
-                  accountRef: event.target.value
-                }))
-              }
-            />
-            <input
-              type="text"
-              placeholder="Solde initial (ex: 100000.00)"
-              value={accountForm.openingBalance}
-              onChange={(event) =>
-                setAccountForm((prev) => ({
-                  ...prev,
-                  openingBalance: event.target.value
-                }))
-              }
-              required
-            />
+            <label className="operations-inline-group">
+              <span>Nom du compte</span>
+              <input
+                type="text"
+                placeholder="Ex: Caisse principale"
+                value={accountForm.name}
+                onChange={(event) =>
+                  setAccountForm((prev) => ({
+                    ...prev,
+                    name: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+            <label className="operations-inline-group">
+              <span>Référence</span>
+              <input
+                type="text"
+                placeholder="Optionnel"
+                value={accountForm.accountRef}
+                onChange={(event) =>
+                  setAccountForm((prev) => ({
+                    ...prev,
+                    accountRef: event.target.value
+                  }))
+                }
+              />
+            </label>
+            <label className="operations-inline-group">
+              <span>Solde initial</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex: 100000.00"
+                value={accountForm.openingBalance}
+                onChange={(event) =>
+                  setAccountForm((prev) => ({
+                    ...prev,
+                    openingBalance: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
             {false ? (
               <p className="hint">
                 Les comptes globaux entreprise sont réservés au propriétaire et à l'admin système.
               </p>
             ) : null}
             {accountForm.scopeType === "DEDICATED" ? (
-              <select
-                value={accountForm.primaryActivityCode}
-                onChange={(event) =>
-                  setAccountForm((prev) => ({
-                    ...prev,
-                    primaryActivityCode: event.target.value as BusinessActivityCode
-                  }))
-                }
-                required
-              >
-                <option value="" disabled>
-                  Sélectionner le secteur dédié
-                </option>
-                {enabledActivities.map((activity) => (
-                  <option key={activity.code} value={activity.code}>
-                    {activity.label}
+              <label className="operations-inline-group">
+                <span>Secteur dédié</span>
+                <select
+                  value={accountForm.primaryActivityCode}
+                  onChange={(event) =>
+                    setAccountForm((prev) => ({
+                      ...prev,
+                      primaryActivityCode: event.target.value as BusinessActivityCode
+                    }))
+                  }
+                  required
+                >
+                  <option value="" disabled>
+                    Sélectionner le secteur dédié
                   </option>
-                ))}
-              </select>
+                  {enabledActivities.map((activity) => (
+                    <option key={activity.code} value={activity.code}>
+                      {activity.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : null}
             {accountForm.scopeType === "RESTRICTED" ? (
               <div className="metadata-field-list">
@@ -1190,26 +1307,32 @@ export function FinanceTransactionsPage(): JSX.Element {
           }}
         >
 
-          <select
-            value={filters.type}
-            onChange={(event) =>
-              setFilters((prev) => ({
-                ...prev,
-                type: event.target.value as "ALL" | FinancialTransaction["type"]
-              }))
-            }
-          >
-            <option value="ALL">Tous les types</option>
-            <option value="CASH_IN">Entrée</option>
-            <option value="CASH_OUT">Sortie</option>
-          </select>
-          <input
-            type="search"
-            className="quick-search-input"
-            placeholder="Recherche rapide: compte, reference, description..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
+          <label className="operations-inline-group">
+            <span>Type de transaction</span>
+            <select
+              value={filters.type}
+              onChange={(event) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  type: event.target.value as "ALL" | FinancialTransaction["type"]
+                }))
+              }
+            >
+              <option value="ALL">Tous les types</option>
+              <option value="CASH_IN">Entrée</option>
+              <option value="CASH_OUT">Sortie</option>
+            </select>
+          </label>
+          <label className="operations-inline-group">
+            <span>Recherche rapide</span>
+            <input
+              type="search"
+              className="quick-search-input"
+              placeholder="Compte, référence, description..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </label>
           <button type="submit">Actualiser</button>
         </form>
       </section>
@@ -1231,6 +1354,8 @@ export function FinanceTransactionsPage(): JSX.Element {
             </p>
           ) : null}
           <form className="finance-transaction-form" onSubmit={handleSaveTransaction}>
+          <fieldset className="finance-transaction-form-section">
+            <legend>Informations principales</legend>
           <div className="finance-transaction-form-quick">
             <label className="operations-inline-group">
               <span>Compte</span>
@@ -1275,6 +1400,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               <span>Montant</span>
               <input
                 type="text"
+                inputMode="decimal"
                 placeholder="Montant"
                 value={transactionForm.amount}
                 onChange={(event) =>
@@ -1306,6 +1432,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               </select>
             </label>
           </div>
+          </fieldset>
 
           <div className="scope-field finance-transaction-form-context">
             <span className="scope-field-label">Contexte de saisie</span>
@@ -1315,8 +1442,48 @@ export function FinanceTransactionsPage(): JSX.Element {
             </span>
           </div>
 
-          <details className="finance-transaction-form-options">
-            <summary>Contexte et justificatifs</summary>
+          <fieldset className="finance-transaction-form-section finance-proof-callout">
+            <legend>Justificatif</legend>
+            <div className="finance-proof-callout-copy">
+              <strong>Ajouter la preuve maintenant</strong>
+              <p className="hint">
+                Le fichier sera envoyé automatiquement après l'enregistrement de la transaction.
+                Formats acceptés: PDF, JPG ou PNG.
+              </p>
+            </div>
+            <label className="finance-proof-upload" htmlFor="transaction-proof-file">
+              <span>Fichier de preuve</span>
+              <input
+                key={`${transactionProofFile?.name ?? "empty"}-${transactionProofFile?.size ?? 0}`}
+                id="transaction-proof-file"
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                onChange={(event) => setTransactionProofFile(event.target.files?.[0] ?? null)}
+                disabled={isSavingTransaction}
+              />
+            </label>
+            <div className="finance-proof-selected">
+              {transactionProofFile ? (
+                <>
+                  <strong>{transactionProofFile.name}</strong>
+                  <span>{formatFileSize(transactionProofFile.size)}</span>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => setTransactionProofFile(null)}
+                    disabled={isSavingTransaction}
+                  >
+                    Retirer
+                  </button>
+                </>
+              ) : (
+                <span>Aucun fichier sélectionné.</span>
+              )}
+            </div>
+          </fieldset>
+
+          <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails}>
+            <summary>Informations complémentaires</summary>
             <div className="finance-transaction-form-options-body">
               <label className="operations-inline-group">
                 <span>Date et heure de l'opération</span>
@@ -1332,50 +1499,71 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
 
-              <input
-                type="text"
-                placeholder="Description (optionnelle)"
-                value={transactionForm.description}
-                onChange={(event) =>
-                  setTransactionForm((prev) => ({
-                    ...prev,
-                    description: event.target.value
-                  }))
-                }
-              />
-
-              {financeMetadataFields.map((field) => (
+              <label className="operations-inline-group">
+                <span>Description</span>
                 <input
-                  key={field.key}
                   type="text"
-                  placeholder={field.label}
-                  value={transactionForm.metadata[field.key] ?? ""}
+                  placeholder={
+                    selectedProfile?.finance.requiresDescription ? "Requise" : "Optionnelle"
+                  }
+                  value={transactionForm.description}
                   onChange={(event) =>
                     setTransactionForm((prev) => ({
                       ...prev,
-                      metadata: {
-                        ...prev.metadata,
-                        [field.key]: event.target.value
-                      }
+                      description: event.target.value
                     }))
                   }
-                  title={field.helpText}
+                  required={selectedProfile?.finance.requiresDescription ?? false}
                 />
+              </label>
+
+              {financeMetadataFields.map((field) => (
+                <label key={field.key} className="operations-inline-group">
+                  <span>{field.label}</span>
+                  <input
+                    type="text"
+                    placeholder={field.helpText || field.label}
+                    value={transactionForm.metadata[field.key] ?? ""}
+                    onChange={(event) =>
+                      setTransactionForm((prev) => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata,
+                          [field.key]: event.target.value
+                        }
+                      }))
+                    }
+                    title={field.helpText}
+                    required={field.required}
+                  />
+                </label>
               ))}
             </div>
           </details>
 
           <button
             type="submit"
-            disabled={accounts.length === 0 || !selectedActivityCode || isLoadingActivities}
+            disabled={
+              accounts.length === 0 ||
+              !selectedActivityCode ||
+              isLoadingActivities ||
+              isSavingTransaction
+            }
           >
-            {editingTransactionId ? "Enregistrer les modifications" : "Enregistrer la transaction"}
+            {isSavingTransaction
+              ? transactionProofFile
+                ? "Enregistrement et envoi de la preuve..."
+                : "Enregistrement..."
+              : editingTransactionId
+                ? "Enregistrer les modifications"
+                : "Enregistrer la transaction"}
           </button>
           {editingTransactionId ? (
             <button
               type="button"
               className="secondary-btn"
               onClick={handleCancelEditTransaction}
+              disabled={isSavingTransaction}
             >
               Annuler la modification
             </button>
@@ -1558,6 +1746,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                             {canManageTransactions ? <div className="proof-inline-form">
                               <input
                                 type="file"
+                                aria-label={`Preuve pour la transaction ${tx.accountName}`}
                                 accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
                                 onChange={(event) =>
                                   setProofFiles((prev) => ({
@@ -1739,6 +1928,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             {canManageTransactions ? <div className="proof-inline-form">
               <input
                 type="file"
+                aria-label={`Preuve pour la transaction ${selectedTransaction.accountName}`}
                 accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
                 onChange={(event) =>
                   setProofFiles((prev) => ({

@@ -207,6 +207,7 @@ export function OperationsTasksPage(): JSX.Element {
   }, [user]);
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
+  const hasRequiredTaskMetadata = taskMetadataFields.some((field) => field.required);
   const displayTasks = useMemo(() => {
     return tasks.filter((task) =>
       matchesQuickSearch(searchQuery, [
@@ -774,13 +775,18 @@ export function OperationsTasksPage(): JSX.Element {
                 onChange={(event) =>
                   setCreateForm((prev) => ({
                     ...prev,
-                    description: event.target.value
-                  }))
-                }
+                      description: event.target.value
+                    }))
+                  }
+                required={selectedProfile?.tasks.requiresDescription ?? false}
               />
             </div>
             <label className="operations-inline-group">
-              <span>Échéance (optionnelle)</span>
+              <span>
+                {selectedProfile?.tasks.requiresDueDate
+                  ? "Échéance requise"
+                  : "Échéance (optionnelle)"}
+              </span>
               <input
                 type="datetime-local"
                 value={createForm.dueDate}
@@ -790,6 +796,7 @@ export function OperationsTasksPage(): JSX.Element {
                     dueDate: event.target.value
                   }))
                 }
+                required={selectedProfile?.tasks.requiresDueDate ?? false}
               />
             </label>
             {canAssignTasks ? (
@@ -805,6 +812,7 @@ export function OperationsTasksPage(): JSX.Element {
                         assignedToId: event.target.value
                       }))
                     }
+                    required={selectedProfile?.tasks.requiresAssignee ?? false}
                   >
                     <option value="">Non assignée</option>
                     {members.map((member) => (
@@ -822,7 +830,7 @@ export function OperationsTasksPage(): JSX.Element {
               </div>
             )}
             {taskMetadataFields.length > 0 ? (
-              <details className="operations-task-form-options">
+              <details className="operations-task-form-options" open={hasRequiredTaskMetadata}>
                 <summary>Champs avancés</summary>
                 <div className="operations-task-form-options-body">
                   {taskMetadataFields.map((field) => (
@@ -841,6 +849,7 @@ export function OperationsTasksPage(): JSX.Element {
                         }))
                       }
                       title={field.helpText}
+                      required={field.required}
                     />
                   ))}
                 </div>

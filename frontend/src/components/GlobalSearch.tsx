@@ -25,6 +25,8 @@ function buildSearchItems(
 ): SearchItem[] {
   const isReadOnlyOwner = isReadOnlyOwnerRole(role);
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
+  const canUse = (key: NavigationItem["key"]): boolean =>
+    navigation.some((item) => item.key === key);
   const items: SearchItem[] = navigation.map((item) => ({
     label: item.label,
     description: item.section,
@@ -32,35 +34,57 @@ function buildSearchItems(
     keywords: [item.label, item.section, item.key]
   }));
 
-  items.push(
-    {
-      label: "Mon travail",
-      description: "T\u00e2ches ouvertes, validations et \u00e9ch\u00e9ances",
-      to: "/my-work",
-      keywords: ["mon travail", "mes t\u00e2ches", "\u00e0 faire", "\u00e9ch\u00e9ances", "urgent"]
-    },
-    {
+  const shortcuts: SearchItem[] = [
+    canUse("myWork")
+      ? {
+          label: "Mon travail",
+          description: "T\u00e2ches ouvertes, validations et \u00e9ch\u00e9ances",
+          to: "/my-work",
+          keywords: ["mon travail", "mes t\u00e2ches", "\u00e0 faire", "\u00e9ch\u00e9ances", "urgent"]
+        }
+      : null,
+    canUse("operationsTasks")
+      ? {
       label: isReadOnlyOwner ? "Voir les t\u00e2ches" : "Cr\u00e9er une t\u00e2che",
       description: "Voir les t\u00e2ches",
       to: `/operations/tasks${activityQuery}`,
       keywords: isReadOnlyOwner
         ? ["t\u00e2ches", "op\u00e9rations", "suivi", "contr\u00f4le"]
         : ["nouvelle t\u00e2che", "cr\u00e9er t\u00e2che", "assigner", "op\u00e9ration"]
-    },
-    {
+        }
+      : null,
+    canUse("financeTransactions")
+      ? {
       label: isReadOnlyOwner ? "Voir les transactions" : "Cr\u00e9er une transaction",
       description: "Voir les transactions",
       to: `/finance/transactions${activityQuery}`,
       keywords: isReadOnlyOwner
         ? ["transactions", "finance", "contr\u00f4le", "caisse"]
         : ["nouvelle transaction", "finance", "caisse", "d\u00e9pense", "recette"]
-    },
-    {
-      label: "Alertes",
-      description: "Consulter les notifications \u00e0 traiter",
-      to: "/alerts",
-      keywords: ["alerte", "notification", "risque"]
-    }
+        }
+      : null,
+    canUse("reports")
+      ? {
+          label: isReadOnlyOwner ? "Vue propriétaire" : "Rapports",
+          description: isReadOnlyOwner ? "Contrôle, synthèse et exports" : "Exports PDF et Excel",
+          to: isReadOnlyOwner ? "/dashboard" : "/reports",
+          keywords: isReadOnlyOwner
+            ? ["propriétaire", "controle", "pilotage", "synthese", "vue propriétaire"]
+            : ["rapport", "export", "pdf", "excel"]
+        }
+      : null,
+    canUse("alerts")
+      ? {
+          label: "Alertes",
+          description: "Consulter les notifications \u00e0 traiter",
+          to: "/alerts",
+          keywords: ["alerte", "notification", "risque"]
+        }
+      : null
+  ].filter((item): item is SearchItem => item !== null);
+
+  items.push(
+    ...shortcuts
   );
 
   return items;

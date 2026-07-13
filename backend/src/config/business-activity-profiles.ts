@@ -388,7 +388,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   AGRICULTURE: makeProfile("AGRICULTURE", {
-    operationsModel: "Exploitation terrain avec suivi de campagnes, intrants et execution datee.",
+    operationsModel: "Exploitation terrain avec suivi de campagnes, types de champs, intrants et execution datee.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "USD"],
@@ -401,7 +401,9 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("campaignRef", "Reference campagne", true, "Campagne ou saison concernee."),
-        field("parcelRef", "Reference parcelle", true, "Parcelle ou zone d'exploitation.")
+        field("parcelRef", "Reference parcelle", true, "Parcelle ou zone d'exploitation."),
+        field("fieldType", "Type de champ", true, "Riz, maraichage, verger, coton ou autre type de champ."),
+        field("cropType", "Culture", false, "Culture principale ou association de cultures.")
       ],
       workflow: [
         workflow("CREATE", "Saisie terrain", "Les depenses et recettes sont saisies par campagne."),
@@ -423,7 +425,9 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("campaignRef", "Reference campagne", true, "Campagne ou saison concernee."),
-        field("parcelRef", "Reference parcelle", true, "Parcelle ou zone terrain concernee.")
+        field("parcelRef", "Reference parcelle", true, "Parcelle ou zone terrain concernee."),
+        field("fieldType", "Type de champ", true, "Riz, maraichage, verger, coton ou autre type de champ."),
+        field("cropType", "Culture", false, "Culture principale ou association de cultures.")
       ],
       workflow: [
         workflow("PLAN", "Plan de campagne", "Chaque intervention est planifiee avec date."),
@@ -432,8 +436,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ]
     },
     reporting: {
-      focusArea: "Execution de campagne et traçabilite terrain",
-      exportSections: ["flux campagne", "interventions terrain", "blocages parcelles"],
+      focusArea: "Execution de campagne, types de champs et tracabilite terrain",
+      exportSections: ["flux campagne", "types de champs", "interventions terrain", "blocages parcelles"],
       highlights: [
         {
           code: "agri-flows",
@@ -455,6 +459,390 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
           description: "Interventions bloquees qui menacent la campagne.",
           metric: "blockedTasksCount",
           thresholds: { warningAt: 1, criticalAt: 2 }
+        }
+      ]
+    }
+  }),
+  BTP: makeProfile("BTP", {
+    operationsModel: "Gestion de chantiers BTP avec suivi des devis, achats, main-d'oeuvre, avancement et reserves.",
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
+      allowedCurrencies: ["XOF", "EUR", "USD"],
+      requiresDescription: true,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte chantier", true, "Compte ou caisse du chantier."),
+        field("amount", "Montant", true, "Montant de l'encaissement ou de la charge."),
+        field("description", "Chantier ou lot", true, "Chantier, devis, fournisseur, lot technique ou client concerne.")
+      ],
+      metadataFields: [
+        field("projectRef", "Reference chantier", true, "Nom, code ou reference du chantier."),
+        field("workPackage", "Lot de travaux", true, "Gros oeuvre, second oeuvre, terrassement, finition ou autre lot."),
+        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier.")
+      ],
+      workflow: [
+        workflow("CREATE", "Saisie chantier", "Le flux est saisi avec reference chantier et lot de travaux."),
+        workflow("TRACE", "Suivi couts", "Les depenses et recettes restent reliees au chantier."),
+        workflow("OVERVIEW", "Suivi global", "Les flux alimentent le tableau de bord et les rapports BTP.")
+      ]
+    },
+    tasks: {
+      requiresDescription: true,
+      requiresDueDate: true,
+      requiresAssignee: true,
+      completionRequiresAssignee: true,
+      blockedRequiresAssignee: true,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Action chantier", true, "Exemple: coulage dalle, achat ciment ou controle qualite."),
+        field("description", "Details chantier", true, "Chantier, lot, fournisseur ou equipe concernee."),
+        field("assignedToId", "Responsable chantier", true, "Conducteur de travaux ou responsable terrain."),
+        field("dueDate", "Echeance", true, "Les actions chantier doivent etre planifiees.")
+      ],
+      metadataFields: [
+        field("projectRef", "Reference chantier", true, "Nom, code ou reference du chantier."),
+        field("workPackage", "Lot de travaux", true, "Gros oeuvre, second oeuvre, terrassement, finition ou autre lot."),
+        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier.")
+      ],
+      workflow: [
+        workflow("PLAN", "Planification chantier", "L'action est affectee, datee et rattachee a un lot."),
+        workflow("EXECUTE", "Execution terrain", "L'equipe execute et met a jour l'avancement."),
+        workflow("ESCALATE", "Alerte blocage", "Tout blocage chantier remonte pour arbitrage."),
+        workflow("CLOSE", "Reception interne", "Cloture apres verification de l'action.")
+      ]
+    },
+    reporting: {
+      focusArea: "Couts, avancement et blocages par chantier",
+      exportSections: ["flux chantier", "lots de travaux", "actions chantier", "blocages"],
+      highlights: [
+        {
+          code: "btp-flows",
+          label: "Flux chantier traces",
+          description: "Operations financieres reliees aux chantiers et lots.",
+          metric: "transactionsCount",
+          thresholds: { warningAt: 5 }
+        },
+        {
+          code: "btp-open-actions",
+          label: "Actions chantier ouvertes",
+          description: "Taches de chantier encore a traiter.",
+          metric: "openTasksCount",
+          thresholds: { warningAt: 5, criticalAt: 10 }
+        },
+        {
+          code: "btp-blockers",
+          label: "Blocages chantier",
+          description: "Points bloquants qui freinent l'avancement.",
+          metric: "blockedTasksCount",
+          thresholds: { warningAt: 1, criticalAt: 3 }
+        }
+      ]
+    }
+  }),
+  FISH_FARMING: makeProfile("FISH_FARMING", {
+    operationsModel: "Pisciculture avec suivi des bassins, cycles d'elevage, aliments, ventes et alertes sanitaires.",
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
+      allowedCurrencies: ["XOF", "USD"],
+      requiresDescription: true,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte piscicole", true, "Compte ou caisse de l'activite piscicole."),
+        field("amount", "Montant", true, "Montant de vente, achat aliment, alevins ou charge."),
+        field("description", "Bassin ou cycle", true, "Bassin, cycle, lot d'alevins, aliment ou vente concernee.")
+      ],
+      metadataFields: [
+        field("pondRef", "Reference bassin", true, "Bassin, etang ou unite de production."),
+        field("cycleRef", "Reference cycle", true, "Cycle d'elevage ou lot suivi."),
+        field("species", "Espece", false, "Tilapia, silure, carpe ou autre espece.")
+      ],
+      workflow: [
+        workflow("CREATE", "Saisie bassin", "Les flux sont rattaches au bassin et au cycle."),
+        workflow("TRACE", "Suivi cycle", "Les achats, charges et ventes gardent le contexte de production."),
+        workflow("OVERVIEW", "Suivi global", "Le rapport consolide les flux piscicoles.")
+      ]
+    },
+    tasks: {
+      requiresDescription: true,
+      requiresDueDate: true,
+      requiresAssignee: true,
+      completionRequiresAssignee: true,
+      blockedRequiresAssignee: true,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Action piscicole", true, "Exemple: nourrissage, controle eau, tri ou recolte."),
+        field("description", "Bassin ou cycle", true, "Bassin, cycle, lot ou intervention sanitaire."),
+        field("assignedToId", "Responsable bassin", true, "Agent ou responsable du bassin."),
+        field("dueDate", "Date d'intervention", true, "Les actions piscicoles doivent etre datees.")
+      ],
+      metadataFields: [
+        field("pondRef", "Reference bassin", true, "Bassin, etang ou unite de production."),
+        field("cycleRef", "Reference cycle", true, "Cycle d'elevage ou lot suivi."),
+        field("species", "Espece", false, "Tilapia, silure, carpe ou autre espece.")
+      ],
+      workflow: [
+        workflow("PLAN", "Plan d'elevage", "L'action est planifiee par bassin et cycle."),
+        workflow("EXECUTE", "Intervention bassin", "Nourrissage, controle, tri ou traitement."),
+        workflow("ESCALATE", "Alerte sanitaire", "Blocage ou anomalie sanitaire remonte rapidement."),
+        workflow("CLOSE", "Retour production", "Cloture apres controle du bassin.")
+      ]
+    },
+    reporting: {
+      focusArea: "Cycles piscicoles, bassins et alertes de production",
+      exportSections: ["flux bassin", "cycles d'elevage", "interventions", "alertes sanitaires"],
+      highlights: [
+        {
+          code: "fish-flows",
+          label: "Flux piscicoles traces",
+          description: "Flux relies aux bassins, cycles ou ventes.",
+          metric: "transactionsCount",
+          thresholds: { warningAt: 5 }
+        },
+        {
+          code: "fish-open-actions",
+          label: "Actions bassin ouvertes",
+          description: "Interventions piscicoles encore ouvertes.",
+          metric: "openTasksCount",
+          thresholds: { warningAt: 4, criticalAt: 8 }
+        },
+        {
+          code: "fish-blockers",
+          label: "Alertes piscicoles",
+          description: "Blocages ou anomalies de production.",
+          metric: "blockedTasksCount",
+          thresholds: { warningAt: 1, criticalAt: 2 }
+        }
+      ]
+    }
+  }),
+  TRANSPORT: makeProfile("TRANSPORT", {
+    operationsModel: "Transport avec location et gestion de camions bennes, tracteurs, citernes, rotations et charges vehicules.",
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
+      allowedCurrencies: ["XOF", "EUR", "USD"],
+      requiresDescription: true,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte transport", true, "Compte ou caisse transport."),
+        field("amount", "Montant", true, "Recette de location, carburant, maintenance ou charge."),
+        field("description", "Vehicule ou mission", true, "Mission, client, vehicule ou charge concernee.")
+      ],
+      metadataFields: [
+        field("transportService", "Sous-section transport", true, "Location, gestion camion benne, tracteur ou citerne."),
+        field("assetType", "Type d'engin", true, "Camion benne, tracteur, citerne ou autre engin."),
+        field("vehicleRef", "Reference vehicule", false, "Immatriculation ou code interne."),
+        field("routeRef", "Trajet ou mission", false, "Trajet, client ou ordre de mission.")
+      ],
+      workflow: [
+        workflow("CREATE", "Saisie mission", "Le flux est rattache au service, engin et vehicule si connu."),
+        workflow("TRACE", "Suivi vehicule", "Les recettes et charges restent exploitables par engin."),
+        workflow("OVERVIEW", "Suivi global", "Les flux alimentent les rapports transport.")
+      ]
+    },
+    tasks: {
+      requiresDescription: true,
+      requiresDueDate: true,
+      requiresAssignee: true,
+      completionRequiresAssignee: true,
+      blockedRequiresAssignee: true,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Action transport", true, "Exemple: location, entretien, rotation ou controle citerne."),
+        field("description", "Vehicule ou mission", true, "Mission, client, vehicule ou probleme a traiter."),
+        field("assignedToId", "Responsable transport", true, "Chauffeur, gestionnaire ou responsable parc."),
+        field("dueDate", "Echeance", true, "Les missions et entretiens doivent etre dates.")
+      ],
+      metadataFields: [
+        field("transportService", "Sous-section transport", true, "Location, gestion camion benne, tracteur ou citerne."),
+        field("assetType", "Type d'engin", true, "Camion benne, tracteur, citerne ou autre engin."),
+        field("vehicleRef", "Reference vehicule", false, "Immatriculation ou code interne."),
+        field("routeRef", "Trajet ou mission", false, "Trajet, client ou ordre de mission.")
+      ],
+      workflow: [
+        workflow("PLAN", "Planification mission", "La mission ou action parc est affectee et datee."),
+        workflow("EXECUTE", "Execution transport", "Le responsable suit la rotation, location ou maintenance."),
+        workflow("ESCALATE", "Blocage parc", "Tout blocage vehicule remonte pour arbitrage."),
+        workflow("CLOSE", "Cloture mission", "Cloture apres retour ou verification.")
+      ]
+    },
+    reporting: {
+      focusArea: "Rentabilite et disponibilite du parc transport",
+      exportSections: ["locations", "camions bennes", "tracteurs", "citernes", "maintenance", "blocages"],
+      highlights: [
+        {
+          code: "transport-flows",
+          label: "Flux transport traces",
+          description: "Flux financiers lies aux missions, locations ou vehicules.",
+          metric: "transactionsCount",
+          thresholds: { warningAt: 5 }
+        },
+        {
+          code: "transport-open-actions",
+          label: "Actions parc ouvertes",
+          description: "Locations, rotations ou maintenances encore ouvertes.",
+          metric: "openTasksCount",
+          thresholds: { warningAt: 5, criticalAt: 10 }
+        },
+        {
+          code: "transport-blockers",
+          label: "Blocages vehicules",
+          description: "Vehicules ou missions bloques.",
+          metric: "blockedTasksCount",
+          thresholds: { warningAt: 1, criticalAt: 3 }
+        }
+      ]
+    }
+  }),
+  MONEY_TRANSFER: makeProfile("MONEY_TRANSFER", {
+    operationsModel: "Gestion des transactions Orange Money, Moov Money, Wave, Western Union, MoneyGram et Ria avec suivi caisse et rapprochement.",
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
+      allowedCurrencies: ["XOF"],
+      requiresDescription: true,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte transaction", true, "Caisse ou compte du point transaction."),
+        field("amount", "Montant", true, "Montant de depot, retrait, commission ou charge."),
+        field("description", "Operation client", true, "Client, reference, reseau ou motif de l'operation.")
+      ],
+      metadataFields: [
+        field("provider", "Reseau de transaction", true, "Orange Money, Moov Money, Wave, Western Union, MoneyGram ou Ria."),
+        field("operationKind", "Type d'operation", true, "Depot, retrait, transfert, commission, approvisionnement ou charge."),
+        field("agentPointRef", "Point ou caisse", false, "Guichet, agent, caisse ou telephone de service."),
+        field("externalRef", "Reference externe", false, "Reference operateur ou bordereau client.")
+      ],
+      workflow: [
+        workflow("CREATE", "Saisie guichet", "Le flux est saisi avec reseau et type d'operation."),
+        workflow("RECONCILE", "Rapprochement caisse", "Les ecarts peuvent etre suivis par reseau et guichet."),
+        workflow("OVERVIEW", "Suivi global", "Les transactions alimentent les rapports financiers.")
+      ]
+    },
+    tasks: {
+      requiresDescription: true,
+      requiresDueDate: true,
+      requiresAssignee: true,
+      completionRequiresAssignee: true,
+      blockedRequiresAssignee: true,
+      blockedAlertSeverity: "CRITICAL",
+      fields: [
+        field("title", "Action transaction", true, "Exemple: rapprochement Orange Money ou controle Wave."),
+        field("description", "Reseau ou caisse", true, "Reseau, guichet, ecart caisse ou reference a traiter."),
+        field("assignedToId", "Responsable guichet", true, "Agent, comptable ou superviseur responsable."),
+        field("dueDate", "Echeance", true, "Les rapprochements et ecarts doivent etre dates.")
+      ],
+      metadataFields: [
+        field("provider", "Reseau de transaction", true, "Orange Money, Moov Money, Wave, Western Union, MoneyGram ou Ria."),
+        field("operationKind", "Type d'operation", true, "Depot, retrait, transfert, commission, approvisionnement ou charge."),
+        field("agentPointRef", "Point ou caisse", false, "Guichet, agent, caisse ou telephone de service."),
+        field("externalRef", "Reference externe", false, "Reference operateur ou bordereau client.")
+      ],
+      workflow: [
+        workflow("PLAN", "Planification controle", "Le controle ou rapprochement est affecte."),
+        workflow("EXECUTE", "Traitement guichet", "L'agent traite l'operation ou l'ecart."),
+        workflow("ESCALATE", "Alerte ecart", "Un ecart bloque remonte en criticite elevee."),
+        workflow("CLOSE", "Validation caisse", "Cloture apres verification ou rapprochement.")
+      ]
+    },
+    reporting: {
+      focusArea: "Volumes par reseau, ecarts caisse et rapprochements",
+      exportSections: ["Orange Money", "Moov Money", "Wave", "Western Union", "MoneyGram", "Ria", "ecarts"],
+      highlights: [
+        {
+          code: "money-transfer-flows",
+          label: "Flux transaction traces",
+          description: "Operations financieres par reseau transactionnel.",
+          metric: "transactionsCount",
+          thresholds: { warningAt: 10 }
+        },
+        {
+          code: "money-transfer-followup",
+          label: "Rapprochements ouverts",
+          description: "Controles, ecarts ou traitements encore ouverts.",
+          metric: "openTasksCount",
+          thresholds: { warningAt: 4, criticalAt: 8 }
+        },
+        {
+          code: "money-transfer-blockers",
+          label: "Ecarts critiques",
+          description: "Blocages de caisse ou reseau a arbitrer rapidement.",
+          metric: "blockedTasksCount",
+          thresholds: { warningAt: 1, criticalAt: 2 }
+        }
+      ]
+    }
+  }),
+  HOTEL_LODGING: makeProfile("HOTEL_LODGING", {
+    operationsModel: "Hotellerie et auberge avec suivi des reservations, chambres, encaissements, charges et maintenance.",
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
+      allowedCurrencies: ["XOF", "EUR", "USD"],
+      requiresDescription: true,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte hotel", true, "Caisse, banque ou compte de l'etablissement."),
+        field("amount", "Montant", true, "Nuitee, acompte, restauration, achat ou charge."),
+        field("description", "Reservation ou service", true, "Client, chambre, reservation ou charge concernee.")
+      ],
+      metadataFields: [
+        field("bookingRef", "Reference reservation", true, "Reservation, client ou facture."),
+        field("roomRef", "Chambre ou unite", false, "Numero de chambre, dortoir ou unite louee."),
+        field("serviceLine", "Service", true, "Hebergement, restauration, entretien, evenement ou charge.")
+      ],
+      workflow: [
+        workflow("CREATE", "Saisie reception", "Le flux est rattache a la reservation ou au service."),
+        workflow("TRACE", "Suivi sejour", "Les encaissements et charges gardent le contexte client."),
+        workflow("OVERVIEW", "Suivi global", "Le rapport consolide exploitation, recettes et charges.")
+      ]
+    },
+    tasks: {
+      requiresDescription: true,
+      requiresDueDate: true,
+      requiresAssignee: false,
+      completionRequiresAssignee: true,
+      blockedRequiresAssignee: true,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Action hotel", true, "Exemple: preparation chambre, maintenance ou check-in."),
+        field("description", "Chambre ou reservation", true, "Client, chambre, reservation ou intervention."),
+        field("assignedToId", "Responsable", false, "Reception, menage, maintenance ou superviseur."),
+        field("dueDate", "Echeance", true, "Les actions hotelieres doivent etre datees.")
+      ],
+      metadataFields: [
+        field("bookingRef", "Reference reservation", true, "Reservation, client ou facture."),
+        field("roomRef", "Chambre ou unite", false, "Numero de chambre, dortoir ou unite louee."),
+        field("serviceLine", "Service", true, "Hebergement, restauration, entretien, evenement ou charge.")
+      ],
+      workflow: [
+        workflow("PLAN", "Planification sejour", "L'action est rattachee a une reservation ou chambre."),
+        workflow("EXECUTE", "Execution service", "Reception, menage, maintenance ou service client."),
+        workflow("ESCALATE", "Alerte exploitation", "Blocage chambre ou service remonte au management."),
+        workflow("CLOSE", "Cloture sejour", "Cloture apres verification du service rendu.")
+      ]
+    },
+    reporting: {
+      focusArea: "Occupation, recettes, charges et qualite de service",
+      exportSections: ["reservations", "chambres", "hebergement", "restauration", "maintenance", "blocages"],
+      highlights: [
+        {
+          code: "hotel-flows",
+          label: "Flux hotel traces",
+          description: "Encaissements et charges rattaches aux reservations ou services.",
+          metric: "transactionsCount",
+          thresholds: { warningAt: 5 }
+        },
+        {
+          code: "hotel-open-actions",
+          label: "Actions exploitation ouvertes",
+          description: "Reservations, chambres ou interventions encore ouvertes.",
+          metric: "openTasksCount",
+          thresholds: { warningAt: 5, criticalAt: 10 }
+        },
+        {
+          code: "hotel-blockers",
+          label: "Blocages hotel",
+          description: "Blocages de chambre, reservation ou service.",
+          metric: "blockedTasksCount",
+          thresholds: { warningAt: 1, criticalAt: 3 }
         }
       ]
     }
@@ -760,6 +1148,21 @@ function toMetricSeverity(
   return "INFO";
 }
 
+function assertRequiredMetadataFields(
+  profileLabel: string,
+  scopeLabel: string,
+  fields: ActivityFieldDefinition[] | undefined,
+  metadata: ActivityMetadataMap | undefined
+): void {
+  for (const field of fields ?? []) {
+    if (field.required && !metadata?.[field.key]?.trim()) {
+      throw new Error(
+        `Le secteur ${profileLabel} exige le champ ${field.label.toLowerCase()} pour chaque ${scopeLabel}.`
+      );
+    }
+  }
+}
+
 export function getBusinessActivityProfile(
   activityCode: BusinessActivityCode
 ): BusinessActivityProfile {
@@ -791,6 +1194,17 @@ export function assertTransactionInputMatchesActivityProfile(
       `Le secteur ${profile.label} n'autorise pas la devise ${currency}.`
     );
   }
+  if (profile.finance.requiresDescription && !input.description?.trim()) {
+    throw new Error(
+      `Le secteur ${profile.label} exige une description metier pour chaque transaction.`
+    );
+  }
+  assertRequiredMetadataFields(
+    profile.label,
+    "transaction",
+    profile.finance.metadataFields,
+    input.metadata
+  );
 }
 
 export function assertTaskInputMatchesActivityProfile(
@@ -813,6 +1227,17 @@ export function assertTaskInputMatchesActivityProfile(
       `Le secteur ${profile.label} exige qu'une tache soit assignee des sa creation.`
     );
   }
+  if (profile.tasks.requiresDueDate && !input.dueDate?.trim()) {
+    throw new Error(
+      `Le secteur ${profile.label} exige une echeance pour chaque tache.`
+    );
+  }
+  assertRequiredMetadataFields(
+    profile.label,
+    "tache",
+    profile.tasks.metadataFields,
+    input.metadata
+  );
 }
 
 export function assertTaskStatusMatchesActivityProfile(

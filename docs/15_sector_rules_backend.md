@@ -24,6 +24,7 @@ Chaque profil definit:
 - `finance`: types de flux autorises, devises, description obligatoire ou non, preuve obligatoire, workflow, champs attendus
 - `tasks`: description/echeance/assignation obligatoires ou non, severite d'escalade en cas de blocage, workflow, champs attendus
 - `reporting`: focus de lecture, sections d'export et indicateurs dedies
+- `metadataFields`: champs de sous-section stockes dans `metadata_json` pour qualifier les flux et taches sans ajouter de tables dediees
 
 ## Exemples de regles executees
 
@@ -31,6 +32,12 @@ Chaque profil definit:
 - `WATER`: devise finance `XOF` uniquement, taches obligatoirement assignees et datees, blocages escalades en `CRITICAL`
 - `RENTAL`: description obligatoire, echeance obligatoire pour les taches, cloture interdite sur une tache non assignee
 - `REAL_ESTATE_AGENCY`: transaction rattachee a un mandat/bien via la description, tache obligatoirement assignee et datee
+- `BTP`: transaction et tache rattachees a un chantier et un lot de travaux
+- `FISH_FARMING`: suivi par bassin et cycle piscicole
+- `TRANSPORT`: sous-section location/gestion et type d'engin camion benne, tracteur ou citerne
+- `MONEY_TRANSFER`: suivi par reseau Orange Money, Moov Money, Wave, Western Union, MoneyGram ou Ria, avec blocages critiques
+- `HOTEL_LODGING`: suivi par reservation, chambre ou service hotelier
+- `AGRICULTURE`: suivi des campagnes par parcelle, type de champ et culture
 
 ## API exposee
 
