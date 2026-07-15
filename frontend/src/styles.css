@@ -977,9 +977,9 @@ a {
 .reports-filter-form {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, max-content));
+  grid-template-columns: repeat(auto-fit, minmax(180px, max-content));
   gap: 10px;
-  align-items: center;
+  align-items: end;
 }
 
 .reports-filter-field {
@@ -1081,7 +1081,13 @@ a {
 }
 
 .reports-export-card strong {
-  color: #102a43;
+  color: var(--theme-text, #102a43);
+}
+
+.reports-export-card-title {
+  color: var(--theme-text, #102a43);
+  font-size: 16px;
+  line-height: 1.25;
 }
 
 .reports-export-card .hint {

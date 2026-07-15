@@ -6,6 +6,7 @@ export const BUSINESS_ACTIVITY_CODES = [
   "AGRICULTURE",
   "BTP",
   "FISH_FARMING",
+  "LIVESTOCK",
   "TRANSPORT",
   "MONEY_TRANSFER",
   "HOTEL_LODGING",
@@ -58,6 +59,11 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     code: "FISH_FARMING",
     label: "Pisciculture",
     description: "Bassins, cycles d'elevage, alimentation, ventes et suivi sanitaire."
+  },
+  {
+    code: "LIVESTOCK",
+    label: "Elevage",
+    description: "Boeufs, moutons, poulets et autres especes avec suivi des lots, alimentation, soins et ventes."
   },
   {
     code: "TRANSPORT",

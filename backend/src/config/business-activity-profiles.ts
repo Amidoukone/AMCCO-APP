@@ -36,6 +36,12 @@ export type ActivityReportHighlight = {
   emphasis: AlertSeverity;
 };
 
+export type ActivityOperationalDimension = {
+  key: string;
+  label: string;
+  description: string;
+};
+
 type ActivityReportHighlightDefinition = {
   code: string;
   label: string;
@@ -82,6 +88,7 @@ export type BusinessActivityProfile = {
   reporting: {
     focusArea: string;
     exportSections: string[];
+    operationalDimensions?: ActivityOperationalDimension[];
     highlights: ActivityReportHighlightDefinition[];
   };
 };
@@ -103,6 +110,14 @@ function workflow(
   return { code, label, description };
 }
 
+function dimension(
+  key: string,
+  label: string,
+  description: string
+): ActivityOperationalDimension {
+  return { key, label, description };
+}
+
 function makeProfile(
   activityCode: BusinessActivityCode,
   input: Omit<BusinessActivityProfile, "activityCode" | "label">
@@ -116,7 +131,7 @@ function makeProfile(
 
 const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityProfile> = {
   HARDWARE: makeProfile("HARDWARE", {
-    operationsModel: "Pilotage de points de vente, achats fournisseurs et approvisionnement terrain.",
+    operationsModel: "Pilotage de points de vente, achats fournisseurs, ventes articlees et approvisionnement terrain.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -126,6 +141,16 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("accountId", "Compte de caisse", true, "Caisse ou compte de vente utilise."),
         field("amount", "Montant", true, "Montant encaisse ou depense."),
         field("description", "Objet", false, "Reference achat, depot fournisseur ou vente speciale.")
+      ],
+      metadataFields: [
+        field("hardwareOperationKind", "Nature quincaillerie", false, "GLOBAL, ITEM_ENTRY ou ITEM_EXIT selon la nature de l'operation."),
+        field("productFamily", "Famille produit", false, "Ciment, fer, outillage, plomberie ou autre famille."),
+        field("itemName", "Designation", false, "Article vendu ou achete: ciment, fer, outillage ou reference precise."),
+        field("quantity", "Quantite", false, "Nombre d'articles, sacs, barres, lots ou unites."),
+        field("purchaseUnitPrice", "Prix d'achat unitaire", false, "Cout d'achat unitaire en XOF pour calculer le benefice."),
+        field("saleUnitPrice", "Prix de vente unitaire", false, "Prix de vente unitaire en XOF pour calculer la vente du jour."),
+        field("dailyPayment", "Versement du jour", false, "Montant effectivement verse ou depose pour cette vente."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur ou source d'approvisionnement.")
       ],
       workflow: [
         workflow("CREATE", "Saisie terrain", "Le point de vente saisit le flux financier."),
@@ -145,6 +170,12 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Details", false, "Reference rayon, fournisseur ou emplacement."),
         field("dueDate", "Echeance", false, "Date utile pour les inventaires ou receptions.")
       ],
+      metadataFields: [
+        field("productFamily", "Famille produit", false, "Ciment, fer, outillage, plomberie ou autre famille."),
+        field("itemName", "Designation", false, "Article, rayon ou reference concernee."),
+        field("quantity", "Quantite", false, "Quantite a controler, receptionner ou ajuster."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur ou source d'approvisionnement.")
+      ],
       workflow: [
         workflow("PLAN", "Planification", "Le superviseur planifie les actions magasin."),
         workflow("EXECUTE", "Execution", "L'equipe execute inventaire, mise en rayon ou reception."),
@@ -152,8 +183,13 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ]
     },
     reporting: {
-      focusArea: "Rotation commerciale et execution magasin",
-      exportSections: ["transactions", "taches", "inventaire commercial"],
+      focusArea: "Rotation commerciale, marge article et execution magasin",
+      exportSections: ["transactions", "taches", "inventaire commercial", "rapport mensuel ventes"],
+      operationalDimensions: [
+        dimension("productFamily", "Famille produit", "Mesure la rentabilite et l'execution par famille de produits."),
+        dimension("itemName", "Designation", "Suit les ventes, couts et benefices par article ou designation."),
+        dimension("supplierRef", "Fournisseur", "Suit les flux et blocages par fournisseur.")
+      ],
       highlights: [
         {
           code: "sales-volume",
@@ -191,6 +227,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("amount", "Montant", true, "Montant de l'operation."),
         field("description", "Contexte", false, "Rayon, famille produit ou fournisseur.")
       ],
+      metadataFields: [
+        field("department", "Rayon", false, "Rayon ou departement commercial."),
+        field("productFamily", "Famille produit", false, "Famille de produits ou categorie vendue.")
+      ],
       workflow: [
         workflow("CREATE", "Saisie", "Le personnel saisit les encaissements ou depenses."),
         workflow("PROOF_OPTIONAL", "Preuve", "Le justificatif peut etre rattache sans bloquer le flux."),
@@ -209,6 +249,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Perimetre", false, "Rayon, fournisseur ou operation concernee."),
         field("assignedToId", "Responsable", false, "Responsable de rayon ou employe.")
       ],
+      metadataFields: [
+        field("department", "Rayon", false, "Rayon ou departement commercial."),
+        field("productFamily", "Famille produit", false, "Famille de produits ou categorie vendue.")
+      ],
       workflow: [
         workflow("PLAN", "Planification", "Le superviseur affecte les actions du magasin."),
         workflow("TRACK", "Suivi", "L'avancement est mis a jour au fil de la journee."),
@@ -218,6 +262,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Performance multi-rayons",
       exportSections: ["transactions", "taches", "suivi rayon"],
+      operationalDimensions: [
+        dimension("department", "Rayon", "Compare rentabilite, suivi et execution par rayon."),
+        dimension("productFamily", "Famille produit", "Analyse les volumes et blocages par famille de produits.")
+      ],
       highlights: [
         {
           code: "store-volume",
@@ -290,6 +338,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Traçabilite des flux alimentaires",
       exportSections: ["transactions", "taches", "suivi lots"],
+      operationalDimensions: [
+        dimension("productFamily", "Famille produit", "Mesure marge, rotations et controles par famille alimentaire."),
+        dimension("batchRef", "Lot ou reference", "Suit les anomalies et flux par lot ou reference.")
+      ],
       highlights: [
         {
           code: "food-volume",
@@ -362,6 +414,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Suivi du portefeuille locatif",
       exportSections: ["encaissements", "interventions", "relances"],
+      operationalDimensions: [
+        dimension("propertyRef", "Bien", "Mesure rentabilite et suivi par bien ou lot."),
+        dimension("tenantRef", "Locataire", "Suit les flux, relances et interventions par dossier locataire.")
+      ],
       highlights: [
         {
           code: "rental-cashflow",
@@ -400,10 +456,20 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Parcelle ou intrant", true, "Parcelle, campagne, culture ou intrant concerne.")
       ],
       metadataFields: [
+        field("agricultureOperationKind", "Operation agricole", false, "INPUT_PURCHASE, FIELD_EXPENSE, HARVEST_SALE ou SUPPORT_INCOME selon l'operation."),
         field("campaignRef", "Reference campagne", true, "Campagne ou saison concernee."),
         field("parcelRef", "Reference parcelle", true, "Parcelle ou zone d'exploitation."),
         field("fieldType", "Type de champ", true, "Riz, maraichage, verger, coton ou autre type de champ."),
-        field("cropType", "Culture", false, "Culture principale ou association de cultures.")
+        field("cropType", "Culture", false, "Culture principale ou association de cultures."),
+        field("surfaceArea", "Surface exploitee", false, "Surface de la parcelle ou zone concernee, en hectare si disponible."),
+        field("inputName", "Intrant ou materiel", false, "Semence, engrais, pesticide, carburant, location ou materiel concerne."),
+        field("workType", "Travaux agricoles", false, "Labour, semis, entretien, traitement, recolte, transport ou stockage."),
+        field("quantity", "Quantite", false, "Quantite d'intrant, de recolte ou d'unites concernees."),
+        field("unit", "Unite", false, "kg, tonne, sac, litre, hectare ou unite terrain."),
+        field("unitPrice", "Prix unitaire", false, "Prix unitaire utilise pour calculer le montant quand il est renseigne."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur d'intrants, prestataire ou source d'approvisionnement."),
+        field("buyerRef", "Acheteur", false, "Acheteur ou client de la recolte."),
+        field("sourceRef", "Source d'appui", false, "Partenaire, subvention, avance ou source de financement.")
       ],
       workflow: [
         workflow("CREATE", "Saisie terrain", "Les depenses et recettes sont saisies par campagne."),
@@ -424,10 +490,16 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Date terrain", true, "Les operations agricoles doivent etre planifiees.")
       ],
       metadataFields: [
+        field("agricultureTaskKind", "Type d'intervention", false, "PREPARATION, SOWING, MAINTENANCE, TREATMENT, HARVEST, STORAGE ou FOLLOW_UP."),
         field("campaignRef", "Reference campagne", true, "Campagne ou saison concernee."),
         field("parcelRef", "Reference parcelle", true, "Parcelle ou zone terrain concernee."),
         field("fieldType", "Type de champ", true, "Riz, maraichage, verger, coton ou autre type de champ."),
-        field("cropType", "Culture", false, "Culture principale ou association de cultures.")
+        field("cropType", "Culture", false, "Culture principale ou association de cultures."),
+        field("surfaceArea", "Surface concernee", false, "Surface d'intervention en hectare si disponible."),
+        field("inputName", "Intrant ou materiel", false, "Intrant, equipement ou materiel utile pour l'intervention."),
+        field("workType", "Travaux agricoles", false, "Travail terrain ou action d'execution attendue."),
+        field("quantity", "Quantite prevue", false, "Quantite a appliquer, recolter, transporter ou controler."),
+        field("unit", "Unite", false, "kg, tonne, sac, litre, hectare ou unite terrain.")
       ],
       workflow: [
         workflow("PLAN", "Plan de campagne", "Chaque intervention est planifiee avec date."),
@@ -438,6 +510,11 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Execution de campagne, types de champs et tracabilite terrain",
       exportSections: ["flux campagne", "types de champs", "interventions terrain", "blocages parcelles"],
+      operationalDimensions: [
+        dimension("fieldType", "Type de champ", "Compare rentabilite et execution par type de champ."),
+        dimension("cropType", "Culture", "Suit les flux et interventions par culture."),
+        dimension("parcelRef", "Parcelle", "Mesure le suivi et les blocages par parcelle.")
+      ],
       highlights: [
         {
           code: "agri-flows",
@@ -514,6 +591,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Couts, avancement et blocages par chantier",
       exportSections: ["flux chantier", "lots de travaux", "actions chantier", "blocages"],
+      operationalDimensions: [
+        dimension("projectRef", "Chantier", "Mesure rentabilite, avancement et alertes par chantier."),
+        dimension("workPackage", "Lot de travaux", "Compare les couts et l'execution par lot de travaux.")
+      ],
       highlights: [
         {
           code: "btp-flows",
@@ -552,9 +633,20 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Bassin ou cycle", true, "Bassin, cycle, lot d'alevins, aliment ou vente concernee.")
       ],
       metadataFields: [
+        field("fishOperationKind", "Operation piscicole", false, "FINGERLING_PURCHASE, FEED_PURCHASE, POND_EXPENSE, FISH_SALE ou SUPPORT_INCOME selon l'operation."),
         field("pondRef", "Reference bassin", true, "Bassin, etang ou unite de production."),
         field("cycleRef", "Reference cycle", true, "Cycle d'elevage ou lot suivi."),
-        field("species", "Espece", false, "Tilapia, silure, carpe ou autre espece.")
+        field("species", "Espece", false, "Tilapia, silure, carpe ou autre espece."),
+        field("fingerlingBatchRef", "Lot d'alevins", false, "Lot, origine ou reference d'alevins."),
+        field("feedName", "Aliment ou intrant", false, "Aliment, traitement, oxygene ou intrant piscicole."),
+        field("quantity", "Quantite", false, "Nombre d'alevins, kg d'aliment ou kg de poisson vendu."),
+        field("unit", "Unite", false, "piece, kg, sac, tonne ou unite de suivi."),
+        field("unitPrice", "Prix unitaire", false, "Prix unitaire utilise pour calculer le montant quand il est renseigne."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur d'alevins, aliment ou materiel."),
+        field("buyerRef", "Acheteur", false, "Acheteur ou client de la vente."),
+        field("sourceRef", "Source d'appui", false, "Partenaire, subvention, avance ou financement."),
+        field("mortalityCount", "Mortalite", false, "Nombre de poissons morts signales si applicable."),
+        field("waterQuality", "Qualite eau", false, "pH, temperature, oxygene ou observation d'eau.")
       ],
       workflow: [
         workflow("CREATE", "Saisie bassin", "Les flux sont rattaches au bassin et au cycle."),
@@ -576,9 +668,16 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Date d'intervention", true, "Les actions piscicoles doivent etre datees.")
       ],
       metadataFields: [
+        field("fishTaskKind", "Type d'intervention", false, "FEEDING, WATER_CONTROL, TREATMENT, SORTING, HARVEST, STOCKING ou FOLLOW_UP."),
         field("pondRef", "Reference bassin", true, "Bassin, etang ou unite de production."),
         field("cycleRef", "Reference cycle", true, "Cycle d'elevage ou lot suivi."),
-        field("species", "Espece", false, "Tilapia, silure, carpe ou autre espece.")
+        field("species", "Espece", false, "Tilapia, silure, carpe ou autre espece."),
+        field("feedName", "Aliment ou intrant", false, "Aliment, traitement ou intrant utilise."),
+        field("quantity", "Quantite prevue", false, "Quantite a distribuer, controler, trier ou recolter."),
+        field("unit", "Unite", false, "kg, sac, piece, bassin ou unite de suivi."),
+        field("mortalityCount", "Mortalite observee", false, "Nombre de poissons morts constates pendant l'intervention."),
+        field("averageWeight", "Poids moyen", false, "Poids moyen observe si disponible."),
+        field("waterQuality", "Qualite eau", false, "pH, temperature, oxygene ou observation d'eau.")
       ],
       workflow: [
         workflow("PLAN", "Plan d'elevage", "L'action est planifiee par bassin et cycle."),
@@ -589,7 +688,12 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     },
     reporting: {
       focusArea: "Cycles piscicoles, bassins et alertes de production",
-      exportSections: ["flux bassin", "cycles d'elevage", "interventions", "alertes sanitaires"],
+      exportSections: ["flux bassin", "cycles d'elevage", "stocks alevins", "aliments", "ventes", "interventions", "alertes sanitaires"],
+      operationalDimensions: [
+        dimension("pondRef", "Bassin", "Mesure rentabilite et suivi sanitaire par bassin."),
+        dimension("cycleRef", "Cycle d'elevage", "Suit les charges, ventes et interventions par cycle."),
+        dimension("species", "Espece", "Compare les performances par espece.")
+      ],
       highlights: [
         {
           code: "fish-flows",
@@ -609,6 +713,114 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
           code: "fish-blockers",
           label: "Alertes piscicoles",
           description: "Blocages ou anomalies de production.",
+          metric: "blockedTasksCount",
+          thresholds: { warningAt: 1, criticalAt: 2 }
+        }
+      ]
+    }
+  }),
+  LIVESTOCK: makeProfile("LIVESTOCK", {
+    operationsModel: "Elevage avec suivi des troupeaux, lots, especes, alimentation, soins, mortalite, achats et ventes.",
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
+      allowedCurrencies: ["XOF", "USD"],
+      requiresDescription: true,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte elevage", true, "Compte ou caisse de l'activite d'elevage."),
+        field("amount", "Montant", true, "Montant d'achat animal, aliment, soin, charge ou vente."),
+        field("description", "Troupeau ou lot", true, "Troupeau, lot, espece, aliment, soin ou vente concernee.")
+      ],
+      metadataFields: [
+        field("livestockOperationKind", "Operation elevage", false, "ANIMAL_PURCHASE, FEED_PURCHASE, VET_CARE, FARM_EXPENSE, ANIMAL_SALE, PRODUCT_SALE ou SUPPORT_INCOME selon l'operation."),
+        field("herdRef", "Reference troupeau", true, "Troupeau, bande, poulailler, enclos ou unite d'elevage."),
+        field("batchRef", "Reference lot", true, "Lot, bande, cycle ou groupe d'animaux suivi."),
+        field("species", "Espece", true, "Boeuf, mouton, poulet, chevre ou autre espece."),
+        field("animalCategory", "Categorie", false, "Bovin, ovin, caprin, volaille ou autre categorie."),
+        field("animalCount", "Nombre d'animaux", false, "Nombre d'animaux achetes, vendus, suivis ou impactes."),
+        field("feedName", "Aliment ou intrant", false, "Aliment, complement, litiere, produit sanitaire ou intrant."),
+        field("feedQuantity", "Quantite aliment", false, "Quantite d'aliment ou d'intrant en kg, sac ou unite suivie."),
+        field("productName", "Produit d'elevage", false, "Oeufs, lait, fumier ou autre produit issu de l'elevage."),
+        field("productQuantity", "Quantite produit", false, "Quantite de produit d'elevage vendue ou suivie."),
+        field("unit", "Unite", false, "piece, tete, kg, sac, carton ou unite de suivi."),
+        field("unitPrice", "Prix unitaire", false, "Prix unitaire utilise pour calculer le montant quand il est renseigne."),
+        field("treatmentName", "Soin ou vaccin", false, "Vaccin, traitement, medicament ou intervention veterinaire."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur d'animaux, aliment, medicament ou materiel."),
+        field("buyerRef", "Acheteur", false, "Acheteur ou client de la vente."),
+        field("sourceRef", "Source d'appui", false, "Partenaire, subvention, avance ou financement."),
+        field("mortalityCount", "Mortalite", false, "Nombre d'animaux morts signales si applicable."),
+        field("healthStatus", "Etat sanitaire", false, "Observation sanitaire, symptome ou statut du lot.")
+      ],
+      workflow: [
+        workflow("CREATE", "Saisie elevage", "Les flux sont rattaches au troupeau, lot et espece."),
+        workflow("TRACE", "Suivi lot", "Les achats, charges, soins et ventes gardent le contexte de production."),
+        workflow("OVERVIEW", "Suivi global", "Le rapport consolide les flux d'elevage.")
+      ]
+    },
+    tasks: {
+      requiresDescription: true,
+      requiresDueDate: true,
+      requiresAssignee: true,
+      completionRequiresAssignee: true,
+      blockedRequiresAssignee: true,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Action elevage", true, "Exemple: nourrissage, vaccination, controle lot ou preparation vente."),
+        field("description", "Troupeau ou lot", true, "Troupeau, lot, espece ou intervention sanitaire."),
+        field("assignedToId", "Responsable elevage", true, "Agent ou responsable de l'unite d'elevage."),
+        field("dueDate", "Date d'intervention", true, "Les actions d'elevage doivent etre datees.")
+      ],
+      metadataFields: [
+        field("livestockTaskKind", "Type d'intervention", false, "FEEDING, HEALTH_CHECK, VACCINATION, TREATMENT, CLEANING, BREEDING, SALE_PREP ou FOLLOW_UP."),
+        field("herdRef", "Reference troupeau", true, "Troupeau, bande, poulailler, enclos ou unite d'elevage."),
+        field("batchRef", "Reference lot", true, "Lot, bande, cycle ou groupe d'animaux suivi."),
+        field("species", "Espece", true, "Boeuf, mouton, poulet, chevre ou autre espece."),
+        field("animalCategory", "Categorie", false, "Bovin, ovin, caprin, volaille ou autre categorie."),
+        field("animalCount", "Nombre d'animaux", false, "Nombre d'animaux a nourrir, traiter, vacciner ou vendre."),
+        field("feedName", "Aliment ou intrant", false, "Aliment, complement, litiere ou intrant utilise."),
+        field("feedQuantity", "Quantite aliment", false, "Quantite a distribuer ou controler."),
+        field("productName", "Produit d'elevage", false, "Oeufs, lait, fumier ou autre produit issu de l'elevage."),
+        field("productQuantity", "Quantite produit", false, "Quantite de produit a recolter, vendre ou controler."),
+        field("unit", "Unite", false, "piece, tete, kg, sac, carton ou unite de suivi."),
+        field("treatmentName", "Soin ou vaccin", false, "Vaccin, traitement, medicament ou intervention veterinaire."),
+        field("mortalityCount", "Mortalite observee", false, "Nombre d'animaux morts constates pendant l'intervention."),
+        field("averageWeight", "Poids moyen", false, "Poids moyen observe si disponible."),
+        field("healthStatus", "Etat sanitaire", false, "Observation sanitaire, symptome ou statut du lot.")
+      ],
+      workflow: [
+        workflow("PLAN", "Plan d'elevage", "L'action est planifiee par troupeau, lot et espece."),
+        workflow("EXECUTE", "Intervention elevage", "Nourrissage, controle, vaccination, traitement ou vente."),
+        workflow("ESCALATE", "Alerte sanitaire", "Blocage ou anomalie sanitaire remonte rapidement."),
+        workflow("CLOSE", "Retour elevage", "Cloture apres controle du lot ou troupeau.")
+      ]
+    },
+    reporting: {
+      focusArea: "Lots d'elevage, especes, alimentation, soins et alertes sanitaires",
+      exportSections: ["flux troupeau", "lots d'elevage", "alimentation", "soins", "ventes", "interventions", "alertes sanitaires"],
+      operationalDimensions: [
+        dimension("herdRef", "Troupeau", "Mesure rentabilite et suivi sanitaire par troupeau ou unite d'elevage."),
+        dimension("batchRef", "Lot", "Suit les charges, ventes et interventions par lot ou bande."),
+        dimension("species", "Espece", "Compare les performances par boeufs, moutons, poulets ou autres especes.")
+      ],
+      highlights: [
+        {
+          code: "livestock-flows",
+          label: "Flux d'elevage traces",
+          description: "Flux relies aux troupeaux, lots, especes ou ventes.",
+          metric: "transactionsCount",
+          thresholds: { warningAt: 5 }
+        },
+        {
+          code: "livestock-open-actions",
+          label: "Actions elevage ouvertes",
+          description: "Interventions d'elevage encore ouvertes.",
+          metric: "openTasksCount",
+          thresholds: { warningAt: 4, criticalAt: 8 }
+        },
+        {
+          code: "livestock-blockers",
+          label: "Alertes elevage",
+          description: "Blocages ou anomalies de production animale.",
           metric: "blockedTasksCount",
           thresholds: { warningAt: 1, criticalAt: 2 }
         }
@@ -668,6 +880,11 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Rentabilite et disponibilite du parc transport",
       exportSections: ["locations", "camions bennes", "tracteurs", "citernes", "maintenance", "blocages"],
+      operationalDimensions: [
+        dimension("transportService", "Sous-section transport", "Compare location et gestion d'engins."),
+        dimension("assetType", "Type d'engin", "Mesure les flux et blocages camions bennes, tracteurs et citernes."),
+        dimension("vehicleRef", "Vehicule", "Suit rentabilite et disponibilite par vehicule.")
+      ],
       highlights: [
         {
           code: "transport-flows",
@@ -746,6 +963,11 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Volumes par reseau, ecarts caisse et rapprochements",
       exportSections: ["Orange Money", "Moov Money", "Wave", "Western Union", "MoneyGram", "Ria", "ecarts"],
+      operationalDimensions: [
+        dimension("provider", "Reseau de transaction", "Compare volumes, marge et ecarts par reseau."),
+        dimension("operationKind", "Type d'operation", "Suit depots, retraits, commissions et approvisionnements."),
+        dimension("agentPointRef", "Point ou caisse", "Mesure le suivi par guichet ou caisse.")
+      ],
       highlights: [
         {
           code: "money-transfer-flows",
@@ -822,6 +1044,11 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Occupation, recettes, charges et qualite de service",
       exportSections: ["reservations", "chambres", "hebergement", "restauration", "maintenance", "blocages"],
+      operationalDimensions: [
+        dimension("serviceLine", "Service hotelier", "Compare hebergement, restauration, entretien et evenements."),
+        dimension("roomRef", "Chambre ou unite", "Suit rentabilite et interventions par chambre."),
+        dimension("bookingRef", "Reservation", "Mesure encaissements et suivi par reservation.")
+      ],
       highlights: [
         {
           code: "hotel-flows",
@@ -859,6 +1086,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("amount", "Montant", true, "Montant du flux."),
         field("description", "Mission", false, "Mission, client ou intervention.")
       ],
+      metadataFields: [
+        field("serviceType", "Type de service", false, "Type de prestation ou intervention."),
+        field("clientRef", "Client", false, "Client, site ou dossier de prestation.")
+      ],
       workflow: [
         workflow("CREATE", "Saisie", "Le flux est saisi a la creation ou facturation."),
         workflow("PROOF_OPTIONAL", "Justificatif", "Facture ou piece jointe si disponible."),
@@ -877,6 +1108,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Contexte", false, "Client, site ou portee de l'intervention."),
         field("assignedToId", "Intervenant", false, "Collaborateur ou superviseur responsable.")
       ],
+      metadataFields: [
+        field("serviceType", "Type de service", false, "Type de prestation ou intervention."),
+        field("clientRef", "Client", false, "Client, site ou dossier de prestation.")
+      ],
       workflow: [
         workflow("PLAN", "Planification", "Les interventions sont planifiees selon disponibilite."),
         workflow("EXECUTE", "Realisation", "Execution de la prestation."),
@@ -886,6 +1121,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Pilotage des prestations",
       exportSections: ["facturation", "interventions", "charge equipe"],
+      operationalDimensions: [
+        dimension("serviceType", "Type de service", "Compare rentabilite et execution par type de prestation."),
+        dimension("clientRef", "Client", "Suit les flux, interventions et blocages par client.")
+      ],
       highlights: [
         {
           code: "service-volume",
@@ -960,6 +1199,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Traçabilite et risque d'exploitation",
       exportSections: ["flux site", "operations critiques", "blocages miniers"],
+      operationalDimensions: [
+        dimension("siteRef", "Site minier", "Suit rentabilite, operations et risques par site."),
+        dimension("equipmentRef", "Equipement", "Mesure les charges et blocages par equipement.")
+      ],
       highlights: [
         {
           code: "mining-pending-review",
@@ -1034,6 +1277,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Continuité de service et discipline d'exploitation",
       exportSections: ["flux exploitation", "interventions reseau", "blocages critiques"],
+      operationalDimensions: [
+        dimension("facilityRef", "Site eau", "Mesure couts, interventions et continuite par station ou forage."),
+        dimension("networkZone", "Zone reseau", "Suit les blocages et interventions par zone de distribution.")
+      ],
       highlights: [
         {
           code: "water-pending-review",
@@ -1108,6 +1355,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     reporting: {
       focusArea: "Pilotage de portefeuille commercial",
       exportSections: ["encaissements", "actions commerciales", "blocages dossier"],
+      operationalDimensions: [
+        dimension("mandateRef", "Mandat", "Suit rentabilite et execution par mandat commercial."),
+        dimension("propertyRef", "Bien", "Mesure les flux et actions par bien.")
+      ],
       highlights: [
         {
           code: "agency-commercial-flow",

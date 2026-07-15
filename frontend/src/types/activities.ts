@@ -21,6 +21,12 @@ export type ActivityReportHighlight = {
   emphasis: "INFO" | "WARNING" | "CRITICAL";
 };
 
+export type ActivityOperationalDimension = {
+  key: string;
+  label: string;
+  description: string;
+};
+
 export type BusinessActivityProfile = {
   activityCode: BusinessActivityCode;
   label: string;
@@ -49,6 +55,7 @@ export type BusinessActivityProfile = {
   reporting: {
     focusArea: string;
     exportSections: string[];
+    operationalDimensions?: ActivityOperationalDimension[];
   };
 };
 

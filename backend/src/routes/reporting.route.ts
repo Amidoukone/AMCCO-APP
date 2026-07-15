@@ -17,7 +17,7 @@ import {
 const reportsQuerySchema = z.object({
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
-  activityCode: z.enum(BUSINESS_ACTIVITY_CODES).optional()
+  activityCode: z.enum(BUSINESS_ACTIVITY_CODES)
 });
 
 export const reportingRouter = Router();
@@ -53,7 +53,7 @@ reportingRouter.get(
 
 reportingRouter.get(
   "/reports/overview",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"),
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -76,7 +76,7 @@ reportingRouter.get(
 
 reportingRouter.get(
   "/reports/exports/overview.pdf",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"),
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -107,7 +107,7 @@ reportingRouter.get(
 
 reportingRouter.get(
   "/reports/exports/transactions.csv",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"),
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -135,7 +135,7 @@ reportingRouter.get(
 
 reportingRouter.get(
   "/reports/exports/transactions.xlsx",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"),
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -169,7 +169,7 @@ reportingRouter.get(
 
 reportingRouter.get(
   "/reports/exports/tasks.csv",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"),
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -197,7 +197,7 @@ reportingRouter.get(
 
 reportingRouter.get(
   "/reports/exports/tasks.xlsx",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR"),
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");

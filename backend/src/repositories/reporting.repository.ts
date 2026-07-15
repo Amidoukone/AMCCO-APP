@@ -97,6 +97,7 @@ export type DashboardSummary = {
   activitySummary: DashboardActivitySummary[];
   activityProfiles: BusinessActivityProfile[];
   activityHighlightsByCode: Partial<Record<BusinessActivityCode, ActivityReportHighlight[]>>;
+  operationalPerformance: ReportOperationalMetric[];
   recentTransactions: DashboardRecentTransaction[];
   recentTasks: DashboardRecentTask[];
   workload: DashboardWorkloadItem[];
@@ -142,6 +143,220 @@ export type ReportRoleDistribution = {
   count: number;
 };
 
+export type ReportOperationalMetric = {
+  scope: "ACTIVITY" | "SUBSECTION";
+  activityCode: BusinessActivityCode;
+  dimensionKey: string;
+  dimensionLabel: string;
+  itemKey: string;
+  itemLabel: string;
+  currency: "XOF";
+  transactionsCount: number;
+  approvedTransactionsCount: number;
+  approvedCashIn: string;
+  approvedCashOut: string;
+  netProfit: string;
+  marginRate: number;
+  returnOnCostRate: number;
+  totalTasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  overdueTasksCount: number;
+  executionRate: number;
+  blockageRate: number;
+  followUpPressure: number;
+};
+
+export type HardwareMonthlyReportRow = {
+  date: string;
+  designation: string;
+  quantity: number;
+  salesAmount: string;
+  paymentAmount: string;
+  purchaseAmount: string;
+  grossProfit: string;
+  marginRate: number;
+  transactionsCount: number;
+  currency: "XOF";
+};
+
+export type HardwareMonthlyReport = {
+  periodLabel: string;
+  rows: HardwareMonthlyReportRow[];
+  totals: {
+    quantity: number;
+    salesAmount: string;
+    paymentAmount: string;
+    purchaseAmount: string;
+    grossProfit: string;
+    marginRate: number;
+    transactionsCount: number;
+    currency: "XOF";
+  };
+};
+
+export type AgricultureOperationsReportRow = {
+  campaignRef: string;
+  parcelRef: string;
+  fieldType: string;
+  cropType: string;
+  surfaceArea: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type AgricultureOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type AgricultureOperationsReport = {
+  periodLabel: string;
+  rows: AgricultureOperationsReportRow[];
+  operationRows: AgricultureOperationsReportOperationRow[];
+  totals: {
+    parcelsCount: number;
+    surfaceArea: number;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type FishFarmingOperationsReportRow = {
+  pondRef: string;
+  cycleRef: string;
+  species: string;
+  fingerlingsQuantity: number;
+  feedQuantity: number;
+  soldQuantity: number;
+  mortalityCount: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type FishFarmingOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type FishFarmingOperationsReport = {
+  periodLabel: string;
+  rows: FishFarmingOperationsReportRow[];
+  operationRows: FishFarmingOperationsReportOperationRow[];
+  totals: {
+    pondsCount: number;
+    cyclesCount: number;
+    fingerlingsQuantity: number;
+    feedQuantity: number;
+    soldQuantity: number;
+    mortalityCount: number;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type LivestockOperationsReportRow = {
+  herdRef: string;
+  batchRef: string;
+  species: string;
+  animalPurchaseCount: number;
+  feedQuantity: number;
+  soldAnimalCount: number;
+  productQuantity: number;
+  mortalityCount: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type LivestockOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type LivestockOperationsReport = {
+  periodLabel: string;
+  rows: LivestockOperationsReportRow[];
+  operationRows: LivestockOperationsReportOperationRow[];
+  totals: {
+    herdsCount: number;
+    batchesCount: number;
+    animalPurchaseCount: number;
+    feedQuantity: number;
+    soldAnimalCount: number;
+    productQuantity: number;
+    mortalityCount: number;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
 export type FinancialAccountsScopeSummary = {
   totalCount: number;
   globalCount: number;
@@ -182,6 +397,11 @@ export type ReportsOverview = {
   financeAccounts: FinancialAccountGovernanceItem[];
   taskByStatus: ReportTaskByStatus[];
   taskByActivity: ReportTaskByActivity[];
+  operationalPerformance: ReportOperationalMetric[];
+  hardwareMonthlyReport: HardwareMonthlyReport | null;
+  agricultureOperationsReport: AgricultureOperationsReport | null;
+  fishFarmingOperationsReport: FishFarmingOperationsReport | null;
+  livestockOperationsReport: LivestockOperationsReport | null;
   roleDistribution: ReportRoleDistribution[];
   topAssignees: DashboardWorkloadItem[];
 };
@@ -314,6 +534,40 @@ type ReportRoleDistributionRow = RowDataPacket & {
   count: number;
 };
 
+type ReportOperationalTransactionRow = RowDataPacket & {
+  activityCode: BusinessActivityCode;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  type: "CASH_IN" | "CASH_OUT";
+  amount: string;
+  currency: string;
+  occurredAt: Date;
+  metadataJson: unknown;
+};
+
+type ReportOperationalTaskRow = RowDataPacket & {
+  activityCode: BusinessActivityCode;
+  status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+  dueDate: Date | null;
+  metadataJson: unknown;
+};
+
+export type ReportOperationalTransaction = {
+  activityCode: BusinessActivityCode;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  type: "CASH_IN" | "CASH_OUT";
+  amount: string;
+  currency: string;
+  occurredAt: string;
+  metadata: Record<string, string>;
+};
+
+export type ReportOperationalTask = {
+  activityCode: BusinessActivityCode;
+  status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+  dueDate: string | null;
+  metadata: Record<string, string>;
+};
+
 type TransactionExportRow = RowDataPacket & {
   id: string;
   occurredAt: Date;
@@ -352,6 +606,28 @@ type TaskExportRow = RowDataPacket & {
 
 function toIso(value: Date | null): string | null {
   return value ? new Date(value).toISOString() : null;
+}
+
+function toMetadataMap(value: unknown): Record<string, string> {
+  if (!value) {
+    return {};
+  }
+  if (typeof value === "string") {
+    try {
+      return toMetadataMap(JSON.parse(value));
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => typeof item === "string")
+      .map(([key, item]) => [key, item as string])
+  );
 }
 
 function toDashboardRecentTransaction(
@@ -902,6 +1178,72 @@ export async function listReportTaskByActivity(
     openCount: row.openCount ?? 0,
     blockedCount: row.blockedCount ?? 0,
     doneCount: row.doneCount ?? 0
+  }));
+}
+
+export async function listReportOperationalTransactions(
+  companyId: string,
+  period?: ReportPeriodFilter
+): Promise<ReportOperationalTransaction[]> {
+  const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
+  const values: Array<string | number> = [companyId];
+  appendPeriodFilters(filters, values, "occurred_at", period);
+  appendActivityFilter(filters, values, "activity_code", period);
+
+  const rows = await queryRows<ReportOperationalTransactionRow[]>(
+    `
+      SELECT
+        activity_code AS activityCode,
+        status AS status,
+        type AS type,
+        CAST(amount AS CHAR) AS amount,
+        currency AS currency,
+        occurred_at AS occurredAt,
+        metadata_json AS metadataJson
+      FROM transactions
+      WHERE ${filters.join(" AND ")}
+    `,
+    values
+  );
+
+  return rows.map((row) => ({
+    activityCode: row.activityCode,
+    status: row.status,
+    type: row.type,
+    amount: row.amount,
+    currency: row.currency,
+    occurredAt: new Date(row.occurredAt).toISOString(),
+    metadata: toMetadataMap(row.metadataJson)
+  }));
+}
+
+export async function listReportOperationalTasks(
+  companyId: string,
+  period?: ReportPeriodFilter
+): Promise<ReportOperationalTask[]> {
+  const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
+  const values: Array<string | number> = [companyId];
+  appendPeriodFilters(filters, values, "updated_at", period);
+  appendActivityFilter(filters, values, "activity_code", period);
+
+  const rows = await queryRows<ReportOperationalTaskRow[]>(
+    `
+      SELECT
+        activity_code AS activityCode,
+        status AS status,
+        due_date AS dueDate,
+        metadata_json AS metadataJson
+      FROM tasks
+      WHERE ${filters.join(" AND ")}
+    `,
+    values
+  );
+
+  return rows.map((row) => ({
+    activityCode: row.activityCode,
+    status: row.status,
+    dueDate: toIso(row.dueDate),
+    metadata: toMetadataMap(row.metadataJson)
   }));
 }
 

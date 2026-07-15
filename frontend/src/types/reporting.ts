@@ -84,6 +84,220 @@ export type DashboardActivitySummary = {
   blockedTasksCount: number;
 };
 
+export type ReportOperationalMetric = {
+  scope: "ACTIVITY" | "SUBSECTION";
+  activityCode: BusinessActivityCode;
+  dimensionKey: string;
+  dimensionLabel: string;
+  itemKey: string;
+  itemLabel: string;
+  currency: "XOF";
+  transactionsCount: number;
+  approvedTransactionsCount: number;
+  approvedCashIn: string;
+  approvedCashOut: string;
+  netProfit: string;
+  marginRate: number;
+  returnOnCostRate: number;
+  totalTasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  overdueTasksCount: number;
+  executionRate: number;
+  blockageRate: number;
+  followUpPressure: number;
+};
+
+export type HardwareMonthlyReportRow = {
+  date: string;
+  designation: string;
+  quantity: number;
+  salesAmount: string;
+  paymentAmount: string;
+  purchaseAmount: string;
+  grossProfit: string;
+  marginRate: number;
+  transactionsCount: number;
+  currency: "XOF";
+};
+
+export type HardwareMonthlyReport = {
+  periodLabel: string;
+  rows: HardwareMonthlyReportRow[];
+  totals: {
+    quantity: number;
+    salesAmount: string;
+    paymentAmount: string;
+    purchaseAmount: string;
+    grossProfit: string;
+    marginRate: number;
+    transactionsCount: number;
+    currency: "XOF";
+  };
+};
+
+export type AgricultureOperationsReportRow = {
+  campaignRef: string;
+  parcelRef: string;
+  fieldType: string;
+  cropType: string;
+  surfaceArea: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type AgricultureOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type AgricultureOperationsReport = {
+  periodLabel: string;
+  rows: AgricultureOperationsReportRow[];
+  operationRows: AgricultureOperationsReportOperationRow[];
+  totals: {
+    parcelsCount: number;
+    surfaceArea: number;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type FishFarmingOperationsReportRow = {
+  pondRef: string;
+  cycleRef: string;
+  species: string;
+  fingerlingsQuantity: number;
+  feedQuantity: number;
+  soldQuantity: number;
+  mortalityCount: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type FishFarmingOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type FishFarmingOperationsReport = {
+  periodLabel: string;
+  rows: FishFarmingOperationsReportRow[];
+  operationRows: FishFarmingOperationsReportOperationRow[];
+  totals: {
+    pondsCount: number;
+    cyclesCount: number;
+    fingerlingsQuantity: number;
+    feedQuantity: number;
+    soldQuantity: number;
+    mortalityCount: number;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type LivestockOperationsReportRow = {
+  herdRef: string;
+  batchRef: string;
+  species: string;
+  animalPurchaseCount: number;
+  feedQuantity: number;
+  soldAnimalCount: number;
+  productQuantity: number;
+  mortalityCount: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type LivestockOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type LivestockOperationsReport = {
+  periodLabel: string;
+  rows: LivestockOperationsReportRow[];
+  operationRows: LivestockOperationsReportOperationRow[];
+  totals: {
+    herdsCount: number;
+    batchesCount: number;
+    animalPurchaseCount: number;
+    feedQuantity: number;
+    soldAnimalCount: number;
+    productQuantity: number;
+    mortalityCount: number;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
 export type DashboardSummary = {
   generatedAt: string;
   sectorRulesVersion: string;
@@ -93,6 +307,7 @@ export type DashboardSummary = {
   activitySummary: DashboardActivitySummary[];
   activityProfiles: BusinessActivityProfile[];
   activityHighlightsByCode: Partial<Record<BusinessActivityCode, ActivityReportHighlight[]>>;
+  operationalPerformance: ReportOperationalMetric[];
   recentTransactions: DashboardRecentTransaction[];
   recentTasks: DashboardRecentTask[];
   workload: DashboardWorkloadItem[];
@@ -182,6 +397,11 @@ export type ReportsOverview = {
   financeAccounts: FinancialAccountGovernanceItem[];
   taskByStatus: ReportTaskByStatus[];
   taskByActivity: ReportTaskByActivity[];
+  operationalPerformance: ReportOperationalMetric[];
+  hardwareMonthlyReport: HardwareMonthlyReport | null;
+  agricultureOperationsReport: AgricultureOperationsReport | null;
+  fishFarmingOperationsReport: FishFarmingOperationsReport | null;
+  livestockOperationsReport: LivestockOperationsReport | null;
   roleDistribution: ReportRoleDistribution[];
   topAssignees: DashboardWorkloadItem[];
 };

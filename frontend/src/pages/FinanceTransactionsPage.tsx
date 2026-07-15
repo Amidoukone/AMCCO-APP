@@ -49,6 +49,305 @@ const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
 const TRANSACTIONS_PAGE_SIZE = 100;
 const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 25;
+const HARDWARE_OPERATION_KIND_KEY = "hardwareOperationKind";
+type HardwareOperationKind = "GLOBAL" | "ITEM_ENTRY" | "ITEM_EXIT";
+const HARDWARE_OPERATION_LABELS: Record<HardwareOperationKind, string> = {
+  GLOBAL: "Transaction globale",
+  ITEM_ENTRY: "Acquisition",
+  ITEM_EXIT: "Vente"
+};
+const HARDWARE_NUMERIC_METADATA_FIELDS = new Set([
+  "quantity",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "dailyPayment",
+  "paymentAmount"
+]);
+const HARDWARE_AMOUNT_METADATA_FIELDS = new Set([
+  "quantity",
+  "purchaseUnitPrice",
+  "saleUnitPrice"
+]);
+const HARDWARE_COMMON_METADATA_FIELDS = new Set([
+  "itemName",
+  "quantity"
+]);
+const HARDWARE_CASH_IN_METADATA_FIELDS = new Set([
+  ...HARDWARE_COMMON_METADATA_FIELDS,
+  "saleUnitPrice",
+  "dailyPayment"
+]);
+const HARDWARE_CASH_OUT_METADATA_FIELDS = new Set([
+  ...HARDWARE_COMMON_METADATA_FIELDS,
+  "purchaseUnitPrice",
+  "supplierRef"
+]);
+const HARDWARE_METADATA_FIELDS = new Set([
+  HARDWARE_OPERATION_KIND_KEY,
+  "productFamily",
+  "itemName",
+  "quantity",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "dailyPayment",
+  "paymentAmount",
+  "supplierRef"
+]);
+const AGRICULTURE_OPERATION_KIND_KEY = "agricultureOperationKind";
+type AgricultureOperationKind = "INPUT_PURCHASE" | "FIELD_EXPENSE" | "HARVEST_SALE" | "SUPPORT_INCOME";
+const AGRICULTURE_OPERATION_LABELS: Record<AgricultureOperationKind, string> = {
+  INPUT_PURCHASE: "Achat intrants",
+  FIELD_EXPENSE: "Travaux champ",
+  HARVEST_SALE: "Vente recolte",
+  SUPPORT_INCOME: "Appui / subvention"
+};
+const AGRICULTURE_NUMERIC_METADATA_FIELDS = new Set([
+  "surfaceArea",
+  "quantity",
+  "unitPrice"
+]);
+const AGRICULTURE_AMOUNT_METADATA_FIELDS = new Set([
+  "quantity",
+  "unitPrice"
+]);
+const AGRICULTURE_COMMON_METADATA_FIELDS = new Set([
+  "campaignRef",
+  "parcelRef",
+  "fieldType",
+  "cropType",
+  "surfaceArea"
+]);
+const AGRICULTURE_INPUT_PURCHASE_METADATA_FIELDS = new Set([
+  ...AGRICULTURE_COMMON_METADATA_FIELDS,
+  "inputName",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "supplierRef"
+]);
+const AGRICULTURE_FIELD_EXPENSE_METADATA_FIELDS = new Set([
+  ...AGRICULTURE_COMMON_METADATA_FIELDS,
+  "workType",
+  "inputName",
+  "quantity",
+  "unit",
+  "supplierRef"
+]);
+const AGRICULTURE_HARVEST_SALE_METADATA_FIELDS = new Set([
+  ...AGRICULTURE_COMMON_METADATA_FIELDS,
+  "quantity",
+  "unit",
+  "unitPrice",
+  "buyerRef"
+]);
+const AGRICULTURE_SUPPORT_INCOME_METADATA_FIELDS = new Set([
+  ...AGRICULTURE_COMMON_METADATA_FIELDS,
+  "sourceRef"
+]);
+const AGRICULTURE_METADATA_FIELDS = new Set([
+  AGRICULTURE_OPERATION_KIND_KEY,
+  "campaignRef",
+  "parcelRef",
+  "fieldType",
+  "cropType",
+  "surfaceArea",
+  "inputName",
+  "workType",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "supplierRef",
+  "buyerRef",
+  "sourceRef"
+]);
+const FISH_FARMING_OPERATION_KIND_KEY = "fishOperationKind";
+type FishFarmingOperationKind =
+  | "FINGERLING_PURCHASE"
+  | "FEED_PURCHASE"
+  | "POND_EXPENSE"
+  | "FISH_SALE"
+  | "SUPPORT_INCOME";
+const FISH_FARMING_OPERATION_LABELS: Record<FishFarmingOperationKind, string> = {
+  FINGERLING_PURCHASE: "Achat alevins",
+  FEED_PURCHASE: "Achat aliment",
+  POND_EXPENSE: "Charge bassin",
+  FISH_SALE: "Vente poisson",
+  SUPPORT_INCOME: "Appui / subvention"
+};
+const FISH_FARMING_NUMERIC_METADATA_FIELDS = new Set([
+  "quantity",
+  "unitPrice",
+  "mortalityCount"
+]);
+const FISH_FARMING_AMOUNT_METADATA_FIELDS = new Set([
+  "quantity",
+  "unitPrice"
+]);
+const FISH_FARMING_COMMON_METADATA_FIELDS = new Set([
+  "pondRef",
+  "cycleRef",
+  "species"
+]);
+const FISH_FARMING_FINGERLING_PURCHASE_METADATA_FIELDS = new Set([
+  ...FISH_FARMING_COMMON_METADATA_FIELDS,
+  "fingerlingBatchRef",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "supplierRef"
+]);
+const FISH_FARMING_FEED_PURCHASE_METADATA_FIELDS = new Set([
+  ...FISH_FARMING_COMMON_METADATA_FIELDS,
+  "feedName",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "supplierRef"
+]);
+const FISH_FARMING_POND_EXPENSE_METADATA_FIELDS = new Set([
+  ...FISH_FARMING_COMMON_METADATA_FIELDS,
+  "feedName",
+  "quantity",
+  "unit",
+  "supplierRef",
+  "mortalityCount",
+  "waterQuality"
+]);
+const FISH_FARMING_FISH_SALE_METADATA_FIELDS = new Set([
+  ...FISH_FARMING_COMMON_METADATA_FIELDS,
+  "quantity",
+  "unit",
+  "unitPrice",
+  "buyerRef"
+]);
+const FISH_FARMING_SUPPORT_INCOME_METADATA_FIELDS = new Set([
+  ...FISH_FARMING_COMMON_METADATA_FIELDS,
+  "sourceRef"
+]);
+const FISH_FARMING_METADATA_FIELDS = new Set([
+  FISH_FARMING_OPERATION_KIND_KEY,
+  "pondRef",
+  "cycleRef",
+  "species",
+  "fingerlingBatchRef",
+  "feedName",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "supplierRef",
+  "buyerRef",
+  "sourceRef",
+  "mortalityCount",
+  "waterQuality"
+]);
+const LIVESTOCK_OPERATION_KIND_KEY = "livestockOperationKind";
+type LivestockOperationKind =
+  | "ANIMAL_PURCHASE"
+  | "FEED_PURCHASE"
+  | "VET_CARE"
+  | "FARM_EXPENSE"
+  | "ANIMAL_SALE"
+  | "PRODUCT_SALE"
+  | "SUPPORT_INCOME";
+const LIVESTOCK_OPERATION_LABELS: Record<LivestockOperationKind, string> = {
+  ANIMAL_PURCHASE: "Achat animaux",
+  FEED_PURCHASE: "Achat aliment",
+  VET_CARE: "Soins / vaccin",
+  FARM_EXPENSE: "Charge elevage",
+  ANIMAL_SALE: "Vente animaux",
+  PRODUCT_SALE: "Vente produit",
+  SUPPORT_INCOME: "Appui / subvention"
+};
+const LIVESTOCK_NUMERIC_METADATA_FIELDS = new Set([
+  "animalCount",
+  "feedQuantity",
+  "productQuantity",
+  "unitPrice",
+  "mortalityCount"
+]);
+const LIVESTOCK_AMOUNT_METADATA_FIELDS = new Set([
+  "animalCount",
+  "feedQuantity",
+  "productQuantity",
+  "unitPrice"
+]);
+const LIVESTOCK_COMMON_METADATA_FIELDS = new Set([
+  "herdRef",
+  "batchRef",
+  "species",
+  "animalCategory"
+]);
+const LIVESTOCK_ANIMAL_PURCHASE_METADATA_FIELDS = new Set([
+  ...LIVESTOCK_COMMON_METADATA_FIELDS,
+  "animalCount",
+  "unit",
+  "unitPrice",
+  "supplierRef"
+]);
+const LIVESTOCK_FEED_PURCHASE_METADATA_FIELDS = new Set([
+  ...LIVESTOCK_COMMON_METADATA_FIELDS,
+  "feedName",
+  "feedQuantity",
+  "unit",
+  "unitPrice",
+  "supplierRef"
+]);
+const LIVESTOCK_VET_CARE_METADATA_FIELDS = new Set([
+  ...LIVESTOCK_COMMON_METADATA_FIELDS,
+  "treatmentName",
+  "animalCount",
+  "unit",
+  "supplierRef",
+  "healthStatus"
+]);
+const LIVESTOCK_FARM_EXPENSE_METADATA_FIELDS = new Set([
+  ...LIVESTOCK_COMMON_METADATA_FIELDS,
+  "feedName",
+  "feedQuantity",
+  "unit",
+  "supplierRef",
+  "mortalityCount",
+  "healthStatus"
+]);
+const LIVESTOCK_ANIMAL_SALE_METADATA_FIELDS = new Set([
+  ...LIVESTOCK_COMMON_METADATA_FIELDS,
+  "animalCount",
+  "unit",
+  "unitPrice",
+  "buyerRef"
+]);
+const LIVESTOCK_PRODUCT_SALE_METADATA_FIELDS = new Set([
+  ...LIVESTOCK_COMMON_METADATA_FIELDS,
+  "productName",
+  "productQuantity",
+  "unit",
+  "unitPrice",
+  "buyerRef"
+]);
+const LIVESTOCK_SUPPORT_INCOME_METADATA_FIELDS = new Set([
+  ...LIVESTOCK_COMMON_METADATA_FIELDS,
+  "sourceRef"
+]);
+const LIVESTOCK_METADATA_FIELDS = new Set([
+  LIVESTOCK_OPERATION_KIND_KEY,
+  "herdRef",
+  "batchRef",
+  "species",
+  "animalCategory",
+  "animalCount",
+  "feedName",
+  "feedQuantity",
+  "productName",
+  "productQuantity",
+  "unit",
+  "unitPrice",
+  "treatmentName",
+  "supplierRef",
+  "buyerRef",
+  "sourceRef",
+  "mortalityCount",
+  "healthStatus"
+]);
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -68,8 +367,582 @@ function formatFileSize(bytes: number): string {
 }
 
 function toAmountNumber(input: string): number {
-  const normalized = Number.parseFloat(input.replace(",", "."));
+  const normalized = Number.parseFloat(input.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(normalized) ? normalized : 0;
+}
+
+function normalizeAmountForApi(input: string): string {
+  return input.trim().replace(/\s/g, "").replace(",", ".");
+}
+
+function formatAmountForDisplay(input: string | number): string {
+  const rawValue = typeof input === "number" ? String(input) : input.trim();
+  if (!rawValue) {
+    return "";
+  }
+  const normalized = rawValue.replace(/\s/g, "").replace(",", ".");
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount)) {
+    return rawValue;
+  }
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+    .format(amount)
+    .replace(/[\u202f\u00a0]/g, " ");
+}
+
+function formatAmountForInput(input: string): string {
+  return formatAmountForDisplay(input);
+}
+
+function isMoneyMetadataField(key: string): boolean {
+  return (
+    key === "purchaseUnitPrice" ||
+    key === "saleUnitPrice" ||
+    key === "dailyPayment" ||
+    key === "paymentAmount" ||
+    key === "unitPrice"
+  );
+}
+
+function deriveHardwareAmount(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): string | null {
+  const quantity = toAmountNumber(metadata.quantity ?? "");
+  const unitPrice = type === "CASH_IN"
+    ? toAmountNumber(metadata.saleUnitPrice ?? "")
+    : toAmountNumber(metadata.purchaseUnitPrice ?? "");
+  if (quantity <= 0 || unitPrice <= 0) {
+    return null;
+  }
+  return (quantity * unitPrice).toFixed(2);
+}
+
+function deriveAgricultureAmount(
+  operationKind: AgricultureOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind !== "INPUT_PURCHASE" && operationKind !== "HARVEST_SALE") {
+    return null;
+  }
+  const quantity = toAmountNumber(metadata.quantity ?? "");
+  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+  if (quantity <= 0 || unitPrice <= 0) {
+    return null;
+  }
+  return (quantity * unitPrice).toFixed(2);
+}
+
+function deriveFishFarmingAmount(
+  operationKind: FishFarmingOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (
+    operationKind !== "FINGERLING_PURCHASE" &&
+    operationKind !== "FEED_PURCHASE" &&
+    operationKind !== "FISH_SALE"
+  ) {
+    return null;
+  }
+  const quantity = toAmountNumber(metadata.quantity ?? "");
+  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+  if (quantity <= 0 || unitPrice <= 0) {
+    return null;
+  }
+  return (quantity * unitPrice).toFixed(2);
+}
+
+function deriveLivestockAmount(
+  operationKind: LivestockOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (
+    operationKind !== "ANIMAL_PURCHASE" &&
+    operationKind !== "FEED_PURCHASE" &&
+    operationKind !== "ANIMAL_SALE" &&
+    operationKind !== "PRODUCT_SALE"
+  ) {
+    return null;
+  }
+  const quantity = operationKind === "FEED_PURCHASE"
+    ? toAmountNumber(metadata.feedQuantity ?? "")
+    : operationKind === "PRODUCT_SALE"
+      ? toAmountNumber(metadata.productQuantity ?? "")
+      : toAmountNumber(metadata.animalCount ?? "");
+  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+  if (quantity <= 0 || unitPrice <= 0) {
+    return null;
+  }
+  return (quantity * unitPrice).toFixed(2);
+}
+
+function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
+  return HARDWARE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    AGRICULTURE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    FISH_FARMING_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    LIVESTOCK_NUMERIC_METADATA_FIELDS.has(fieldKey)
+    ? "decimal"
+    : "text";
+}
+
+function shouldDeriveHardwareAmount(fieldKey: string): boolean {
+  return HARDWARE_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveAgricultureAmount(fieldKey: string): boolean {
+  return AGRICULTURE_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveFishFarmingAmount(fieldKey: string): boolean {
+  return FISH_FARMING_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveLivestockAmount(fieldKey: string): boolean {
+  return LIVESTOCK_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function getDefaultTransactionType(
+  activityCode: BusinessActivityCode | null
+): "CASH_IN" | "CASH_OUT" {
+  return activityCode === "HARDWARE" ? "CASH_IN" : "CASH_OUT";
+}
+
+function isHardwareOperationKind(value: string | undefined): value is HardwareOperationKind {
+  return value === "GLOBAL" || value === "ITEM_ENTRY" || value === "ITEM_EXIT";
+}
+
+function hasHardwareItemMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "itemName",
+    "quantity",
+    "purchaseUnitPrice",
+    "saleUnitPrice",
+    "dailyPayment",
+    "supplierRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getHardwareOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): HardwareOperationKind {
+  const configuredKind = metadata[HARDWARE_OPERATION_KIND_KEY]?.trim();
+  if (isHardwareOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasHardwareItemMetadata(metadata)) {
+    return "GLOBAL";
+  }
+  return type === "CASH_OUT" ? "ITEM_ENTRY" : "ITEM_EXIT";
+}
+
+function getHardwareOperationType(kind: HardwareOperationKind): "CASH_IN" | "CASH_OUT" | null {
+  if (kind === "ITEM_ENTRY") {
+    return "CASH_OUT";
+  }
+  if (kind === "ITEM_EXIT") {
+    return "CASH_IN";
+  }
+  return null;
+}
+
+function isAgricultureOperationKind(value: string | undefined): value is AgricultureOperationKind {
+  return (
+    value === "INPUT_PURCHASE" ||
+    value === "FIELD_EXPENSE" ||
+    value === "HARVEST_SALE" ||
+    value === "SUPPORT_INCOME"
+  );
+}
+
+function hasAgricultureMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "campaignRef",
+    "parcelRef",
+    "fieldType",
+    "cropType",
+    "surfaceArea",
+    "inputName",
+    "workType",
+    "quantity",
+    "unitPrice",
+    "supplierRef",
+    "buyerRef",
+    "sourceRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getAgricultureOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): AgricultureOperationKind {
+  const configuredKind = metadata[AGRICULTURE_OPERATION_KIND_KEY]?.trim();
+  if (isAgricultureOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasAgricultureMetadata(metadata)) {
+    return "INPUT_PURCHASE";
+  }
+  return type === "CASH_IN" ? "HARVEST_SALE" : "FIELD_EXPENSE";
+}
+
+function getAgricultureOperationType(kind: AgricultureOperationKind): "CASH_IN" | "CASH_OUT" {
+  return kind === "HARVEST_SALE" || kind === "SUPPORT_INCOME" ? "CASH_IN" : "CASH_OUT";
+}
+
+function getAgricultureVisibleKeys(kind: AgricultureOperationKind): Set<string> {
+  if (kind === "INPUT_PURCHASE") {
+    return AGRICULTURE_INPUT_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "FIELD_EXPENSE") {
+    return AGRICULTURE_FIELD_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "HARVEST_SALE") {
+    return AGRICULTURE_HARVEST_SALE_METADATA_FIELDS;
+  }
+  return AGRICULTURE_SUPPORT_INCOME_METADATA_FIELDS;
+}
+
+function isFishFarmingOperationKind(value: string | undefined): value is FishFarmingOperationKind {
+  return (
+    value === "FINGERLING_PURCHASE" ||
+    value === "FEED_PURCHASE" ||
+    value === "POND_EXPENSE" ||
+    value === "FISH_SALE" ||
+    value === "SUPPORT_INCOME"
+  );
+}
+
+function hasFishFarmingMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "pondRef",
+    "cycleRef",
+    "species",
+    "fingerlingBatchRef",
+    "feedName",
+    "quantity",
+    "unitPrice",
+    "supplierRef",
+    "buyerRef",
+    "sourceRef",
+    "mortalityCount",
+    "waterQuality"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getFishFarmingOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): FishFarmingOperationKind {
+  const configuredKind = metadata[FISH_FARMING_OPERATION_KIND_KEY]?.trim();
+  if (isFishFarmingOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasFishFarmingMetadata(metadata)) {
+    return "FINGERLING_PURCHASE";
+  }
+  return type === "CASH_IN" ? "FISH_SALE" : "POND_EXPENSE";
+}
+
+function getFishFarmingOperationType(kind: FishFarmingOperationKind): "CASH_IN" | "CASH_OUT" {
+  return kind === "FISH_SALE" || kind === "SUPPORT_INCOME" ? "CASH_IN" : "CASH_OUT";
+}
+
+function getFishFarmingVisibleKeys(kind: FishFarmingOperationKind): Set<string> {
+  if (kind === "FINGERLING_PURCHASE") {
+    return FISH_FARMING_FINGERLING_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "FEED_PURCHASE") {
+    return FISH_FARMING_FEED_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "POND_EXPENSE") {
+    return FISH_FARMING_POND_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "FISH_SALE") {
+    return FISH_FARMING_FISH_SALE_METADATA_FIELDS;
+  }
+  return FISH_FARMING_SUPPORT_INCOME_METADATA_FIELDS;
+}
+
+function isLivestockOperationKind(value: string | undefined): value is LivestockOperationKind {
+  return (
+    value === "ANIMAL_PURCHASE" ||
+    value === "FEED_PURCHASE" ||
+    value === "VET_CARE" ||
+    value === "FARM_EXPENSE" ||
+    value === "ANIMAL_SALE" ||
+    value === "PRODUCT_SALE" ||
+    value === "SUPPORT_INCOME"
+  );
+}
+
+function hasLivestockMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "herdRef",
+    "batchRef",
+    "species",
+    "animalCategory",
+    "animalCount",
+    "feedName",
+    "feedQuantity",
+    "productName",
+    "productQuantity",
+    "unitPrice",
+    "treatmentName",
+    "supplierRef",
+    "buyerRef",
+    "sourceRef",
+    "mortalityCount",
+    "healthStatus"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getLivestockOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): LivestockOperationKind {
+  const configuredKind = metadata[LIVESTOCK_OPERATION_KIND_KEY]?.trim();
+  if (isLivestockOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasLivestockMetadata(metadata)) {
+    return "ANIMAL_PURCHASE";
+  }
+  return type === "CASH_IN" ? "ANIMAL_SALE" : "FARM_EXPENSE";
+}
+
+function getLivestockOperationType(kind: LivestockOperationKind): "CASH_IN" | "CASH_OUT" {
+  return kind === "ANIMAL_SALE" || kind === "PRODUCT_SALE" || kind === "SUPPORT_INCOME"
+    ? "CASH_IN"
+    : "CASH_OUT";
+}
+
+function getLivestockVisibleKeys(kind: LivestockOperationKind): Set<string> {
+  if (kind === "ANIMAL_PURCHASE") {
+    return LIVESTOCK_ANIMAL_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "FEED_PURCHASE") {
+    return LIVESTOCK_FEED_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "VET_CARE") {
+    return LIVESTOCK_VET_CARE_METADATA_FIELDS;
+  }
+  if (kind === "FARM_EXPENSE") {
+    return LIVESTOCK_FARM_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "ANIMAL_SALE") {
+    return LIVESTOCK_ANIMAL_SALE_METADATA_FIELDS;
+  }
+  if (kind === "PRODUCT_SALE") {
+    return LIVESTOCK_PRODUCT_SALE_METADATA_FIELDS;
+  }
+  return LIVESTOCK_SUPPORT_INCOME_METADATA_FIELDS;
+}
+
+function getVisibleFinanceMetadataFields(
+  activityCode: BusinessActivityCode | null,
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>,
+  fields: ActivityFieldDefinition[]
+): ActivityFieldDefinition[] {
+  if (activityCode === "LIVESTOCK") {
+    const operationKind = getLivestockOperationKind(type, metadata);
+    const visibleKeys = getLivestockVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "FISH_FARMING") {
+    const operationKind = getFishFarmingOperationKind(type, metadata);
+    const visibleKeys = getFishFarmingVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "AGRICULTURE") {
+    const operationKind = getAgricultureOperationKind(type, metadata);
+    const visibleKeys = getAgricultureVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode !== "HARDWARE") {
+    return fields;
+  }
+
+  const operationKind = getHardwareOperationKind(type, metadata);
+  const visibleKeys =
+    operationKind === "ITEM_EXIT"
+      ? HARDWARE_CASH_IN_METADATA_FIELDS
+      : operationKind === "ITEM_ENTRY"
+        ? HARDWARE_CASH_OUT_METADATA_FIELDS
+        : new Set<string>();
+  return fields.filter((field) => visibleKeys.has(field.key));
+}
+
+function cleanSectorFinanceMetadata(
+  activityCode: BusinessActivityCode | null,
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): Record<string, string> {
+  if (activityCode === "LIVESTOCK") {
+    const operationKind = getLivestockOperationKind(type, metadata);
+    const visibleKeys = getLivestockVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [LIVESTOCK_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        LIVESTOCK_METADATA_FIELDS.has(key) &&
+        key !== LIVESTOCK_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "FISH_FARMING") {
+    const operationKind = getFishFarmingOperationKind(type, metadata);
+    const visibleKeys = getFishFarmingVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [FISH_FARMING_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        FISH_FARMING_METADATA_FIELDS.has(key) &&
+        key !== FISH_FARMING_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "AGRICULTURE") {
+    const operationKind = getAgricultureOperationKind(type, metadata);
+    const visibleKeys = getAgricultureVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [AGRICULTURE_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        AGRICULTURE_METADATA_FIELDS.has(key) &&
+        key !== AGRICULTURE_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode !== "HARDWARE") {
+    return metadata;
+  }
+
+  const operationKind = getHardwareOperationKind(type, metadata);
+  const visibleKeys =
+    operationKind === "ITEM_EXIT"
+      ? HARDWARE_CASH_IN_METADATA_FIELDS
+      : operationKind === "ITEM_ENTRY"
+        ? HARDWARE_CASH_OUT_METADATA_FIELDS
+        : new Set<string>();
+
+  return Object.fromEntries(
+    Object.entries({
+      ...metadata,
+      [HARDWARE_OPERATION_KIND_KEY]: operationKind
+    }).map(([key, value]) => [
+      key,
+      HARDWARE_METADATA_FIELDS.has(key) &&
+      key !== HARDWARE_OPERATION_KIND_KEY &&
+      !visibleKeys.has(key)
+        ? ""
+        : value
+    ])
+  );
+}
+
+function deriveSectorAmount(
+  activityCode: BusinessActivityCode | null,
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): string | null {
+  if (activityCode === "HARDWARE") {
+    return deriveHardwareAmount(type, metadata);
+  }
+  if (activityCode === "AGRICULTURE") {
+    return deriveAgricultureAmount(getAgricultureOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "FISH_FARMING") {
+    return deriveFishFarmingAmount(getFishFarmingOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "LIVESTOCK") {
+    return deriveLivestockAmount(getLivestockOperationKind(type, metadata), metadata);
+  }
+  return null;
+}
+
+function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
+  return kind === "ITEM_EXIT"
+    ? "Vente: renseignez la quantite, le prix de vente et le versement."
+    : kind === "ITEM_ENTRY"
+      ? "Acquisition: renseignez la quantite, le prix d'achat et le fournisseur."
+      : "Transaction globale: renseignez seulement le montant et la description utile.";
+}
+
+function getAgricultureFormModeLabel(kind: AgricultureOperationKind): string {
+  if (kind === "INPUT_PURCHASE") {
+    return "Achat intrants: campagne, parcelle, type de champ, intrant, quantite et prix unitaire.";
+  }
+  if (kind === "FIELD_EXPENSE") {
+    return "Travaux champ: campagne, parcelle, surface et nature des travaux agricoles.";
+  }
+  if (kind === "HARVEST_SALE") {
+    return "Vente recolte: culture, quantite vendue, prix unitaire et acheteur.";
+  }
+  return "Appui / subvention: campagne, parcelle et source de financement.";
+}
+
+function getFishFarmingFormModeLabel(kind: FishFarmingOperationKind): string {
+  if (kind === "FINGERLING_PURCHASE") {
+    return "Achat alevins: bassin, cycle, lot, quantite et prix unitaire.";
+  }
+  if (kind === "FEED_PURCHASE") {
+    return "Achat aliment: bassin, cycle, aliment, quantite, unite et fournisseur.";
+  }
+  if (kind === "POND_EXPENSE") {
+    return "Charge bassin: intervention, intrant, mortalite ou qualite d'eau si applicable.";
+  }
+  if (kind === "FISH_SALE") {
+    return "Vente poisson: bassin, cycle, quantite vendue, prix unitaire et acheteur.";
+  }
+  return "Appui / subvention: bassin, cycle et source de financement.";
+}
+
+function getLivestockFormModeLabel(kind: LivestockOperationKind): string {
+  if (kind === "ANIMAL_PURCHASE") {
+    return "Achat animaux: troupeau, lot, espece, nombre d'animaux et prix unitaire.";
+  }
+  if (kind === "FEED_PURCHASE") {
+    return "Achat aliment: troupeau, lot, aliment, quantite, unite et fournisseur.";
+  }
+  if (kind === "VET_CARE") {
+    return "Soins / vaccin: troupeau, lot, soin, animaux concernes et etat sanitaire.";
+  }
+  if (kind === "FARM_EXPENSE") {
+    return "Charge elevage: alimentation, intrant, mortalite ou observation sanitaire si applicable.";
+  }
+  if (kind === "ANIMAL_SALE") {
+    return "Vente animaux: troupeau, lot, nombre vendu, prix unitaire et acheteur.";
+  }
+  if (kind === "PRODUCT_SALE") {
+    return "Vente produit: produit d'elevage, quantite vendue, prix unitaire et acheteur.";
+  }
+  return "Appui / subvention: troupeau, lot et source de financement.";
 }
 
 function toDateTimeLocalInput(value: string): string {
@@ -139,7 +1012,7 @@ function formatMetadataSummary(
   const items = fields
     .map((field) => {
       const value = metadata[field.key]?.trim();
-      return value ? `${field.label}: ${value}` : null;
+      return value ? `${field.label}: ${formatMetadataValue(field.key, value)}` : null;
     })
     .filter((value): value is string => value !== null);
 
@@ -149,8 +1022,27 @@ function formatMetadataSummary(
 
   const fallbackItems = Object.entries(metadata)
     .filter(([, value]) => value.trim().length > 0)
-    .map(([key, value]) => `${key}: ${value}`);
+    .map(([key, value]) => `${key}: ${formatMetadataValue(key, value)}`);
   return fallbackItems.length > 0 ? fallbackItems.join(" | ") : "-";
+}
+
+function formatMetadataValue(key: string, value: string): string {
+  if (key === HARDWARE_OPERATION_KIND_KEY && isHardwareOperationKind(value)) {
+    return HARDWARE_OPERATION_LABELS[value];
+  }
+  if (key === AGRICULTURE_OPERATION_KIND_KEY && isAgricultureOperationKind(value)) {
+    return AGRICULTURE_OPERATION_LABELS[value];
+  }
+  if (key === FISH_FARMING_OPERATION_KIND_KEY && isFishFarmingOperationKind(value)) {
+    return FISH_FARMING_OPERATION_LABELS[value];
+  }
+  if (key === LIVESTOCK_OPERATION_KIND_KEY && isLivestockOperationKind(value)) {
+    return LIVESTOCK_OPERATION_LABELS[value];
+  }
+  if (isMoneyMetadataField(key)) {
+    return formatAmountForDisplay(value);
+  }
+  return value;
 }
 
 function buildDefaultAccountForm(
@@ -298,7 +1190,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   const [transactionForm, setTransactionForm] = useState({
     accountId: "",
-    type: "CASH_OUT" as "CASH_IN" | "CASH_OUT",
+    type: getDefaultTransactionType(selectedActivityCode),
     amount: "",
     currency: "XOF",
     description: "",
@@ -322,9 +1214,35 @@ export function FinanceTransactionsPage(): JSX.Element {
   );
 
   const financeMetadataFields = selectedProfile?.finance.metadataFields ?? EMPTY_METADATA_FIELDS;
+  const visibleFinanceMetadataFields = useMemo(
+    () =>
+      getVisibleFinanceMetadataFields(
+        selectedActivityCode,
+        transactionForm.type,
+        transactionForm.metadata,
+        financeMetadataFields
+      ),
+    [financeMetadataFields, selectedActivityCode, transactionForm.metadata, transactionForm.type]
+  );
+  const hardwareOperationKind = selectedActivityCode === "HARDWARE"
+    ? getHardwareOperationKind(transactionForm.type, transactionForm.metadata)
+    : "GLOBAL";
+  const agricultureOperationKind = selectedActivityCode === "AGRICULTURE"
+    ? getAgricultureOperationKind(transactionForm.type, transactionForm.metadata)
+    : "INPUT_PURCHASE";
+  const fishFarmingOperationKind = selectedActivityCode === "FISH_FARMING"
+    ? getFishFarmingOperationKind(transactionForm.type, transactionForm.metadata)
+    : "FINGERLING_PURCHASE";
+  const livestockOperationKind = selectedActivityCode === "LIVESTOCK"
+    ? getLivestockOperationKind(transactionForm.type, transactionForm.metadata)
+    : "ANIMAL_PURCHASE";
   const hasRequiredFinanceDetails = Boolean(
     selectedProfile?.finance.requiresDescription ||
-      financeMetadataFields.some((field) => field.required)
+      visibleFinanceMetadataFields.some((field) => field.required) ||
+      selectedActivityCode === "HARDWARE" ||
+      selectedActivityCode === "AGRICULTURE" ||
+      selectedActivityCode === "FISH_FARMING" ||
+      selectedActivityCode === "LIVESTOCK"
   );
   const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
   const enabledActivityCodes = useMemo(
@@ -383,14 +1301,14 @@ export function FinanceTransactionsPage(): JSX.Element {
     setTransactionProofFile(null);
     setTransactionForm({
       accountId: accounts[0]?.id ?? "",
-      type: "CASH_OUT",
+      type: getDefaultTransactionType(selectedActivityCode),
       amount: "",
       currency: allowedCurrencies[0] ?? "XOF",
       description: "",
       metadata: syncMetadataState({}, financeMetadataFields),
       occurredAt: ""
     });
-  }, [accounts, allowedCurrencies, financeMetadataFields]);
+  }, [accounts, allowedCurrencies, financeMetadataFields, selectedActivityCode]);
 
   const canManageAccount = useCallback(
     (account: FinancialAccount): boolean => {
@@ -413,17 +1331,17 @@ export function FinanceTransactionsPage(): JSX.Element {
     const cards = [
       {
         title: "Entrées",
-        value: cashInTotal.toFixed(2),
+        value: formatAmountForDisplay(cashInTotal),
         note: "Montant cumulé"
       },
       {
         title: "Sorties",
-        value: cashOutTotal.toFixed(2),
+        value: formatAmountForDisplay(cashOutTotal),
         note: "Montant cumulé"
       },
       {
         title: "Solde net",
-        value: netBalance.toFixed(2),
+        value: formatAmountForDisplay(netBalance),
         note: "Entrées - sorties"
       }
     ];
@@ -661,6 +1579,21 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [allowedCurrencies, financeMetadataFields]);
 
   useEffect(() => {
+    setTransactionForm((prev) => {
+      if (editingTransactionId) {
+        return prev;
+      }
+      const hasDraftInput =
+        prev.amount.trim().length > 0 ||
+        prev.description.trim().length > 0 ||
+        prev.occurredAt.trim().length > 0 ||
+        Object.values(prev.metadata).some((value) => value.trim().length > 0);
+      const nextType = getDefaultTransactionType(selectedActivityCode);
+      return hasDraftInput || prev.type === nextType ? prev : { ...prev, type: nextType };
+    });
+  }, [editingTransactionId, selectedActivityCode]);
+
+  useEffect(() => {
     setAccountForm((prev) => {
       const next = normalizeAccountFormForActivities(prev, enabledActivityCodes, selectedActivityCode);
       return sameAccountForm(prev, next) ? prev : next;
@@ -694,7 +1627,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         const payload = {
           name: accountForm.name.trim(),
           accountRef: accountForm.accountRef.trim() || undefined,
-          openingBalance: accountForm.openingBalance.trim()
+          openingBalance: normalizeAmountForApi(accountForm.openingBalance)
         };
 
         return editingAccountId
@@ -729,7 +1662,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setAccountForm({
       name: account.name,
       accountRef: account.accountRef ?? "",
-      openingBalance: account.balance,
+      openingBalance: formatAmountForInput(account.balance),
       scopeType: account.scopeType,
       primaryActivityCode: account.primaryActivityCode ?? "",
       allowedActivityCodes: account.allowedActivityCodes
@@ -792,14 +1725,19 @@ export function FinanceTransactionsPage(): JSX.Element {
 
     try {
       const response = await withAuthorizedToken((accessToken) => {
+        const metadata = cleanSectorFinanceMetadata(
+          selectedActivityCode,
+          transactionForm.type,
+          transactionForm.metadata
+        );
         const payload = {
           accountId: transactionForm.accountId,
           type: transactionForm.type,
-          amount: transactionForm.amount.trim(),
+          amount: normalizeAmountForApi(transactionForm.amount),
           currency: transactionForm.currency.trim().toUpperCase(),
           activityCode: selectedActivityCode as BusinessActivityCode,
           description: transactionForm.description.trim() || undefined,
-          metadata: transactionForm.metadata,
+          metadata,
           occurredAt: transactionForm.occurredAt
             ? new Date(transactionForm.occurredAt).toISOString()
             : undefined
@@ -863,7 +1801,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setTransactionForm({
       accountId: transaction.accountId,
       type: transaction.type,
-      amount: transaction.amount,
+      amount: formatAmountForInput(transaction.amount),
       currency: transaction.currency,
       description: transaction.description ?? "",
       metadata: syncMetadataState(transaction.metadata, financeMetadataFields),
@@ -1205,6 +2143,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                     openingBalance: event.target.value
                   }))
                 }
+                onBlur={() =>
+                  setAccountForm((prev) => ({
+                    ...prev,
+                    openingBalance: formatAmountForInput(prev.openingBalance)
+                  }))
+                }
                 required
               />
             </label>
@@ -1374,27 +2318,232 @@ export function FinanceTransactionsPage(): JSX.Element {
                 </option>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.name} ({account.balance} {transactionForm.currency}) | {formatAccountScopeLabel(account)}
+                    {account.name} ({formatAmountForDisplay(account.balance)} {transactionForm.currency}) | {formatAccountScopeLabel(account)}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label className="operations-inline-group">
-              <span>Type</span>
-              <select
-                value={transactionForm.type}
-                onChange={(event) =>
-                  setTransactionForm((prev) => ({
-                    ...prev,
-                    type: event.target.value as "CASH_IN" | "CASH_OUT"
-                  }))
-                }
-              >
-                <option value="CASH_IN">Entrée</option>
-                <option value="CASH_OUT">Sortie</option>
-              </select>
-            </label>
+            {selectedActivityCode === "HARDWARE" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Nature quincaillerie</span>
+                  <select
+                    value={hardwareOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as HardwareOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getHardwareOperationType(nextKind) ?? prev.type;
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [HARDWARE_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = nextKind === "GLOBAL"
+                          ? null
+                          : deriveSectorAmount(selectedActivityCode, nextType, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: nextKind === "GLOBAL" ? "" : formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="GLOBAL">{HARDWARE_OPERATION_LABELS.GLOBAL}</option>
+                    <option value="ITEM_ENTRY">{HARDWARE_OPERATION_LABELS.ITEM_ENTRY}</option>
+                    <option value="ITEM_EXIT">{HARDWARE_OPERATION_LABELS.ITEM_EXIT}</option>
+                  </select>
+                </label>
+
+                {hardwareOperationKind === "GLOBAL" ? (
+                  <label className="operations-inline-group">
+                    <span>Flux financier</span>
+                    <select
+                      value={transactionForm.type}
+                      onChange={(event) => {
+                        const nextType = event.target.value as "CASH_IN" | "CASH_OUT";
+                        setTransactionForm((prev) => ({
+                          ...prev,
+                          type: nextType,
+                          metadata: cleanSectorFinanceMetadata(
+                            selectedActivityCode,
+                            nextType,
+                            {
+                              ...prev.metadata,
+                              [HARDWARE_OPERATION_KIND_KEY]: "GLOBAL"
+                            }
+                          )
+                        }));
+                      }}
+                    >
+                      <option value="CASH_IN">Encaissement</option>
+                      <option value="CASH_OUT">Decaissement</option>
+                    </select>
+                  </label>
+                ) : (
+                  <div className="operations-inline-group">
+                    <span>Flux financier</span>
+                    <strong>
+                      {transactionForm.type === "CASH_IN"
+                        ? "Vente"
+                        : "Acquisition"}
+                    </strong>
+                  </div>
+                )}
+              </>
+            ) : selectedActivityCode === "AGRICULTURE" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation agricole</span>
+                  <select
+                    value={agricultureOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as AgricultureOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getAgricultureOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [AGRICULTURE_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveAgricultureAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="INPUT_PURCHASE">{AGRICULTURE_OPERATION_LABELS.INPUT_PURCHASE}</option>
+                    <option value="FIELD_EXPENSE">{AGRICULTURE_OPERATION_LABELS.FIELD_EXPENSE}</option>
+                    <option value="HARVEST_SALE">{AGRICULTURE_OPERATION_LABELS.HARVEST_SALE}</option>
+                    <option value="SUPPORT_INCOME">{AGRICULTURE_OPERATION_LABELS.SUPPORT_INCOME}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette agricole" : "Depense agricole"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "FISH_FARMING" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation piscicole</span>
+                  <select
+                    value={fishFarmingOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as FishFarmingOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getFishFarmingOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [FISH_FARMING_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveFishFarmingAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="FINGERLING_PURCHASE">{FISH_FARMING_OPERATION_LABELS.FINGERLING_PURCHASE}</option>
+                    <option value="FEED_PURCHASE">{FISH_FARMING_OPERATION_LABELS.FEED_PURCHASE}</option>
+                    <option value="POND_EXPENSE">{FISH_FARMING_OPERATION_LABELS.POND_EXPENSE}</option>
+                    <option value="FISH_SALE">{FISH_FARMING_OPERATION_LABELS.FISH_SALE}</option>
+                    <option value="SUPPORT_INCOME">{FISH_FARMING_OPERATION_LABELS.SUPPORT_INCOME}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette piscicole" : "Depense piscicole"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "LIVESTOCK" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation elevage</span>
+                  <select
+                    value={livestockOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as LivestockOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getLivestockOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [LIVESTOCK_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveLivestockAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="ANIMAL_PURCHASE">{LIVESTOCK_OPERATION_LABELS.ANIMAL_PURCHASE}</option>
+                    <option value="FEED_PURCHASE">{LIVESTOCK_OPERATION_LABELS.FEED_PURCHASE}</option>
+                    <option value="VET_CARE">{LIVESTOCK_OPERATION_LABELS.VET_CARE}</option>
+                    <option value="FARM_EXPENSE">{LIVESTOCK_OPERATION_LABELS.FARM_EXPENSE}</option>
+                    <option value="ANIMAL_SALE">{LIVESTOCK_OPERATION_LABELS.ANIMAL_SALE}</option>
+                    <option value="PRODUCT_SALE">{LIVESTOCK_OPERATION_LABELS.PRODUCT_SALE}</option>
+                    <option value="SUPPORT_INCOME">{LIVESTOCK_OPERATION_LABELS.SUPPORT_INCOME}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette elevage" : "Depense elevage"}
+                  </strong>
+                </div>
+              </>
+            ) : (
+              <label className="operations-inline-group">
+                <span>Type</span>
+                <select
+                  value={transactionForm.type}
+                  onChange={(event) => {
+                    const nextType = event.target.value as "CASH_IN" | "CASH_OUT";
+                    setTransactionForm((prev) => ({
+                      ...prev,
+                      type: nextType
+                    }));
+                  }}
+                >
+                  <option value="CASH_IN">Entrée</option>
+                  <option value="CASH_OUT">Sortie</option>
+                </select>
+              </label>
+            )}
 
             <label className="operations-inline-group">
               <span>Montant</span>
@@ -1407,6 +2556,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                   setTransactionForm((prev) => ({
                     ...prev,
                     amount: event.target.value
+                  }))
+                }
+                onBlur={() =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    amount: formatAmountForInput(prev.amount)
                   }))
                 }
                 required
@@ -1485,6 +2640,27 @@ export function FinanceTransactionsPage(): JSX.Element {
           <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails}>
             <summary>Informations complémentaires</summary>
             <div className="finance-transaction-form-options-body">
+              {selectedActivityCode === "HARDWARE" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getHardwareFormModeLabel(hardwareOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "AGRICULTURE" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getAgricultureFormModeLabel(agricultureOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "FISH_FARMING" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getFishFarmingFormModeLabel(fishFarmingOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "LIVESTOCK" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getLivestockFormModeLabel(livestockOperationKind)}
+                </p>
+              ) : null}
+
               <label className="operations-inline-group">
                 <span>Date et heure de l'opération</span>
                 <input
@@ -1517,22 +2693,48 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
 
-              {financeMetadataFields.map((field) => (
+              {visibleFinanceMetadataFields.map((field) => (
                 <label key={field.key} className="operations-inline-group">
                   <span>{field.label}</span>
                   <input
                     type="text"
+                    inputMode={getMetadataInputMode(field.key)}
                     placeholder={field.helpText || field.label}
                     value={transactionForm.metadata[field.key] ?? ""}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setTransactionForm((prev) => {
+                        const nextMetadata = {
+                          ...prev.metadata,
+                          [field.key]: nextValue
+                        };
+                        const shouldDeriveAmount =
+                          (selectedActivityCode === "HARDWARE" && shouldDeriveHardwareAmount(field.key)) ||
+                          (selectedActivityCode === "AGRICULTURE" && shouldDeriveAgricultureAmount(field.key)) ||
+                          (selectedActivityCode === "FISH_FARMING" && shouldDeriveFishFarmingAmount(field.key)) ||
+                          (selectedActivityCode === "LIVESTOCK" && shouldDeriveLivestockAmount(field.key));
+                        const derivedAmount = shouldDeriveAmount
+                          ? deriveSectorAmount(selectedActivityCode, prev.type, nextMetadata)
+                          : null;
+                        return {
+                          ...prev,
+                          amount: derivedAmount ? formatAmountForInput(derivedAmount) : prev.amount,
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                    onBlur={() => {
+                      if (!isMoneyMetadataField(field.key)) {
+                        return;
+                      }
                       setTransactionForm((prev) => ({
                         ...prev,
                         metadata: {
                           ...prev.metadata,
-                          [field.key]: event.target.value
+                          [field.key]: formatAmountForInput(prev.metadata[field.key] ?? "")
                         }
-                      }))
-                    }
+                      }));
+                    }}
                     title={field.helpText}
                     required={field.required}
                   />
@@ -1638,7 +2840,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                         </div>
                       </td>
                       <td>
-                        {tx.amount} {tx.currency}
+                        {formatAmountForDisplay(tx.amount)} {tx.currency}
                       </td>
                       <td>
                         <div>
@@ -1830,7 +3032,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               <strong>Type:</strong> {selectedTransaction.type === "CASH_IN" ? "Entrée" : "Sortie"}
             </p>
             <p>
-              <strong>Montant:</strong> {selectedTransaction.amount} {selectedTransaction.currency}
+              <strong>Montant:</strong> {formatAmountForDisplay(selectedTransaction.amount)} {selectedTransaction.currency}
             </p>
             <p>
               <strong>Preuves:</strong> {selectedTransaction.proofsCount}
@@ -2002,7 +3204,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                         {line}
                       </p>
                     ))}
-                    <p className="hint">Solde: {account.balance}</p>
+                    <p className="hint">Solde: {formatAmountForDisplay(account.balance)}</p>
                     <p className="hint">
                       Transactions liees: {account.transactionsCount}
                     </p>

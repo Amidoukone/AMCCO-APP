@@ -136,6 +136,8 @@ Le referentiel metier v1 expose maintenant les activites du projet:
 - Alimentation
 - Location immobiliere
 - Activites agricoles
+- Pisciculture
+- Elevage
 - Services divers
 - Exploitation miniere
 - Production d'eau potable
@@ -219,10 +221,10 @@ Le pipeline CI GitHub execute aussi ces tests backend avant `typecheck` et `buil
 - `PATCH /api/v1/operations/tasks/:taskId/assign` : assignation/desassignation (OWNER/SYS_ADMIN/SUPERVISOR)
 - `PATCH /api/v1/operations/tasks/assign-bulk` : assignation en lot (OWNER/SYS_ADMIN/SUPERVISOR)
 - `PATCH /api/v1/operations/tasks/:taskId/status` : changement statut tache (manager ou employe assigne)
-- `GET /api/v1/reports/overview` : consolidation reporting finance + operations + gouvernance comptes (`dateFrom`, `dateTo`, `activityCode` optionnels)
-- `GET /api/v1/reports/exports/overview.pdf` : export PDF du rapport consolide (`dateFrom`, `dateTo`, `activityCode` optionnels)
-- `GET /api/v1/reports/exports/transactions.csv` : export CSV des transactions (`dateFrom`, `dateTo`, `activityCode` optionnels)
-- `GET /api/v1/reports/exports/transactions.xlsx` : export Excel des transactions (`dateFrom`, `dateTo`, `activityCode` optionnels)
+- `GET /api/v1/reports/overview` : consolidation reporting finance + operations + gouvernance comptes (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
+- `GET /api/v1/reports/exports/overview.pdf` : export PDF du rapport consolide (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
+- `GET /api/v1/reports/exports/transactions.csv` : export CSV des transactions (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
+- `GET /api/v1/reports/exports/transactions.xlsx` : export Excel des transactions (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
 - les exports transactions incluent la gouvernance compte: portee, secteur principal, secteurs autorises, compatibilite
-- `GET /api/v1/reports/exports/tasks.csv` : export CSV des taches (`dateFrom`, `dateTo`, `activityCode` optionnels)
-- `GET /api/v1/reports/exports/tasks.xlsx` : export Excel des taches (`dateFrom`, `dateTo`, `activityCode` optionnels)
+- `GET /api/v1/reports/exports/tasks.csv` : export CSV des taches (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
+- `GET /api/v1/reports/exports/tasks.xlsx` : export Excel des taches (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)

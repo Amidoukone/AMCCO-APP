@@ -12,12 +12,17 @@ import {
 } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import type { ReportsOverview } from "../types/reporting";
-import type { RoleCode } from "../types/role";
+
+type ReportPeriodMode = "CUSTOM" | "MONTH" | "QUARTER" | "YEAR";
 
 type PeriodFormState = {
+  periodMode: ReportPeriodMode;
   dateFrom: string;
   dateTo: string;
-  activityCode: "ALL" | BusinessActivityCode;
+  month: string;
+  quarter: string;
+  year: string;
+  activityCode: BusinessActivityCode | "";
 };
 
 type ReportPeriodQuery = {
@@ -26,12 +31,14 @@ type ReportPeriodQuery = {
   activityCode?: BusinessActivityCode;
 };
 
-type ExportTarget =
-  | "overview-pdf"
-  | "transactions-xlsx"
-  | "tasks-xlsx";
+type ExportTarget = "overview-pdf";
 
-type ReportPeriodPreset = "TODAY" | "LAST_7_DAYS" | "LAST_30_DAYS" | "THIS_MONTH";
+const REPORT_PERIOD_MODE_OPTIONS: Array<{ value: ReportPeriodMode; label: string }> = [
+  { value: "CUSTOM", label: "Dates" },
+  { value: "MONTH", label: "Mois" },
+  { value: "QUARTER", label: "Trimestre" },
+  { value: "YEAR", label: "Annee" }
+];
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -42,6 +49,11 @@ function toErrorMessage(error: unknown): string {
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("fr-FR");
+}
+
+function formatReportDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("fr-FR");
 }
 
 function taskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
@@ -72,22 +84,6 @@ function transactionStatusLabel(status: "DRAFT" | "SUBMITTED" | "APPROVED" | "RE
 
 function transactionTypeLabel(type: "CASH_IN" | "CASH_OUT"): string {
   return type === "CASH_IN" ? "Entrée" : "Sortie";
-}
-
-function roleLabel(role: RoleCode): string {
-  if (role === "OWNER") {
-    return "Propriétaire";
-  }
-  if (role === "SYS_ADMIN") {
-    return "Administrateur système";
-  }
-  if (role === "ACCOUNTANT") {
-    return "Comptable";
-  }
-  if (role === "SUPERVISOR") {
-    return "Superviseur";
-  }
-  return "Employé";
 }
 
 function parseAmount(value: string): number {
@@ -124,10 +120,6 @@ function accountScopeLabel(account: ReportsOverview["financeAccounts"][number]):
     : "Restreint";
 }
 
-function compatibilityLabel(value: boolean): string {
-  return value ? "Compatible" : "Hors secteur";
-}
-
 function highlightToneClass(emphasis: "INFO" | "WARNING" | "CRITICAL"): string {
   if (emphasis === "CRITICAL") {
     return "severity-critical";
@@ -136,6 +128,16 @@ function highlightToneClass(emphasis: "INFO" | "WARNING" | "CRITICAL"): string {
     return "severity-warning";
   }
   return "severity-info";
+}
+
+function formatRate(value: number): string {
+  return `${new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 1
+  }).format(value)}%`;
+}
+
+function operationalScopeLabel(scope: "ACTIVITY" | "SUBSECTION"): string {
+  return scope === "ACTIVITY" ? "Secteur" : "Sous-section";
 }
 
 function buildApprovedCurrencyRows(overview: ReportsOverview): Array<{
@@ -228,54 +230,154 @@ function toDateInputValue(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function resolvePresetPeriod(preset: ReportPeriodPreset): Pick<PeriodFormState, "dateFrom" | "dateTo"> {
-  const now = new Date();
-  const today = toDateInputValue(now);
-
-  if (preset === "TODAY") {
-    return { dateFrom: today, dateTo: today };
-  }
-
-  if (preset === "LAST_7_DAYS") {
-    const start = new Date(now);
-    start.setDate(start.getDate() - 6);
-    return { dateFrom: toDateInputValue(start), dateTo: today };
-  }
-
-  if (preset === "LAST_30_DAYS") {
-    const start = new Date(now);
-    start.setDate(start.getDate() - 29);
-    return { dateFrom: toDateInputValue(start), dateTo: today };
-  }
-
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { dateFrom: toDateInputValue(monthStart), dateTo: today };
+function toMonthInputValue(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
-function normalizePeriodQuery(form: PeriodFormState): ReportPeriodQuery {
+function getCurrentQuarterValue(value = new Date()): string {
+  return String(Math.floor(value.getMonth() / 3) + 1);
+}
+
+function getCurrentYearValue(value = new Date()): string {
+  return String(value.getFullYear());
+}
+
+function createDefaultPeriodForm(activityCode: BusinessActivityCode | ""): PeriodFormState {
+  const now = new Date();
   return {
-    dateFrom: form.dateFrom ? toStartOfDayIso(form.dateFrom) : undefined,
-    dateTo: form.dateTo ? toEndOfDayIso(form.dateTo) : undefined,
-    activityCode: form.activityCode === "ALL" ? undefined : form.activityCode
+    periodMode: "CUSTOM",
+    dateFrom: "",
+    dateTo: "",
+    month: toMonthInputValue(now),
+    quarter: getCurrentQuarterValue(now),
+    year: getCurrentYearValue(now),
+    activityCode
   };
 }
 
-function buildExportFileName(
-  kind: "overview" | "transactions" | "tasks",
-  format: "xlsx" | "pdf",
-  form: PeriodFormState
-): string {
+function isValidYearValue(value: string): boolean {
+  const year = Number(value);
+  return /^\d{4}$/.test(value) && Number.isInteger(year) && year >= 1900 && year <= 9999;
+}
+
+function isValidMonthInputValue(value: string): boolean {
+  const [yearPart, monthPart] = value.split("-");
+  const month = Number(monthPart);
+  return isValidYearValue(yearPart) && Number.isInteger(month) && month >= 1 && month <= 12;
+}
+
+function resolvePeriodRange(form: PeriodFormState): Pick<ReportPeriodQuery, "dateFrom" | "dateTo"> {
+  if (form.periodMode === "MONTH") {
+    const [yearValue, monthValue] = form.month.split("-").map(Number);
+    if (!isValidMonthInputValue(form.month)) {
+      return {};
+    }
+
+    const start = new Date(yearValue, monthValue - 1, 1);
+    const end = new Date(yearValue, monthValue, 0);
+    return {
+      dateFrom: toStartOfDayIso(toDateInputValue(start)),
+      dateTo: toEndOfDayIso(toDateInputValue(end))
+    };
+  }
+
+  if (form.periodMode === "QUARTER") {
+    const yearValue = Number(form.year);
+    const quarterValue = Number(form.quarter);
+    if (!isValidYearValue(form.year) || !Number.isInteger(quarterValue) || quarterValue < 1 || quarterValue > 4) {
+      return {};
+    }
+
+    const startMonth = (quarterValue - 1) * 3;
+    const start = new Date(yearValue, startMonth, 1);
+    const end = new Date(yearValue, startMonth + 3, 0);
+    return {
+      dateFrom: toStartOfDayIso(toDateInputValue(start)),
+      dateTo: toEndOfDayIso(toDateInputValue(end))
+    };
+  }
+
+  if (form.periodMode === "YEAR") {
+    const yearValue = Number(form.year);
+    if (!isValidYearValue(form.year)) {
+      return {};
+    }
+
+    return {
+      dateFrom: toStartOfDayIso(`${yearValue}-01-01`),
+      dateTo: toEndOfDayIso(`${yearValue}-12-31`)
+    };
+  }
+
+  return {
+    dateFrom: form.dateFrom ? toStartOfDayIso(form.dateFrom) : undefined,
+    dateTo: form.dateTo ? toEndOfDayIso(form.dateTo) : undefined
+  };
+}
+
+function normalizePeriodQuery(form: PeriodFormState): ReportPeriodQuery {
+  const periodRange = resolvePeriodRange(form);
+  return {
+    ...periodRange,
+    activityCode: form.activityCode || undefined
+  };
+}
+
+function validatePeriodForm(form: PeriodFormState): string | null {
+  if (!form.activityCode) {
+    return "Selectionnez un secteur pour afficher le rapport.";
+  }
+
+  if (form.periodMode === "CUSTOM") {
+    if (form.dateFrom && form.dateTo && form.dateFrom > form.dateTo) {
+      return "La date de debut doit etre inferieure ou egale a la date de fin.";
+    }
+    return null;
+  }
+
+  if (form.periodMode === "MONTH" && !isValidMonthInputValue(form.month)) {
+    return "Selectionnez un mois valide pour le rapport.";
+  }
+
+  if ((form.periodMode === "QUARTER" || form.periodMode === "YEAR") && !isValidYearValue(form.year)) {
+    return "Saisissez une annee valide pour le rapport.";
+  }
+
+  if (form.periodMode === "QUARTER" && !["1", "2", "3", "4"].includes(form.quarter)) {
+    return "Selectionnez un trimestre valide pour le rapport.";
+  }
+
+  return null;
+}
+
+function buildExportPeriodFilePart(form: PeriodFormState): string {
+  if (form.periodMode === "MONTH") {
+    return `mois-${form.month || "non-selectionne"}`;
+  }
+
+  if (form.periodMode === "QUARTER") {
+    return `trimestre-${form.year || "annee"}-T${form.quarter || "0"}`;
+  }
+
+  if (form.periodMode === "YEAR") {
+    return `annee-${form.year || "non-selectionnee"}`;
+  }
+
+  return `dates-${form.dateFrom || "all"}-${form.dateTo || "all"}`;
+}
+
+function buildExportFileName(form: PeriodFormState): string {
   const stamp = new Date().toISOString().slice(0, 10);
-  const from = form.dateFrom || "all";
-  const to = form.dateTo || "all";
-  return `amcco-${kind}-${from}-${to}-${stamp}.${format}`;
+  return `amcco-rapport-${buildExportPeriodFilePart(form)}-${stamp}.pdf`;
 }
 
 function formatAppliedRange(overview: ReportsOverview): string {
   if (!overview.filters.dateFrom && !overview.filters.dateTo) {
     return overview.filters.activityCode
       ? `Toutes périodes | ${getBusinessActivityLabel(overview.filters.activityCode)}`
-      : "Toutes périodes";
+      : "Toutes périodes | Secteur non selectionne";
   }
 
   const fromLabel = overview.filters.dateFrom
@@ -287,31 +389,33 @@ function formatAppliedRange(overview: ReportsOverview): string {
 
   const periodLabel = `${fromLabel} -> ${toLabel}`;
   if (!overview.filters.activityCode) {
-    return periodLabel;
+    return `${periodLabel} | Secteur non selectionne`;
   }
   return `${periodLabel} | ${getBusinessActivityLabel(overview.filters.activityCode)}`;
 }
 
 export function ReportsPage(): JSX.Element {
   const withAuthorizedToken = useAuthorizedRequest();
-  const { activities, selectedActivity, selectedActivityCode } = useBusinessActivity();
+  const { enabledActivities, selectedActivity, selectedActivityCode } = useBusinessActivity();
   const [overview, setOverview] = useState<ReportsOverview | null>(null);
-  const [periodForm, setPeriodForm] = useState<PeriodFormState>({
-    dateFrom: "",
-    dateTo: "",
-    activityCode: selectedActivityCode ?? "ALL"
-  });
-  const [appliedPeriod, setAppliedPeriod] = useState<PeriodFormState>({
-    dateFrom: "",
-    dateTo: "",
-    activityCode: selectedActivityCode ?? "ALL"
-  });
+  const [periodForm, setPeriodForm] = useState<PeriodFormState>(() =>
+    createDefaultPeriodForm(selectedActivityCode ?? "")
+  );
+  const [appliedPeriod, setAppliedPeriod] = useState<PeriodFormState>(() =>
+    createDefaultPeriodForm(selectedActivityCode ?? "")
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [busyExport, setBusyExport] = useState<ExportTarget | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (!appliedPeriod.activityCode) {
+      setOverview(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
     try {
@@ -331,7 +435,7 @@ export function ReportsPage(): JSX.Element {
   }, [loadData]);
 
   useEffect(() => {
-    const nextActivityCode = selectedActivityCode ?? "ALL";
+    const nextActivityCode = selectedActivityCode ?? "";
     setPeriodForm((prev) =>
       prev.activityCode === nextActivityCode ? prev : { ...prev, activityCode: nextActivityCode }
     );
@@ -342,8 +446,9 @@ export function ReportsPage(): JSX.Element {
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (periodForm.dateFrom && periodForm.dateTo && periodForm.dateFrom > periodForm.dateTo) {
-      setErrorMessage("La date de début doit être inférieure ou égale à la date de fin.");
+    const validationMessage = validatePeriodForm(periodForm);
+    if (validationMessage) {
+      setErrorMessage(validationMessage);
       return;
     }
 
@@ -353,91 +458,48 @@ export function ReportsPage(): JSX.Element {
   }
 
   function handleResetFilters(): void {
-    const nextActivityCode = selectedActivityCode ?? "ALL";
+    const nextActivityCode = selectedActivityCode ?? "";
     setSuccessMessage(null);
     setErrorMessage(null);
-    setPeriodForm({
-      dateFrom: "",
-      dateTo: "",
-      activityCode: nextActivityCode
-    });
-    setAppliedPeriod({
-      dateFrom: "",
-      dateTo: "",
-      activityCode: nextActivityCode
-    });
+    const nextPeriod = createDefaultPeriodForm(nextActivityCode);
+    setPeriodForm(nextPeriod);
+    setAppliedPeriod(nextPeriod);
   }
-
-  function handleApplyPreset(preset: ReportPeriodPreset): void {
-    const period = resolvePresetPeriod(preset);
-    setSuccessMessage(null);
-    setErrorMessage(null);
-    setPeriodForm((prev) => {
-      const next = { ...prev, ...period };
-      setAppliedPeriod(next);
-      return next;
-    });
-  }
-
-  const activePreset = useMemo<ReportPeriodPreset | null>(() => {
-    if (!periodForm.dateFrom || !periodForm.dateTo) {
-      return null;
-    }
-
-    const today = resolvePresetPeriod("TODAY");
-    if (periodForm.dateFrom === today.dateFrom && periodForm.dateTo === today.dateTo) {
-      return "TODAY";
-    }
-
-    const last7Days = resolvePresetPeriod("LAST_7_DAYS");
-    if (periodForm.dateFrom === last7Days.dateFrom && periodForm.dateTo === last7Days.dateTo) {
-      return "LAST_7_DAYS";
-    }
-
-    const last30Days = resolvePresetPeriod("LAST_30_DAYS");
-    if (periodForm.dateFrom === last30Days.dateFrom && periodForm.dateTo === last30Days.dateTo) {
-      return "LAST_30_DAYS";
-    }
-
-    const thisMonth = resolvePresetPeriod("THIS_MONTH");
-    if (periodForm.dateFrom === thisMonth.dateFrom && periodForm.dateTo === thisMonth.dateTo) {
-      return "THIS_MONTH";
-    }
-
-    return null;
-  }, [periodForm.dateFrom, periodForm.dateTo]);
 
   const reportMetrics = useMemo(
     () => (overview ? buildReportMetrics(overview) : null),
     [overview]
   );
+  const hasFocusedOperationsReport = Boolean(
+    overview?.agricultureOperationsReport ||
+    overview?.fishFarmingOperationsReport ||
+    overview?.livestockOperationsReport
+  );
 
-  async function handleExport(
-    kind: "overview" | "transactions" | "tasks",
-    format: "xlsx" | "pdf"
-  ): Promise<void> {
-    const exportTarget = `${kind}-${format}` as ExportTarget;
-    setBusyExport(exportTarget);
+  async function handleExport(): Promise<void> {
+    const validationMessage = validatePeriodForm(periodForm);
+    if (validationMessage) {
+      setErrorMessage(validationMessage);
+      return;
+    }
+
+    const exportPeriod = periodForm;
+    setAppliedPeriod(exportPeriod);
+    setBusyExport("overview-pdf");
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       const blob = await withAuthorizedToken((accessToken) =>
         downloadReportExportRequest(
           accessToken,
-          kind,
-          format,
-          normalizePeriodQuery(appliedPeriod)
+          "overview",
+          "pdf",
+          normalizePeriodQuery(exportPeriod)
         )
       );
-      triggerBlobDownload(blob, buildExportFileName(kind, format, appliedPeriod));
+      triggerBlobDownload(blob, buildExportFileName(exportPeriod));
 
-      if (kind === "overview") {
-        setSuccessMessage("Export PDF du rapport généré pour la période appliquée.");
-      } else if (kind === "transactions" && format === "xlsx") {
-        setSuccessMessage("Export Excel des transactions généré pour la période appliquée.");
-      } else if (kind === "tasks" && format === "xlsx") {
-        setSuccessMessage("Export Excel des tâches généré pour la période appliquée.");
-      }
+      setSuccessMessage("Export PDF du rapport genere pour la periode selectionnee.");
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -448,75 +510,137 @@ export function ReportsPage(): JSX.Element {
   return (
     <>
       <header className="section-header">
-        <h2>Rapports et exports</h2>
-        <p>Données calculées depuis les transactions, tâches, comptes et utilisateurs filtrés.</p>
+        <h2>Rapports PDF</h2>
+        <p>Donnees du secteur choisi, calculees depuis les transactions, taches et comptes.</p>
       </header>
 
       <section className="panel">
         <h3>Filtres du rapport</h3>
-        <div className="reports-period-presets">
-          <button
-            type="button"
-            className={activePreset === "TODAY" ? "view-preset-btn is-active" : "view-preset-btn"}
-            onClick={() => handleApplyPreset("TODAY")}
-            aria-pressed={activePreset === "TODAY"}
-          >
-            Aujourd'hui
-          </button>
-          <button
-            type="button"
-            className={activePreset === "LAST_7_DAYS" ? "view-preset-btn is-active" : "view-preset-btn"}
-            onClick={() => handleApplyPreset("LAST_7_DAYS")}
-            aria-pressed={activePreset === "LAST_7_DAYS"}
-          >
-            7 jours
-          </button>
-          <button
-            type="button"
-            className={activePreset === "LAST_30_DAYS" ? "view-preset-btn is-active" : "view-preset-btn"}
-            onClick={() => handleApplyPreset("LAST_30_DAYS")}
-            aria-pressed={activePreset === "LAST_30_DAYS"}
-          >
-            30 jours
-          </button>
-          <button
-            type="button"
-            className={activePreset === "THIS_MONTH" ? "view-preset-btn is-active" : "view-preset-btn"}
-            onClick={() => handleApplyPreset("THIS_MONTH")}
-            aria-pressed={activePreset === "THIS_MONTH"}
-          >
-            Ce mois
-          </button>
+        <div className="reports-period-presets" role="group" aria-label="Type de periode">
+          {REPORT_PERIOD_MODE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={periodForm.periodMode === option.value ? "view-preset-btn is-active" : "view-preset-btn"}
+              onClick={() =>
+                setPeriodForm((prev) => ({
+                  ...prev,
+                  periodMode: option.value
+                }))
+              }
+              aria-pressed={periodForm.periodMode === option.value}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
         <form className="reports-filter-form" onSubmit={handleApplyFilters}>
-          <label className="reports-filter-field" htmlFor="reports-date-from">
-            <span>Date de début</span>
-            <input
-              id="reports-date-from"
-              type="date"
-              value={periodForm.dateFrom}
-              onChange={(event) =>
-                setPeriodForm((prev) => ({
-                  ...prev,
-                  dateFrom: event.target.value
-                }))
-              }
-            />
-          </label>
-          <label className="reports-filter-field" htmlFor="reports-date-to">
-            <span>Date de fin</span>
-            <input
-              id="reports-date-to"
-              type="date"
-              value={periodForm.dateTo}
-              onChange={(event) =>
-                setPeriodForm((prev) => ({
-                  ...prev,
-                  dateTo: event.target.value
-                }))
-              }
-            />
-          </label>
+          {periodForm.periodMode === "CUSTOM" ? (
+            <>
+              <label className="reports-filter-field" htmlFor="reports-date-from">
+                <span>Date debut</span>
+                <input
+                  id="reports-date-from"
+                  type="date"
+                  value={periodForm.dateFrom}
+                  onChange={(event) =>
+                    setPeriodForm((prev) => ({
+                      ...prev,
+                      dateFrom: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label className="reports-filter-field" htmlFor="reports-date-to">
+                <span>Date fin</span>
+                <input
+                  id="reports-date-to"
+                  type="date"
+                  value={periodForm.dateTo}
+                  onChange={(event) =>
+                    setPeriodForm((prev) => ({
+                      ...prev,
+                      dateTo: event.target.value
+                    }))
+                  }
+                />
+              </label>
+            </>
+          ) : null}
+          {periodForm.periodMode === "MONTH" ? (
+            <label className="reports-filter-field" htmlFor="reports-month">
+              <span>Mois</span>
+              <input
+                id="reports-month"
+                type="month"
+                value={periodForm.month}
+                onChange={(event) =>
+                  setPeriodForm((prev) => ({
+                    ...prev,
+                    month: event.target.value
+                  }))
+                }
+              />
+            </label>
+          ) : null}
+          {periodForm.periodMode === "QUARTER" ? (
+            <>
+              <label className="reports-filter-field" htmlFor="reports-quarter-year">
+                <span>Annee</span>
+                <input
+                  id="reports-quarter-year"
+                  type="number"
+                  min="1900"
+                  max="9999"
+                  step="1"
+                  value={periodForm.year}
+                  onChange={(event) =>
+                    setPeriodForm((prev) => ({
+                      ...prev,
+                      year: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label className="reports-filter-field" htmlFor="reports-quarter">
+                <span>Trimestre</span>
+                <select
+                  id="reports-quarter"
+                  value={periodForm.quarter}
+                  onChange={(event) =>
+                    setPeriodForm((prev) => ({
+                      ...prev,
+                      quarter: event.target.value
+                    }))
+                  }
+                >
+                  <option value="1">T1 - Janvier a Mars</option>
+                  <option value="2">T2 - Avril a Juin</option>
+                  <option value="3">T3 - Juillet a Septembre</option>
+                  <option value="4">T4 - Octobre a Decembre</option>
+                </select>
+              </label>
+            </>
+          ) : null}
+          {periodForm.periodMode === "YEAR" ? (
+            <label className="reports-filter-field" htmlFor="reports-year">
+              <span>Annee</span>
+              <input
+                id="reports-year"
+                type="number"
+                min="1900"
+                max="9999"
+                step="1"
+                value={periodForm.year}
+                onChange={(event) =>
+                  setPeriodForm((prev) => ({
+                    ...prev,
+                    year: event.target.value
+                  }))
+                }
+              />
+            </label>
+          ) : null}
           <label className="reports-filter-field" htmlFor="reports-activity-code">
             <span>Secteur</span>
             <select
@@ -525,15 +649,17 @@ export function ReportsPage(): JSX.Element {
               onChange={(event) =>
                 setPeriodForm((prev) => ({
                   ...prev,
-                  activityCode: event.target.value as "ALL" | BusinessActivityCode
+                  activityCode: event.target.value as BusinessActivityCode
                 }))
               }
+              disabled={enabledActivities.length === 0}
             >
-              <option value="ALL">Toutes les activités</option>
-              {activities.map((activity) => (
+              {enabledActivities.length === 0 ? (
+                <option value="">Aucun secteur actif</option>
+              ) : null}
+              {enabledActivities.map((activity) => (
                 <option key={activity.code} value={activity.code}>
                   {activity.label}
-                  {activity.isEnabled ? "" : " (inactif)"}
                 </option>
               ))}
             </select>
@@ -544,7 +670,7 @@ export function ReportsPage(): JSX.Element {
           </button>
         </form>
         <p className="hint">
-          Secteur appliqué: {selectedActivity?.label ?? "Tous les secteurs"}.
+          Secteur applique: {selectedActivity?.label ?? "aucun secteur actif"}.
         </p>
       </section>
 
@@ -564,27 +690,6 @@ export function ReportsPage(): JSX.Element {
                   Consolidation: {formatDateTime(overview.generatedAt)} | Période:{" "}
                   {formatAppliedRange(overview)}
                 </p>
-              </div>
-              <div className="reports-scope-strip">
-                <span className="reports-scope-pill">
-                  <strong>Règles</strong>
-                  <span>{overview.sectorRulesVersion}</span>
-                </span>
-                <span className="reports-scope-pill">
-                  <strong>Secteur</strong>
-                  <span>
-                    {overview.filters.activityCode
-                      ? getBusinessActivityLabel(overview.filters.activityCode)
-                      : "Tous les secteurs"}
-                  </span>
-                </span>
-                <span className="reports-scope-pill">
-                  <strong>Comptes</strong>
-                  <span>
-                    {formatCount(overview.financeAccountsSummary.compatibleCount)} compatibles /{" "}
-                    {formatCount(overview.financeAccountsSummary.totalCount)}
-                  </span>
-                </span>
               </div>
             </div>
 
@@ -612,63 +717,34 @@ export function ReportsPage(): JSX.Element {
                   {formatCount(reportMetrics.doneTasks)} terminées
                 </small>
               </article>
-              <article className="reports-kpi-card">
-                <span>Utilisateurs par rôle</span>
-                <strong>
-                  {formatCount(overview.roleDistribution.reduce((sum, item) => sum + item.count, 0))}
-                </strong>
-                <small>{formatCount(overview.roleDistribution.length)} rôles représentés</small>
-              </article>
             </div>
           </section>
 
           <section className="panel reports-export-panel">
             <div className="dashboard-panel-header">
               <div>
-                <h3>Exports avec les filtres appliqués</h3>
-                <p className="hint">Chaque fichier reprend la période et le secteur visibles sur cette page.</p>
+                <h3>Export PDF avec les filtres selectionnes</h3>
+                <p className="hint">Le fichier PDF reprend la periode et le secteur choisis dans les filtres.</p>
               </div>
               <div className="reports-export-grid">
                 <article className="reports-export-card">
-                  <strong>Rapport PDF</strong>
-                  <p className="hint">Synthèse, flux financiers, comptes, tâches et équipe.</p>
+                  <strong className="reports-export-card-title">Rapport PDF</strong>
+                  <p className="hint">Synthese, flux financiers, comptes et taches du secteur.</p>
                   <button
                     type="button"
                     className="secondary-btn"
-                    onClick={() => void handleExport("overview", "pdf")}
+                    onClick={() => void handleExport()}
                     disabled={busyExport !== null}
                   >
                     {busyExport === "overview-pdf" ? "Préparation..." : "Télécharger PDF"}
-                  </button>
-                </article>
-                <article className="reports-export-card">
-                  <strong>Transactions Excel</strong>
-                  <p className="hint">Lignes financières détaillées selon les filtres.</p>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => void handleExport("transactions", "xlsx")}
-                    disabled={busyExport !== null}
-                  >
-                    {busyExport === "transactions-xlsx" ? "Préparation..." : "Télécharger Excel"}
-                  </button>
-                </article>
-                <article className="reports-export-card">
-                  <strong>Tâches Excel</strong>
-                  <p className="hint">Tâches opérationnelles détaillées selon les filtres.</p>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => void handleExport("tasks", "xlsx")}
-                    disabled={busyExport !== null}
-                  >
-                    {busyExport === "tasks-xlsx" ? "Préparation..." : "Télécharger Excel"}
                   </button>
                 </article>
               </div>
             </div>
           </section>
 
+          {!hasFocusedOperationsReport ? (
+            <>
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
@@ -676,7 +752,7 @@ export function ReportsPage(): JSX.Element {
                 <p className="hint">
                   {overview.activityProfile
                     ? `${overview.activityProfile.label} | ${overview.activityProfile.reporting.focusArea}`
-                    : `${formatCount(overview.availableActivityProfiles.length)} secteurs disponibles dans le référentiel.`}
+                    : "Aucun secteur selectionne."}
                 </p>
               </div>
             </div>
@@ -697,14 +773,7 @@ export function ReportsPage(): JSX.Element {
                 </article>
               </div>
             ) : (
-              <div className="reports-profile-grid">
-                {overview.availableActivityProfiles.map((profile) => (
-                  <article className="reports-focus-note" key={profile.activityCode}>
-                    <strong>{profile.label}</strong>
-                    <span>{profile.reporting.focusArea}</span>
-                  </article>
-                ))}
-              </div>
+              <p className="hint">Selectionnez un secteur actif pour afficher son profil.</p>
             )}
 
             {overview.activityHighlights.length > 0 ? (
@@ -723,6 +792,633 @@ export function ReportsPage(): JSX.Element {
             ) : null}
           </section>
 
+          <section className="panel">
+            <div className="dashboard-panel-header">
+              <div>
+                <h3>Rentabilité et exécution</h3>
+                <p className="hint">
+                  Pilotage adapté au contexte malien: marge XOF, suivi des tâches,
+                  blocages, retards et efficacité opérationnelle.
+                </p>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Niveau</th>
+                    <th>Secteur</th>
+                    <th>Dimension</th>
+                    <th>Élément</th>
+                    <th>Entrées XOF</th>
+                    <th>Sorties XOF</th>
+                    <th>Net XOF</th>
+                    <th>Marge</th>
+                    <th>Rent. coûts</th>
+                    <th>Exécution</th>
+                    <th>Ouvertes</th>
+                    <th>Bloquées</th>
+                    <th>Retards</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.operationalPerformance.length === 0 ? (
+                    <tr>
+                      <td colSpan={13}>
+                        Aucune donnée de rentabilité ou d'exécution sur la période filtrée.
+                      </td>
+                    </tr>
+                  ) : (
+                    overview.operationalPerformance
+                      .filter((row) => row.transactionsCount > 0 || row.totalTasksCount > 0)
+                      .map((row) => (
+                        <tr key={`${row.scope}-${row.activityCode}-${row.dimensionKey}-${row.itemKey}`}>
+                          <td>{operationalScopeLabel(row.scope)}</td>
+                          <td>{getBusinessActivityLabel(row.activityCode)}</td>
+                          <td>{row.dimensionLabel}</td>
+                          <td>{row.itemLabel}</td>
+                          <td>{formatAmount(row.approvedCashIn, row.currency)}</td>
+                          <td>{formatAmount(row.approvedCashOut, row.currency)}</td>
+                          <td>{formatAmount(row.netProfit, row.currency)}</td>
+                          <td>{formatRate(row.marginRate)}</td>
+                          <td>{formatRate(row.returnOnCostRate)}</td>
+                          <td>{formatRate(row.executionRate)}</td>
+                          <td>{formatCount(row.openTasksCount)}</td>
+                          <td>{formatCount(row.blockedTasksCount)}</td>
+                          <td>{formatCount(row.overdueTasksCount)}</td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+            </>
+          ) : null}
+
+          {overview.hardwareMonthlyReport ? (
+            <section className="panel">
+              <div className="dashboard-panel-header">
+                <div>
+                  <h3>Rapport quincaillerie</h3>
+                  <p className="hint">
+                    {overview.hardwareMonthlyReport.periodLabel} | ventes soumises ou approuvees en XOF.
+                  </p>
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Designation</th>
+                      <th>Quantite</th>
+                      <th>Vente par jour</th>
+                      <th>Versement</th>
+                      <th>Cout achat</th>
+                      <th>Benefice</th>
+                      <th>Marge</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.hardwareMonthlyReport.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={8}>
+                          Aucune vente quincaillerie soumise ou approuvee sur la periode filtree.
+                        </td>
+                      </tr>
+                    ) : (
+                      overview.hardwareMonthlyReport.rows.map((row) => (
+                        <tr key={`${row.date}-${row.designation}`}>
+                          <td>{formatReportDate(row.date)}</td>
+                          <td>{row.designation}</td>
+                          <td>{formatCount(row.quantity)}</td>
+                          <td>{formatAmount(row.salesAmount, row.currency)}</td>
+                          <td>{formatAmount(row.paymentAmount, row.currency)}</td>
+                          <td>{formatAmount(row.purchaseAmount, row.currency)}</td>
+                          <td>{formatAmount(row.grossProfit, row.currency)}</td>
+                          <td>{formatRate(row.marginRate)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colSpan={2}>TOTAL</th>
+                      <th>{formatCount(overview.hardwareMonthlyReport.totals.quantity)}</th>
+                      <th>
+                        {formatAmount(
+                          overview.hardwareMonthlyReport.totals.salesAmount,
+                          overview.hardwareMonthlyReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.hardwareMonthlyReport.totals.paymentAmount,
+                          overview.hardwareMonthlyReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.hardwareMonthlyReport.totals.purchaseAmount,
+                          overview.hardwareMonthlyReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.hardwareMonthlyReport.totals.grossProfit,
+                          overview.hardwareMonthlyReport.totals.currency
+                        )}
+                      </th>
+                      <th>{formatRate(overview.hardwareMonthlyReport.totals.marginRate)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {overview.agricultureOperationsReport ? (
+            <section className="panel">
+              <div className="dashboard-panel-header">
+                <div>
+                  <h3>Rapport activite agricole</h3>
+                  <p className="hint">
+                    {overview.agricultureOperationsReport.periodLabel} | suivi par campagne, parcelle,
+                    type de champ et culture.
+                  </p>
+                </div>
+              </div>
+
+              <div className="reports-summary-grid">
+                <article className="reports-kpi-card">
+                  <span>Parcelles suivies</span>
+                  <strong>{formatCount(overview.agricultureOperationsReport.totals.parcelsCount)}</strong>
+                  <small>
+                    Surface: {formatAmount(overview.agricultureOperationsReport.totals.surfaceArea)} ha
+                  </small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Solde agricole</span>
+                  <strong>
+                    {formatAmount(
+                      overview.agricultureOperationsReport.totals.netAmount,
+                      overview.agricultureOperationsReport.totals.currency
+                    )}
+                  </strong>
+                  <small>
+                    Recettes - depenses sur les operations agricoles.
+                  </small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Execution terrain</span>
+                  <strong>{formatRate(overview.agricultureOperationsReport.totals.executionRate)}</strong>
+                  <small>
+                    {formatCount(overview.agricultureOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.agricultureOperationsReport.totals.openTasksCount)} ouvertes
+                  </small>
+                </article>
+              </div>
+
+              <div className="reports-data-grid">
+                <article className="reports-table-panel">
+                  <div className="reports-table-header">
+                    <h4>Types d'operations</h4>
+                    <span>{formatCount(overview.agricultureOperationsReport.operationRows.length)} type(s)</span>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Operation</th>
+                          <th>Transactions</th>
+                          <th>Taches</th>
+                          <th>Recettes</th>
+                          <th>Depenses</th>
+                          <th>Net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {overview.agricultureOperationsReport.operationRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={6}>Aucune operation agricole sur la periode filtree.</td>
+                          </tr>
+                        ) : (
+                          overview.agricultureOperationsReport.operationRows.map((row) => (
+                            <tr key={row.operationKind}>
+                              <td>{row.operationLabel}</td>
+                              <td>{formatCount(row.transactionsCount)}</td>
+                              <td>{formatCount(row.tasksCount)}</td>
+                              <td>{formatAmount(row.cashInAmount, row.currency)}</td>
+                              <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
+                              <td>{formatAmount(row.netAmount, row.currency)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </div>
+
+              <div className="table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Campagne</th>
+                      <th>Parcelle</th>
+                      <th>Type de champ</th>
+                      <th>Culture</th>
+                      <th>Surface</th>
+                      <th>Recettes</th>
+                      <th>Depenses</th>
+                      <th>Net</th>
+                      <th>Execution</th>
+                      <th>Blocages</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.agricultureOperationsReport.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={10}>
+                          Aucune parcelle agricole alimentee sur la periode filtree.
+                        </td>
+                      </tr>
+                    ) : (
+                      overview.agricultureOperationsReport.rows.map((row) => (
+                        <tr key={`${row.campaignRef}-${row.parcelRef}-${row.fieldType}-${row.cropType}`}>
+                          <td>{row.campaignRef}</td>
+                          <td>{row.parcelRef}</td>
+                          <td>{row.fieldType}</td>
+                          <td>{row.cropType}</td>
+                          <td>{formatAmount(row.surfaceArea)} ha</td>
+                          <td>{formatAmount(row.cashInAmount, row.currency)}</td>
+                          <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
+                          <td>{formatAmount(row.netAmount, row.currency)}</td>
+                          <td>{formatRate(row.executionRate)}</td>
+                          <td>{formatCount(row.blockedTasksCount)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colSpan={4}>TOTAL</th>
+                      <th>{formatAmount(overview.agricultureOperationsReport.totals.surfaceArea)} ha</th>
+                      <th>
+                        {formatAmount(
+                          overview.agricultureOperationsReport.totals.cashInAmount,
+                          overview.agricultureOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.agricultureOperationsReport.totals.cashOutAmount,
+                          overview.agricultureOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.agricultureOperationsReport.totals.netAmount,
+                          overview.agricultureOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>{formatRate(overview.agricultureOperationsReport.totals.executionRate)}</th>
+                      <th>{formatCount(overview.agricultureOperationsReport.totals.blockedTasksCount)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {overview.fishFarmingOperationsReport ? (
+            <section className="panel">
+              <div className="dashboard-panel-header">
+                <div>
+                  <h3>Rapport pisciculture</h3>
+                  <p className="hint">
+                    {overview.fishFarmingOperationsReport.periodLabel} | suivi par bassin, cycle
+                    d'elevage, espece, aliments, ventes et alertes.
+                  </p>
+                </div>
+              </div>
+
+              <div className="reports-summary-grid">
+                <article className="reports-kpi-card">
+                  <span>Bassins suivis</span>
+                  <strong>{formatCount(overview.fishFarmingOperationsReport.totals.pondsCount)}</strong>
+                  <small>
+                    {formatCount(overview.fishFarmingOperationsReport.totals.cyclesCount)} cycle(s) actif(s)
+                  </small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Solde piscicole</span>
+                  <strong>
+                    {formatAmount(
+                      overview.fishFarmingOperationsReport.totals.netAmount,
+                      overview.fishFarmingOperationsReport.totals.currency
+                    )}
+                  </strong>
+                  <small>
+                    Recettes - depenses sur les cycles piscicoles.
+                  </small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Execution bassin</span>
+                  <strong>{formatRate(overview.fishFarmingOperationsReport.totals.executionRate)}</strong>
+                  <small>
+                    {formatCount(overview.fishFarmingOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.fishFarmingOperationsReport.totals.openTasksCount)} ouvertes
+                  </small>
+                </article>
+              </div>
+
+              <div className="reports-data-grid">
+                <article className="reports-table-panel">
+                  <div className="reports-table-header">
+                    <h4>Types d'operations</h4>
+                    <span>{formatCount(overview.fishFarmingOperationsReport.operationRows.length)} type(s)</span>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Operation</th>
+                          <th>Transactions</th>
+                          <th>Taches</th>
+                          <th>Recettes</th>
+                          <th>Depenses</th>
+                          <th>Net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {overview.fishFarmingOperationsReport.operationRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={6}>Aucune operation piscicole sur la periode filtree.</td>
+                          </tr>
+                        ) : (
+                          overview.fishFarmingOperationsReport.operationRows.map((row) => (
+                            <tr key={row.operationKind}>
+                              <td>{row.operationLabel}</td>
+                              <td>{formatCount(row.transactionsCount)}</td>
+                              <td>{formatCount(row.tasksCount)}</td>
+                              <td>{formatAmount(row.cashInAmount, row.currency)}</td>
+                              <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
+                              <td>{formatAmount(row.netAmount, row.currency)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </div>
+
+              <div className="table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Bassin</th>
+                      <th>Cycle</th>
+                      <th>Espece</th>
+                      <th>Alevins</th>
+                      <th>Aliment</th>
+                      <th>Ventes</th>
+                      <th>Mortalite</th>
+                      <th>Recettes</th>
+                      <th>Depenses</th>
+                      <th>Net</th>
+                      <th>Execution</th>
+                      <th>Blocages</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.fishFarmingOperationsReport.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={12}>
+                          Aucun bassin piscicole alimente sur la periode filtree.
+                        </td>
+                      </tr>
+                    ) : (
+                      overview.fishFarmingOperationsReport.rows.map((row) => (
+                        <tr key={`${row.pondRef}-${row.cycleRef}-${row.species}`}>
+                          <td>{row.pondRef}</td>
+                          <td>{row.cycleRef}</td>
+                          <td>{row.species}</td>
+                          <td>{formatAmount(row.fingerlingsQuantity)}</td>
+                          <td>{formatAmount(row.feedQuantity)}</td>
+                          <td>{formatAmount(row.soldQuantity)}</td>
+                          <td>{formatAmount(row.mortalityCount)}</td>
+                          <td>{formatAmount(row.cashInAmount, row.currency)}</td>
+                          <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
+                          <td>{formatAmount(row.netAmount, row.currency)}</td>
+                          <td>{formatRate(row.executionRate)}</td>
+                          <td>{formatCount(row.blockedTasksCount)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colSpan={3}>TOTAL</th>
+                      <th>{formatAmount(overview.fishFarmingOperationsReport.totals.fingerlingsQuantity)}</th>
+                      <th>{formatAmount(overview.fishFarmingOperationsReport.totals.feedQuantity)}</th>
+                      <th>{formatAmount(overview.fishFarmingOperationsReport.totals.soldQuantity)}</th>
+                      <th>{formatAmount(overview.fishFarmingOperationsReport.totals.mortalityCount)}</th>
+                      <th>
+                        {formatAmount(
+                          overview.fishFarmingOperationsReport.totals.cashInAmount,
+                          overview.fishFarmingOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.fishFarmingOperationsReport.totals.cashOutAmount,
+                          overview.fishFarmingOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.fishFarmingOperationsReport.totals.netAmount,
+                          overview.fishFarmingOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>{formatRate(overview.fishFarmingOperationsReport.totals.executionRate)}</th>
+                      <th>{formatCount(overview.fishFarmingOperationsReport.totals.blockedTasksCount)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {overview.livestockOperationsReport ? (
+            <section className="panel">
+              <div className="dashboard-panel-header">
+                <div>
+                  <h3>Rapport elevage</h3>
+                  <p className="hint">
+                    {overview.livestockOperationsReport.periodLabel} | suivi par troupeau, lot,
+                    espece, alimentation, soins, ventes et mortalite.
+                  </p>
+                </div>
+              </div>
+
+              <div className="reports-summary-grid">
+                <article className="reports-kpi-card">
+                  <span>Troupeaux suivis</span>
+                  <strong>{formatCount(overview.livestockOperationsReport.totals.herdsCount)}</strong>
+                  <small>
+                    {formatCount(overview.livestockOperationsReport.totals.batchesCount)} lot(s) actif(s)
+                  </small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Solde elevage</span>
+                  <strong>
+                    {formatAmount(
+                      overview.livestockOperationsReport.totals.netAmount,
+                      overview.livestockOperationsReport.totals.currency
+                    )}
+                  </strong>
+                  <small>
+                    Recettes - depenses sur les lots d'elevage.
+                  </small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Execution elevage</span>
+                  <strong>{formatRate(overview.livestockOperationsReport.totals.executionRate)}</strong>
+                  <small>
+                    {formatCount(overview.livestockOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.livestockOperationsReport.totals.openTasksCount)} ouvertes
+                  </small>
+                </article>
+              </div>
+
+              <div className="reports-data-grid">
+                <article className="reports-table-panel">
+                  <div className="reports-table-header">
+                    <h4>Types d'operations</h4>
+                    <span>{formatCount(overview.livestockOperationsReport.operationRows.length)} type(s)</span>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Operation</th>
+                          <th>Transactions</th>
+                          <th>Taches</th>
+                          <th>Recettes</th>
+                          <th>Depenses</th>
+                          <th>Net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {overview.livestockOperationsReport.operationRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={6}>Aucune operation d'elevage sur la periode filtree.</td>
+                          </tr>
+                        ) : (
+                          overview.livestockOperationsReport.operationRows.map((row) => (
+                            <tr key={row.operationKind}>
+                              <td>{row.operationLabel}</td>
+                              <td>{formatCount(row.transactionsCount)}</td>
+                              <td>{formatCount(row.tasksCount)}</td>
+                              <td>{formatAmount(row.cashInAmount, row.currency)}</td>
+                              <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
+                              <td>{formatAmount(row.netAmount, row.currency)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </div>
+
+              <div className="table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Troupeau</th>
+                      <th>Lot</th>
+                      <th>Espece</th>
+                      <th>Achats</th>
+                      <th>Aliment</th>
+                      <th>Ventes</th>
+                      <th>Produits</th>
+                      <th>Mortalite</th>
+                      <th>Recettes</th>
+                      <th>Depenses</th>
+                      <th>Net</th>
+                      <th>Execution</th>
+                      <th>Blocages</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.livestockOperationsReport.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={13}>
+                          Aucun lot d'elevage alimente sur la periode filtree.
+                        </td>
+                      </tr>
+                    ) : (
+                      overview.livestockOperationsReport.rows.map((row) => (
+                        <tr key={`${row.herdRef}-${row.batchRef}-${row.species}`}>
+                          <td>{row.herdRef}</td>
+                          <td>{row.batchRef}</td>
+                          <td>{row.species}</td>
+                          <td>{formatAmount(row.animalPurchaseCount)}</td>
+                          <td>{formatAmount(row.feedQuantity)}</td>
+                          <td>{formatAmount(row.soldAnimalCount)}</td>
+                          <td>{formatAmount(row.productQuantity)}</td>
+                          <td>{formatAmount(row.mortalityCount)}</td>
+                          <td>{formatAmount(row.cashInAmount, row.currency)}</td>
+                          <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
+                          <td>{formatAmount(row.netAmount, row.currency)}</td>
+                          <td>{formatRate(row.executionRate)}</td>
+                          <td>{formatCount(row.blockedTasksCount)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colSpan={3}>TOTAL</th>
+                      <th>{formatAmount(overview.livestockOperationsReport.totals.animalPurchaseCount)}</th>
+                      <th>{formatAmount(overview.livestockOperationsReport.totals.feedQuantity)}</th>
+                      <th>{formatAmount(overview.livestockOperationsReport.totals.soldAnimalCount)}</th>
+                      <th>{formatAmount(overview.livestockOperationsReport.totals.productQuantity)}</th>
+                      <th>{formatAmount(overview.livestockOperationsReport.totals.mortalityCount)}</th>
+                      <th>
+                        {formatAmount(
+                          overview.livestockOperationsReport.totals.cashInAmount,
+                          overview.livestockOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.livestockOperationsReport.totals.cashOutAmount,
+                          overview.livestockOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.livestockOperationsReport.totals.netAmount,
+                          overview.livestockOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>{formatRate(overview.livestockOperationsReport.totals.executionRate)}</th>
+                      <th>{formatCount(overview.livestockOperationsReport.totals.blockedTasksCount)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {!hasFocusedOperationsReport ? (
+            <>
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
@@ -841,45 +1537,20 @@ export function ReportsPage(): JSX.Element {
                 </div>
               </article>
 
-              <article className="reports-table-panel">
-                <div className="reports-table-header">
-                  <h4>Transactions par secteur</h4>
-                  <span>{formatCount(overview.financeByActivity.length)} secteur(s)</span>
-                </div>
-                <div className="table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Secteur</th>
-                        <th>Nombre</th>
-                        <th>Total</th>
-                        <th>Approuvé</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overview.financeByActivity.map((item) => (
-                        <tr key={item.activityCode}>
-                          <td>{getBusinessActivityLabel(item.activityCode)}</td>
-                          <td>{formatCount(item.count)}</td>
-                          <td>{formatAmount(item.totalAmount)}</td>
-                          <td>{formatAmount(item.approvedAmount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
             </div>
           </section>
+            </>
+          ) : null}
 
+          {!hasFocusedOperationsReport ? (
+            <>
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
                 <h3>Comptes financiers</h3>
                 <p className="hint">
-                  {formatCount(overview.financeAccountsSummary.totalCount)} compte(s),{" "}
-                  {formatCount(overview.financeAccountsSummary.compatibleCount)} compatible(s)
-                  avec le secteur appliqué.
+                  {formatCount(overview.financeAccountsSummary.totalCount)} compte(s) disponible(s)
+                  pour le secteur applique.
                 </p>
               </div>
               <div className="reports-inline-metrics">
@@ -895,14 +1566,13 @@ export function ReportsPage(): JSX.Element {
                     <th>Compte</th>
                     <th>Référence</th>
                     <th>Portée</th>
-                    <th>Compatibilité</th>
                     <th>Solde</th>
                   </tr>
                 </thead>
                 <tbody>
                   {overview.financeAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>Aucun compte financier enregistré.</td>
+                      <td colSpan={4}>Aucun compte financier disponible pour ce secteur.</td>
                     </tr>
                   ) : (
                     overview.financeAccounts.map((account) => (
@@ -910,7 +1580,6 @@ export function ReportsPage(): JSX.Element {
                         <td>{account.name}</td>
                         <td>{account.accountRef ?? "-"}</td>
                         <td>{accountScopeLabel(account)}</td>
-                        <td>{compatibilityLabel(account.isCompatibleWithSelectedActivity)}</td>
                         <td>{formatAmount(account.balance)}</td>
                       </tr>
                     ))
@@ -924,7 +1593,7 @@ export function ReportsPage(): JSX.Element {
             <div className="dashboard-panel-header">
               <div>
                 <h3>Rapport opérationnel</h3>
-                <p className="hint">Tâches consolidées par statut, secteur et responsable.</p>
+                <p className="hint">Taches consolidees par statut pour le secteur applique.</p>
               </div>
             </div>
 
@@ -960,110 +1629,10 @@ export function ReportsPage(): JSX.Element {
                 </div>
               </article>
 
-              <article className="reports-table-panel">
-                <div className="reports-table-header">
-                  <h4>Tâches par secteur</h4>
-                  <span>{formatCount(overview.taskByActivity.length)} secteur(s)</span>
-                </div>
-                <div className="table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Secteur</th>
-                        <th>Total</th>
-                        <th>Ouvertes</th>
-                        <th>Bloquées</th>
-                        <th>Terminées</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overview.taskByActivity.map((item) => (
-                        <tr key={item.activityCode}>
-                          <td>{getBusinessActivityLabel(item.activityCode)}</td>
-                          <td>{formatCount(item.totalCount)}</td>
-                          <td>{formatCount(item.openCount)}</td>
-                          <td>{formatCount(item.blockedCount)}</td>
-                          <td>{formatCount(item.doneCount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
-            </div>
-
-            <div className="reports-data-grid">
-              <article className="reports-table-panel">
-                <div className="reports-table-header">
-                  <h4>Responsables les plus chargés</h4>
-                  <span>{formatCount(overview.topAssignees.length)} responsable(s)</span>
-                </div>
-                <div className="table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Responsable</th>
-                        <th>Rôle</th>
-                        <th>Ouvertes</th>
-                        <th>En cours</th>
-                        <th>Bloquées</th>
-                        <th>Terminées</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overview.topAssignees.length === 0 ? (
-                        <tr>
-                          <td colSpan={6}>Aucune tâche assignée sur la période filtrée.</td>
-                        </tr>
-                      ) : (
-                        overview.topAssignees.map((item) => (
-                          <tr key={item.userId}>
-                            <td>{item.fullName}</td>
-                            <td>{roleLabel(item.role)}</td>
-                            <td>{formatCount(item.openTasksCount)}</td>
-                            <td>{formatCount(item.inProgressTasksCount)}</td>
-                            <td>{formatCount(item.blockedTasksCount)}</td>
-                            <td>{formatCount(item.doneTasksCount)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
-
-              <article className="reports-table-panel">
-                <div className="reports-table-header">
-                  <h4>Répartition des rôles</h4>
-                  <span>{formatCount(overview.roleDistribution.length)} rôle(s)</span>
-                </div>
-                <div className="table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Rôle</th>
-                        <th>Utilisateurs</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overview.roleDistribution.length === 0 ? (
-                        <tr>
-                          <td colSpan={2}>Aucun utilisateur actif rattaché à ce rapport.</td>
-                        </tr>
-                      ) : (
-                        overview.roleDistribution.map((item) => (
-                          <tr key={item.role}>
-                            <td>{roleLabel(item.role)}</td>
-                            <td>{formatCount(item.count)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
             </div>
           </section>
+            </>
+          ) : null}
         </>
       ) : null}
     </>

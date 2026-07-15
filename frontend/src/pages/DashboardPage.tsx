@@ -12,7 +12,7 @@ import {
   formatDateTime,
   type DashboardActionCard
 } from "../utils/dashboardDisplay";
-import type { DashboardSummary } from "../types/reporting";
+import type { DashboardSummary, ReportOperationalMetric } from "../types/reporting";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -105,6 +105,24 @@ function buildOwnerSummaryPills(
   ];
 }
 
+function formatAmount(value: string, currency = "XOF"): string {
+  const amount = Number(value);
+  const formatted = new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 0
+  }).format(Number.isFinite(amount) ? amount : 0);
+  return `${formatted} ${currency}`;
+}
+
+function formatRate(value: number): string {
+  return `${new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 1
+  }).format(value)}%`;
+}
+
+function getOperationalRowLabel(row: ReportOperationalMetric): string {
+  return row.scope === "ACTIVITY" ? row.itemLabel : `${row.dimensionLabel}: ${row.itemLabel}`;
+}
+
 export function DashboardPage(): JSX.Element {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -157,6 +175,19 @@ export function DashboardPage(): JSX.Element {
     }
     return buildDailyActionCards(summary);
   }, [isReadOnlyOwner, selectedActivityCode, summary]);
+
+  const operationalRows = useMemo(() => {
+    if (!summary) return [];
+    const rows = selectedActivityCode
+      ? summary.operationalPerformance.filter(
+          (item) => item.scope === "SUBSECTION" && item.activityCode === selectedActivityCode
+        )
+      : summary.operationalPerformance.filter((item) => item.scope === "ACTIVITY");
+
+    return rows
+      .filter((item) => item.transactionsCount > 0 || item.totalTasksCount > 0)
+      .slice(0, 8);
+  }, [selectedActivityCode, summary]);
 
   return (
     <>
@@ -253,6 +284,55 @@ export function DashboardPage(): JSX.Element {
               </div>
             </section>
           ) : null}
+
+          <section className="panel">
+            <div className="dashboard-panel-header">
+              <div>
+                <p className="sidebar-section-label">Pilotage opérationnel</p>
+                <h3>Rentabilité, efficacité et exécution</h3>
+                <p className="hint">
+                  Rentabilité calculée sur les flux approuvés en XOF, avec suivi des tâches,
+                  blocages et retards.
+                </p>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Périmètre</th>
+                    <th>Entrées</th>
+                    <th>Sorties</th>
+                    <th>Net</th>
+                    <th>Exécution</th>
+                    <th>Ouvertes</th>
+                    <th>Blocages</th>
+                    <th>Retards</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {operationalRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={8}>Aucune donnée opérationnelle consolidée pour ce périmètre.</td>
+                    </tr>
+                  ) : (
+                    operationalRows.map((row) => (
+                      <tr key={`${row.scope}-${row.activityCode}-${row.dimensionKey}-${row.itemKey}`}>
+                        <td>{getOperationalRowLabel(row)}</td>
+                        <td>{formatAmount(row.approvedCashIn, row.currency)}</td>
+                        <td>{formatAmount(row.approvedCashOut, row.currency)}</td>
+                        <td>{formatAmount(row.netProfit, row.currency)}</td>
+                        <td>{formatRate(row.executionRate)}</td>
+                        <td>{row.openTasksCount}</td>
+                        <td>{row.blockedTasksCount}</td>
+                        <td>{row.overdueTasksCount}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
           <DashboardPriorityPanels
             summary={summary}

@@ -39,6 +39,62 @@ import type { OperationTask, OperationTaskMember, TaskScope, TaskStatus } from "
 const TASKS_PAGE_SIZE = 200;
 const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const DEFAULT_TASKS_VISIBLE_PAGE_SIZE = 25;
+const AGRICULTURE_TASK_KIND_KEY = "agricultureTaskKind";
+type AgricultureTaskKind =
+  | "PREPARATION"
+  | "SOWING"
+  | "MAINTENANCE"
+  | "TREATMENT"
+  | "HARVEST"
+  | "STORAGE"
+  | "FOLLOW_UP";
+const AGRICULTURE_TASK_LABELS: Record<AgricultureTaskKind, string> = {
+  PREPARATION: "Preparation",
+  SOWING: "Semis",
+  MAINTENANCE: "Entretien",
+  TREATMENT: "Traitement",
+  HARVEST: "Recolte",
+  STORAGE: "Stockage",
+  FOLLOW_UP: "Suivi terrain"
+};
+const FISH_FARMING_TASK_KIND_KEY = "fishTaskKind";
+type FishFarmingTaskKind =
+  | "FEEDING"
+  | "WATER_CONTROL"
+  | "TREATMENT"
+  | "SORTING"
+  | "HARVEST"
+  | "STOCKING"
+  | "FOLLOW_UP";
+const FISH_FARMING_TASK_LABELS: Record<FishFarmingTaskKind, string> = {
+  FEEDING: "Nourrissage",
+  WATER_CONTROL: "Controle eau",
+  TREATMENT: "Traitement sanitaire",
+  SORTING: "Tri / calibrage",
+  HARVEST: "Recolte",
+  STOCKING: "Mise en charge",
+  FOLLOW_UP: "Suivi bassin"
+};
+const LIVESTOCK_TASK_KIND_KEY = "livestockTaskKind";
+type LivestockTaskKind =
+  | "FEEDING"
+  | "HEALTH_CHECK"
+  | "VACCINATION"
+  | "TREATMENT"
+  | "CLEANING"
+  | "BREEDING"
+  | "SALE_PREP"
+  | "FOLLOW_UP";
+const LIVESTOCK_TASK_LABELS: Record<LivestockTaskKind, string> = {
+  FEEDING: "Nourrissage",
+  HEALTH_CHECK: "Controle sanitaire",
+  VACCINATION: "Vaccination",
+  TREATMENT: "Traitement",
+  CLEANING: "Nettoyage enclos",
+  BREEDING: "Reproduction",
+  SALE_PREP: "Preparation vente",
+  FOLLOW_UP: "Suivi elevage"
+};
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -104,6 +160,56 @@ function syncMetadataState(
   return Object.fromEntries(fields.map((field) => [field.key, previous[field.key] ?? ""]));
 }
 
+function isAgricultureTaskKind(value: string | undefined): value is AgricultureTaskKind {
+  return (
+    value === "PREPARATION" ||
+    value === "SOWING" ||
+    value === "MAINTENANCE" ||
+    value === "TREATMENT" ||
+    value === "HARVEST" ||
+    value === "STORAGE" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isFishFarmingTaskKind(value: string | undefined): value is FishFarmingTaskKind {
+  return (
+    value === "FEEDING" ||
+    value === "WATER_CONTROL" ||
+    value === "TREATMENT" ||
+    value === "SORTING" ||
+    value === "HARVEST" ||
+    value === "STOCKING" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isLivestockTaskKind(value: string | undefined): value is LivestockTaskKind {
+  return (
+    value === "FEEDING" ||
+    value === "HEALTH_CHECK" ||
+    value === "VACCINATION" ||
+    value === "TREATMENT" ||
+    value === "CLEANING" ||
+    value === "BREEDING" ||
+    value === "SALE_PREP" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function formatMetadataValue(key: string, value: string): string {
+  if (key === AGRICULTURE_TASK_KIND_KEY && isAgricultureTaskKind(value)) {
+    return AGRICULTURE_TASK_LABELS[value];
+  }
+  if (key === FISH_FARMING_TASK_KIND_KEY && isFishFarmingTaskKind(value)) {
+    return FISH_FARMING_TASK_LABELS[value];
+  }
+  if (key === LIVESTOCK_TASK_KIND_KEY && isLivestockTaskKind(value)) {
+    return LIVESTOCK_TASK_LABELS[value];
+  }
+  return value;
+}
+
 function formatMetadataSummary(
   metadata: Record<string, string>,
   fields: ActivityFieldDefinition[]
@@ -111,7 +217,7 @@ function formatMetadataSummary(
   const items = fields
     .map((field) => {
       const value = metadata[field.key]?.trim();
-      return value ? `${field.label}: ${value}` : null;
+      return value ? `${field.label}: ${formatMetadataValue(field.key, value)}` : null;
     })
     .filter((value): value is string => value !== null);
 
@@ -121,7 +227,7 @@ function formatMetadataSummary(
 
   const fallbackItems = Object.entries(metadata)
     .filter(([, value]) => value.trim().length > 0)
-    .map(([key, value]) => `${key}: ${value}`);
+    .map(([key, value]) => `${key}: ${formatMetadataValue(key, value)}`);
   return fallbackItems.length > 0 ? fallbackItems.join(" | ") : "-";
 }
 
@@ -834,23 +940,101 @@ export function OperationsTasksPage(): JSX.Element {
                 <summary>Champs avancés</summary>
                 <div className="operations-task-form-options-body">
                   {taskMetadataFields.map((field) => (
-                    <input
-                      key={field.key}
-                      type="text"
-                      placeholder={field.label}
-                      value={createForm.metadata[field.key] ?? ""}
-                      onChange={(event) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          metadata: {
-                            ...prev.metadata,
-                            [field.key]: event.target.value
-                          }
-                        }))
-                      }
-                      title={field.helpText}
-                      required={field.required}
-                    />
+                    field.key === AGRICULTURE_TASK_KIND_KEY && selectedActivityCode === "AGRICULTURE" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'intervention</option>
+                        <option value="PREPARATION">{AGRICULTURE_TASK_LABELS.PREPARATION}</option>
+                        <option value="SOWING">{AGRICULTURE_TASK_LABELS.SOWING}</option>
+                        <option value="MAINTENANCE">{AGRICULTURE_TASK_LABELS.MAINTENANCE}</option>
+                        <option value="TREATMENT">{AGRICULTURE_TASK_LABELS.TREATMENT}</option>
+                        <option value="HARVEST">{AGRICULTURE_TASK_LABELS.HARVEST}</option>
+                        <option value="STORAGE">{AGRICULTURE_TASK_LABELS.STORAGE}</option>
+                        <option value="FOLLOW_UP">{AGRICULTURE_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === FISH_FARMING_TASK_KIND_KEY && selectedActivityCode === "FISH_FARMING" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'intervention</option>
+                        <option value="FEEDING">{FISH_FARMING_TASK_LABELS.FEEDING}</option>
+                        <option value="WATER_CONTROL">{FISH_FARMING_TASK_LABELS.WATER_CONTROL}</option>
+                        <option value="TREATMENT">{FISH_FARMING_TASK_LABELS.TREATMENT}</option>
+                        <option value="SORTING">{FISH_FARMING_TASK_LABELS.SORTING}</option>
+                        <option value="HARVEST">{FISH_FARMING_TASK_LABELS.HARVEST}</option>
+                        <option value="STOCKING">{FISH_FARMING_TASK_LABELS.STOCKING}</option>
+                        <option value="FOLLOW_UP">{FISH_FARMING_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === LIVESTOCK_TASK_KIND_KEY && selectedActivityCode === "LIVESTOCK" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'intervention</option>
+                        <option value="FEEDING">{LIVESTOCK_TASK_LABELS.FEEDING}</option>
+                        <option value="HEALTH_CHECK">{LIVESTOCK_TASK_LABELS.HEALTH_CHECK}</option>
+                        <option value="VACCINATION">{LIVESTOCK_TASK_LABELS.VACCINATION}</option>
+                        <option value="TREATMENT">{LIVESTOCK_TASK_LABELS.TREATMENT}</option>
+                        <option value="CLEANING">{LIVESTOCK_TASK_LABELS.CLEANING}</option>
+                        <option value="BREEDING">{LIVESTOCK_TASK_LABELS.BREEDING}</option>
+                        <option value="SALE_PREP">{LIVESTOCK_TASK_LABELS.SALE_PREP}</option>
+                        <option value="FOLLOW_UP">{LIVESTOCK_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : (
+                      <input
+                        key={field.key}
+                        type="text"
+                        placeholder={field.label}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      />
+                    )
                   ))}
                 </div>
               </details>
