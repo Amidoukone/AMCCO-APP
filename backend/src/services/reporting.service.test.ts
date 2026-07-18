@@ -603,6 +603,1891 @@ describe("reporting.service", () => {
     expect(unfilteredResult.agricultureOperationsReport?.periodLabel).toBe("Toutes periodes");
   });
 
+  it("builds the general store operations report from department and item metadata", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 4, totalAmount: "365000.00" },
+      { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "15000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 1,
+        totalAmount: "250000.00",
+        approvedAmount: "250000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 4,
+        totalAmount: "130000.00",
+        approvedAmount: "115000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "GENERAL_STORE",
+        count: 5,
+        totalAmount: "380000.00",
+        approvedAmount: "365000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "GENERAL_STORE",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "GENERAL_STORE",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "250000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-03T09:00:00.000Z",
+        metadata: {
+          storeOperationKind: "STORE_SALE",
+          department: "Electromenager",
+          productFamily: "Petit appareil",
+          itemName: "Mixeur",
+          skuRef: "MIX-01",
+          barcode: "123456",
+          shelfRef: "R1",
+          registerRef: "Caisse 1",
+          cashierRef: "Awa",
+          quantity: "10",
+          unit: "piece",
+          saleUnitPrice: "26000",
+          discountAmount: "10000",
+          receiptRef: "TCK-01"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "100000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-05T09:00:00.000Z",
+        metadata: {
+          storeOperationKind: "STOCK_PURCHASE",
+          department: "Electromenager",
+          productFamily: "Petit appareil",
+          itemName: "Mixeur",
+          skuRef: "MIX-01",
+          shelfRef: "R1",
+          quantity: "8",
+          unit: "piece",
+          purchaseUnitPrice: "12500",
+          supplierRef: "Fournisseur 1",
+          invoiceRef: "FAC-MAG-01"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "25000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-07T09:00:00.000Z",
+        metadata: {
+          storeOperationKind: "CUSTOMER_RETURN",
+          department: "Electromenager",
+          productFamily: "Petit appareil",
+          itemName: "Mixeur",
+          skuRef: "MIX-01",
+          shelfRef: "R1",
+          returnQuantity: "1",
+          unit: "piece",
+          saleUnitPrice: "25000",
+          customerRef: "Client B",
+          receiptRef: "TCK-RET-01"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "5000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-08T09:00:00.000Z",
+        metadata: {
+          storeOperationKind: "INVENTORY_ADJUSTMENT",
+          department: "Electromenager",
+          productFamily: "Petit appareil",
+          itemName: "Mixeur",
+          skuRef: "MIX-01",
+          shelfRef: "R1",
+          adjustmentQuantity: "-1",
+          unit: "piece",
+          purchaseUnitPrice: "5000",
+          expenseLabel: "Ecart inventaire"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "SUBMITTED",
+        type: "CASH_OUT",
+        amount: "15000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-12T09:00:00.000Z",
+        metadata: {
+          storeOperationKind: "STORE_EXPENSE",
+          department: "Electromenager",
+          productFamily: "Petit appareil",
+          itemName: "Mixeur",
+          skuRef: "MIX-01",
+          expenseLabel: "Manutention",
+          invoiceRef: "FAC-CHG-MAG-01",
+          invoiceAmount: "15000"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "GENERAL_STORE",
+        status: "DONE",
+        dueDate: "2026-09-15T09:00:00.000Z",
+        metadata: {
+          storeTaskKind: "STOCK_CONTROL",
+          department: "Electromenager",
+          productFamily: "Petit appareil",
+          itemName: "Mixeur",
+          skuRef: "MIX-01",
+          shelfRef: "R1"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "BLOCKED",
+        dueDate: "2026-09-16T09:00:00.000Z",
+        metadata: {
+          storeTaskKind: "REPLENISHMENT",
+          department: "Electromenager",
+          productFamily: "Petit appareil",
+          itemName: "Mixeur",
+          skuRef: "MIX-01",
+          shelfRef: "R1",
+          issueRef: "Stock faible"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "GENERAL_STORE",
+      dateFrom: "2026-09-01T00:00:00.000Z",
+      dateTo: "2026-09-30T23:59:59.999Z"
+    });
+
+    expect(result.generalStoreOperationsReport?.periodLabel).toBe("septembre 2026");
+    expect(result.generalStoreOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        department: "Electromenager",
+        productFamily: "Petit appareil",
+        itemName: "Mixeur",
+        skuRef: "MIX-01",
+        soldQuantity: 10,
+        purchaseQuantity: 8,
+        returnQuantity: 1,
+        adjustmentQuantity: -1,
+        transferQuantity: 0,
+        salesAmount: "250000.00",
+        purchaseAmount: "100000.00",
+        returnAmount: "25000.00",
+        discountAmount: "10000.00",
+        expenseAmount: "20000.00",
+        transactionsCount: 5,
+        tasksCount: 2,
+        doneTasksCount: 1,
+        openTasksCount: 1,
+        blockedTasksCount: 1,
+        cashInAmount: "250000.00",
+        cashOutAmount: "145000.00",
+        netAmount: "105000.00",
+        grossMargin: "115000.00",
+        marginRate: 46,
+        executionRate: 50,
+        currency: "XOF"
+      })
+    ]);
+    expect(result.generalStoreOperationsReport?.operationRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Vente caisse", cashInAmount: "250000.00" }),
+        expect.objectContaining({ operationLabel: "Achat stock", cashOutAmount: "100000.00" }),
+        expect.objectContaining({ operationLabel: "Retour client", cashOutAmount: "25000.00" }),
+        expect.objectContaining({ operationLabel: "Ajustement inventaire", cashOutAmount: "5000.00" }),
+        expect.objectContaining({ operationLabel: "Charge magasin", cashOutAmount: "15000.00" }),
+        expect.objectContaining({ operationLabel: "Tache: Controle stock", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tache: Reassort rayon", tasksCount: 1 })
+      ])
+    );
+    expect(result.generalStoreOperationsReport?.totals).toMatchObject({
+      departmentsCount: 1,
+      productFamiliesCount: 1,
+      itemsCount: 1,
+      soldQuantity: 10,
+      purchaseQuantity: 8,
+      returnQuantity: 1,
+      adjustmentQuantity: -1,
+      transferQuantity: 0,
+      salesAmount: "250000.00",
+      purchaseAmount: "100000.00",
+      returnAmount: "25000.00",
+      discountAmount: "10000.00",
+      expenseAmount: "20000.00",
+      cashInAmount: "250000.00",
+      cashOutAmount: "145000.00",
+      netAmount: "105000.00",
+      grossMargin: "115000.00",
+      marginRate: 46,
+      executionRate: 50,
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "GENERAL_STORE",
+      dateFrom: "2026-09-01T00:00:00.000Z",
+      dateTo: "2026-09-30T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("builds the food operations report from product and batch metadata", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "260000.00" },
+      { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "15000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 1,
+        totalAmount: "150000.00",
+        approvedAmount: "150000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 3,
+        totalAmount: "125000.00",
+        approvedAmount: "110000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "FOOD",
+        count: 4,
+        totalAmount: "275000.00",
+        approvedAmount: "260000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "FOOD",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "FOOD",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "100000.00",
+        currency: "XOF",
+        occurredAt: "2026-12-03T09:00:00.000Z",
+        metadata: {
+          foodOperationKind: "PRODUCT_PURCHASE",
+          productFamily: "Boissons",
+          productName: "Jus mangue",
+          batchRef: "LOT-JM-01",
+          expiryDate: "2027-03-31",
+          storageArea: "Reserve",
+          quantity: "100",
+          unit: "carton",
+          purchaseUnitPrice: "1000",
+          supplierRef: "Grossiste Bamako",
+          invoiceRef: "FAC-FOOD-01"
+        }
+      },
+      {
+        activityCode: "FOOD",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "150000.00",
+        currency: "XOF",
+        occurredAt: "2026-12-05T09:00:00.000Z",
+        metadata: {
+          foodOperationKind: "PRODUCT_SALE",
+          productFamily: "Boissons",
+          productName: "Jus mangue",
+          batchRef: "LOT-JM-01",
+          expiryDate: "2027-03-31",
+          storageArea: "Reserve",
+          quantity: "60",
+          unit: "carton",
+          saleUnitPrice: "2500",
+          buyerRef: "Boutique A",
+          paymentRef: "CAISSE-01"
+        }
+      },
+      {
+        activityCode: "FOOD",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "10000.00",
+        currency: "XOF",
+        occurredAt: "2026-12-08T09:00:00.000Z",
+        metadata: {
+          foodOperationKind: "STOCK_LOSS",
+          productFamily: "Boissons",
+          productName: "Jus mangue",
+          batchRef: "LOT-JM-01",
+          expiryDate: "2027-03-31",
+          storageArea: "Reserve",
+          lossQuantity: "10",
+          unit: "carton",
+          purchaseUnitPrice: "1000",
+          lossReason: "Casse"
+        }
+      },
+      {
+        activityCode: "FOOD",
+        status: "SUBMITTED",
+        type: "CASH_OUT",
+        amount: "15000.00",
+        currency: "XOF",
+        occurredAt: "2026-12-10T09:00:00.000Z",
+        metadata: {
+          foodOperationKind: "COLD_CHAIN_EXPENSE",
+          productFamily: "Boissons",
+          productName: "Jus mangue",
+          batchRef: "LOT-JM-01",
+          storageArea: "Reserve",
+          temperatureRange: "4-8 C",
+          supplierRef: "Technicien froid",
+          invoiceRef: "FAC-FROID-01",
+          invoiceAmount: "15000"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "FOOD",
+        status: "DONE",
+        dueDate: "2026-12-12T09:00:00.000Z",
+        metadata: {
+          foodTaskKind: "EXPIRY_CHECK",
+          productFamily: "Boissons",
+          productName: "Jus mangue",
+          batchRef: "LOT-JM-01",
+          expiryDate: "2027-03-31",
+          storageArea: "Reserve"
+        }
+      },
+      {
+        activityCode: "FOOD",
+        status: "BLOCKED",
+        dueDate: "2026-12-14T09:00:00.000Z",
+        metadata: {
+          foodTaskKind: "COLD_CHAIN_CHECK",
+          productFamily: "Boissons",
+          productName: "Jus mangue",
+          batchRef: "LOT-JM-01",
+          expiryDate: "2027-03-31",
+          storageArea: "Reserve",
+          issueRef: "Temperature instable"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "FOOD",
+      dateFrom: "2026-12-01T00:00:00.000Z",
+      dateTo: "2026-12-31T23:59:59.999Z"
+    });
+
+    expect(result.foodOperationsReport?.periodLabel).toBe("décembre 2026");
+    expect(result.foodOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        productFamily: "Boissons",
+        productName: "Jus mangue",
+        batchRef: "LOT-JM-01",
+        storageArea: "Reserve",
+        purchaseQuantity: 100,
+        soldQuantity: 60,
+        lossQuantity: 10,
+        purchaseAmount: "100000.00",
+        salesAmount: "150000.00",
+        lossAmount: "10000.00",
+        expenseAmount: "15000.00",
+        transactionsCount: 4,
+        tasksCount: 2,
+        doneTasksCount: 1,
+        openTasksCount: 1,
+        blockedTasksCount: 1,
+        cashInAmount: "150000.00",
+        cashOutAmount: "125000.00",
+        netAmount: "25000.00",
+        grossMargin: "40000.00",
+        marginRate: 26.67,
+        executionRate: 50,
+        currency: "XOF"
+      })
+    ]);
+    expect(result.foodOperationsReport?.operationRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Achat stock", cashOutAmount: "100000.00" }),
+        expect.objectContaining({ operationLabel: "Vente produit", cashInAmount: "150000.00" }),
+        expect.objectContaining({ operationLabel: "Perte / peremption", cashOutAmount: "10000.00" }),
+        expect.objectContaining({ operationLabel: "Chaine du froid", cashOutAmount: "15000.00" }),
+        expect.objectContaining({ operationLabel: "Tache: Controle DLC", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tache: Controle froid", tasksCount: 1 })
+      ])
+    );
+    expect(result.foodOperationsReport?.totals).toMatchObject({
+      productFamiliesCount: 1,
+      productsCount: 1,
+      batchesCount: 1,
+      purchaseQuantity: 100,
+      soldQuantity: 60,
+      lossQuantity: 10,
+      purchaseAmount: "100000.00",
+      salesAmount: "150000.00",
+      lossAmount: "10000.00",
+      expenseAmount: "15000.00",
+      transactionsCount: 4,
+      tasksCount: 2,
+      doneTasksCount: 1,
+      openTasksCount: 1,
+      blockedTasksCount: 1,
+      cashInAmount: "150000.00",
+      cashOutAmount: "125000.00",
+      netAmount: "25000.00",
+      grossMargin: "40000.00",
+      marginRate: 26.67,
+      executionRate: 50,
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "FOOD",
+      dateFrom: "2026-12-01T00:00:00.000Z",
+      dateTo: "2026-12-31T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("builds the BTP operations report from project and work-package metadata", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "660000.00" },
+      { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "90000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 1,
+        totalAmount: "500000.00",
+        approvedAmount: "500000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 3,
+        totalAmount: "250000.00",
+        approvedAmount: "160000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "BTP",
+        count: 4,
+        totalAmount: "750000.00",
+        approvedAmount: "660000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "BTP",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "BTP",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "500000.00",
+        currency: "XOF",
+        occurredAt: "2026-10-03T09:00:00.000Z",
+        metadata: {
+          btpOperationKind: "CLIENT_PAYMENT",
+          projectRef: "Chantier Kalaban",
+          contractRef: "DEV-2026-10",
+          clientRef: "Client AMCCO",
+          workPackage: "Gros oeuvre",
+          siteLocation: "Kalaban",
+          invoiceRef: "SIT-01",
+          progressPercent: "40"
+        }
+      },
+      {
+        activityCode: "BTP",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "120000.00",
+        currency: "XOF",
+        occurredAt: "2026-10-05T09:00:00.000Z",
+        metadata: {
+          btpOperationKind: "MATERIAL_PURCHASE",
+          projectRef: "Chantier Kalaban",
+          clientRef: "Client AMCCO",
+          workPackage: "Gros oeuvre",
+          siteLocation: "Kalaban",
+          materialName: "Ciment",
+          quantity: "100",
+          unit: "sac",
+          unitPrice: "1200",
+          supplierRef: "Depot ciment"
+        }
+      },
+      {
+        activityCode: "BTP",
+        status: "SUBMITTED",
+        type: "CASH_OUT",
+        amount: "90000.00",
+        currency: "XOF",
+        occurredAt: "2026-10-10T09:00:00.000Z",
+        metadata: {
+          btpOperationKind: "LABOR_PAYMENT",
+          projectRef: "Chantier Kalaban",
+          clientRef: "Client AMCCO",
+          workPackage: "Gros oeuvre",
+          siteLocation: "Kalaban",
+          teamRef: "Equipe macons",
+          workerCount: "5",
+          workDays: "6",
+          dailyRate: "3000"
+        }
+      },
+      {
+        activityCode: "BTP",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "40000.00",
+        currency: "XOF",
+        occurredAt: "2026-10-12T09:00:00.000Z",
+        metadata: {
+          btpOperationKind: "EQUIPMENT_RENTAL",
+          projectRef: "Chantier Kalaban",
+          clientRef: "Client AMCCO",
+          workPackage: "Gros oeuvre",
+          siteLocation: "Kalaban",
+          equipmentRef: "Betonniere",
+          equipmentHours: "10",
+          hourlyRate: "4000"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "BTP",
+        status: "DONE",
+        dueDate: "2026-10-14T09:00:00.000Z",
+        metadata: {
+          btpTaskKind: "QUALITY_CONTROL",
+          projectRef: "Chantier Kalaban",
+          clientRef: "Client AMCCO",
+          workPackage: "Gros oeuvre",
+          siteLocation: "Kalaban",
+          progressPercent: "60"
+        }
+      },
+      {
+        activityCode: "BTP",
+        status: "BLOCKED",
+        dueDate: "2026-10-20T09:00:00.000Z",
+        metadata: {
+          btpTaskKind: "RESERVE",
+          projectRef: "Chantier Kalaban",
+          clientRef: "Client AMCCO",
+          workPackage: "Gros oeuvre",
+          siteLocation: "Kalaban",
+          issueRef: "Fer manquant",
+          progressPercent: "60"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "BTP",
+      dateFrom: "2026-10-01T00:00:00.000Z",
+      dateTo: "2026-10-31T23:59:59.999Z"
+    });
+
+    expect(result.btpOperationsReport?.periodLabel).toBe("octobre 2026");
+    expect(result.btpOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        projectRef: "Chantier Kalaban",
+        workPackage: "Gros oeuvre",
+        siteLocation: "Kalaban",
+        clientRef: "Client AMCCO",
+        progressPercent: 60,
+        materialQuantity: 100,
+        laborDays: 30,
+        equipmentHours: 10,
+        transactionsCount: 4,
+        tasksCount: 2,
+        doneTasksCount: 1,
+        openTasksCount: 1,
+        blockedTasksCount: 1,
+        cashInAmount: "500000.00",
+        cashOutAmount: "250000.00",
+        netAmount: "250000.00",
+        executionRate: 50,
+        currency: "XOF"
+      })
+    ]);
+    expect(result.btpOperationsReport?.operationRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Encaissement client", cashInAmount: "500000.00" }),
+        expect.objectContaining({ operationLabel: "Achat materiaux", cashOutAmount: "120000.00" }),
+        expect.objectContaining({ operationLabel: "Main-d'oeuvre", cashOutAmount: "90000.00" }),
+        expect.objectContaining({ operationLabel: "Location engin", cashOutAmount: "40000.00" }),
+        expect.objectContaining({ operationLabel: "Tache: Controle qualite", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tache: Reserve / reprise", tasksCount: 1 })
+      ])
+    );
+    expect(result.btpOperationsReport?.totals).toMatchObject({
+      projectsCount: 1,
+      workPackagesCount: 1,
+      progressPercent: 60,
+      materialQuantity: 100,
+      laborDays: 30,
+      equipmentHours: 10,
+      transactionsCount: 4,
+      tasksCount: 2,
+      doneTasksCount: 1,
+      openTasksCount: 1,
+      blockedTasksCount: 1,
+      cashInAmount: "500000.00",
+      cashOutAmount: "250000.00",
+      netAmount: "250000.00",
+      executionRate: 50,
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "BTP",
+      dateFrom: "2026-10-01T00:00:00.000Z",
+      dateTo: "2026-10-31T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("builds the rental operations report from property and tenant metadata", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "375000.00" },
+      { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "15000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 2,
+        totalAmount: "360000.00",
+        approvedAmount: "360000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 2,
+        totalAmount: "50000.00",
+        approvedAmount: "35000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "RENTAL",
+        count: 4,
+        totalAmount: "410000.00",
+        approvedAmount: "395000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "RENTAL",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "RENTAL",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "240000.00",
+        currency: "XOF",
+        occurredAt: "2026-11-03T09:00:00.000Z",
+        metadata: {
+          rentalOperationKind: "RENT_PAYMENT",
+          propertyRef: "Villa A",
+          unitRef: "A1",
+          tenantRef: "Client Traore",
+          leaseRef: "BAIL-01",
+          propertyType: "Villa",
+          locationZone: "ACI",
+          periodRef: "2026-11",
+          monthsCount: "2",
+          monthlyRent: "120000",
+          paymentRef: "QUIT-01"
+        }
+      },
+      {
+        activityCode: "RENTAL",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "120000.00",
+        currency: "XOF",
+        occurredAt: "2026-11-04T09:00:00.000Z",
+        metadata: {
+          rentalOperationKind: "SECURITY_DEPOSIT",
+          propertyRef: "Villa A",
+          unitRef: "A1",
+          tenantRef: "Client Traore",
+          leaseRef: "BAIL-01",
+          propertyType: "Villa",
+          depositAmount: "120000",
+          paymentRef: "CAUT-01"
+        }
+      },
+      {
+        activityCode: "RENTAL",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "35000.00",
+        currency: "XOF",
+        occurredAt: "2026-11-08T09:00:00.000Z",
+        metadata: {
+          rentalOperationKind: "MAINTENANCE_EXPENSE",
+          propertyRef: "Villa A",
+          unitRef: "A1",
+          tenantRef: "Client Traore",
+          leaseRef: "BAIL-01",
+          propertyType: "Villa",
+          maintenanceType: "Plomberie",
+          supplierRef: "Plombier",
+          invoiceRef: "FAC-MAINT-01",
+          invoiceAmount: "35000"
+        }
+      },
+      {
+        activityCode: "RENTAL",
+        status: "SUBMITTED",
+        type: "CASH_OUT",
+        amount: "15000.00",
+        currency: "XOF",
+        occurredAt: "2026-11-12T09:00:00.000Z",
+        metadata: {
+          rentalOperationKind: "PROPERTY_EXPENSE",
+          propertyRef: "Villa A",
+          unitRef: "A1",
+          tenantRef: "Client Traore",
+          leaseRef: "BAIL-01",
+          propertyType: "Villa",
+          chargeLabel: "Gardiennage",
+          supplierRef: "Gardien",
+          invoiceRef: "FAC-CHG-01",
+          invoiceAmount: "15000"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "RENTAL",
+        status: "DONE",
+        dueDate: "2026-11-15T09:00:00.000Z",
+        metadata: {
+          rentalTaskKind: "RENT_COLLECTION",
+          propertyRef: "Villa A",
+          unitRef: "A1",
+          tenantRef: "Client Traore",
+          leaseRef: "BAIL-01",
+          propertyType: "Villa",
+          periodRef: "2026-11"
+        }
+      },
+      {
+        activityCode: "RENTAL",
+        status: "BLOCKED",
+        dueDate: "2026-11-20T09:00:00.000Z",
+        metadata: {
+          rentalTaskKind: "MAINTENANCE",
+          propertyRef: "Villa A",
+          unitRef: "A1",
+          tenantRef: "Client Traore",
+          leaseRef: "BAIL-01",
+          propertyType: "Villa",
+          issueRef: "Fuite cuisine"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "RENTAL",
+      dateFrom: "2026-11-01T00:00:00.000Z",
+      dateTo: "2026-11-30T23:59:59.999Z"
+    });
+
+    expect(result.rentalOperationsReport?.periodLabel).toBe("novembre 2026");
+    expect(result.rentalOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        propertyRef: "Villa A",
+        unitRef: "A1",
+        tenantRef: "Client Traore",
+        leaseRef: "BAIL-01",
+        propertyType: "Villa",
+        rentPaymentsCount: 1,
+        rentAmount: "240000.00",
+        depositAmount: "120000.00",
+        serviceChargeAmount: "0.00",
+        maintenanceAmount: "35000.00",
+        propertyExpenseAmount: "15000.00",
+        transactionsCount: 4,
+        tasksCount: 2,
+        doneTasksCount: 1,
+        openTasksCount: 1,
+        blockedTasksCount: 1,
+        cashInAmount: "360000.00",
+        cashOutAmount: "50000.00",
+        netAmount: "310000.00",
+        executionRate: 50,
+        currency: "XOF"
+      })
+    ]);
+    expect(result.rentalOperationsReport?.operationRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Paiement loyer", cashInAmount: "240000.00" }),
+        expect.objectContaining({ operationLabel: "Caution", cashInAmount: "120000.00" }),
+        expect.objectContaining({ operationLabel: "Maintenance", cashOutAmount: "35000.00" }),
+        expect.objectContaining({ operationLabel: "Charge bien", cashOutAmount: "15000.00" }),
+        expect.objectContaining({ operationLabel: "Tache: Recouvrement loyer", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tache: Maintenance", tasksCount: 1 })
+      ])
+    );
+    expect(result.rentalOperationsReport?.totals).toMatchObject({
+      propertiesCount: 1,
+      unitsCount: 1,
+      tenantsCount: 1,
+      rentPaymentsCount: 1,
+      rentAmount: "240000.00",
+      depositAmount: "120000.00",
+      serviceChargeAmount: "0.00",
+      maintenanceAmount: "35000.00",
+      propertyExpenseAmount: "15000.00",
+      transactionsCount: 4,
+      tasksCount: 2,
+      doneTasksCount: 1,
+      openTasksCount: 1,
+      blockedTasksCount: 1,
+      cashInAmount: "360000.00",
+      cashOutAmount: "50000.00",
+      netAmount: "310000.00",
+      executionRate: 50,
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "RENTAL",
+      dateFrom: "2026-11-01T00:00:00.000Z",
+      dateTo: "2026-11-30T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("builds the hotel operations report from booking and stay metadata", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 6, totalAmount: "295000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 3,
+        totalAmount: "260000.00",
+        approvedAmount: "260000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 3,
+        totalAmount: "35000.00",
+        approvedAmount: "35000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "HOTEL_LODGING",
+        count: 6,
+        totalAmount: "295000.00",
+        approvedAmount: "295000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "HOTEL_LODGING",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "180000.00",
+        currency: "XOF",
+        occurredAt: "2026-04-03T09:00:00.000Z",
+        metadata: {
+          hotelOperationKind: "ROOM_PAYMENT",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          checkInDate: "2026-04-02",
+          checkOutDate: "2026-04-05",
+          nightsCount: "3",
+          roomRate: "60000",
+          guestCount: "2",
+          paymentRef: "PAY-ROOM-01"
+        }
+      },
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "50000.00",
+        currency: "XOF",
+        occurredAt: "2026-04-03T10:00:00.000Z",
+        metadata: {
+          hotelOperationKind: "BOOKING_DEPOSIT",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          paymentRef: "PAY-DEP-01"
+        }
+      },
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "30000.00",
+        currency: "XOF",
+        occurredAt: "2026-04-04T12:00:00.000Z",
+        metadata: {
+          hotelOperationKind: "RESTAURANT_SALE",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          mealCount: "3",
+          mealUnitPrice: "10000",
+          paymentRef: "PAY-REST-01"
+        }
+      },
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "20000.00",
+        currency: "XOF",
+        occurredAt: "2026-04-05T08:00:00.000Z",
+        metadata: {
+          hotelOperationKind: "ROOM_MAINTENANCE",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          supplierRef: "Technicien clim",
+          invoiceRef: "FAC-MAINT-01",
+          invoiceAmount: "20000"
+        }
+      },
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "10000.00",
+        currency: "XOF",
+        occurredAt: "2026-04-05T09:00:00.000Z",
+        metadata: {
+          hotelOperationKind: "COMMISSION_FEE",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          commissionAmount: "10000"
+        }
+      },
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "5000.00",
+        currency: "XOF",
+        occurredAt: "2026-04-05T10:00:00.000Z",
+        metadata: {
+          hotelOperationKind: "TAX_PAYMENT",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          taxAmount: "5000"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "DONE",
+        dueDate: "2026-04-02T14:00:00.000Z",
+        metadata: {
+          hotelTaskKind: "CHECK_IN",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          checkInDate: "2026-04-02"
+        }
+      },
+      {
+        activityCode: "HOTEL_LODGING",
+        status: "BLOCKED",
+        dueDate: "2026-04-05T10:00:00.000Z",
+        metadata: {
+          hotelTaskKind: "MAINTENANCE",
+          bookingRef: "BKG-01",
+          stayRef: "STAY-01",
+          guestRef: "Client Diarra",
+          roomRef: "Chambre 12",
+          roomType: "Double",
+          serviceLine: "Hebergement",
+          issueRef: "Climatisation a controler"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "HOTEL_LODGING",
+      dateFrom: "2026-04-01T00:00:00.000Z",
+      dateTo: "2026-04-30T23:59:59.999Z"
+    });
+
+    expect(result.hotelOperationsReport?.periodLabel).toBe("avril 2026");
+    expect(result.hotelOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        serviceLine: "Hebergement",
+        roomRef: "Chambre 12",
+        roomType: "Double",
+        bookingRef: "BKG-01",
+        guestRef: "Client Diarra",
+        nightsCount: 3,
+        guestCount: 2,
+        roomRevenue: "180000.00",
+        depositAmount: "50000.00",
+        restaurantAmount: "30000.00",
+        serviceAmount: "0.00",
+        maintenanceAmount: "20000.00",
+        commissionAmount: "10000.00",
+        taxAmount: "5000.00",
+        refundAmount: "0.00",
+        expenseAmount: "0.00",
+        transactionsCount: 6,
+        tasksCount: 2,
+        doneTasksCount: 1,
+        openTasksCount: 1,
+        blockedTasksCount: 1,
+        cashInAmount: "260000.00",
+        cashOutAmount: "35000.00",
+        netAmount: "225000.00",
+        averageRoomRate: 60000,
+        executionRate: 50,
+        currency: "XOF"
+      })
+    ]);
+    expect(result.hotelOperationsReport?.operationRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Paiement chambre", cashInAmount: "180000.00" }),
+        expect.objectContaining({ operationLabel: "Acompte reservation", cashInAmount: "50000.00" }),
+        expect.objectContaining({ operationLabel: "Restauration", cashInAmount: "30000.00" }),
+        expect.objectContaining({ operationLabel: "Maintenance chambre", cashOutAmount: "20000.00" }),
+        expect.objectContaining({ operationLabel: "Commission", cashOutAmount: "10000.00" }),
+        expect.objectContaining({ operationLabel: "Taxe sejour", cashOutAmount: "5000.00" }),
+        expect.objectContaining({ operationLabel: "Tache: Check-in", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tache: Maintenance", tasksCount: 1 })
+      ])
+    );
+    expect(result.hotelOperationsReport?.totals).toMatchObject({
+      bookingsCount: 1,
+      roomsCount: 1,
+      guestsCount: 1,
+      nightsCount: 3,
+      guestCount: 2,
+      roomRevenue: "180000.00",
+      depositAmount: "50000.00",
+      restaurantAmount: "30000.00",
+      serviceAmount: "0.00",
+      maintenanceAmount: "20000.00",
+      commissionAmount: "10000.00",
+      taxAmount: "5000.00",
+      refundAmount: "0.00",
+      expenseAmount: "0.00",
+      transactionsCount: 6,
+      tasksCount: 2,
+      doneTasksCount: 1,
+      openTasksCount: 1,
+      blockedTasksCount: 1,
+      cashInAmount: "260000.00",
+      cashOutAmount: "35000.00",
+      netAmount: "225000.00",
+      averageRoomRate: 60000,
+      executionRate: 50,
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "HOTEL_LODGING",
+      dateFrom: "2026-04-01T00:00:00.000Z",
+      dateTo: "2026-04-30T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("builds the water operations report from facility and network metadata", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 9, totalAmount: "360000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 4,
+        totalAmount: "250000.00",
+        approvedAmount: "250000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 5,
+        totalAmount: "110000.00",
+        approvedAmount: "110000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "WATER",
+        count: 9,
+        totalAmount: "360000.00",
+        approvedAmount: "360000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "WATER",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "150000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-03T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "WATER_BILLING",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          meterRef: "CTR-001",
+          customerRef: "Abonnes Zone A",
+          billingPeriod: "2026-05",
+          producedVolumeM3: "1500",
+          volumeM3: "1000",
+          unitPrice: "150",
+          invoiceRef: "FAC-EAU-01",
+          paymentRef: "PAY-EAU-01"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "50000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-04T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "BULK_WATER_SALE",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          customerRef: "Camion citerne",
+          volumeM3: "250",
+          unitPrice: "200",
+          invoiceRef: "FAC-GROS-01",
+          paymentRef: "PAY-GROS-01"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "30000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-05T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "CONNECTION_FEE",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          customerRef: "Client Coulibaly",
+          connectionRef: "BR-01",
+          connectionFee: "30000",
+          paymentRef: "PAY-BR-01"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "20000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-05T10:00:00.000Z",
+        metadata: {
+          waterOperationKind: "SUBSIDY_INCOME",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          customerRef: "Mairie",
+          invoiceAmount: "20000",
+          paymentRef: "SUB-01"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "15000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-06T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "CHEMICAL_PURCHASE",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          treatmentProduct: "Chlore",
+          chemicalQuantity: "10",
+          unitPrice: "1500",
+          supplierRef: "Fournisseur chlore",
+          invoiceRef: "FAC-CH-01"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "25000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-07T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "ENERGY_PAYMENT",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          energySource: "Electricite",
+          energyQuantity: "500",
+          unitPrice: "50",
+          supplierRef: "Energie Mali",
+          invoiceRef: "FAC-EN-01"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "40000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-08T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "MAINTENANCE_EXPENSE",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          equipmentRef: "Pompe P1",
+          maintenanceType: "Preventif",
+          supplierRef: "Technicien pompe",
+          invoiceRef: "FAC-MAINT-EAU-01",
+          invoiceAmount: "40000"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "10000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-09T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "QUALITY_TEST_EXPENSE",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          testRef: "LAB-01",
+          waterQuality: "Chlore OK",
+          supplierRef: "Laboratoire",
+          invoiceRef: "FAC-LAB-01",
+          invoiceAmount: "10000"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "20000.00",
+        currency: "XOF",
+        occurredAt: "2026-05-10T09:00:00.000Z",
+        metadata: {
+          waterOperationKind: "NETWORK_REPAIR",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          equipmentRef: "Conduite A4",
+          issueRef: "Fuite conduite",
+          supplierRef: "Equipe reseau",
+          invoiceRef: "FAC-REP-01",
+          invoiceAmount: "20000"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "WATER",
+        status: "DONE",
+        dueDate: "2026-05-11T09:00:00.000Z",
+        metadata: {
+          waterTaskKind: "QUALITY_CONTROL",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          testRef: "LAB-01",
+          waterQuality: "Conforme"
+        }
+      },
+      {
+        activityCode: "WATER",
+        status: "BLOCKED",
+        dueDate: "2026-05-12T09:00:00.000Z",
+        metadata: {
+          waterTaskKind: "LEAK_REPAIR",
+          facilityRef: "Station Nord",
+          networkZone: "Zone A",
+          productionLine: "Distribution",
+          equipmentRef: "Conduite A4",
+          issueRef: "Piece de rechange manquante"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "WATER",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    });
+
+    expect(result.waterOperationsReport?.periodLabel).toBe("mai 2026");
+    expect(result.waterOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        facilityRef: "Station Nord",
+        networkZone: "Zone A",
+        productionLine: "Distribution",
+        producedVolumeM3: 1500,
+        billedVolumeM3: 1250,
+        waterRevenue: "150000.00",
+        bulkSaleAmount: "50000.00",
+        connectionAmount: "30000.00",
+        subsidyAmount: "20000.00",
+        treatmentCost: "15000.00",
+        energyCost: "25000.00",
+        maintenanceCost: "40000.00",
+        qualityCost: "10000.00",
+        repairCost: "20000.00",
+        supplierPaymentAmount: "0.00",
+        transactionsCount: 9,
+        tasksCount: 2,
+        doneTasksCount: 1,
+        openTasksCount: 1,
+        blockedTasksCount: 1,
+        cashInAmount: "250000.00",
+        cashOutAmount: "110000.00",
+        netAmount: "140000.00",
+        lossRate: 16.67,
+        executionRate: 50,
+        currency: "XOF"
+      })
+    ]);
+    expect(result.waterOperationsReport?.operationRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Facture eau", cashInAmount: "150000.00" }),
+        expect.objectContaining({ operationLabel: "Vente eau en gros", cashInAmount: "50000.00" }),
+        expect.objectContaining({ operationLabel: "Frais branchement", cashInAmount: "30000.00" }),
+        expect.objectContaining({ operationLabel: "Subvention / appui", cashInAmount: "20000.00" }),
+        expect.objectContaining({ operationLabel: "Produit traitement", cashOutAmount: "15000.00" }),
+        expect.objectContaining({ operationLabel: "Energie", cashOutAmount: "25000.00" }),
+        expect.objectContaining({ operationLabel: "Maintenance", cashOutAmount: "40000.00" }),
+        expect.objectContaining({ operationLabel: "Analyse qualite", cashOutAmount: "10000.00" }),
+        expect.objectContaining({ operationLabel: "Reparation reseau", cashOutAmount: "20000.00" }),
+        expect.objectContaining({ operationLabel: "Tache: Controle qualite", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tache: Reparation fuite", tasksCount: 1 })
+      ])
+    );
+    expect(result.waterOperationsReport?.totals).toMatchObject({
+      facilitiesCount: 1,
+      zonesCount: 1,
+      producedVolumeM3: 1500,
+      billedVolumeM3: 1250,
+      waterRevenue: "150000.00",
+      bulkSaleAmount: "50000.00",
+      connectionAmount: "30000.00",
+      subsidyAmount: "20000.00",
+      treatmentCost: "15000.00",
+      energyCost: "25000.00",
+      maintenanceCost: "40000.00",
+      qualityCost: "10000.00",
+      repairCost: "20000.00",
+      supplierPaymentAmount: "0.00",
+      transactionsCount: 9,
+      tasksCount: 2,
+      doneTasksCount: 1,
+      openTasksCount: 1,
+      blockedTasksCount: 1,
+      cashInAmount: "250000.00",
+      cashOutAmount: "110000.00",
+      netAmount: "140000.00",
+      lossRate: 16.67,
+      executionRate: 50,
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "WATER",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("builds the real estate agency operations report from mandate and deal metadata", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 10, totalAmount: "655000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 5,
+        totalAmount: "515000.00",
+        approvedAmount: "515000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 5,
+        totalAmount: "140000.00",
+        approvedAmount: "140000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        count: 10,
+        totalAmount: "655000.00",
+        approvedAmount: "655000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+
+    const commonMetadata = {
+      mandateRef: "MAND-01",
+      propertyRef: "Villa Faso",
+      mandateType: "Vente / location",
+      propertyType: "Villa",
+      locationZone: "ACI",
+      ownerRef: "Proprietaire Traore",
+      clientRef: "Client Diallo",
+      prospectRef: "Lead-01",
+      dealRef: "AFF-01",
+      dealStage: "Compromis"
+    };
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "300000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-03T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "SALE_COMMISSION",
+          dealAmount: "10000000",
+          commissionRate: "3",
+          commissionAmount: "300000",
+          invoiceRef: "COM-V-01",
+          paymentRef: "PAY-COM-V-01"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "120000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-04T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "RENTAL_COMMISSION",
+          dealAmount: "2400000",
+          commissionRate: "5",
+          commissionAmount: "120000",
+          invoiceRef: "COM-L-01",
+          paymentRef: "PAY-COM-L-01"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "50000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-05T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "MANDATE_FEE",
+          feeAmount: "50000",
+          documentRef: "MANDAT-SIGNE",
+          paymentRef: "PAY-MAND-01"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "20000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-06T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "VISIT_FEE",
+          visitCount: "2",
+          unitPrice: "10000",
+          paymentRef: "PAY-VIS-01"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "25000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-07T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "FILE_FEE",
+          feeAmount: "25000",
+          documentRef: "DOSSIER-01",
+          paymentRef: "PAY-DOS-01"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "30000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-08T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "ADVERTISING_EXPENSE",
+          advertisingChannel: "Portail immobilier",
+          supplierRef: "Annonceur",
+          invoiceRef: "ADV-01",
+          expenseAmount: "30000"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "10000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-09T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "FIELD_VISIT_EXPENSE",
+          visitCount: "2",
+          unitPrice: "5000",
+          supplierRef: "Carburant",
+          invoiceRef: "DEP-01",
+          expenseAmount: "10000"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "60000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-10T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "BROKER_PAYOUT",
+          supplierRef: "Courtier Keita",
+          payoutAmount: "60000",
+          paymentRef: "PAY-COURT-01"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "15000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-11T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "DOCUMENT_EXPENSE",
+          documentRef: "Attestation",
+          supplierRef: "Mairie",
+          invoiceRef: "DOC-01",
+          expenseAmount: "15000"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "25000.00",
+        currency: "XOF",
+        occurredAt: "2026-06-12T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyOperationKind: "CUSTOMER_REFUND",
+          refundAmount: "5000",
+          expenseAmount: "20000",
+          paymentRef: "PAY-REM-01"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "DONE",
+        dueDate: "2026-06-13T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyTaskKind: "VISIT_SCHEDULE"
+        }
+      },
+      {
+        activityCode: "REAL_ESTATE_AGENCY",
+        status: "BLOCKED",
+        dueDate: "2026-06-14T09:00:00.000Z",
+        metadata: {
+          ...commonMetadata,
+          agencyTaskKind: "DOCUMENT_COLLECTION",
+          issueRef: "Titre foncier manquant"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "REAL_ESTATE_AGENCY",
+      dateFrom: "2026-06-01T00:00:00.000Z",
+      dateTo: "2026-06-30T23:59:59.999Z"
+    });
+
+    expect(result.agencyOperationsReport?.periodLabel).toBe("juin 2026");
+    expect(result.agencyOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        mandateRef: "MAND-01",
+        propertyRef: "Villa Faso",
+        mandateType: "Vente / location",
+        propertyType: "Villa",
+        locationZone: "ACI",
+        clientRef: "Client Diallo",
+        dealStage: "Compromis",
+        dealAmount: "12400000.00",
+        saleCommissionAmount: "300000.00",
+        rentalCommissionAmount: "120000.00",
+        mandateFeeAmount: "50000.00",
+        visitFeeAmount: "20000.00",
+        fileFeeAmount: "25000.00",
+        advertisingExpenseAmount: "30000.00",
+        fieldVisitExpenseAmount: "10000.00",
+        brokerPayoutAmount: "60000.00",
+        documentExpenseAmount: "15000.00",
+        officeExpenseAmount: "0.00",
+        refundAmount: "25000.00",
+        transactionsCount: 10,
+        tasksCount: 2,
+        doneTasksCount: 1,
+        openTasksCount: 1,
+        blockedTasksCount: 1,
+        cashInAmount: "515000.00",
+        cashOutAmount: "140000.00",
+        netAmount: "375000.00",
+        commissionRate: 3.39,
+        executionRate: 50,
+        currency: "XOF"
+      })
+    ]);
+    expect(result.agencyOperationsReport?.operationRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Commission vente", cashInAmount: "300000.00" }),
+        expect.objectContaining({ operationLabel: "Commission location", cashInAmount: "120000.00" }),
+        expect.objectContaining({ operationLabel: "Frais mandat", cashInAmount: "50000.00" }),
+        expect.objectContaining({ operationLabel: "Frais visite", cashInAmount: "20000.00" }),
+        expect.objectContaining({ operationLabel: "Frais dossier", cashInAmount: "25000.00" }),
+        expect.objectContaining({ operationLabel: "Publicite", cashOutAmount: "30000.00" }),
+        expect.objectContaining({ operationLabel: "Deplacement visite", cashOutAmount: "10000.00" }),
+        expect.objectContaining({ operationLabel: "Reversement courtier", cashOutAmount: "60000.00" }),
+        expect.objectContaining({ operationLabel: "Frais document", cashOutAmount: "15000.00" }),
+        expect.objectContaining({ operationLabel: "Remboursement client", cashOutAmount: "25000.00" }),
+        expect.objectContaining({ operationLabel: "Tache: Visite", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tache: Collecte documents", tasksCount: 1 })
+      ])
+    );
+    expect(result.agencyOperationsReport?.totals).toMatchObject({
+      mandatesCount: 1,
+      propertiesCount: 1,
+      clientsCount: 1,
+      dealAmount: "12400000.00",
+      saleCommissionAmount: "300000.00",
+      rentalCommissionAmount: "120000.00",
+      mandateFeeAmount: "50000.00",
+      visitFeeAmount: "20000.00",
+      fileFeeAmount: "25000.00",
+      advertisingExpenseAmount: "30000.00",
+      fieldVisitExpenseAmount: "10000.00",
+      brokerPayoutAmount: "60000.00",
+      documentExpenseAmount: "15000.00",
+      officeExpenseAmount: "0.00",
+      refundAmount: "25000.00",
+      transactionsCount: 10,
+      tasksCount: 2,
+      doneTasksCount: 1,
+      openTasksCount: 1,
+      blockedTasksCount: 1,
+      cashInAmount: "515000.00",
+      cashOutAmount: "140000.00",
+      netAmount: "375000.00",
+      commissionRate: 3.39,
+      executionRate: 50,
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "REAL_ESTATE_AGENCY",
+      dateFrom: "2026-06-01T00:00:00.000Z",
+      dateTo: "2026-06-30T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
   it("builds the fish farming operations report from pond and cycle metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "155000.00" }

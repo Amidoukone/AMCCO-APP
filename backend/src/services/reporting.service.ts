@@ -31,10 +31,17 @@ import {
   toTransactionExportRecord,
   type ReportPeriodFilter,
   type AgricultureOperationsReport,
+  type AgencyOperationsReport,
+  type BtpOperationsReport,
   type DashboardSummary,
   type FishFarmingOperationsReport,
+  type FoodOperationsReport,
+  type GeneralStoreOperationsReport,
   type HardwareMonthlyReport,
+  type HotelOperationsReport,
   type LivestockOperationsReport,
+  type RentalOperationsReport,
+  type WaterOperationsReport,
   type ReportOperationalMetric,
   type ReportOperationalTask,
   type ReportOperationalTransaction,
@@ -97,6 +104,233 @@ const AGRICULTURE_REPORT_BRANDING = {
   subtitle: "Suivi de campagne, parcelles, cultures et operations terrain",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO"
+};
+const GENERAL_STORE_OPERATION_LABELS: Record<string, string> = {
+  STORE_SALE: "Vente caisse",
+  STOCK_PURCHASE: "Achat stock",
+  SUPPLIER_PAYMENT: "Paiement fournisseur",
+  CUSTOMER_RETURN: "Retour client",
+  DISCOUNT_ADJUSTMENT: "Remise / ecart",
+  INVENTORY_ADJUSTMENT: "Ajustement inventaire",
+  INTERNAL_TRANSFER: "Transfert interne",
+  STORE_EXPENSE: "Charge magasin"
+};
+const GENERAL_STORE_TASK_LABELS: Record<string, string> = {
+  OPENING_CASH: "Ouverture caisse",
+  CLOSING_CASH: "Cloture caisse",
+  STOCK_CONTROL: "Controle stock",
+  INVENTORY: "Inventaire",
+  REPLENISHMENT: "Reassort rayon",
+  MERCHANDISING: "Implantation rayon",
+  PRICE_UPDATE: "Mise a jour prix",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  CUSTOMER_RETURN: "Retour client",
+  CLEANING: "Nettoyage rayon",
+  SECURITY_CHECK: "Controle securite",
+  FOLLOW_UP: "Suivi magasin"
+};
+const GENERAL_STORE_REPORT_BRANDING = {
+  title: "MAGASINS - COMMERCE GENERAL",
+  subtitle: "Suivi des rayons, articles, ventes caisse, achats, retours, remises, inventaire et charges",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+const FOOD_OPERATION_LABELS: Record<string, string> = {
+  PRODUCT_SALE: "Vente produit",
+  PRODUCT_PURCHASE: "Achat stock",
+  SUPPLIER_PAYMENT: "Paiement fournisseur",
+  STOCK_LOSS: "Perte / peremption",
+  COLD_CHAIN_EXPENSE: "Chaine du froid",
+  PACKAGING_EXPENSE: "Emballage",
+  CUSTOMER_REFUND: "Remboursement client"
+};
+const FOOD_TASK_LABELS: Record<string, string> = {
+  RECEPTION: "Reception stock",
+  STOCK_CONTROL: "Controle stock",
+  EXPIRY_CHECK: "Controle DLC",
+  COLD_CHAIN_CHECK: "Controle froid",
+  SHELF_ROTATION: "Rotation rayon",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  PRODUCT_WITHDRAWAL: "Retrait produit",
+  CLEANING: "Nettoyage",
+  INVENTORY: "Inventaire",
+  QUALITY_CONTROL: "Controle qualite",
+  DELIVERY: "Livraison",
+  FOLLOW_UP: "Suivi alimentaire"
+};
+const FOOD_REPORT_BRANDING = {
+  title: "ALIMENTATION",
+  subtitle: "Suivi des achats, ventes, lots, DLC, pertes, chaine du froid et controles",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+const RENTAL_OPERATION_LABELS: Record<string, string> = {
+  RENT_PAYMENT: "Paiement loyer",
+  SECURITY_DEPOSIT: "Caution",
+  ADVANCE_PAYMENT: "Avance loyer",
+  SERVICE_CHARGE_INCOME: "Charges recuperees",
+  MAINTENANCE_EXPENSE: "Maintenance",
+  PROPERTY_EXPENSE: "Charge bien",
+  OWNER_PAYOUT: "Reversement proprietaire"
+};
+const RENTAL_TASK_LABELS: Record<string, string> = {
+  RENT_COLLECTION: "Recouvrement loyer",
+  TENANT_FOLLOW_UP: "Suivi locataire",
+  VISIT: "Visite",
+  LEASE_RENEWAL: "Renouvellement bail",
+  MOVE_IN: "Entree locataire",
+  MOVE_OUT: "Sortie locataire",
+  MAINTENANCE: "Maintenance",
+  INSPECTION: "Inspection",
+  DOCUMENTS: "Documents",
+  OWNER_REPORT: "Reporting proprietaire",
+  LITIGATION: "Litige",
+  FOLLOW_UP: "Suivi locatif"
+};
+const RENTAL_REPORT_BRANDING = {
+  title: "LOCATION IMMOBILIERE",
+  subtitle: "Suivi des biens, lots, locataires, loyers, charges, maintenances et relances",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+const HOTEL_OPERATION_LABELS: Record<string, string> = {
+  ROOM_PAYMENT: "Paiement chambre",
+  BOOKING_DEPOSIT: "Acompte reservation",
+  RESTAURANT_SALE: "Restauration",
+  EVENT_SERVICE: "Evenement / salle",
+  LAUNDRY_SERVICE: "Blanchisserie",
+  ROOM_MAINTENANCE: "Maintenance chambre",
+  SUPPLIER_PAYMENT: "Paiement fournisseur",
+  COMMISSION_FEE: "Commission",
+  TAX_PAYMENT: "Taxe sejour",
+  GUEST_REFUND: "Remboursement client"
+};
+const HOTEL_TASK_LABELS: Record<string, string> = {
+  CHECK_IN: "Check-in",
+  CHECK_OUT: "Check-out",
+  ROOM_PREPARATION: "Preparation chambre",
+  HOUSEKEEPING: "Menage",
+  MAINTENANCE: "Maintenance",
+  RESTAURANT_SERVICE: "Service restauration",
+  LAUNDRY: "Blanchisserie",
+  EVENT_SETUP: "Preparation evenement",
+  GUEST_FOLLOW_UP: "Suivi client",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  NIGHT_AUDIT: "Audit nuit",
+  FOLLOW_UP: "Suivi hotelier"
+};
+const HOTEL_REPORT_BRANDING = {
+  title: "HOTELLERIE / AUBERGE",
+  subtitle: "Suivi des reservations, chambres, nuitees, restauration, services, charges et maintenance",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+const WATER_OPERATION_LABELS: Record<string, string> = {
+  WATER_BILLING: "Facture eau",
+  BULK_WATER_SALE: "Vente eau en gros",
+  CONNECTION_FEE: "Frais branchement",
+  SUBSIDY_INCOME: "Subvention / appui",
+  CHEMICAL_PURCHASE: "Produit traitement",
+  ENERGY_PAYMENT: "Energie",
+  MAINTENANCE_EXPENSE: "Maintenance",
+  QUALITY_TEST_EXPENSE: "Analyse qualite",
+  NETWORK_REPAIR: "Reparation reseau",
+  SUPPLIER_PAYMENT: "Paiement fournisseur"
+};
+const WATER_TASK_LABELS: Record<string, string> = {
+  PRODUCTION_READING: "Releve production",
+  QUALITY_CONTROL: "Controle qualite",
+  PUMP_MAINTENANCE: "Maintenance pompe",
+  NETWORK_INSPECTION: "Inspection reseau",
+  LEAK_REPAIR: "Reparation fuite",
+  METER_READING: "Releve compteur",
+  CONNECTION_WORK: "Branchement",
+  CHEMICAL_DOSING: "Dosage traitement",
+  BILLING_FOLLOW_UP: "Suivi facturation",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  SERVICE_RESTORE: "Remise en service",
+  FOLLOW_UP: "Suivi eau"
+};
+const WATER_REPORT_BRANDING = {
+  title: "PRODUCTION D'EAU POTABLE",
+  subtitle: "Suivi des stations, volumes, facturation, qualite, maintenance et continuite de service",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+const AGENCY_OPERATION_LABELS: Record<string, string> = {
+  SALE_COMMISSION: "Commission vente",
+  RENTAL_COMMISSION: "Commission location",
+  MANDATE_FEE: "Frais mandat",
+  VISIT_FEE: "Frais visite",
+  FILE_FEE: "Frais dossier",
+  ADVERTISING_EXPENSE: "Publicite",
+  FIELD_VISIT_EXPENSE: "Deplacement visite",
+  BROKER_PAYOUT: "Reversement courtier",
+  DOCUMENT_EXPENSE: "Frais document",
+  CUSTOMER_REFUND: "Remboursement client",
+  OFFICE_EXPENSE: "Charge agence"
+};
+const AGENCY_TASK_LABELS: Record<string, string> = {
+  MANDATE_INTAKE: "Prise mandat",
+  PROPERTY_VALUATION: "Estimation bien",
+  LISTING_PUBLICATION: "Publication annonce",
+  CLIENT_PROSPECTING: "Prospection client",
+  VISIT_SCHEDULE: "Visite",
+  OFFER_FOLLOW_UP: "Suivi offre",
+  DOCUMENT_COLLECTION: "Collecte documents",
+  NOTARY_FOLLOW_UP: "Suivi notaire",
+  CONTRACT_SIGNING: "Signature contrat",
+  OWNER_REPORTING: "Reporting proprietaire",
+  COMMISSION_COLLECTION: "Recouvrement commission",
+  FOLLOW_UP: "Suivi dossier"
+};
+const AGENCY_REPORT_BRANDING = {
+  title: "AGENCE IMMOBILIERE",
+  subtitle: "Suivi des mandats, biens, visites, offres, commissions, frais et closing",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+const BTP_OPERATION_LABELS: Record<string, string> = {
+  CLIENT_PAYMENT: "Encaissement client",
+  MATERIAL_PURCHASE: "Achat materiaux",
+  LABOR_PAYMENT: "Main-d'oeuvre",
+  EQUIPMENT_RENTAL: "Location engin",
+  SUBCONTRACTING: "Sous-traitance",
+  SITE_EXPENSE: "Charge chantier"
+};
+const BTP_TASK_LABELS: Record<string, string> = {
+  SITE_PREPARATION: "Preparation chantier",
+  EARTHWORKS: "Terrassement",
+  FOUNDATION: "Fondation",
+  STRUCTURAL_WORK: "Structure",
+  MASONRY: "Maconnerie",
+  MEP: "Electricite / plomberie",
+  FINISHING: "Finition",
+  PROCUREMENT: "Approvisionnement",
+  QUALITY_CONTROL: "Controle qualite",
+  RESERVE: "Reserve / reprise",
+  HANDOVER: "Reception",
+  FOLLOW_UP: "Suivi chantier"
+};
+const BTP_REPORT_BRANDING = {
+  title: "BTP",
+  subtitle: "Suivi de chantiers, lots, couts, avancement et reserves",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
 };
 const FISH_FARMING_OPERATION_LABELS: Record<string, string> = {
   FINGERLING_PURCHASE: "Achat alevins",
@@ -1568,6 +1802,2766 @@ function renderAgricultureReportsPdf(
   drawAgricultureBreakdown(doc, report);
 }
 
+function buildEmptyGeneralStoreOperationsReport(filters: ReportPeriodFilter): GeneralStoreOperationsReport {
+  return {
+    periodLabel: toGeneralStorePeriodLabel(filters, []),
+    rows: [],
+    operationRows: [],
+    totals: {
+      departmentsCount: 0,
+      productFamiliesCount: 0,
+      itemsCount: 0,
+      soldQuantity: 0,
+      purchaseQuantity: 0,
+      returnQuantity: 0,
+      adjustmentQuantity: 0,
+      transferQuantity: 0,
+      salesAmount: "0.00",
+      purchaseAmount: "0.00",
+      returnAmount: "0.00",
+      discountAmount: "0.00",
+      expenseAmount: "0.00",
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInAmount: "0.00",
+      cashOutAmount: "0.00",
+      netAmount: "0.00",
+      grossMargin: "0.00",
+      marginRate: 0,
+      executionRate: 0,
+      currency: "XOF"
+    }
+  };
+}
+
+const GENERAL_STORE_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "RAYON", width: 54, align: "left" },
+  { label: "FAMILLE", width: 50, align: "left" },
+  { label: "ARTICLE", width: 52, align: "left" },
+  { label: "REF", width: 38, align: "left" },
+  { label: "VTE", width: 32, align: "right" },
+  { label: "ACH", width: 32, align: "right" },
+  { label: "RET", width: 30, align: "right" },
+  { label: "CA", width: 49, align: "right" },
+  { label: "COUT", width: 49, align: "right" },
+  { label: "NET", width: 49, align: "right" },
+  { label: "MARGE", width: 39, align: "right" },
+  { label: "BLQ", width: 22, align: "right" }
+];
+
+function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 92;
+  const centerWidth = pageWidth - margin * 2 - 184;
+
+  doc.save();
+  doc.roundedRect(margin, 22, 86, 58, 6).fill("#eef2ff");
+  doc.roundedRect(margin, 22, 86, 58, 6).strokeColor("#4338ca").lineWidth(1).stroke();
+  doc.rect(margin + 16, 45, 54, 18).fill("#4f46e5");
+  doc.rect(margin + 20, 34, 14, 11).fill("#818cf8");
+  doc.rect(margin + 38, 29, 14, 16).fill("#818cf8");
+  doc.rect(margin + 56, 37, 10, 8).fill("#818cf8");
+  doc.moveTo(margin + 14, 64).lineTo(margin + 72, 64).strokeColor("#4338ca").lineWidth(2).stroke();
+  doc.restore();
+
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(15).text(GENERAL_STORE_REPORT_BRANDING.title, centerX, 22, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#3730a3").font("Helvetica").fontSize(9.2).text(GENERAL_STORE_REPORT_BRANDING.agency, centerX, 42, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11).text(`"${GENERAL_STORE_REPORT_BRANDING.brand}"`, centerX, 55, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(8.5).text(`${GENERAL_STORE_REPORT_BRANDING.fiscal}     ${GENERAL_STORE_REPORT_BRANDING.phone}`, centerX, 69, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(8.2).text(GENERAL_STORE_REPORT_BRANDING.subtitle, centerX, 82, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#4f46e5").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SUIVI DES OPERATIONS MAGASIN PAR RAYON", margin, 114, {
+    width: pageWidth - margin * 2,
+    align: "center"
+  });
+  doc.y = 140;
+}
+
+function drawGeneralStoreMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: GeneralStoreOperationsReport,
+  filters: ReportPeriodFilter,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+  const period = filters.dateFrom || filters.dateTo
+    ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
+    : report.periodLabel;
+
+  doc.roundedRect(margin, y, width, 42, 4).fill("#eef2ff");
+  doc.rect(margin, y, width, 42).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Magasins", margin + 205, y + 21, { width: 140 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
+    width: 140,
+    align: "right"
+  });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
+    width: 140,
+    align: "right"
+  });
+  doc.y = y + 56;
+}
+
+function drawGeneralStoreMetricCards(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const gap = 8;
+  const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
+  const y = doc.y;
+  const metrics = [
+    { label: "Rayons / articles", value: `${formatPdfNumber(report.totals.departmentsCount)} | ${formatPdfNumber(report.totals.itemsCount)}` },
+    { label: "Ventes", value: formatPdfMoney(report.totals.salesAmount) },
+    { label: "Achats", value: formatPdfMoney(report.totals.purchaseAmount) },
+    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, 45, 4).fill("#eef2ff");
+    doc.rect(x, y, cardWidth, 45).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
+    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 8, y + 8, { width: cardWidth - 16 });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, { width: cardWidth - 16 });
+  });
+  doc.y = y + 60;
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
+    `Quantites: ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | achats ${formatPdfNumber(report.totals.purchaseQuantity, 2)} | retours ${formatPdfNumber(report.totals.returnQuantity, 2)} | remises ${formatPdfMoney(report.totals.discountAmount)} | marge ${formatPdfMoney(report.totals.grossMargin)} (${formatPdfNumber(report.totals.marginRate, 1)}%).`,
+    margin,
+    doc.y - 8,
+    { width: pageWidth - margin * 2, align: "center" }
+  );
+  doc.moveDown(0.8);
+}
+
+function drawGeneralStoreTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of GENERAL_STORE_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+      align: "center",
+      fill: "#e0e7ff",
+      font: "Helvetica-Bold",
+      fontSize: 5.55
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawGeneralStoreDataRow(
+  doc: PDFKit.PDFDocument,
+  row: GeneralStoreOperationsReport["rows"][number],
+  y: number
+): number {
+  const values = [
+    { value: truncatePdfText(row.department, 12), align: "left" as const },
+    { value: truncatePdfText(row.productFamily, 11), align: "left" as const },
+    { value: truncatePdfText(row.itemName, 11), align: "left" as const },
+    { value: truncatePdfText(row.skuRef, 8), align: "left" as const },
+    { value: formatPdfNumber(row.soldQuantity, 1), align: "right" as const },
+    { value: formatPdfNumber(row.purchaseQuantity, 1), align: "right" as const },
+    { value: formatPdfNumber(row.returnQuantity, 1), align: "right" as const },
+    { value: formatPdfMoney(row.salesAmount), align: "right" as const },
+    { value: formatPdfMoney(row.purchaseAmount), align: "right" as const },
+    { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: `${formatPdfNumber(row.marginRate, 0)}%`, align: "right" as const },
+    { value: formatPdfNumber(row.blockedTasksCount), align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  values.forEach((item, index) => {
+    const column = GENERAL_STORE_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+      align: item.align,
+      fontSize: 5.25
+    });
+    x += column.width;
+  });
+  return y + 20;
+}
+
+function drawGeneralStoreTotalsRow(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport, y: number): number {
+  const firstColumnsWidth = GENERAL_STORE_PDF_COLUMNS.slice(0, 4).reduce((sum, item) => sum + item.width, 0);
+  let x = PDF_PAGE_MARGIN;
+  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+    align: "center",
+    fill: "#f8fafc",
+    font: "Helvetica-Bold",
+    fontSize: 7
+  });
+  x += firstColumnsWidth;
+
+  const values = [
+    formatPdfNumber(report.totals.soldQuantity, 1),
+    formatPdfNumber(report.totals.purchaseQuantity, 1),
+    formatPdfNumber(report.totals.returnQuantity, 1),
+    formatPdfMoney(report.totals.salesAmount),
+    formatPdfMoney(report.totals.purchaseAmount),
+    formatPdfMoney(report.totals.netAmount),
+    `${formatPdfNumber(report.totals.marginRate, 0)}%`,
+    formatPdfNumber(report.totals.blockedTasksCount)
+  ];
+  for (let index = 0; index < values.length; index += 1) {
+    const column = GENERAL_STORE_PDF_COLUMNS[index + 4];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
+      align: "right",
+      fill: "#eef2ff",
+      font: "Helvetica-Bold",
+      fontSize: 5.3
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawGeneralStoreEmptyState(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#eef2ff");
+  doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(11).text("Aucune operation magasin reportable", margin + 14, y + 16, {
+    width: pageWidth - margin * 2 - 28
+  });
+  doc.fillColor("#3730a3").font("Helvetica").fontSize(9.2).text(
+    "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Magasins de la periode. Renseignez rayon, famille, article, reference, quantite et caisse pour alimenter le suivi.",
+    margin + 14,
+    y + 34,
+    { width: pageWidth - margin * 2 - 28 }
+  );
+  doc.y = y + 88;
+}
+
+function drawGeneralStoreOperationsTable(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
+  if (report.rows.length === 0) {
+    drawGeneralStoreEmptyState(doc);
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (needsPdfPageBreak(doc, 78)) {
+    doc.addPage();
+    drawGeneralStoreReportHeader(doc, report);
+  }
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(10.5).text("Synthese par rayon, famille et article", PDF_PAGE_MARGIN, doc.y, {
+    width: doc.page.width - PDF_PAGE_MARGIN * 2
+  });
+  doc.moveDown(0.4);
+  let y = drawGeneralStoreTableHeader(doc, doc.y);
+
+  for (const row of report.rows) {
+    if (y + 20 + 22 > tableBottom) {
+      doc.addPage();
+      drawGeneralStoreReportHeader(doc, report);
+      y = drawGeneralStoreTableHeader(doc, doc.y);
+    }
+    y = drawGeneralStoreDataRow(doc, row, y);
+  }
+
+  if (y + 22 > tableBottom) {
+    doc.addPage();
+    drawGeneralStoreReportHeader(doc, report);
+    y = drawGeneralStoreTableHeader(doc, doc.y);
+  }
+  doc.y = drawGeneralStoreTotalsRow(doc, report, y) + 14;
+}
+
+function drawGeneralStoreBreakdown(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
+  if (report.operationRows.length === 0) {
+    return;
+  }
+
+  if (needsPdfPageBreak(doc, 62)) {
+    doc.addPage();
+    drawGeneralStoreReportHeader(doc, report);
+  }
+
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    width: doc.page.width - PDF_PAGE_MARGIN * 2
+  });
+  doc.moveDown(0.4);
+
+  const columns: PdfTableColumn[] = [
+    { label: "OPERATION", width: 170, align: "left" },
+    { label: "TRANS.", width: 50, align: "right" },
+    { label: "TACHES", width: 50, align: "right" },
+    { label: "RECETTES", width: 80, align: "right" },
+    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "NET", width: 85, align: "right" }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  let y = doc.y;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: "center",
+      fill: "#e0e7ff",
+      font: "Helvetica-Bold",
+      fontSize: 7.5
+    });
+    x += column.width;
+  }
+  y += 20;
+
+  for (const row of report.operationRows) {
+    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawGeneralStoreReportHeader(doc, report);
+      y = doc.y;
+      x = PDF_PAGE_MARGIN;
+      for (const column of columns) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+          align: "center",
+          fill: "#e0e7ff",
+          font: "Helvetica-Bold",
+          fontSize: 7.5
+        });
+        x += column.width;
+      }
+      y += 20;
+    }
+    x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
+      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+      { value: formatPdfMoney(row.netAmount), align: "right" as const }
+    ];
+    values.forEach((item, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
+        align: item.align,
+        fontSize: 7.4
+      });
+      x += column.width;
+    });
+    y += 19;
+  }
+  doc.y = y + 10;
+}
+
+function drawGeneralStorePdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+
+  doc.save();
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#c7d2fe").lineWidth(1).stroke();
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport magasins | ${periodLabel}`, margin, pageHeight - 32, {
+    width: 330
+  });
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+    width: 80,
+    align: "right"
+  });
+  doc.restore();
+}
+
+function renderGeneralStoreReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.generalStoreOperationsReport ?? buildEmptyGeneralStoreOperationsReport(filters);
+
+  drawGeneralStoreReportHeader(doc, report);
+  drawGeneralStoreMetadataStrip(doc, report, filters, overview.generatedAt);
+  drawGeneralStoreMetricCards(doc, report);
+  drawGeneralStoreOperationsTable(doc, report);
+  drawGeneralStoreBreakdown(doc, report);
+}
+
+function buildEmptyFoodOperationsReport(filters: ReportPeriodFilter): FoodOperationsReport {
+  return {
+    periodLabel: toFoodPeriodLabel(filters, []),
+    rows: [],
+    operationRows: [],
+    totals: {
+      productFamiliesCount: 0,
+      productsCount: 0,
+      batchesCount: 0,
+      purchaseQuantity: 0,
+      soldQuantity: 0,
+      lossQuantity: 0,
+      purchaseAmount: "0.00",
+      salesAmount: "0.00",
+      lossAmount: "0.00",
+      expenseAmount: "0.00",
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInAmount: "0.00",
+      cashOutAmount: "0.00",
+      netAmount: "0.00",
+      grossMargin: "0.00",
+      marginRate: 0,
+      executionRate: 0,
+      currency: "XOF"
+    }
+  };
+}
+
+const FOOD_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "FAMILLE", width: 55, align: "left" },
+  { label: "PRODUIT", width: 47, align: "left" },
+  { label: "LOT", width: 48, align: "left" },
+  { label: "ZONE", width: 40, align: "left" },
+  { label: "ACHAT", width: 36, align: "right" },
+  { label: "VENTE", width: 36, align: "right" },
+  { label: "PERTE", width: 36, align: "right" },
+  { label: "CA", width: 48, align: "right" },
+  { label: "COUT", width: 48, align: "right" },
+  { label: "NET", width: 48, align: "right" },
+  { label: "MARGE", width: 41, align: "right" },
+  { label: "BLQ", width: 25, align: "right" }
+];
+
+function drawFoodReportHeader(doc: PDFKit.PDFDocument, report: FoodOperationsReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 92;
+  const centerWidth = pageWidth - margin * 2 - 184;
+
+  doc.save();
+  doc.roundedRect(margin, 22, 86, 58, 6).fill("#fff7ed");
+  doc.roundedRect(margin, 22, 86, 58, 6).strokeColor("#16a34a").lineWidth(1).stroke();
+  doc.circle(margin + 30, 43, 12).fill("#f97316");
+  doc.rect(margin + 48, 32, 18, 28).fill("#22c55e");
+  doc.rect(margin + 52, 26, 10, 8).fill("#15803d");
+  doc.moveTo(margin + 18, 64).lineTo(margin + 72, 64).strokeColor("#16a34a").lineWidth(2).stroke();
+  doc.restore();
+
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(FOOD_REPORT_BRANDING.title, centerX, 22, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#166534").font("Helvetica").fontSize(9.2).text(FOOD_REPORT_BRANDING.agency, centerX, 42, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11).text(`"${FOOD_REPORT_BRANDING.brand}"`, centerX, 55, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(8.5).text(`${FOOD_REPORT_BRANDING.fiscal}     ${FOOD_REPORT_BRANDING.phone}`, centerX, 69, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(8.5).text(FOOD_REPORT_BRANDING.subtitle, centerX, 82, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#22c55e").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SUIVI DES OPERATIONS ALIMENTAIRES PAR PRODUIT", margin, 114, {
+    width: pageWidth - margin * 2,
+    align: "center"
+  });
+  doc.y = 140;
+}
+
+function drawFoodMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: FoodOperationsReport,
+  filters: ReportPeriodFilter,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+  const period = filters.dateFrom || filters.dateTo
+    ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
+    : report.periodLabel;
+
+  doc.roundedRect(margin, y, width, 42, 4).fill("#f0fdf4");
+  doc.rect(margin, y, width, 42).strokeColor("#bbf7d0").lineWidth(0.8).stroke();
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Alimentation", margin + 205, y + 21, { width: 140 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
+    width: 140,
+    align: "right"
+  });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
+    width: 140,
+    align: "right"
+  });
+  doc.y = y + 56;
+}
+
+function drawFoodMetricCards(doc: PDFKit.PDFDocument, report: FoodOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const gap = 8;
+  const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
+  const y = doc.y;
+  const metrics = [
+    { label: "Familles / lots", value: `${formatPdfNumber(report.totals.productFamiliesCount)} | ${formatPdfNumber(report.totals.batchesCount)}` },
+    { label: "Ventes", value: formatPdfMoney(report.totals.salesAmount) },
+    { label: "Achats", value: formatPdfMoney(report.totals.purchaseAmount) },
+    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, 45, 4).fill("#f0fdf4");
+    doc.rect(x, y, cardWidth, 45).strokeColor("#bbf7d0").lineWidth(0.8).stroke();
+    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 8, y + 8, {
+      width: cardWidth - 16
+    });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, {
+      width: cardWidth - 16
+    });
+  });
+  doc.y = y + 60;
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
+    `Quantites: achats ${formatPdfNumber(report.totals.purchaseQuantity, 2)} | ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | pertes ${formatPdfNumber(report.totals.lossQuantity, 2)} | marge ${formatPdfMoney(report.totals.grossMargin)} (${formatPdfNumber(report.totals.marginRate, 1)}%) | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+    margin,
+    doc.y - 8,
+    {
+      width: pageWidth - margin * 2,
+      align: "center"
+    }
+  );
+  doc.moveDown(0.8);
+}
+
+function drawFoodTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of FOOD_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+      align: "center",
+      fill: "#dcfce7",
+      font: "Helvetica-Bold",
+      fontSize: 5.65
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawFoodDataRow(
+  doc: PDFKit.PDFDocument,
+  row: FoodOperationsReport["rows"][number],
+  y: number
+): number {
+  const values = [
+    { value: truncatePdfText(row.productFamily, 12), align: "left" as const },
+    { value: truncatePdfText(row.productName, 10), align: "left" as const },
+    { value: truncatePdfText(row.batchRef, 10), align: "left" as const },
+    { value: truncatePdfText(row.storageArea, 9), align: "left" as const },
+    { value: formatPdfNumber(row.purchaseQuantity, 1), align: "right" as const },
+    { value: formatPdfNumber(row.soldQuantity, 1), align: "right" as const },
+    { value: formatPdfNumber(row.lossQuantity, 1), align: "right" as const },
+    { value: formatPdfMoney(row.salesAmount), align: "right" as const },
+    { value: formatPdfMoney(row.purchaseAmount), align: "right" as const },
+    { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: `${formatPdfNumber(row.marginRate, 0)}%`, align: "right" as const },
+    { value: formatPdfNumber(row.blockedTasksCount), align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  values.forEach((item, index) => {
+    const column = FOOD_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+      align: item.align,
+      fontSize: 5.35
+    });
+    x += column.width;
+  });
+  return y + 20;
+}
+
+function drawFoodTotalsRow(doc: PDFKit.PDFDocument, report: FoodOperationsReport, y: number): number {
+  const firstColumnsWidth = FOOD_PDF_COLUMNS.slice(0, 4).reduce((sum, item) => sum + item.width, 0);
+  let x = PDF_PAGE_MARGIN;
+  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+    align: "center",
+    fill: "#f8fafc",
+    font: "Helvetica-Bold",
+    fontSize: 7
+  });
+  x += firstColumnsWidth;
+
+  const values = [
+    formatPdfNumber(report.totals.purchaseQuantity, 1),
+    formatPdfNumber(report.totals.soldQuantity, 1),
+    formatPdfNumber(report.totals.lossQuantity, 1),
+    formatPdfMoney(report.totals.salesAmount),
+    formatPdfMoney(report.totals.purchaseAmount),
+    formatPdfMoney(report.totals.netAmount),
+    `${formatPdfNumber(report.totals.marginRate, 0)}%`,
+    formatPdfNumber(report.totals.blockedTasksCount)
+  ];
+  for (let index = 0; index < values.length; index += 1) {
+    const column = FOOD_PDF_COLUMNS[index + 4];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
+      align: "right",
+      fill: "#f0fdf4",
+      font: "Helvetica-Bold",
+      fontSize: 5.4
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawFoodEmptyState(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#f0fdf4");
+  doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#bbf7d0").lineWidth(0.8).stroke();
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(11).text("Aucune operation alimentaire reportable", margin + 14, y + 16, {
+    width: pageWidth - margin * 2 - 28
+  });
+  doc.fillColor("#166534").font("Helvetica").fontSize(9.2).text(
+    "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Alimentation de la periode. Renseignez famille, produit, lot, quantite et zone pour alimenter le suivi.",
+    margin + 14,
+    y + 34,
+    {
+      width: pageWidth - margin * 2 - 28
+    }
+  );
+  doc.y = y + 88;
+}
+
+function drawFoodOperationsTable(doc: PDFKit.PDFDocument, report: FoodOperationsReport): void {
+  if (report.rows.length === 0) {
+    drawFoodEmptyState(doc);
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (needsPdfPageBreak(doc, 78)) {
+    doc.addPage();
+    drawFoodReportHeader(doc, report);
+  }
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(10.5).text("Synthese par famille, produit, lot et zone", PDF_PAGE_MARGIN, doc.y, {
+    width: doc.page.width - PDF_PAGE_MARGIN * 2
+  });
+  doc.moveDown(0.4);
+  let y = drawFoodTableHeader(doc, doc.y);
+
+  for (const row of report.rows) {
+    if (y + 20 + 22 > tableBottom) {
+      doc.addPage();
+      drawFoodReportHeader(doc, report);
+      y = drawFoodTableHeader(doc, doc.y);
+    }
+    y = drawFoodDataRow(doc, row, y);
+  }
+
+  if (y + 22 > tableBottom) {
+    doc.addPage();
+    drawFoodReportHeader(doc, report);
+    y = drawFoodTableHeader(doc, doc.y);
+  }
+  doc.y = drawFoodTotalsRow(doc, report, y) + 14;
+}
+
+function drawFoodBreakdown(doc: PDFKit.PDFDocument, report: FoodOperationsReport): void {
+  if (report.operationRows.length === 0) {
+    return;
+  }
+
+  if (needsPdfPageBreak(doc, 62)) {
+    doc.addPage();
+    drawFoodReportHeader(doc, report);
+  }
+
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    width: doc.page.width - PDF_PAGE_MARGIN * 2
+  });
+  doc.moveDown(0.4);
+
+  const columns: PdfTableColumn[] = [
+    { label: "OPERATION", width: 170, align: "left" },
+    { label: "TRANS.", width: 50, align: "right" },
+    { label: "TACHES", width: 50, align: "right" },
+    { label: "RECETTES", width: 80, align: "right" },
+    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "NET", width: 85, align: "right" }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  let y = doc.y;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: "center",
+      fill: "#dcfce7",
+      font: "Helvetica-Bold",
+      fontSize: 7.5
+    });
+    x += column.width;
+  }
+  y += 20;
+
+  for (const row of report.operationRows) {
+    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawFoodReportHeader(doc, report);
+      y = doc.y;
+      x = PDF_PAGE_MARGIN;
+      for (const column of columns) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+          align: "center",
+          fill: "#dcfce7",
+          font: "Helvetica-Bold",
+          fontSize: 7.5
+        });
+        x += column.width;
+      }
+      y += 20;
+    }
+    x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
+      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+      { value: formatPdfMoney(row.netAmount), align: "right" as const }
+    ];
+    values.forEach((item, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
+        align: item.align,
+        fontSize: 7.4
+      });
+      x += column.width;
+    });
+    y += 19;
+  }
+  doc.y = y + 10;
+}
+
+function drawFoodPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+
+  doc.save();
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#bbf7d0").lineWidth(1).stroke();
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport alimentation | ${periodLabel}`, margin, pageHeight - 32, {
+    width: 330
+  });
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+    width: 80,
+    align: "right"
+  });
+  doc.restore();
+}
+
+function renderFoodReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.foodOperationsReport ?? buildEmptyFoodOperationsReport(filters);
+
+  drawFoodReportHeader(doc, report);
+  drawFoodMetadataStrip(doc, report, filters, overview.generatedAt);
+  drawFoodMetricCards(doc, report);
+  drawFoodOperationsTable(doc, report);
+  drawFoodBreakdown(doc, report);
+}
+
+function buildEmptyRentalOperationsReport(filters: ReportPeriodFilter): RentalOperationsReport {
+  return {
+    periodLabel: toRentalPeriodLabel(filters, []),
+    rows: [],
+    operationRows: [],
+    totals: {
+      propertiesCount: 0,
+      unitsCount: 0,
+      tenantsCount: 0,
+      rentPaymentsCount: 0,
+      rentAmount: "0.00",
+      depositAmount: "0.00",
+      serviceChargeAmount: "0.00",
+      maintenanceAmount: "0.00",
+      propertyExpenseAmount: "0.00",
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInAmount: "0.00",
+      cashOutAmount: "0.00",
+      netAmount: "0.00",
+      executionRate: 0,
+      currency: "XOF"
+    }
+  };
+}
+
+const RENTAL_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "BIEN", width: 56, align: "left" },
+  { label: "LOT", width: 42, align: "left" },
+  { label: "LOCATAIRE", width: 56, align: "left" },
+  { label: "LOYERS", width: 50, align: "right" },
+  { label: "CAUTION", width: 46, align: "right" },
+  { label: "CHARGES", width: 46, align: "right" },
+  { label: "MAINT.", width: 46, align: "right" },
+  { label: "DEP.", width: 48, align: "right" },
+  { label: "NET", width: 52, align: "right" },
+  { label: "EXEC.%", width: 33, align: "right" },
+  { label: "BLQ", width: 20, align: "right" }
+];
+
+function drawRentalPropertyMark(doc: PDFKit.PDFDocument, x: number, y: number): void {
+  doc.save();
+  doc.roundedRect(x + 4, y + 18, 108, 52, 6).fill("#ecfeff");
+  doc.roundedRect(x + 4, y + 18, 108, 52, 6).strokeColor("#0f766e").lineWidth(0.9).stroke();
+  doc.rect(x + 22, y + 32, 60, 30).fill("#14b8a6");
+  doc
+    .moveTo(x + 18, y + 32)
+    .lineTo(x + 52, y + 14)
+    .lineTo(x + 86, y + 32)
+    .closePath()
+    .fill("#0f766e");
+  doc.rect(x + 44, y + 45, 16, 17).fill("#f8fafc");
+  doc.rect(x + 28, y + 38, 9, 9).fill("#ccfbf1");
+  doc.rect(x + 68, y + 38, 9, 9).fill("#ccfbf1");
+  doc.circle(x + 102, y + 31, 6).strokeColor("#0f766e").lineWidth(2).stroke();
+  doc.moveTo(x + 107, y + 35).lineTo(x + 113, y + 41).strokeColor("#0f766e").lineWidth(2).stroke();
+  doc.moveTo(x + 112, y + 41).lineTo(x + 118, y + 41).strokeColor("#0f766e").lineWidth(2).stroke();
+  doc.restore();
+}
+
+function drawRentalReportHeader(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 118;
+  const centerWidth = pageWidth - margin * 2 - 220;
+
+  drawRentalPropertyMark(doc, margin, 16);
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .text(RENTAL_REPORT_BRANDING.title, centerX, 22, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#0f766e")
+    .font("Helvetica")
+    .fontSize(9.2)
+    .text(RENTAL_REPORT_BRANDING.agency, centerX, 42, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#d21f1f")
+    .font("Helvetica-Bold")
+    .fontSize(11)
+    .text(`"${RENTAL_REPORT_BRANDING.brand}"`, centerX, 55, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#115e59")
+    .font("Helvetica-Bold")
+    .fontSize(8.5)
+    .text(`${RENTAL_REPORT_BRANDING.fiscal}     ${RENTAL_REPORT_BRANDING.phone}`, centerX, 69, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#115e59")
+    .font("Helvetica-Bold")
+    .fontSize(8.5)
+    .text(RENTAL_REPORT_BRANDING.subtitle, centerX, 82, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .moveTo(margin, 100)
+    .lineTo(pageWidth - margin, 100)
+    .strokeColor("#14b8a6")
+    .lineWidth(2)
+    .stroke();
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .text("SUIVI DES OPERATIONS LOCATIVES PAR BIEN", margin, 114, {
+      width: pageWidth - margin * 2,
+      align: "center"
+    });
+  doc.y = 140;
+}
+
+function drawRentalMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: RentalOperationsReport,
+  filters: ReportPeriodFilter,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+  const period = filters.dateFrom || filters.dateTo
+    ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
+    : report.periodLabel;
+
+  doc.roundedRect(margin, y, width, 42, 4).fill("#ecfeff");
+  doc.rect(margin, y, width, 42).strokeColor("#99f6e4").lineWidth(0.8).stroke();
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Location immobiliere", margin + 205, y + 21, { width: 170 });
+  doc
+    .fillColor("#486581")
+    .font("Helvetica")
+    .fontSize(8.8)
+    .text("Genere le", pageWidth - margin - 150, y + 8, {
+      width: 140,
+      align: "right"
+    });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
+      width: 140,
+      align: "right"
+    });
+  doc.y = y + 56;
+}
+
+function drawRentalMetricCards(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const gap = 8;
+  const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
+  const y = doc.y;
+  const metrics = [
+    {
+      label: "Biens / lots",
+      value: `${formatPdfNumber(report.totals.propertiesCount)} | ${formatPdfNumber(report.totals.unitsCount)}`
+    },
+    { label: "Loyers", value: formatPdfMoney(report.totals.rentAmount) },
+    { label: "Depenses", value: formatPdfMoney(report.totals.cashOutAmount) },
+    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, 45, 4).fill("#ecfeff");
+    doc.rect(x, y, cardWidth, 45).strokeColor("#99f6e4").lineWidth(0.8).stroke();
+    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 8, y + 8, {
+      width: cardWidth - 16
+    });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, {
+      width: cardWidth - 16
+    });
+  });
+  doc.y = y + 60;
+  doc
+    .fillColor("#486581")
+    .font("Helvetica")
+    .fontSize(8.8)
+    .text(
+      `Locataires: ${formatPdfNumber(report.totals.tenantsCount)} | cautions ${formatPdfMoney(report.totals.depositAmount)} | charges ${formatPdfMoney(report.totals.serviceChargeAmount)} | maintenance ${formatPdfMoney(report.totals.maintenanceAmount)} | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+      margin,
+      doc.y - 8,
+      {
+        width: pageWidth - margin * 2,
+        align: "center"
+      }
+    );
+  doc.moveDown(0.8);
+}
+
+function drawRentalTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of RENTAL_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+      align: "center",
+      fill: "#ccfbf1",
+      font: "Helvetica-Bold",
+      fontSize: 5.8
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawRentalDataRow(
+  doc: PDFKit.PDFDocument,
+  row: RentalOperationsReport["rows"][number],
+  y: number
+): number {
+  const values = [
+    { value: truncatePdfText(row.propertyRef, 12), align: "left" as const },
+    { value: truncatePdfText(row.unitRef, 9), align: "left" as const },
+    { value: truncatePdfText(row.tenantRef, 12), align: "left" as const },
+    { value: formatPdfMoney(row.rentAmount), align: "right" as const },
+    { value: formatPdfMoney(row.depositAmount), align: "right" as const },
+    { value: formatPdfMoney(row.serviceChargeAmount), align: "right" as const },
+    { value: formatPdfMoney(row.maintenanceAmount), align: "right" as const },
+    { value: formatPdfMoney(row.propertyExpenseAmount), align: "right" as const },
+    { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const },
+    { value: formatPdfNumber(row.blockedTasksCount), align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  values.forEach((item, index) => {
+    const column = RENTAL_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+      align: item.align,
+      fontSize: 5.55
+    });
+    x += column.width;
+  });
+  return y + 20;
+}
+
+function drawRentalTotalsRow(doc: PDFKit.PDFDocument, report: RentalOperationsReport, y: number): number {
+  const firstColumnsWidth = RENTAL_PDF_COLUMNS.slice(0, 3).reduce((sum, item) => sum + item.width, 0);
+  let x = PDF_PAGE_MARGIN;
+  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+    align: "center",
+    fill: "#f8fafc",
+    font: "Helvetica-Bold",
+    fontSize: 7
+  });
+  x += firstColumnsWidth;
+
+  const values = [
+    formatPdfMoney(report.totals.rentAmount),
+    formatPdfMoney(report.totals.depositAmount),
+    formatPdfMoney(report.totals.serviceChargeAmount),
+    formatPdfMoney(report.totals.maintenanceAmount),
+    formatPdfMoney(report.totals.propertyExpenseAmount),
+    formatPdfMoney(report.totals.netAmount),
+    `${formatPdfNumber(report.totals.executionRate, 0)}%`,
+    formatPdfNumber(report.totals.blockedTasksCount)
+  ];
+  for (let index = 0; index < values.length; index += 1) {
+    const column = RENTAL_PDF_COLUMNS[index + 3];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
+      align: "right",
+      fill: "#ecfeff",
+      font: "Helvetica-Bold",
+      fontSize: 5.55
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#ecfeff");
+  doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#99f6e4").lineWidth(0.8).stroke();
+  doc
+    .fillColor("#115e59")
+    .font("Helvetica-Bold")
+    .fontSize(11)
+    .text("Aucune operation locative reportable", margin + 14, y + 16, {
+      width: pageWidth - margin * 2 - 28
+    });
+  doc
+    .fillColor("#0f766e")
+    .font("Helvetica")
+    .fontSize(9.2)
+    .text(
+      "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Location de la periode. Renseignez bien, lot, locataire et bail pour alimenter le suivi.",
+      margin + 14,
+      y + 34,
+      {
+        width: pageWidth - margin * 2 - 28
+      }
+    );
+  doc.y = y + 88;
+}
+
+function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
+  if (report.rows.length === 0) {
+    drawRentalEmptyState(doc);
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (needsPdfPageBreak(doc, 78)) {
+    doc.addPage();
+    drawRentalReportHeader(doc, report);
+  }
+  doc
+    .fillColor("#115e59")
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
+    .text("Synthese par bien, lot et locataire", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.4);
+  let y = drawRentalTableHeader(doc, doc.y);
+
+  for (const row of report.rows) {
+    if (y + 20 + 22 > tableBottom) {
+      doc.addPage();
+      drawRentalReportHeader(doc, report);
+      y = drawRentalTableHeader(doc, doc.y);
+    }
+    y = drawRentalDataRow(doc, row, y);
+  }
+
+  if (y + 22 > tableBottom) {
+    doc.addPage();
+    drawRentalReportHeader(doc, report);
+    y = drawRentalTableHeader(doc, doc.y);
+  }
+  doc.y = drawRentalTotalsRow(doc, report, y) + 14;
+}
+
+function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
+  if (report.operationRows.length === 0) {
+    return;
+  }
+
+  if (needsPdfPageBreak(doc, 62)) {
+    doc.addPage();
+    drawRentalReportHeader(doc, report);
+  }
+
+  doc
+    .fillColor("#115e59")
+    .font("Helvetica-Bold")
+    .fontSize(12)
+    .text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.4);
+
+  const columns: PdfTableColumn[] = [
+    { label: "OPERATION", width: 170, align: "left" },
+    { label: "TRANS.", width: 50, align: "right" },
+    { label: "TACHES", width: 50, align: "right" },
+    { label: "RECETTES", width: 80, align: "right" },
+    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "NET", width: 85, align: "right" }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  let y = doc.y;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: "center",
+      fill: "#ccfbf1",
+      font: "Helvetica-Bold",
+      fontSize: 7.5
+    });
+    x += column.width;
+  }
+  y += 20;
+
+  for (const row of report.operationRows) {
+    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawRentalReportHeader(doc, report);
+      y = doc.y;
+      x = PDF_PAGE_MARGIN;
+      for (const column of columns) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+          align: "center",
+          fill: "#ccfbf1",
+          font: "Helvetica-Bold",
+          fontSize: 7.5
+        });
+        x += column.width;
+      }
+      y += 20;
+    }
+    x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
+      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+      { value: formatPdfMoney(row.netAmount), align: "right" as const }
+    ];
+    values.forEach((item, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
+        align: item.align,
+        fontSize: 7.4
+      });
+      x += column.width;
+    });
+    y += 19;
+  }
+  doc.y = y + 10;
+}
+
+function drawRentalPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+
+  doc.save();
+  doc
+    .moveTo(margin, pageHeight - 44)
+    .lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#99f6e4")
+    .lineWidth(1)
+    .stroke();
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8.5)
+    .text(`AMCCO - Rapport location immobiliere | ${periodLabel}`, margin, pageHeight - 32, {
+      width: 330
+    });
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8.5)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80,
+      align: "right"
+    });
+  doc.restore();
+}
+
+function renderRentalReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.rentalOperationsReport ?? buildEmptyRentalOperationsReport(filters);
+
+  drawRentalReportHeader(doc, report);
+  drawRentalMetadataStrip(doc, report, filters, overview.generatedAt);
+  drawRentalMetricCards(doc, report);
+  drawRentalOperationsTable(doc, report);
+  drawRentalBreakdown(doc, report);
+}
+
+function buildEmptyHotelOperationsReport(filters: ReportPeriodFilter): HotelOperationsReport {
+  return {
+    periodLabel: toHotelPeriodLabel(filters, []),
+    rows: [],
+    operationRows: [],
+    totals: {
+      bookingsCount: 0,
+      roomsCount: 0,
+      guestsCount: 0,
+      nightsCount: 0,
+      guestCount: 0,
+      roomRevenue: "0.00",
+      depositAmount: "0.00",
+      restaurantAmount: "0.00",
+      serviceAmount: "0.00",
+      maintenanceAmount: "0.00",
+      commissionAmount: "0.00",
+      taxAmount: "0.00",
+      refundAmount: "0.00",
+      expenseAmount: "0.00",
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInAmount: "0.00",
+      cashOutAmount: "0.00",
+      netAmount: "0.00",
+      averageRoomRate: 0,
+      executionRate: 0,
+      currency: "XOF"
+    }
+  };
+}
+
+const HOTEL_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "SERVICE", width: 50, align: "left" },
+  { label: "CH.", width: 38, align: "left" },
+  { label: "RESA", width: 48, align: "left" },
+  { label: "CLIENT", width: 48, align: "left" },
+  { label: "NUITS", width: 30, align: "right" },
+  { label: "HEBERG.", width: 52, align: "right" },
+  { label: "RESTO", width: 45, align: "right" },
+  { label: "SERV.", width: 45, align: "right" },
+  { label: "CHARGES", width: 48, align: "right" },
+  { label: "NET", width: 48, align: "right" },
+  { label: "EXEC", width: 31, align: "right" }
+];
+
+function drawHotelReportHeader(doc: PDFKit.PDFDocument, report: HotelOperationsReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 100;
+  const centerWidth = pageWidth - margin * 2 - 194;
+
+  doc.save();
+  doc.roundedRect(margin, 20, 92, 60, 6).fill("#f0f9ff");
+  doc.roundedRect(margin, 20, 92, 60, 6).strokeColor("#0369a1").lineWidth(1).stroke();
+  doc.rect(margin + 18, 36, 56, 32).fill("#0ea5e9");
+  doc.rect(margin + 26, 44, 10, 10).fill("#e0f2fe");
+  doc.rect(margin + 42, 44, 10, 10).fill("#e0f2fe");
+  doc.rect(margin + 58, 44, 10, 10).fill("#e0f2fe");
+  doc.rect(margin + 42, 56, 12, 12).fill("#075985");
+  doc.moveTo(margin + 14, 68).lineTo(margin + 78, 68).strokeColor("#0369a1").lineWidth(2).stroke();
+  doc.restore();
+
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(HOTEL_REPORT_BRANDING.title, centerX, 22, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#075985").font("Helvetica").fontSize(9.2).text(HOTEL_REPORT_BRANDING.agency, centerX, 42, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11).text(`"${HOTEL_REPORT_BRANDING.brand}"`, centerX, 55, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(8.5).text(`${HOTEL_REPORT_BRANDING.fiscal}     ${HOTEL_REPORT_BRANDING.phone}`, centerX, 69, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(8.2).text(HOTEL_REPORT_BRANDING.subtitle, centerX, 82, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#0ea5e9").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SUIVI DES OPERATIONS HOTELIERES PAR CHAMBRE", margin, 114, {
+    width: pageWidth - margin * 2,
+    align: "center"
+  });
+  doc.y = 140;
+}
+
+function drawHotelMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: HotelOperationsReport,
+  filters: ReportPeriodFilter,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+  const period = filters.dateFrom || filters.dateTo
+    ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
+    : report.periodLabel;
+
+  doc.roundedRect(margin, y, width, 42, 4).fill("#f0f9ff");
+  doc.rect(margin, y, width, 42).strokeColor("#bae6fd").lineWidth(0.8).stroke();
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Hotellerie / Auberge", margin + 205, y + 21, { width: 165 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
+    width: 140,
+    align: "right"
+  });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
+    width: 140,
+    align: "right"
+  });
+  doc.y = y + 56;
+}
+
+function drawHotelMetricCards(doc: PDFKit.PDFDocument, report: HotelOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const gap = 8;
+  const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
+  const y = doc.y;
+  const metrics = [
+    { label: "Reservations / chambres", value: `${formatPdfNumber(report.totals.bookingsCount)} | ${formatPdfNumber(report.totals.roomsCount)}` },
+    { label: "Nuitees", value: formatPdfNumber(report.totals.nightsCount, 1) },
+    { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
+    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, 45, 4).fill("#f0f9ff");
+    doc.rect(x, y, cardWidth, 45).strokeColor("#bae6fd").lineWidth(0.8).stroke();
+    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 8, y + 8, { width: cardWidth - 16 });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, { width: cardWidth - 16 });
+  });
+  doc.y = y + 60;
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
+    `Hebergement ${formatPdfMoney(report.totals.roomRevenue)} | restauration ${formatPdfMoney(report.totals.restaurantAmount)} | services ${formatPdfMoney(report.totals.serviceAmount)} | charges ${formatPdfMoney(report.totals.cashOutAmount)} | tarif moyen ${formatPdfMoney(report.totals.averageRoomRate)}.`,
+    margin,
+    doc.y - 8,
+    { width: pageWidth - margin * 2, align: "center" }
+  );
+  doc.moveDown(0.8);
+}
+
+function drawHotelTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of HOTEL_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+      align: "center",
+      fill: "#e0f2fe",
+      font: "Helvetica-Bold",
+      fontSize: 5.6
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawHotelDataRow(
+  doc: PDFKit.PDFDocument,
+  row: HotelOperationsReport["rows"][number],
+  y: number
+): number {
+  const charges = toNumberAmount(row.cashOutAmount);
+  const values = [
+    { value: truncatePdfText(row.serviceLine, 11), align: "left" as const },
+    { value: truncatePdfText(row.roomRef, 8), align: "left" as const },
+    { value: truncatePdfText(row.bookingRef, 10), align: "left" as const },
+    { value: truncatePdfText(row.guestRef, 10), align: "left" as const },
+    { value: formatPdfNumber(row.nightsCount, 1), align: "right" as const },
+    { value: formatPdfMoney(row.roomRevenue), align: "right" as const },
+    { value: formatPdfMoney(row.restaurantAmount), align: "right" as const },
+    { value: formatPdfMoney(row.serviceAmount), align: "right" as const },
+    { value: formatPdfMoney(charges), align: "right" as const },
+    { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  values.forEach((item, index) => {
+    const column = HOTEL_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+      align: item.align,
+      fontSize: 5.35
+    });
+    x += column.width;
+  });
+  return y + 20;
+}
+
+function drawHotelTotalsRow(doc: PDFKit.PDFDocument, report: HotelOperationsReport, y: number): number {
+  const firstColumnsWidth = HOTEL_PDF_COLUMNS.slice(0, 4).reduce((sum, item) => sum + item.width, 0);
+  let x = PDF_PAGE_MARGIN;
+  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+    align: "center",
+    fill: "#f8fafc",
+    font: "Helvetica-Bold",
+    fontSize: 7
+  });
+  x += firstColumnsWidth;
+
+  const values = [
+    formatPdfNumber(report.totals.nightsCount, 1),
+    formatPdfMoney(report.totals.roomRevenue),
+    formatPdfMoney(report.totals.restaurantAmount),
+    formatPdfMoney(report.totals.serviceAmount),
+    formatPdfMoney(report.totals.cashOutAmount),
+    formatPdfMoney(report.totals.netAmount),
+    `${formatPdfNumber(report.totals.executionRate, 0)}%`
+  ];
+  for (let index = 0; index < values.length; index += 1) {
+    const column = HOTEL_PDF_COLUMNS[index + 4];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
+      align: "right",
+      fill: "#f0f9ff",
+      font: "Helvetica-Bold",
+      fontSize: 5.3
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawHotelEmptyState(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#f0f9ff");
+  doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#bae6fd").lineWidth(0.8).stroke();
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(11).text("Aucune operation hoteliere reportable", margin + 14, y + 16, {
+    width: pageWidth - margin * 2 - 28
+  });
+  doc.fillColor("#075985").font("Helvetica").fontSize(9.2).text(
+    "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Hotellerie de la periode. Renseignez reservation, chambre, service, nuitees et client pour alimenter le suivi.",
+    margin + 14,
+    y + 34,
+    { width: pageWidth - margin * 2 - 28 }
+  );
+  doc.y = y + 88;
+}
+
+function drawHotelOperationsTable(doc: PDFKit.PDFDocument, report: HotelOperationsReport): void {
+  if (report.rows.length === 0) {
+    drawHotelEmptyState(doc);
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (needsPdfPageBreak(doc, 78)) {
+    doc.addPage();
+    drawHotelReportHeader(doc, report);
+  }
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(10.5).text("Synthese par service, chambre et reservation", PDF_PAGE_MARGIN, doc.y, {
+    width: doc.page.width - PDF_PAGE_MARGIN * 2
+  });
+  doc.moveDown(0.4);
+  let y = drawHotelTableHeader(doc, doc.y);
+
+  for (const row of report.rows) {
+    if (y + 20 + 22 > tableBottom) {
+      doc.addPage();
+      drawHotelReportHeader(doc, report);
+      y = drawHotelTableHeader(doc, doc.y);
+    }
+    y = drawHotelDataRow(doc, row, y);
+  }
+
+  if (y + 22 > tableBottom) {
+    doc.addPage();
+    drawHotelReportHeader(doc, report);
+    y = drawHotelTableHeader(doc, doc.y);
+  }
+  doc.y = drawHotelTotalsRow(doc, report, y) + 14;
+}
+
+function drawHotelBreakdown(doc: PDFKit.PDFDocument, report: HotelOperationsReport): void {
+  if (report.operationRows.length === 0) {
+    return;
+  }
+
+  if (needsPdfPageBreak(doc, 62)) {
+    doc.addPage();
+    drawHotelReportHeader(doc, report);
+  }
+
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    width: doc.page.width - PDF_PAGE_MARGIN * 2
+  });
+  doc.moveDown(0.4);
+
+  const columns: PdfTableColumn[] = [
+    { label: "OPERATION", width: 170, align: "left" },
+    { label: "TRANS.", width: 50, align: "right" },
+    { label: "TACHES", width: 50, align: "right" },
+    { label: "RECETTES", width: 80, align: "right" },
+    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "NET", width: 85, align: "right" }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  let y = doc.y;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: "center",
+      fill: "#e0f2fe",
+      font: "Helvetica-Bold",
+      fontSize: 7.5
+    });
+    x += column.width;
+  }
+  y += 20;
+
+  for (const row of report.operationRows) {
+    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawHotelReportHeader(doc, report);
+      y = doc.y;
+      x = PDF_PAGE_MARGIN;
+      for (const column of columns) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+          align: "center",
+          fill: "#e0f2fe",
+          font: "Helvetica-Bold",
+          fontSize: 7.5
+        });
+        x += column.width;
+      }
+      y += 20;
+    }
+    x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
+      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+      { value: formatPdfMoney(row.netAmount), align: "right" as const }
+    ];
+    values.forEach((item, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
+        align: item.align,
+        fontSize: 7.4
+      });
+      x += column.width;
+    });
+    y += 19;
+  }
+  doc.y = y + 10;
+}
+
+function drawHotelPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+
+  doc.save();
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#bae6fd").lineWidth(1).stroke();
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport hotellerie | ${periodLabel}`, margin, pageHeight - 32, {
+    width: 330
+  });
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+    width: 80,
+    align: "right"
+  });
+  doc.restore();
+}
+
+function renderHotelReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.hotelOperationsReport ?? buildEmptyHotelOperationsReport(filters);
+
+  drawHotelReportHeader(doc, report);
+  drawHotelMetadataStrip(doc, report, filters, overview.generatedAt);
+  drawHotelMetricCards(doc, report);
+  drawHotelOperationsTable(doc, report);
+  drawHotelBreakdown(doc, report);
+}
+
+function buildEmptyWaterOperationsReport(filters: ReportPeriodFilter): WaterOperationsReport {
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    rows: [],
+    operationRows: [],
+    totals: {
+      facilitiesCount: 0,
+      zonesCount: 0,
+      producedVolumeM3: 0,
+      billedVolumeM3: 0,
+      waterRevenue: "0.00",
+      bulkSaleAmount: "0.00",
+      connectionAmount: "0.00",
+      subsidyAmount: "0.00",
+      treatmentCost: "0.00",
+      energyCost: "0.00",
+      maintenanceCost: "0.00",
+      qualityCost: "0.00",
+      repairCost: "0.00",
+      supplierPaymentAmount: "0.00",
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInAmount: "0.00",
+      cashOutAmount: "0.00",
+      netAmount: "0.00",
+      lossRate: 0,
+      executionRate: 0,
+      currency: "XOF"
+    }
+  };
+}
+
+const WATER_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "SITE", width: 54, align: "left" },
+  { label: "ZONE", width: 48, align: "left" },
+  { label: "LIGNE", width: 50, align: "left" },
+  { label: "PROD. M3", width: 45, align: "right" },
+  { label: "FACT. M3", width: 45, align: "right" },
+  { label: "RECETTES", width: 61, align: "right" },
+  { label: "DEPENSES", width: 61, align: "right" },
+  { label: "NET", width: 61, align: "right" },
+  { label: "PERTES", width: 38, align: "right" },
+  { label: "EXEC.", width: 38, align: "right" }
+];
+
+function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  doc.rect(0, 0, doc.page.width, 120).fill("#eff6ff");
+  drawAmccoPdfLogo(doc, margin, 28, 38);
+  doc
+    .fillColor("#0f172a")
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .text(WATER_REPORT_BRANDING.title, margin + 48, 29, { width: 290 });
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica")
+    .fontSize(8.6)
+    .text(WATER_REPORT_BRANDING.subtitle, margin + 48, 50, { width: 310 });
+  doc
+    .fillColor("#1e40af")
+    .font("Helvetica-Bold")
+    .fontSize(8)
+    .text(WATER_REPORT_BRANDING.brand, doc.page.width - margin - 145, 28, {
+      width: 145,
+      align: "right"
+    });
+  doc
+    .fillColor("#334155")
+    .font("Helvetica")
+    .fontSize(7.4)
+    .text(WATER_REPORT_BRANDING.agency, doc.page.width - margin - 210, 44, {
+      width: 210,
+      align: "right"
+    })
+    .text(`${WATER_REPORT_BRANDING.fiscal} | ${WATER_REPORT_BRANDING.phone}`, doc.page.width - margin - 210, 62, {
+      width: 210,
+      align: "right"
+    });
+  doc
+    .roundedRect(margin, 84, doc.page.width - margin * 2, 24, 4)
+    .fill("#dbeafe");
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(8.6)
+    .text(`Periode: ${report.periodLabel}`, margin + 12, 91, {
+      width: doc.page.width - margin * 2 - 24
+    });
+  doc.y = 138;
+}
+
+function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
+  const cards = [
+    {
+      label: "Sites / zones",
+      value: `${formatPdfNumber(report.totals.facilitiesCount)} | ${formatPdfNumber(report.totals.zonesCount)}`
+    },
+    { label: "Volume facture", value: `${formatPdfNumber(report.totals.billedVolumeM3, 1)} m3` },
+    { label: "Recettes eau", value: formatPdfMoney(report.totals.cashInAmount) },
+    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+  ];
+  const margin = PDF_PAGE_MARGIN;
+  const gap = 8;
+  const width = (doc.page.width - margin * 2 - gap * (cards.length - 1)) / cards.length;
+  const y = doc.y;
+  cards.forEach((card, index) => {
+    const x = margin + index * (width + gap);
+    doc.roundedRect(x, y, width, 54, 4).fill("#f8fafc");
+    doc.rect(x, y, width, 54).strokeColor("#bfdbfe").lineWidth(0.6).stroke();
+    doc.fillColor("#64748b").font("Helvetica-Bold").fontSize(7).text(card.label.toUpperCase(), x + 8, y + 10, {
+      width: width - 16
+    });
+    doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(12).text(card.value, x + 8, y + 28, {
+      width: width - 16
+    });
+  });
+  doc.y = y + 70;
+  doc
+    .fillColor("#334155")
+    .font("Helvetica")
+    .fontSize(8.2)
+    .text(
+      `Production ${formatPdfNumber(report.totals.producedVolumeM3, 1)} m3 | pertes apparentes ${formatPdfNumber(report.totals.lossRate, 1)}% | qualite ${formatPdfMoney(report.totals.qualityCost)} | maintenance ${formatPdfMoney(report.totals.maintenanceCost)} | reparations ${formatPdfMoney(report.totals.repairCost)} | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+      margin,
+      doc.y,
+      { width: doc.page.width - margin * 2 }
+    );
+  doc.moveDown(1);
+}
+
+function drawWaterTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of WATER_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: column.align,
+      fill: "#1e3a8a",
+      font: "Helvetica-Bold",
+      fontSize: 5.8,
+      textColor: "#ffffff",
+      borderColor: "#1e3a8a"
+    });
+    x += column.width;
+  }
+  return y + 18;
+}
+
+function drawWaterDataRow(
+  doc: PDFKit.PDFDocument,
+  row: WaterOperationsReport["rows"][number],
+  y: number
+): number {
+  const values = [
+    { value: row.facilityRef, align: "left" as const },
+    { value: row.networkZone, align: "left" as const },
+    { value: row.productionLine, align: "left" as const },
+    { value: formatPdfNumber(row.producedVolumeM3, 1), align: "right" as const },
+    { value: formatPdfNumber(row.billedVolumeM3, 1), align: "right" as const },
+    { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+    { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+    { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: `${formatPdfNumber(row.lossRate, 0)}%`, align: "right" as const },
+    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  for (let index = 0; index < values.length; index += 1) {
+    const column = WATER_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, values[index].value, x, y, column.width, 20, {
+      align: values[index].align,
+      fontSize: 5.8,
+      borderColor: "#bfdbfe"
+    });
+    x += column.width;
+  }
+  return y + 20;
+}
+
+function drawWaterTotalsRow(doc: PDFKit.PDFDocument, report: WaterOperationsReport, y: number): number {
+  const values = [
+    "TOTAL",
+    "",
+    "",
+    formatPdfNumber(report.totals.producedVolumeM3, 1),
+    formatPdfNumber(report.totals.billedVolumeM3, 1),
+    formatPdfMoney(report.totals.cashInAmount),
+    formatPdfMoney(report.totals.cashOutAmount),
+    formatPdfMoney(report.totals.netAmount),
+    `${formatPdfNumber(report.totals.lossRate, 0)}%`,
+    `${formatPdfNumber(report.totals.executionRate, 0)}%`
+  ];
+  let x = PDF_PAGE_MARGIN;
+  for (let index = 0; index < values.length; index += 1) {
+    const column = WATER_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 20, {
+      align: index < 3 ? "left" : "right",
+      fill: "#dbeafe",
+      font: "Helvetica-Bold",
+      fontSize: 5.8,
+      borderColor: "#93c5fd"
+    });
+    x += column.width;
+  }
+  return y + 20;
+}
+
+function drawWaterOperationsTable(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
+  if (report.rows.length === 0) {
+    doc.roundedRect(PDF_PAGE_MARGIN, doc.y, doc.page.width - PDF_PAGE_MARGIN * 2, 64, 4).fill("#eff6ff");
+    doc
+      .fillColor("#1e3a8a")
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .text("Aucune operation eau potable reportable", PDF_PAGE_MARGIN + 14, doc.y + 16);
+    doc.y += 84;
+    return;
+  }
+
+  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Synthese par site, zone et ligne exploitation", PDF_PAGE_MARGIN, doc.y);
+  doc.moveDown(0.4);
+  let y = drawWaterTableHeader(doc, doc.y);
+  for (const row of report.rows) {
+    if (y + 42 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawWaterReportHeader(doc, report);
+      y = drawWaterTableHeader(doc, doc.y);
+    }
+    y = drawWaterDataRow(doc, row, y);
+  }
+  y = drawWaterTotalsRow(doc, report, y);
+  doc.y = y + 18;
+}
+
+function drawWaterBreakdown(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
+  if (report.operationRows.length === 0) {
+    return;
+  }
+  if (needsPdfPageBreak(doc, 88)) {
+    doc.addPage();
+    drawWaterReportHeader(doc, report);
+  }
+  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y);
+  doc.moveDown(0.4);
+  const columns: PdfTableColumn[] = [
+    { label: "OPERATION", width: 168, align: "left" },
+    { label: "TRANS.", width: 52, align: "right" },
+    { label: "TACHES", width: 52, align: "right" },
+    { label: "RECETTES", width: 76, align: "right" },
+    { label: "DEPENSES", width: 76, align: "right" },
+    { label: "NET", width: 76, align: "right" }
+  ];
+  let y = doc.y;
+  let x = PDF_PAGE_MARGIN;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: column.align,
+      fill: "#1e40af",
+      font: "Helvetica-Bold",
+      fontSize: 6,
+      textColor: "#ffffff",
+      borderColor: "#1e40af"
+    });
+    x += column.width;
+  }
+  y += 18;
+  for (const row of report.operationRows.slice(0, 16)) {
+    x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: row.operationLabel, align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
+      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+      { value: formatPdfMoney(row.netAmount), align: "right" as const }
+    ];
+    for (let index = 0; index < values.length; index += 1) {
+      drawPdfTableCell(doc, values[index].value, x, y, columns[index].width, 18, {
+        align: values[index].align,
+        fontSize: 6,
+        borderColor: "#bfdbfe"
+      });
+      x += columns[index].width;
+    }
+    y += 18;
+  }
+  doc.y = y + 12;
+}
+
+function drawWaterPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  drawPdfBrandingFrame(doc, pageNumber, totalPages, periodLabel);
+}
+
+function renderWaterReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.waterOperationsReport ?? buildEmptyWaterOperationsReport(filters);
+  drawWaterReportHeader(doc, report);
+  drawWaterMetricCards(doc, report);
+  drawWaterOperationsTable(doc, report);
+  drawWaterBreakdown(doc, report);
+}
+
+function buildEmptyAgencyOperationsReport(filters: ReportPeriodFilter): AgencyOperationsReport {
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    rows: [],
+    operationRows: [],
+    totals: {
+      mandatesCount: 0,
+      propertiesCount: 0,
+      clientsCount: 0,
+      dealAmount: "0.00",
+      saleCommissionAmount: "0.00",
+      rentalCommissionAmount: "0.00",
+      mandateFeeAmount: "0.00",
+      visitFeeAmount: "0.00",
+      fileFeeAmount: "0.00",
+      advertisingExpenseAmount: "0.00",
+      fieldVisitExpenseAmount: "0.00",
+      brokerPayoutAmount: "0.00",
+      documentExpenseAmount: "0.00",
+      officeExpenseAmount: "0.00",
+      refundAmount: "0.00",
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInAmount: "0.00",
+      cashOutAmount: "0.00",
+      netAmount: "0.00",
+      commissionRate: 0,
+      executionRate: 0,
+      currency: "XOF"
+    }
+  };
+}
+
+const AGENCY_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "MANDAT", width: 56, align: "left" },
+  { label: "BIEN", width: 58, align: "left" },
+  { label: "TYPE", width: 44, align: "left" },
+  { label: "CLIENT", width: 55, align: "left" },
+  { label: "ETAPE", width: 49, align: "left" },
+  { label: "AFFAIRE", width: 62, align: "right" },
+  { label: "RECETTES", width: 58, align: "right" },
+  { label: "DEPENSES", width: 58, align: "right" },
+  { label: "NET", width: 48, align: "right" },
+  { label: "EXEC.", width: 34, align: "right" }
+];
+
+function drawAgencyReportHeader(doc: PDFKit.PDFDocument, report: AgencyOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  doc.rect(0, 0, doc.page.width, 120).fill("#f8fafc");
+  drawAmccoPdfLogo(doc, margin, 28, 38);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(AGENCY_REPORT_BRANDING.title, margin + 48, 29, {
+    width: 290
+  });
+  doc.fillColor("#374151").font("Helvetica").fontSize(8.6).text(AGENCY_REPORT_BRANDING.subtitle, margin + 48, 50, {
+    width: 320
+  });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8).text(AGENCY_REPORT_BRANDING.brand, doc.page.width - margin - 145, 28, {
+    width: 145,
+    align: "right"
+  });
+  doc.fillColor("#4b5563").font("Helvetica").fontSize(7.4).text(AGENCY_REPORT_BRANDING.agency, doc.page.width - margin - 210, 44, {
+    width: 210,
+    align: "right"
+  }).text(`${AGENCY_REPORT_BRANDING.fiscal} | ${AGENCY_REPORT_BRANDING.phone}`, doc.page.width - margin - 210, 62, {
+    width: 210,
+    align: "right"
+  });
+  doc.roundedRect(margin, 84, doc.page.width - margin * 2, 24, 4).fill("#e5e7eb");
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8.6).text(`Periode: ${report.periodLabel}`, margin + 12, 91, {
+    width: doc.page.width - margin * 2 - 24
+  });
+  doc.y = 138;
+}
+
+function drawAgencyMetricCards(doc: PDFKit.PDFDocument, report: AgencyOperationsReport): void {
+  const cards = [
+    { label: "Mandats / biens", value: `${formatPdfNumber(report.totals.mandatesCount)} | ${formatPdfNumber(report.totals.propertiesCount)}` },
+    { label: "Volume affaires", value: formatPdfMoney(report.totals.dealAmount) },
+    { label: "Commissions", value: formatPdfMoney(toNumberAmount(report.totals.saleCommissionAmount) + toNumberAmount(report.totals.rentalCommissionAmount)) },
+    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+  ];
+  const margin = PDF_PAGE_MARGIN;
+  const gap = 8;
+  const width = (doc.page.width - margin * 2 - gap * (cards.length - 1)) / cards.length;
+  const y = doc.y;
+  cards.forEach((card, index) => {
+    const x = margin + index * (width + gap);
+    doc.roundedRect(x, y, width, 54, 4).fill("#ffffff");
+    doc.rect(x, y, width, 54).strokeColor("#d1d5db").lineWidth(0.6).stroke();
+    doc.fillColor("#6b7280").font("Helvetica-Bold").fontSize(7).text(card.label.toUpperCase(), x + 8, y + 10, {
+      width: width - 16
+    });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(12).text(card.value, x + 8, y + 28, {
+      width: width - 16
+    });
+  });
+  doc.y = y + 70;
+  doc.fillColor("#374151").font("Helvetica").fontSize(8.2).text(
+    `Clients ${formatPdfNumber(report.totals.clientsCount)} | taux commission ${formatPdfNumber(report.totals.commissionRate, 1)}% | frais commerciaux ${formatPdfMoney(report.totals.cashOutAmount)} | execution ${formatPdfNumber(report.totals.executionRate, 1)}% | blocages ${formatPdfNumber(report.totals.blockedTasksCount)}.`,
+    margin,
+    doc.y,
+    { width: doc.page.width - margin * 2 }
+  );
+  doc.moveDown(1);
+}
+
+function drawAgencyTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of AGENCY_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: column.align,
+      fill: "#374151",
+      font: "Helvetica-Bold",
+      fontSize: 5.7,
+      textColor: "#ffffff",
+      borderColor: "#374151"
+    });
+    x += column.width;
+  }
+  return y + 18;
+}
+
+function drawAgencyDataRow(
+  doc: PDFKit.PDFDocument,
+  row: AgencyOperationsReport["rows"][number],
+  y: number
+): number {
+  const values = [
+    { value: row.mandateRef, align: "left" as const },
+    { value: row.propertyRef, align: "left" as const },
+    { value: row.mandateType, align: "left" as const },
+    { value: row.clientRef, align: "left" as const },
+    { value: row.dealStage, align: "left" as const },
+    { value: formatPdfMoney(row.dealAmount), align: "right" as const },
+    { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+    { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+    { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  for (let index = 0; index < values.length; index += 1) {
+    const column = AGENCY_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, values[index].value, x, y, column.width, 20, {
+      align: values[index].align,
+      fontSize: 5.7,
+      borderColor: "#d1d5db"
+    });
+    x += column.width;
+  }
+  return y + 20;
+}
+
+function drawAgencyTotalsRow(doc: PDFKit.PDFDocument, report: AgencyOperationsReport, y: number): number {
+  const values = [
+    "TOTAL",
+    "",
+    "",
+    "",
+    "",
+    formatPdfMoney(report.totals.dealAmount),
+    formatPdfMoney(report.totals.cashInAmount),
+    formatPdfMoney(report.totals.cashOutAmount),
+    formatPdfMoney(report.totals.netAmount),
+    `${formatPdfNumber(report.totals.executionRate, 0)}%`
+  ];
+  let x = PDF_PAGE_MARGIN;
+  for (let index = 0; index < values.length; index += 1) {
+    const column = AGENCY_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 20, {
+      align: index < 5 ? "left" : "right",
+      fill: "#f3f4f6",
+      font: "Helvetica-Bold",
+      fontSize: 5.7,
+      borderColor: "#d1d5db"
+    });
+    x += column.width;
+  }
+  return y + 20;
+}
+
+function drawAgencyOperationsTable(doc: PDFKit.PDFDocument, report: AgencyOperationsReport): void {
+  if (report.rows.length === 0) {
+    doc.roundedRect(PDF_PAGE_MARGIN, doc.y, doc.page.width - PDF_PAGE_MARGIN * 2, 64, 4).fill("#f3f4f6");
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11).text("Aucune operation agence immobiliere reportable", PDF_PAGE_MARGIN + 14, doc.y + 16);
+    doc.y += 84;
+    return;
+  }
+
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10.5).text("Synthese par mandat, bien, client et etape", PDF_PAGE_MARGIN, doc.y);
+  doc.moveDown(0.4);
+  let y = drawAgencyTableHeader(doc, doc.y);
+  for (const row of report.rows) {
+    if (y + 42 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawAgencyReportHeader(doc, report);
+      y = drawAgencyTableHeader(doc, doc.y);
+    }
+    y = drawAgencyDataRow(doc, row, y);
+  }
+  y = drawAgencyTotalsRow(doc, report, y);
+  doc.y = y + 18;
+}
+
+function drawAgencyBreakdown(doc: PDFKit.PDFDocument, report: AgencyOperationsReport): void {
+  if (report.operationRows.length === 0) {
+    return;
+  }
+  if (needsPdfPageBreak(doc, 88)) {
+    doc.addPage();
+    drawAgencyReportHeader(doc, report);
+  }
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10.5).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y);
+  doc.moveDown(0.4);
+  writePdfList(
+    doc,
+    limitPdfRows(
+      report.operationRows.map((row) =>
+        `${row.operationLabel}: ${row.transactionsCount} transaction(s), ${row.tasksCount} tache(s), net ${row.netAmount} XOF`
+      ),
+      18
+    ),
+    "Aucune operation agence."
+  );
+}
+
+function drawAgencyPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  drawPdfBrandingFrame(doc, pageNumber, totalPages, periodLabel);
+}
+
+function renderAgencyReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.agencyOperationsReport ?? buildEmptyAgencyOperationsReport(filters);
+  drawAgencyReportHeader(doc, report);
+  drawAgencyMetricCards(doc, report);
+  drawAgencyOperationsTable(doc, report);
+  drawAgencyBreakdown(doc, report);
+}
+
+function buildEmptyBtpOperationsReport(filters: ReportPeriodFilter): BtpOperationsReport {
+  return {
+    periodLabel: toBtpPeriodLabel(filters, []),
+    rows: [],
+    operationRows: [],
+    totals: {
+      projectsCount: 0,
+      workPackagesCount: 0,
+      progressPercent: 0,
+      materialQuantity: 0,
+      laborDays: 0,
+      equipmentHours: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInAmount: "0.00",
+      cashOutAmount: "0.00",
+      netAmount: "0.00",
+      executionRate: 0,
+      currency: "XOF"
+    }
+  };
+}
+
+const BTP_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "CHANTIER", width: 55, align: "left" },
+  { label: "LOT", width: 50, align: "left" },
+  { label: "CLIENT/SITE", width: 62, align: "left" },
+  { label: "AV.%", width: 34, align: "right" },
+  { label: "MAT.", width: 34, align: "right" },
+  { label: "MO J/H", width: 36, align: "right" },
+  { label: "ENG.H", width: 34, align: "right" },
+  { label: "RECETTES", width: 56, align: "right" },
+  { label: "DEPENSES", width: 56, align: "right" },
+  { label: "NET", width: 54, align: "right" },
+  { label: "EXEC.%", width: 34, align: "right" }
+];
+
+function drawBtpSiteMark(doc: PDFKit.PDFDocument, x: number, y: number): void {
+  doc.save();
+  doc.roundedRect(x + 3, y + 18, 110, 52, 6).fill("#fef3c7");
+  doc.roundedRect(x + 3, y + 18, 110, 52, 6).strokeColor("#b45309").lineWidth(0.9).stroke();
+
+  doc.rect(x + 14, y + 51, 86, 11).fill("#d97706");
+  doc.rect(x + 20, y + 42, 20, 9).fill("#f59e0b");
+  doc.rect(x + 44, y + 35, 20, 16).fill("#f59e0b");
+  doc.rect(x + 68, y + 28, 20, 23).fill("#f59e0b");
+  doc.rect(x + 92, y + 21, 6, 41).fill("#374151");
+
+  doc.strokeColor("#111827").lineWidth(1.1);
+  for (let index = 0; index < 5; index += 1) {
+    const barX = x + 18 + index * 18;
+    doc.moveTo(barX, y + 25).lineTo(barX + 18, y + 62).stroke();
+  }
+
+  doc
+    .moveTo(x + 72, y + 14)
+    .lineTo(x + 102, y + 14)
+    .lineTo(x + 102, y + 22)
+    .strokeColor("#374151")
+    .lineWidth(2)
+    .stroke();
+  doc.rect(x + 98, y + 21, 8, 8).fill("#64748b");
+  doc.restore();
+}
+
+function drawBtpReportHeader(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 118;
+  const centerWidth = pageWidth - margin * 2 - 220;
+
+  drawBtpSiteMark(doc, margin, 16);
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(17)
+    .text(BTP_REPORT_BRANDING.title, centerX, 22, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica")
+    .fontSize(9.2)
+    .text(BTP_REPORT_BRANDING.agency, centerX, 42, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#d21f1f")
+    .font("Helvetica-Bold")
+    .fontSize(11)
+    .text(`"${BTP_REPORT_BRANDING.brand}"`, centerX, 55, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(8.5)
+    .text(`${BTP_REPORT_BRANDING.fiscal}     ${BTP_REPORT_BRANDING.phone}`, centerX, 69, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(8.8)
+    .text(BTP_REPORT_BRANDING.subtitle, centerX, 82, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .moveTo(margin, 100)
+    .lineTo(pageWidth - margin, 100)
+    .strokeColor("#d97706")
+    .lineWidth(2)
+    .stroke();
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .text("SUIVI DES OPERATIONS BTP PAR CHANTIER", margin, 114, {
+      width: pageWidth - margin * 2,
+      align: "center"
+    });
+  doc.y = 140;
+}
+
+function drawBtpMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: BtpOperationsReport,
+  filters: ReportPeriodFilter,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+  const period = filters.dateFrom || filters.dateTo
+    ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
+    : report.periodLabel;
+
+  doc.roundedRect(margin, y, width, 42, 4).fill("#fff7ed");
+  doc.rect(margin, y, width, 42).strokeColor("#fed7aa").lineWidth(0.8).stroke();
+  doc
+    .fillColor("#486581")
+    .font("Helvetica")
+    .fontSize(8.8)
+    .text("Periode", margin + 10, y + 8, { width: 155 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text(period, margin + 10, y + 21, { width: 175 });
+  doc
+    .fillColor("#486581")
+    .font("Helvetica")
+    .fontSize(8.8)
+    .text("Secteur", margin + 205, y + 8, { width: 120 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("BTP", margin + 205, y + 21, { width: 140 });
+  doc
+    .fillColor("#486581")
+    .font("Helvetica")
+    .fontSize(8.8)
+    .text("Genere le", pageWidth - margin - 150, y + 8, {
+      width: 140,
+      align: "right"
+    });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
+      width: 140,
+      align: "right"
+    });
+  doc.y = y + 56;
+}
+
+function drawBtpMetricCards(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const gap = 8;
+  const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
+  const y = doc.y;
+  const metrics = [
+    {
+      label: "Chantiers / lots",
+      value: `${formatPdfNumber(report.totals.projectsCount)} | ${formatPdfNumber(report.totals.workPackagesCount)}`
+    },
+    { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
+    { label: "Depenses", value: formatPdfMoney(report.totals.cashOutAmount) },
+    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, 45, 4).fill("#fff7ed");
+    doc.rect(x, y, cardWidth, 45).strokeColor("#fed7aa").lineWidth(0.8).stroke();
+    doc
+      .fillColor("#486581")
+      .font("Helvetica")
+      .fontSize(8.3)
+      .text(metric.label, x + 8, y + 8, {
+        width: cardWidth - 16
+      });
+    doc
+      .fillColor("#111827")
+      .font("Helvetica-Bold")
+      .fontSize(11.2)
+      .text(metric.value, x + 8, y + 23, {
+        width: cardWidth - 16
+      });
+  });
+  doc.y = y + 60;
+
+  doc
+    .fillColor("#486581")
+    .font("Helvetica")
+    .fontSize(8.8)
+    .text(
+      `Avancement moyen: ${formatPdfNumber(report.totals.progressPercent, 1)}% | materiaux ${formatPdfNumber(report.totals.materialQuantity, 2)} | main-d'oeuvre ${formatPdfNumber(report.totals.laborDays, 2)} j/h | engins ${formatPdfNumber(report.totals.equipmentHours, 2)} h | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+      margin,
+      doc.y - 8,
+      {
+        width: pageWidth - margin * 2,
+        align: "center"
+      }
+    );
+  doc.moveDown(0.8);
+}
+
+function drawBtpTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of BTP_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+      align: "center",
+      fill: "#ffedd5",
+      font: "Helvetica-Bold",
+      fontSize: 5.9
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawBtpDataRow(
+  doc: PDFKit.PDFDocument,
+  row: BtpOperationsReport["rows"][number],
+  y: number
+): number {
+  const clientSite = `${row.clientRef} / ${row.siteLocation}`;
+  const values = [
+    { value: truncatePdfText(row.projectRef, 12), align: "left" as const },
+    { value: truncatePdfText(row.workPackage, 11), align: "left" as const },
+    { value: truncatePdfText(clientSite, 15), align: "left" as const },
+    { value: `${formatPdfNumber(row.progressPercent, 0)}%`, align: "right" as const },
+    { value: formatPdfNumber(row.materialQuantity, 1), align: "right" as const },
+    { value: formatPdfNumber(row.laborDays, 1), align: "right" as const },
+    { value: formatPdfNumber(row.equipmentHours, 1), align: "right" as const },
+    { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+    { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+    { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  values.forEach((item, index) => {
+    const column = BTP_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+      align: item.align,
+      fontSize: 5.65
+    });
+    x += column.width;
+  });
+  return y + 20;
+}
+
+function drawBtpTotalsRow(doc: PDFKit.PDFDocument, report: BtpOperationsReport, y: number): number {
+  const firstColumnsWidth = BTP_PDF_COLUMNS.slice(0, 3).reduce((sum, item) => sum + item.width, 0);
+  let x = PDF_PAGE_MARGIN;
+  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+    align: "center",
+    fill: "#f8fafc",
+    font: "Helvetica-Bold",
+    fontSize: 7
+  });
+  x += firstColumnsWidth;
+
+  const values = [
+    `${formatPdfNumber(report.totals.progressPercent, 0)}%`,
+    formatPdfNumber(report.totals.materialQuantity, 1),
+    formatPdfNumber(report.totals.laborDays, 1),
+    formatPdfNumber(report.totals.equipmentHours, 1),
+    formatPdfMoney(report.totals.cashInAmount),
+    formatPdfMoney(report.totals.cashOutAmount),
+    formatPdfMoney(report.totals.netAmount),
+    `${formatPdfNumber(report.totals.executionRate, 0)}%`
+  ];
+  for (let index = 0; index < values.length; index += 1) {
+    const column = BTP_PDF_COLUMNS[index + 3];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
+      align: "right",
+      fill: "#fff7ed",
+      font: "Helvetica-Bold",
+      fontSize: 5.7
+    });
+    x += column.width;
+  }
+  return y + 22;
+}
+
+function drawBtpEmptyState(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#fff7ed");
+  doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#fed7aa").lineWidth(0.8).stroke();
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(11)
+    .text("Aucune operation BTP reportable", margin + 14, y + 16, {
+      width: pageWidth - margin * 2 - 28
+    });
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica")
+    .fontSize(9.2)
+    .text(
+      "Le rapport reprend les transactions XOF soumises ou approuvees et les taches BTP de la periode. Renseignez chantier, lot, client et avancement pour alimenter le suivi.",
+      margin + 14,
+      y + 34,
+      {
+        width: pageWidth - margin * 2 - 28
+      }
+    );
+  doc.y = y + 88;
+}
+
+function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
+  if (report.rows.length === 0) {
+    drawBtpEmptyState(doc);
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (needsPdfPageBreak(doc, 78)) {
+    doc.addPage();
+    drawBtpReportHeader(doc, report);
+  }
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
+    .text("Synthese par chantier, lot et client", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.4);
+  let y = drawBtpTableHeader(doc, doc.y);
+
+  for (const row of report.rows) {
+    if (y + 20 + 22 > tableBottom) {
+      doc.addPage();
+      drawBtpReportHeader(doc, report);
+      y = drawBtpTableHeader(doc, doc.y);
+    }
+    y = drawBtpDataRow(doc, row, y);
+  }
+
+  if (y + 22 > tableBottom) {
+    doc.addPage();
+    drawBtpReportHeader(doc, report);
+    y = drawBtpTableHeader(doc, doc.y);
+  }
+  doc.y = drawBtpTotalsRow(doc, report, y) + 14;
+}
+
+function drawBtpBreakdown(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
+  if (report.operationRows.length === 0) {
+    return;
+  }
+
+  if (needsPdfPageBreak(doc, 62)) {
+    doc.addPage();
+    drawBtpReportHeader(doc, report);
+  }
+
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(12)
+    .text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.4);
+
+  const columns: PdfTableColumn[] = [
+    { label: "OPERATION", width: 170, align: "left" },
+    { label: "TRANS.", width: 50, align: "right" },
+    { label: "TACHES", width: 50, align: "right" },
+    { label: "RECETTES", width: 80, align: "right" },
+    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "NET", width: 85, align: "right" }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  let y = doc.y;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+      align: "center",
+      fill: "#ffedd5",
+      font: "Helvetica-Bold",
+      fontSize: 7.5
+    });
+    x += column.width;
+  }
+  y += 20;
+
+  for (const row of report.operationRows) {
+    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawBtpReportHeader(doc, report);
+      y = doc.y;
+      x = PDF_PAGE_MARGIN;
+      for (const column of columns) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+          align: "center",
+          fill: "#ffedd5",
+          font: "Helvetica-Bold",
+          fontSize: 7.5
+        });
+        x += column.width;
+      }
+      y += 20;
+    }
+    x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
+      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
+      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+      { value: formatPdfMoney(row.netAmount), align: "right" as const }
+    ];
+    values.forEach((item, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
+        align: item.align,
+        fontSize: 7.4
+      });
+      x += column.width;
+    });
+    y += 19;
+  }
+  doc.y = y + 10;
+}
+
+function drawBtpPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+
+  doc.save();
+  doc
+    .moveTo(margin, pageHeight - 44)
+    .lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#fed7aa")
+    .lineWidth(1)
+    .stroke();
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8.5)
+    .text(`AMCCO - Rapport BTP | ${periodLabel}`, margin, pageHeight - 32, {
+      width: 300
+    });
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8.5)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80,
+      align: "right"
+    });
+  doc.restore();
+}
+
+function renderBtpReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.btpOperationsReport ?? buildEmptyBtpOperationsReport(filters);
+
+  drawBtpReportHeader(doc, report);
+  drawBtpMetadataStrip(doc, report, filters, overview.generatedAt);
+  drawBtpMetricCards(doc, report);
+  drawBtpOperationsTable(doc, report);
+  drawBtpBreakdown(doc, report);
+}
+
 function buildEmptyFishFarmingOperationsReport(filters: ReportPeriodFilter): FishFarmingOperationsReport {
   return {
     periodLabel: toFishFarmingPeriodLabel(filters, []),
@@ -2739,6 +5733,76 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     });
   }
 
+  if (overview.generalStoreOperationsReport) {
+    rows.push({
+      category: "GeneralStoreOperationsReport",
+      item: "totals",
+      label: `Magasins ${overview.generalStoreOperationsReport.periodLabel}`,
+      value: overview.generalStoreOperationsReport.totals.netAmount,
+      extra: `rayons ${overview.generalStoreOperationsReport.totals.departmentsCount} | familles ${overview.generalStoreOperationsReport.totals.productFamiliesCount} | articles ${overview.generalStoreOperationsReport.totals.itemsCount} | ventes ${overview.generalStoreOperationsReport.totals.salesAmount} XOF | achats ${overview.generalStoreOperationsReport.totals.purchaseAmount} XOF | retours ${overview.generalStoreOperationsReport.totals.returnAmount} XOF | remises ${overview.generalStoreOperationsReport.totals.discountAmount} XOF | marge ${overview.generalStoreOperationsReport.totals.marginRate}% | execution ${overview.generalStoreOperationsReport.totals.executionRate}%`
+    });
+  }
+
+  if (overview.foodOperationsReport) {
+    rows.push({
+      category: "FoodOperationsReport",
+      item: "totals",
+      label: `Alimentation ${overview.foodOperationsReport.periodLabel}`,
+      value: overview.foodOperationsReport.totals.netAmount,
+      extra: `familles ${overview.foodOperationsReport.totals.productFamiliesCount} | produits ${overview.foodOperationsReport.totals.productsCount} | lots ${overview.foodOperationsReport.totals.batchesCount} | ventes ${overview.foodOperationsReport.totals.salesAmount} XOF | achats ${overview.foodOperationsReport.totals.purchaseAmount} XOF | pertes ${overview.foodOperationsReport.totals.lossAmount} XOF | marge ${overview.foodOperationsReport.totals.marginRate}% | execution ${overview.foodOperationsReport.totals.executionRate}%`
+    });
+  }
+
+  if (overview.rentalOperationsReport) {
+    rows.push({
+      category: "RentalOperationsReport",
+      item: "totals",
+      label: `Location ${overview.rentalOperationsReport.periodLabel}`,
+      value: overview.rentalOperationsReport.totals.netAmount,
+      extra: `biens ${overview.rentalOperationsReport.totals.propertiesCount} | lots ${overview.rentalOperationsReport.totals.unitsCount} | locataires ${overview.rentalOperationsReport.totals.tenantsCount} | loyers ${overview.rentalOperationsReport.totals.rentAmount} XOF | cautions ${overview.rentalOperationsReport.totals.depositAmount} XOF | charges ${overview.rentalOperationsReport.totals.serviceChargeAmount} XOF | maintenance ${overview.rentalOperationsReport.totals.maintenanceAmount} XOF | recettes ${overview.rentalOperationsReport.totals.cashInAmount} XOF | depenses ${overview.rentalOperationsReport.totals.cashOutAmount} XOF | execution ${overview.rentalOperationsReport.totals.executionRate}%`
+    });
+  }
+
+  if (overview.hotelOperationsReport) {
+    rows.push({
+      category: "HotelOperationsReport",
+      item: "totals",
+      label: `Hotellerie ${overview.hotelOperationsReport.periodLabel}`,
+      value: overview.hotelOperationsReport.totals.netAmount,
+      extra: `reservations ${overview.hotelOperationsReport.totals.bookingsCount} | chambres ${overview.hotelOperationsReport.totals.roomsCount} | nuitees ${overview.hotelOperationsReport.totals.nightsCount} | hebergement ${overview.hotelOperationsReport.totals.roomRevenue} XOF | restauration ${overview.hotelOperationsReport.totals.restaurantAmount} XOF | services ${overview.hotelOperationsReport.totals.serviceAmount} XOF | charges ${overview.hotelOperationsReport.totals.cashOutAmount} XOF | tarif moyen ${overview.hotelOperationsReport.totals.averageRoomRate} XOF | execution ${overview.hotelOperationsReport.totals.executionRate}%`
+    });
+  }
+
+  if (overview.waterOperationsReport) {
+    rows.push({
+      category: "WaterOperationsReport",
+      item: "totals",
+      label: `Eau potable ${overview.waterOperationsReport.periodLabel}`,
+      value: overview.waterOperationsReport.totals.netAmount,
+      extra: `sites ${overview.waterOperationsReport.totals.facilitiesCount} | zones ${overview.waterOperationsReport.totals.zonesCount} | produit ${overview.waterOperationsReport.totals.producedVolumeM3} m3 | facture ${overview.waterOperationsReport.totals.billedVolumeM3} m3 | recettes ${overview.waterOperationsReport.totals.cashInAmount} XOF | charges ${overview.waterOperationsReport.totals.cashOutAmount} XOF | pertes ${overview.waterOperationsReport.totals.lossRate}% | execution ${overview.waterOperationsReport.totals.executionRate}%`
+    });
+  }
+
+  if (overview.agencyOperationsReport) {
+    rows.push({
+      category: "AgencyOperationsReport",
+      item: "totals",
+      label: `Agence immobiliere ${overview.agencyOperationsReport.periodLabel}`,
+      value: overview.agencyOperationsReport.totals.netAmount,
+      extra: `mandats ${overview.agencyOperationsReport.totals.mandatesCount} | biens ${overview.agencyOperationsReport.totals.propertiesCount} | clients ${overview.agencyOperationsReport.totals.clientsCount} | affaires ${overview.agencyOperationsReport.totals.dealAmount} XOF | commissions vente ${overview.agencyOperationsReport.totals.saleCommissionAmount} XOF | commissions location ${overview.agencyOperationsReport.totals.rentalCommissionAmount} XOF | charges ${overview.agencyOperationsReport.totals.cashOutAmount} XOF | taux commission ${overview.agencyOperationsReport.totals.commissionRate}% | execution ${overview.agencyOperationsReport.totals.executionRate}%`
+    });
+  }
+
+  if (overview.btpOperationsReport) {
+    rows.push({
+      category: "BtpOperationsReport",
+      item: "totals",
+      label: `BTP ${overview.btpOperationsReport.periodLabel}`,
+      value: overview.btpOperationsReport.totals.netAmount,
+      extra: `chantiers ${overview.btpOperationsReport.totals.projectsCount} | lots ${overview.btpOperationsReport.totals.workPackagesCount} | avancement ${overview.btpOperationsReport.totals.progressPercent}% | main-d'oeuvre ${overview.btpOperationsReport.totals.laborDays} j/h | engins ${overview.btpOperationsReport.totals.equipmentHours} h | recettes ${overview.btpOperationsReport.totals.cashInAmount} XOF | depenses ${overview.btpOperationsReport.totals.cashOutAmount} XOF | execution ${overview.btpOperationsReport.totals.executionRate}%`
+    });
+  }
+
   if (overview.fishFarmingOperationsReport) {
     rows.push({
       category: "FishFarmingOperationsReport",
@@ -2844,6 +5908,303 @@ function buildAgricultureOperationsReportRows(overview: ReportsOverview): Array<
 
 function buildAgricultureOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
   return (overview.agricultureOperationsReport?.operationRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    currency: item.currency
+  }));
+}
+
+function buildGeneralStoreOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.generalStoreOperationsReport?.rows ?? []).map((item) => ({
+    department: item.department,
+    productFamily: item.productFamily,
+    itemName: item.itemName,
+    skuRef: item.skuRef,
+    soldQuantity: item.soldQuantity,
+    purchaseQuantity: item.purchaseQuantity,
+    returnQuantity: item.returnQuantity,
+    adjustmentQuantity: item.adjustmentQuantity,
+    transferQuantity: item.transferQuantity,
+    salesAmount: item.salesAmount,
+    purchaseAmount: item.purchaseAmount,
+    returnAmount: item.returnAmount,
+    discountAmount: item.discountAmount,
+    expenseAmount: item.expenseAmount,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    doneTasksCount: item.doneTasksCount,
+    openTasksCount: item.openTasksCount,
+    blockedTasksCount: item.blockedTasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    grossMargin: item.grossMargin,
+    marginRate: item.marginRate,
+    executionRate: item.executionRate,
+    currency: item.currency
+  }));
+}
+
+function buildGeneralStoreOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.generalStoreOperationsReport?.operationRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    currency: item.currency
+  }));
+}
+
+function buildFoodOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.foodOperationsReport?.rows ?? []).map((item) => ({
+    productFamily: item.productFamily,
+    productName: item.productName,
+    batchRef: item.batchRef,
+    storageArea: item.storageArea,
+    purchaseQuantity: item.purchaseQuantity,
+    soldQuantity: item.soldQuantity,
+    lossQuantity: item.lossQuantity,
+    purchaseAmount: item.purchaseAmount,
+    salesAmount: item.salesAmount,
+    lossAmount: item.lossAmount,
+    expenseAmount: item.expenseAmount,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    doneTasksCount: item.doneTasksCount,
+    openTasksCount: item.openTasksCount,
+    blockedTasksCount: item.blockedTasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    grossMargin: item.grossMargin,
+    marginRate: item.marginRate,
+    executionRate: item.executionRate,
+    currency: item.currency
+  }));
+}
+
+function buildFoodOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.foodOperationsReport?.operationRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    currency: item.currency
+  }));
+}
+
+function buildRentalOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.rentalOperationsReport?.rows ?? []).map((item) => ({
+    propertyRef: item.propertyRef,
+    unitRef: item.unitRef,
+    tenantRef: item.tenantRef,
+    leaseRef: item.leaseRef,
+    propertyType: item.propertyType,
+    rentPaymentsCount: item.rentPaymentsCount,
+    rentAmount: item.rentAmount,
+    depositAmount: item.depositAmount,
+    serviceChargeAmount: item.serviceChargeAmount,
+    maintenanceAmount: item.maintenanceAmount,
+    propertyExpenseAmount: item.propertyExpenseAmount,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    doneTasksCount: item.doneTasksCount,
+    openTasksCount: item.openTasksCount,
+    blockedTasksCount: item.blockedTasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    executionRate: item.executionRate,
+    currency: item.currency
+  }));
+}
+
+function buildRentalOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.rentalOperationsReport?.operationRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    currency: item.currency
+  }));
+}
+
+function buildHotelOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.hotelOperationsReport?.rows ?? []).map((item) => ({
+    serviceLine: item.serviceLine,
+    roomRef: item.roomRef,
+    roomType: item.roomType,
+    bookingRef: item.bookingRef,
+    guestRef: item.guestRef,
+    nightsCount: item.nightsCount,
+    guestCount: item.guestCount,
+    roomRevenue: item.roomRevenue,
+    depositAmount: item.depositAmount,
+    restaurantAmount: item.restaurantAmount,
+    serviceAmount: item.serviceAmount,
+    maintenanceAmount: item.maintenanceAmount,
+    commissionAmount: item.commissionAmount,
+    taxAmount: item.taxAmount,
+    refundAmount: item.refundAmount,
+    expenseAmount: item.expenseAmount,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    doneTasksCount: item.doneTasksCount,
+    openTasksCount: item.openTasksCount,
+    blockedTasksCount: item.blockedTasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    averageRoomRate: item.averageRoomRate,
+    executionRate: item.executionRate,
+    currency: item.currency
+  }));
+}
+
+function buildHotelOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.hotelOperationsReport?.operationRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    currency: item.currency
+  }));
+}
+
+function buildWaterOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.waterOperationsReport?.rows ?? []).map((item) => ({
+    facilityRef: item.facilityRef,
+    networkZone: item.networkZone,
+    productionLine: item.productionLine,
+    producedVolumeM3: item.producedVolumeM3,
+    billedVolumeM3: item.billedVolumeM3,
+    waterRevenue: item.waterRevenue,
+    bulkSaleAmount: item.bulkSaleAmount,
+    connectionAmount: item.connectionAmount,
+    subsidyAmount: item.subsidyAmount,
+    treatmentCost: item.treatmentCost,
+    energyCost: item.energyCost,
+    maintenanceCost: item.maintenanceCost,
+    qualityCost: item.qualityCost,
+    repairCost: item.repairCost,
+    supplierPaymentAmount: item.supplierPaymentAmount,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    doneTasksCount: item.doneTasksCount,
+    openTasksCount: item.openTasksCount,
+    blockedTasksCount: item.blockedTasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    lossRate: item.lossRate,
+    executionRate: item.executionRate,
+    currency: item.currency
+  }));
+}
+
+function buildWaterOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.waterOperationsReport?.operationRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    currency: item.currency
+  }));
+}
+
+function buildAgencyOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.agencyOperationsReport?.rows ?? []).map((item) => ({
+    mandateRef: item.mandateRef,
+    propertyRef: item.propertyRef,
+    mandateType: item.mandateType,
+    propertyType: item.propertyType,
+    locationZone: item.locationZone,
+    clientRef: item.clientRef,
+    dealStage: item.dealStage,
+    dealAmount: item.dealAmount,
+    saleCommissionAmount: item.saleCommissionAmount,
+    rentalCommissionAmount: item.rentalCommissionAmount,
+    mandateFeeAmount: item.mandateFeeAmount,
+    visitFeeAmount: item.visitFeeAmount,
+    fileFeeAmount: item.fileFeeAmount,
+    advertisingExpenseAmount: item.advertisingExpenseAmount,
+    fieldVisitExpenseAmount: item.fieldVisitExpenseAmount,
+    brokerPayoutAmount: item.brokerPayoutAmount,
+    documentExpenseAmount: item.documentExpenseAmount,
+    officeExpenseAmount: item.officeExpenseAmount,
+    refundAmount: item.refundAmount,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    doneTasksCount: item.doneTasksCount,
+    openTasksCount: item.openTasksCount,
+    blockedTasksCount: item.blockedTasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    commissionRate: item.commissionRate,
+    executionRate: item.executionRate,
+    currency: item.currency
+  }));
+}
+
+function buildAgencyOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.agencyOperationsReport?.operationRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    currency: item.currency
+  }));
+}
+
+function buildBtpOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.btpOperationsReport?.rows ?? []).map((item) => ({
+    projectRef: item.projectRef,
+    workPackage: item.workPackage,
+    siteLocation: item.siteLocation,
+    clientRef: item.clientRef,
+    progressPercent: item.progressPercent,
+    materialQuantity: item.materialQuantity,
+    laborDays: item.laborDays,
+    equipmentHours: item.equipmentHours,
+    transactionsCount: item.transactionsCount,
+    tasksCount: item.tasksCount,
+    doneTasksCount: item.doneTasksCount,
+    openTasksCount: item.openTasksCount,
+    blockedTasksCount: item.blockedTasksCount,
+    cashInAmount: item.cashInAmount,
+    cashOutAmount: item.cashOutAmount,
+    netAmount: item.netAmount,
+    executionRate: item.executionRate,
+    currency: item.currency
+  }));
+}
+
+function buildBtpOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.btpOperationsReport?.operationRows ?? []).map((item) => ({
     operationKind: item.operationKind,
     operationLabel: item.operationLabel,
     transactionsCount: item.transactionsCount,
@@ -3612,6 +6973,2758 @@ function buildAgricultureOperationsReport(
     totals: {
       parcelsCount: bucketRows.length,
       surfaceArea: totals.surfaceAreaValue,
+      transactionsCount: totals.transactionsCount,
+      tasksCount: totals.tasksCount,
+      doneTasksCount: totals.doneTasksCount,
+      openTasksCount: totals.openTasksCount,
+      blockedTasksCount: totals.blockedTasksCount,
+      cashInAmount: toMoneyString(totals.cashInValue),
+      cashOutAmount: toMoneyString(totals.cashOutValue),
+      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
+      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      currency: "XOF" as const
+    }
+  };
+}
+
+type GeneralStoreReportBucket = {
+  department: string;
+  productFamily: string;
+  itemName: string;
+  skuRef: string;
+  soldQuantityValue: number;
+  purchaseQuantityValue: number;
+  returnQuantityValue: number;
+  adjustmentQuantityValue: number;
+  transferQuantityValue: number;
+  salesValue: number;
+  purchaseValue: number;
+  returnValue: number;
+  discountValue: number;
+  expenseValue: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+type GeneralStoreOperationBucket = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+function getGeneralStoreMetadataLabel(
+  metadata: Record<string, string>,
+  key: string,
+  fallback: string
+): string {
+  const value = metadata[key]?.trim();
+  return value || fallback;
+}
+
+function getGeneralStoreBucketKey(input: {
+  department: string;
+  productFamily: string;
+  itemName: string;
+  skuRef: string;
+}): string {
+  return [input.department, input.productFamily, input.itemName, input.skuRef].join("|");
+}
+
+function getGeneralStoreReportBucket(
+  buckets: Map<string, GeneralStoreReportBucket>,
+  metadata: Record<string, string>
+): GeneralStoreReportBucket {
+  const input = {
+    department: getGeneralStoreMetadataLabel(metadata, "department", "Rayon non renseigne"),
+    productFamily: getGeneralStoreMetadataLabel(metadata, "productFamily", "Famille non renseignee"),
+    itemName: getGeneralStoreMetadataLabel(metadata, "itemName", "Article non renseigne"),
+    skuRef: getGeneralStoreMetadataLabel(metadata, "skuRef", "Reference non renseignee")
+  };
+  const key = getGeneralStoreBucketKey(input);
+  const existing = buckets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created: GeneralStoreReportBucket = {
+    ...input,
+    soldQuantityValue: 0,
+    purchaseQuantityValue: 0,
+    returnQuantityValue: 0,
+    adjustmentQuantityValue: 0,
+    transferQuantityValue: 0,
+    salesValue: 0,
+    purchaseValue: 0,
+    returnValue: 0,
+    discountValue: 0,
+    expenseValue: 0,
+    transactionsCount: 0,
+    tasksCount: 0,
+    doneTasksCount: 0,
+    openTasksCount: 0,
+    blockedTasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(key, created);
+  return created;
+}
+
+function getGeneralStoreOperationBucket(
+  buckets: Map<string, GeneralStoreOperationBucket>,
+  operationKind: string,
+  operationLabel: string
+): GeneralStoreOperationBucket {
+  const existing = buckets.get(operationKind);
+  if (existing) {
+    return existing;
+  }
+
+  const created: GeneralStoreOperationBucket = {
+    operationKind,
+    operationLabel,
+    transactionsCount: 0,
+    tasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(operationKind, created);
+  return created;
+}
+
+function getGeneralStoreTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+  const configuredKind = transaction.metadata.storeOperationKind?.trim();
+  if (configuredKind) {
+    return configuredKind;
+  }
+  return transaction.type === "CASH_IN" ? "STORE_SALE" : "STORE_EXPENSE";
+}
+
+function getGeneralStoreTaskOperationKind(task: ReportOperationalTask): string {
+  const configuredKind = task.metadata.storeTaskKind?.trim();
+  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+}
+
+function toGeneralStoreOperationLabel(operationKind: string): string {
+  if (GENERAL_STORE_OPERATION_LABELS[operationKind]) {
+    return GENERAL_STORE_OPERATION_LABELS[operationKind];
+  }
+  if (operationKind.startsWith("TASK_")) {
+    const taskKind = operationKind.slice("TASK_".length);
+    return `Tache: ${GENERAL_STORE_TASK_LABELS[taskKind] ?? taskKind}`;
+  }
+  return operationKind;
+}
+
+function toGeneralStorePeriodLabel(
+  filters: ReportPeriodFilter,
+  _rows: GeneralStoreReportBucket[]
+): string {
+  if (!filters.dateFrom && !filters.dateTo) {
+    return "Toutes periodes";
+  }
+
+  if (!filters.dateFrom || !filters.dateTo) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const fromDate = new Date(filters.dateFrom);
+  const toDate = new Date(filters.dateTo);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const sameMonth =
+    fromDate.getFullYear() === toDate.getFullYear() &&
+    fromDate.getMonth() === toDate.getMonth();
+  if (!sameMonth) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  return fromDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function isGeneralStoreReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return (
+    transaction.activityCode === "GENERAL_STORE" &&
+    transaction.currency === "XOF" &&
+    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+  );
+}
+
+function buildGeneralStoreOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): GeneralStoreOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "GENERAL_STORE") {
+    return null;
+  }
+
+  const storeTransactions = transactions.filter(isGeneralStoreReportableTransaction);
+  const storeTasks = tasks.filter((task) => task.activityCode === "GENERAL_STORE");
+  if (!filters.activityCode && storeTransactions.length === 0 && storeTasks.length === 0) {
+    return null;
+  }
+
+  const rowBuckets = new Map<string, GeneralStoreReportBucket>();
+  const operationBuckets = new Map<string, GeneralStoreOperationBucket>();
+
+  for (const transaction of storeTransactions) {
+    const operationKind = getGeneralStoreTransactionOperationKind(transaction);
+    const rowBucket = getGeneralStoreReportBucket(rowBuckets, transaction.metadata);
+    const amount = toNumberAmount(transaction.amount);
+    const quantity = getMetadataNumber(transaction.metadata, "quantity");
+    rowBucket.transactionsCount += 1;
+
+    if (operationKind === "STORE_SALE") {
+      rowBucket.soldQuantityValue += quantity;
+      rowBucket.salesValue += amount;
+      rowBucket.discountValue += getMetadataNumber(transaction.metadata, "discountAmount");
+    }
+    if (operationKind === "STOCK_PURCHASE") {
+      rowBucket.purchaseQuantityValue += quantity;
+      rowBucket.purchaseValue += amount;
+    }
+    if (operationKind === "CUSTOMER_RETURN") {
+      rowBucket.returnQuantityValue += getMetadataNumber(transaction.metadata, "returnQuantity");
+      rowBucket.returnValue += amount;
+    }
+    if (operationKind === "DISCOUNT_ADJUSTMENT") {
+      rowBucket.discountValue += amount;
+    }
+    if (operationKind === "INVENTORY_ADJUSTMENT") {
+      rowBucket.adjustmentQuantityValue += getMetadataNumber(transaction.metadata, "adjustmentQuantity");
+      rowBucket.expenseValue += amount;
+    }
+    if (operationKind === "INTERNAL_TRANSFER") {
+      rowBucket.transferQuantityValue += quantity;
+    }
+    if (operationKind === "SUPPLIER_PAYMENT" || operationKind === "STORE_EXPENSE") {
+      rowBucket.expenseValue += amount;
+    }
+
+    if (transaction.type === "CASH_IN") {
+      rowBucket.cashInValue += amount;
+    } else {
+      rowBucket.cashOutValue += amount;
+    }
+
+    const operationBucket = getGeneralStoreOperationBucket(
+      operationBuckets,
+      operationKind,
+      toGeneralStoreOperationLabel(operationKind)
+    );
+    operationBucket.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") {
+      operationBucket.cashInValue += amount;
+    } else {
+      operationBucket.cashOutValue += amount;
+    }
+  }
+
+  for (const task of storeTasks) {
+    const rowBucket = getGeneralStoreReportBucket(rowBuckets, task.metadata);
+    rowBucket.tasksCount += 1;
+    if (task.status === "DONE") {
+      rowBucket.doneTasksCount += 1;
+    } else {
+      rowBucket.openTasksCount += 1;
+    }
+    if (task.status === "BLOCKED") {
+      rowBucket.blockedTasksCount += 1;
+    }
+
+    const operationKind = getGeneralStoreTaskOperationKind(task);
+    const operationBucket = getGeneralStoreOperationBucket(
+      operationBuckets,
+      operationKind,
+      toGeneralStoreOperationLabel(operationKind)
+    );
+    operationBucket.tasksCount += 1;
+  }
+
+  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
+    return (
+      left.department.localeCompare(right.department) ||
+      left.productFamily.localeCompare(right.productFamily) ||
+      left.itemName.localeCompare(right.itemName) ||
+      left.skuRef.localeCompare(right.skuRef)
+    );
+  });
+
+  const totals = bucketRows.reduce(
+    (sum, row) => ({
+      soldQuantityValue: sum.soldQuantityValue + row.soldQuantityValue,
+      purchaseQuantityValue: sum.purchaseQuantityValue + row.purchaseQuantityValue,
+      returnQuantityValue: sum.returnQuantityValue + row.returnQuantityValue,
+      adjustmentQuantityValue: sum.adjustmentQuantityValue + row.adjustmentQuantityValue,
+      transferQuantityValue: sum.transferQuantityValue + row.transferQuantityValue,
+      salesValue: sum.salesValue + row.salesValue,
+      purchaseValue: sum.purchaseValue + row.purchaseValue,
+      returnValue: sum.returnValue + row.returnValue,
+      discountValue: sum.discountValue + row.discountValue,
+      expenseValue: sum.expenseValue + row.expenseValue,
+      transactionsCount: sum.transactionsCount + row.transactionsCount,
+      tasksCount: sum.tasksCount + row.tasksCount,
+      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
+      openTasksCount: sum.openTasksCount + row.openTasksCount,
+      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
+      cashInValue: sum.cashInValue + row.cashInValue,
+      cashOutValue: sum.cashOutValue + row.cashOutValue
+    }),
+    {
+      soldQuantityValue: 0,
+      purchaseQuantityValue: 0,
+      returnQuantityValue: 0,
+      adjustmentQuantityValue: 0,
+      transferQuantityValue: 0,
+      salesValue: 0,
+      purchaseValue: 0,
+      returnValue: 0,
+      discountValue: 0,
+      expenseValue: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInValue: 0,
+      cashOutValue: 0
+    }
+  );
+
+  const departmentKeys = new Set(bucketRows.map((row) => row.department));
+  const familyKeys = new Set(bucketRows.map((row) => `${row.department}|${row.productFamily}`));
+  const itemKeys = new Set(bucketRows.map((row) => `${row.department}|${row.productFamily}|${row.itemName}|${row.skuRef}`));
+  const totalGrossMargin = totals.salesValue - totals.purchaseValue - totals.returnValue - totals.discountValue;
+
+  return {
+    periodLabel: toGeneralStorePeriodLabel(filters, bucketRows),
+    rows: bucketRows.map((row) => {
+      const netAmount = row.cashInValue - row.cashOutValue;
+      const grossMargin = row.salesValue - row.purchaseValue - row.returnValue - row.discountValue;
+      return {
+        department: row.department,
+        productFamily: row.productFamily,
+        itemName: row.itemName,
+        skuRef: row.skuRef,
+        soldQuantity: row.soldQuantityValue,
+        purchaseQuantity: row.purchaseQuantityValue,
+        returnQuantity: row.returnQuantityValue,
+        adjustmentQuantity: row.adjustmentQuantityValue,
+        transferQuantity: row.transferQuantityValue,
+        salesAmount: toMoneyString(row.salesValue),
+        purchaseAmount: toMoneyString(row.purchaseValue),
+        returnAmount: toMoneyString(row.returnValue),
+        discountAmount: toMoneyString(row.discountValue),
+        expenseAmount: toMoneyString(row.expenseValue),
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        doneTasksCount: row.doneTasksCount,
+        openTasksCount: row.openTasksCount,
+        blockedTasksCount: row.blockedTasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(netAmount),
+        grossMargin: toMoneyString(grossMargin),
+        marginRate: toMarginRate(grossMargin, row.salesValue),
+        executionRate: toRate(row.doneTasksCount, row.tasksCount),
+        currency: "XOF" as const
+      };
+    }),
+    operationRows: Array.from(operationBuckets.values())
+      .map((row) => ({
+        operationKind: row.operationKind,
+        operationLabel: row.operationLabel,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
+        currency: "XOF" as const
+      }))
+      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    totals: {
+      departmentsCount: departmentKeys.size,
+      productFamiliesCount: familyKeys.size,
+      itemsCount: itemKeys.size,
+      soldQuantity: totals.soldQuantityValue,
+      purchaseQuantity: totals.purchaseQuantityValue,
+      returnQuantity: totals.returnQuantityValue,
+      adjustmentQuantity: totals.adjustmentQuantityValue,
+      transferQuantity: totals.transferQuantityValue,
+      salesAmount: toMoneyString(totals.salesValue),
+      purchaseAmount: toMoneyString(totals.purchaseValue),
+      returnAmount: toMoneyString(totals.returnValue),
+      discountAmount: toMoneyString(totals.discountValue),
+      expenseAmount: toMoneyString(totals.expenseValue),
+      transactionsCount: totals.transactionsCount,
+      tasksCount: totals.tasksCount,
+      doneTasksCount: totals.doneTasksCount,
+      openTasksCount: totals.openTasksCount,
+      blockedTasksCount: totals.blockedTasksCount,
+      cashInAmount: toMoneyString(totals.cashInValue),
+      cashOutAmount: toMoneyString(totals.cashOutValue),
+      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
+      grossMargin: toMoneyString(totalGrossMargin),
+      marginRate: toMarginRate(totalGrossMargin, totals.salesValue),
+      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      currency: "XOF" as const
+    }
+  };
+}
+
+type FoodReportBucket = {
+  productFamily: string;
+  productName: string;
+  batchRef: string;
+  storageArea: string;
+  purchaseQuantityValue: number;
+  soldQuantityValue: number;
+  lossQuantityValue: number;
+  purchaseValue: number;
+  salesValue: number;
+  lossValue: number;
+  expenseValue: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+type FoodOperationBucket = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+function getFoodMetadataLabel(
+  metadata: Record<string, string>,
+  key: string,
+  fallback: string
+): string {
+  const value = metadata[key]?.trim();
+  return value || fallback;
+}
+
+function getFoodBucketKey(input: {
+  productFamily: string;
+  productName: string;
+  batchRef: string;
+  storageArea: string;
+}): string {
+  return [input.productFamily, input.productName, input.batchRef, input.storageArea].join("|");
+}
+
+function getFoodReportBucket(
+  buckets: Map<string, FoodReportBucket>,
+  metadata: Record<string, string>
+): FoodReportBucket {
+  const input = {
+    productFamily: getFoodMetadataLabel(metadata, "productFamily", "Famille non renseignee"),
+    productName: getFoodMetadataLabel(metadata, "productName", "Produit non renseigne"),
+    batchRef: getFoodMetadataLabel(metadata, "batchRef", "Lot non renseigne"),
+    storageArea: getFoodMetadataLabel(metadata, "storageArea", "Zone non renseignee")
+  };
+  const key = getFoodBucketKey(input);
+  const existing = buckets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created: FoodReportBucket = {
+    ...input,
+    purchaseQuantityValue: 0,
+    soldQuantityValue: 0,
+    lossQuantityValue: 0,
+    purchaseValue: 0,
+    salesValue: 0,
+    lossValue: 0,
+    expenseValue: 0,
+    transactionsCount: 0,
+    tasksCount: 0,
+    doneTasksCount: 0,
+    openTasksCount: 0,
+    blockedTasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(key, created);
+  return created;
+}
+
+function getFoodOperationBucket(
+  buckets: Map<string, FoodOperationBucket>,
+  operationKind: string,
+  operationLabel: string
+): FoodOperationBucket {
+  const existing = buckets.get(operationKind);
+  if (existing) {
+    return existing;
+  }
+
+  const created: FoodOperationBucket = {
+    operationKind,
+    operationLabel,
+    transactionsCount: 0,
+    tasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(operationKind, created);
+  return created;
+}
+
+function getFoodTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+  const configuredKind = transaction.metadata.foodOperationKind?.trim();
+  if (configuredKind) {
+    return configuredKind;
+  }
+  return transaction.type === "CASH_IN" ? "PRODUCT_SALE" : "SUPPLIER_PAYMENT";
+}
+
+function getFoodTaskOperationKind(task: ReportOperationalTask): string {
+  const configuredKind = task.metadata.foodTaskKind?.trim();
+  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+}
+
+function toFoodOperationLabel(operationKind: string): string {
+  if (FOOD_OPERATION_LABELS[operationKind]) {
+    return FOOD_OPERATION_LABELS[operationKind];
+  }
+  if (operationKind.startsWith("TASK_")) {
+    const taskKind = operationKind.slice("TASK_".length);
+    return `Tache: ${FOOD_TASK_LABELS[taskKind] ?? taskKind}`;
+  }
+  return operationKind;
+}
+
+function toFoodPeriodLabel(
+  filters: ReportPeriodFilter,
+  _rows: FoodReportBucket[]
+): string {
+  if (!filters.dateFrom && !filters.dateTo) {
+    return "Toutes periodes";
+  }
+
+  if (!filters.dateFrom || !filters.dateTo) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const fromDate = new Date(filters.dateFrom);
+  const toDate = new Date(filters.dateTo);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const sameMonth =
+    fromDate.getFullYear() === toDate.getFullYear() &&
+    fromDate.getMonth() === toDate.getMonth();
+  if (!sameMonth) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  return fromDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function isFoodReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return (
+    transaction.activityCode === "FOOD" &&
+    transaction.currency === "XOF" &&
+    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+  );
+}
+
+function toMarginRate(grossMargin: number, salesAmount: number): number {
+  if (salesAmount <= 0) {
+    return 0;
+  }
+  return Number(((grossMargin / salesAmount) * 100).toFixed(2));
+}
+
+function buildFoodOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): FoodOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "FOOD") {
+    return null;
+  }
+
+  const foodTransactions = transactions.filter(isFoodReportableTransaction);
+  const foodTasks = tasks.filter((task) => task.activityCode === "FOOD");
+  if (!filters.activityCode && foodTransactions.length === 0 && foodTasks.length === 0) {
+    return null;
+  }
+
+  const rowBuckets = new Map<string, FoodReportBucket>();
+  const operationBuckets = new Map<string, FoodOperationBucket>();
+
+  for (const transaction of foodTransactions) {
+    const operationKind = getFoodTransactionOperationKind(transaction);
+    const rowBucket = getFoodReportBucket(rowBuckets, transaction.metadata);
+    const amount = toNumberAmount(transaction.amount);
+    const quantity = getMetadataNumber(transaction.metadata, "quantity");
+    const lossQuantity = getMetadataNumber(transaction.metadata, "lossQuantity");
+    rowBucket.transactionsCount += 1;
+
+    if (operationKind === "PRODUCT_SALE") {
+      rowBucket.soldQuantityValue += quantity;
+      rowBucket.salesValue += amount;
+    }
+    if (operationKind === "PRODUCT_PURCHASE") {
+      rowBucket.purchaseQuantityValue += quantity;
+      rowBucket.purchaseValue += amount;
+    }
+    if (operationKind === "STOCK_LOSS") {
+      rowBucket.lossQuantityValue += lossQuantity;
+      rowBucket.lossValue += amount;
+    }
+    if (
+      operationKind === "SUPPLIER_PAYMENT" ||
+      operationKind === "COLD_CHAIN_EXPENSE" ||
+      operationKind === "PACKAGING_EXPENSE" ||
+      operationKind === "CUSTOMER_REFUND"
+    ) {
+      rowBucket.expenseValue += amount;
+    }
+
+    if (transaction.type === "CASH_IN") {
+      rowBucket.cashInValue += amount;
+    } else {
+      rowBucket.cashOutValue += amount;
+    }
+
+    const operationBucket = getFoodOperationBucket(
+      operationBuckets,
+      operationKind,
+      toFoodOperationLabel(operationKind)
+    );
+    operationBucket.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") {
+      operationBucket.cashInValue += amount;
+    } else {
+      operationBucket.cashOutValue += amount;
+    }
+  }
+
+  for (const task of foodTasks) {
+    const rowBucket = getFoodReportBucket(rowBuckets, task.metadata);
+    rowBucket.tasksCount += 1;
+    if (task.status === "DONE") {
+      rowBucket.doneTasksCount += 1;
+    } else {
+      rowBucket.openTasksCount += 1;
+    }
+    if (task.status === "BLOCKED") {
+      rowBucket.blockedTasksCount += 1;
+    }
+
+    const operationKind = getFoodTaskOperationKind(task);
+    const operationBucket = getFoodOperationBucket(
+      operationBuckets,
+      operationKind,
+      toFoodOperationLabel(operationKind)
+    );
+    operationBucket.tasksCount += 1;
+  }
+
+  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
+    return (
+      left.productFamily.localeCompare(right.productFamily) ||
+      left.productName.localeCompare(right.productName) ||
+      left.batchRef.localeCompare(right.batchRef) ||
+      left.storageArea.localeCompare(right.storageArea)
+    );
+  });
+
+  const totals = bucketRows.reduce(
+    (sum, row) => ({
+      purchaseQuantityValue: sum.purchaseQuantityValue + row.purchaseQuantityValue,
+      soldQuantityValue: sum.soldQuantityValue + row.soldQuantityValue,
+      lossQuantityValue: sum.lossQuantityValue + row.lossQuantityValue,
+      purchaseValue: sum.purchaseValue + row.purchaseValue,
+      salesValue: sum.salesValue + row.salesValue,
+      lossValue: sum.lossValue + row.lossValue,
+      expenseValue: sum.expenseValue + row.expenseValue,
+      transactionsCount: sum.transactionsCount + row.transactionsCount,
+      tasksCount: sum.tasksCount + row.tasksCount,
+      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
+      openTasksCount: sum.openTasksCount + row.openTasksCount,
+      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
+      cashInValue: sum.cashInValue + row.cashInValue,
+      cashOutValue: sum.cashOutValue + row.cashOutValue
+    }),
+    {
+      purchaseQuantityValue: 0,
+      soldQuantityValue: 0,
+      lossQuantityValue: 0,
+      purchaseValue: 0,
+      salesValue: 0,
+      lossValue: 0,
+      expenseValue: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInValue: 0,
+      cashOutValue: 0
+    }
+  );
+
+  const familyKeys = new Set(bucketRows.map((row) => row.productFamily));
+  const productKeys = new Set(bucketRows.map((row) => `${row.productFamily}|${row.productName}`));
+  const batchKeys = new Set(bucketRows.map((row) => `${row.productFamily}|${row.productName}|${row.batchRef}`));
+  const totalGrossMargin = totals.salesValue - totals.purchaseValue - totals.lossValue;
+
+  return {
+    periodLabel: toFoodPeriodLabel(filters, bucketRows),
+    rows: bucketRows.map((row) => {
+      const netAmount = row.cashInValue - row.cashOutValue;
+      const grossMargin = row.salesValue - row.purchaseValue - row.lossValue;
+      return {
+        productFamily: row.productFamily,
+        productName: row.productName,
+        batchRef: row.batchRef,
+        storageArea: row.storageArea,
+        purchaseQuantity: row.purchaseQuantityValue,
+        soldQuantity: row.soldQuantityValue,
+        lossQuantity: row.lossQuantityValue,
+        purchaseAmount: toMoneyString(row.purchaseValue),
+        salesAmount: toMoneyString(row.salesValue),
+        lossAmount: toMoneyString(row.lossValue),
+        expenseAmount: toMoneyString(row.expenseValue),
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        doneTasksCount: row.doneTasksCount,
+        openTasksCount: row.openTasksCount,
+        blockedTasksCount: row.blockedTasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(netAmount),
+        grossMargin: toMoneyString(grossMargin),
+        marginRate: toMarginRate(grossMargin, row.salesValue),
+        executionRate: toRate(row.doneTasksCount, row.tasksCount),
+        currency: "XOF" as const
+      };
+    }),
+    operationRows: Array.from(operationBuckets.values())
+      .map((row) => ({
+        operationKind: row.operationKind,
+        operationLabel: row.operationLabel,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
+        currency: "XOF" as const
+      }))
+      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    totals: {
+      productFamiliesCount: familyKeys.size,
+      productsCount: productKeys.size,
+      batchesCount: batchKeys.size,
+      purchaseQuantity: totals.purchaseQuantityValue,
+      soldQuantity: totals.soldQuantityValue,
+      lossQuantity: totals.lossQuantityValue,
+      purchaseAmount: toMoneyString(totals.purchaseValue),
+      salesAmount: toMoneyString(totals.salesValue),
+      lossAmount: toMoneyString(totals.lossValue),
+      expenseAmount: toMoneyString(totals.expenseValue),
+      transactionsCount: totals.transactionsCount,
+      tasksCount: totals.tasksCount,
+      doneTasksCount: totals.doneTasksCount,
+      openTasksCount: totals.openTasksCount,
+      blockedTasksCount: totals.blockedTasksCount,
+      cashInAmount: toMoneyString(totals.cashInValue),
+      cashOutAmount: toMoneyString(totals.cashOutValue),
+      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
+      grossMargin: toMoneyString(totalGrossMargin),
+      marginRate: toMarginRate(totalGrossMargin, totals.salesValue),
+      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      currency: "XOF" as const
+    }
+  };
+}
+
+type RentalReportBucket = {
+  propertyRef: string;
+  unitRef: string;
+  tenantRef: string;
+  leaseRef: string;
+  propertyType: string;
+  rentPaymentsCount: number;
+  rentValue: number;
+  depositValue: number;
+  serviceChargeValue: number;
+  maintenanceValue: number;
+  propertyExpenseValue: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+type RentalOperationBucket = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+function getRentalMetadataLabel(
+  metadata: Record<string, string>,
+  key: string,
+  fallback: string
+): string {
+  const value = metadata[key]?.trim();
+  return value || fallback;
+}
+
+function getRentalBucketKey(input: {
+  propertyRef: string;
+  unitRef: string;
+  tenantRef: string;
+  leaseRef: string;
+  propertyType: string;
+}): string {
+  return [
+    input.propertyRef,
+    input.unitRef,
+    input.tenantRef,
+    input.leaseRef,
+    input.propertyType
+  ].join("|");
+}
+
+function getRentalReportBucket(
+  buckets: Map<string, RentalReportBucket>,
+  metadata: Record<string, string>
+): RentalReportBucket {
+  const input = {
+    propertyRef: getRentalMetadataLabel(metadata, "propertyRef", "Bien non renseigne"),
+    unitRef: getRentalMetadataLabel(metadata, "unitRef", "Lot non renseigne"),
+    tenantRef: getRentalMetadataLabel(metadata, "tenantRef", "Locataire non renseigne"),
+    leaseRef: getRentalMetadataLabel(metadata, "leaseRef", "Bail non renseigne"),
+    propertyType: getRentalMetadataLabel(metadata, "propertyType", "Type non renseigne")
+  };
+  const key = getRentalBucketKey(input);
+  const existing = buckets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created: RentalReportBucket = {
+    ...input,
+    rentPaymentsCount: 0,
+    rentValue: 0,
+    depositValue: 0,
+    serviceChargeValue: 0,
+    maintenanceValue: 0,
+    propertyExpenseValue: 0,
+    transactionsCount: 0,
+    tasksCount: 0,
+    doneTasksCount: 0,
+    openTasksCount: 0,
+    blockedTasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(key, created);
+  return created;
+}
+
+function getRentalOperationBucket(
+  buckets: Map<string, RentalOperationBucket>,
+  operationKind: string,
+  operationLabel: string
+): RentalOperationBucket {
+  const existing = buckets.get(operationKind);
+  if (existing) {
+    return existing;
+  }
+
+  const created: RentalOperationBucket = {
+    operationKind,
+    operationLabel,
+    transactionsCount: 0,
+    tasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(operationKind, created);
+  return created;
+}
+
+function getRentalTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+  const configuredKind = transaction.metadata.rentalOperationKind?.trim();
+  if (configuredKind) {
+    return configuredKind;
+  }
+  return transaction.type === "CASH_IN" ? "RENT_PAYMENT" : "PROPERTY_EXPENSE";
+}
+
+function getRentalTaskOperationKind(task: ReportOperationalTask): string {
+  const configuredKind = task.metadata.rentalTaskKind?.trim();
+  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+}
+
+function toRentalOperationLabel(operationKind: string): string {
+  if (RENTAL_OPERATION_LABELS[operationKind]) {
+    return RENTAL_OPERATION_LABELS[operationKind];
+  }
+  if (operationKind.startsWith("TASK_")) {
+    const taskKind = operationKind.slice("TASK_".length);
+    return `Tache: ${RENTAL_TASK_LABELS[taskKind] ?? taskKind}`;
+  }
+  return operationKind;
+}
+
+function toRentalPeriodLabel(
+  filters: ReportPeriodFilter,
+  _rows: RentalReportBucket[]
+): string {
+  if (!filters.dateFrom && !filters.dateTo) {
+    return "Toutes periodes";
+  }
+
+  if (!filters.dateFrom || !filters.dateTo) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const fromDate = new Date(filters.dateFrom);
+  const toDate = new Date(filters.dateTo);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const sameMonth =
+    fromDate.getFullYear() === toDate.getFullYear() &&
+    fromDate.getMonth() === toDate.getMonth();
+  if (!sameMonth) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  return fromDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function isRentalReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return (
+    transaction.activityCode === "RENTAL" &&
+    transaction.currency === "XOF" &&
+    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+  );
+}
+
+function buildRentalOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): RentalOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "RENTAL") {
+    return null;
+  }
+
+  const rentalTransactions = transactions.filter(isRentalReportableTransaction);
+  const rentalTasks = tasks.filter((task) => task.activityCode === "RENTAL");
+  if (!filters.activityCode && rentalTransactions.length === 0 && rentalTasks.length === 0) {
+    return null;
+  }
+
+  const rowBuckets = new Map<string, RentalReportBucket>();
+  const operationBuckets = new Map<string, RentalOperationBucket>();
+
+  for (const transaction of rentalTransactions) {
+    const operationKind = getRentalTransactionOperationKind(transaction);
+    const rowBucket = getRentalReportBucket(rowBuckets, transaction.metadata);
+    const amount = toNumberAmount(transaction.amount);
+    rowBucket.transactionsCount += 1;
+
+    if (operationKind === "RENT_PAYMENT" || operationKind === "ADVANCE_PAYMENT") {
+      const serviceCharge = getMetadataNumber(transaction.metadata, "serviceCharge");
+      const rentAmount = serviceCharge > 0 && amount > serviceCharge ? amount - serviceCharge : amount;
+      rowBucket.rentPaymentsCount += 1;
+      rowBucket.rentValue += rentAmount;
+      rowBucket.serviceChargeValue += operationKind === "RENT_PAYMENT" ? serviceCharge : 0;
+    }
+    if (operationKind === "SECURITY_DEPOSIT") {
+      rowBucket.depositValue += amount;
+    }
+    if (operationKind === "SERVICE_CHARGE_INCOME") {
+      rowBucket.serviceChargeValue += amount;
+    }
+    if (operationKind === "MAINTENANCE_EXPENSE") {
+      rowBucket.maintenanceValue += amount;
+    }
+    if (operationKind === "PROPERTY_EXPENSE" || operationKind === "OWNER_PAYOUT") {
+      rowBucket.propertyExpenseValue += amount;
+    }
+
+    if (transaction.type === "CASH_IN") {
+      rowBucket.cashInValue += amount;
+    } else {
+      rowBucket.cashOutValue += amount;
+    }
+
+    const operationBucket = getRentalOperationBucket(
+      operationBuckets,
+      operationKind,
+      toRentalOperationLabel(operationKind)
+    );
+    operationBucket.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") {
+      operationBucket.cashInValue += amount;
+    } else {
+      operationBucket.cashOutValue += amount;
+    }
+  }
+
+  for (const task of rentalTasks) {
+    const rowBucket = getRentalReportBucket(rowBuckets, task.metadata);
+    rowBucket.tasksCount += 1;
+    if (task.status === "DONE") {
+      rowBucket.doneTasksCount += 1;
+    } else {
+      rowBucket.openTasksCount += 1;
+    }
+    if (task.status === "BLOCKED") {
+      rowBucket.blockedTasksCount += 1;
+    }
+
+    const operationKind = getRentalTaskOperationKind(task);
+    const operationBucket = getRentalOperationBucket(
+      operationBuckets,
+      operationKind,
+      toRentalOperationLabel(operationKind)
+    );
+    operationBucket.tasksCount += 1;
+  }
+
+  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
+    return (
+      left.propertyRef.localeCompare(right.propertyRef) ||
+      left.unitRef.localeCompare(right.unitRef) ||
+      left.tenantRef.localeCompare(right.tenantRef) ||
+      left.leaseRef.localeCompare(right.leaseRef) ||
+      left.propertyType.localeCompare(right.propertyType)
+    );
+  });
+
+  const totals = bucketRows.reduce(
+    (sum, row) => ({
+      rentPaymentsCount: sum.rentPaymentsCount + row.rentPaymentsCount,
+      rentValue: sum.rentValue + row.rentValue,
+      depositValue: sum.depositValue + row.depositValue,
+      serviceChargeValue: sum.serviceChargeValue + row.serviceChargeValue,
+      maintenanceValue: sum.maintenanceValue + row.maintenanceValue,
+      propertyExpenseValue: sum.propertyExpenseValue + row.propertyExpenseValue,
+      transactionsCount: sum.transactionsCount + row.transactionsCount,
+      tasksCount: sum.tasksCount + row.tasksCount,
+      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
+      openTasksCount: sum.openTasksCount + row.openTasksCount,
+      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
+      cashInValue: sum.cashInValue + row.cashInValue,
+      cashOutValue: sum.cashOutValue + row.cashOutValue
+    }),
+    {
+      rentPaymentsCount: 0,
+      rentValue: 0,
+      depositValue: 0,
+      serviceChargeValue: 0,
+      maintenanceValue: 0,
+      propertyExpenseValue: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInValue: 0,
+      cashOutValue: 0
+    }
+  );
+
+  const propertyKeys = new Set(bucketRows.map((row) => row.propertyRef));
+  const unitKeys = new Set(bucketRows.map((row) => `${row.propertyRef}|${row.unitRef}`));
+  const tenantKeys = new Set(bucketRows.map((row) => row.tenantRef));
+
+  return {
+    periodLabel: toRentalPeriodLabel(filters, bucketRows),
+    rows: bucketRows.map((row) => {
+      const netAmount = row.cashInValue - row.cashOutValue;
+      return {
+        propertyRef: row.propertyRef,
+        unitRef: row.unitRef,
+        tenantRef: row.tenantRef,
+        leaseRef: row.leaseRef,
+        propertyType: row.propertyType,
+        rentPaymentsCount: row.rentPaymentsCount,
+        rentAmount: toMoneyString(row.rentValue),
+        depositAmount: toMoneyString(row.depositValue),
+        serviceChargeAmount: toMoneyString(row.serviceChargeValue),
+        maintenanceAmount: toMoneyString(row.maintenanceValue),
+        propertyExpenseAmount: toMoneyString(row.propertyExpenseValue),
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        doneTasksCount: row.doneTasksCount,
+        openTasksCount: row.openTasksCount,
+        blockedTasksCount: row.blockedTasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(netAmount),
+        executionRate: toRate(row.doneTasksCount, row.tasksCount),
+        currency: "XOF" as const
+      };
+    }),
+    operationRows: Array.from(operationBuckets.values())
+      .map((row) => ({
+        operationKind: row.operationKind,
+        operationLabel: row.operationLabel,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
+        currency: "XOF" as const
+      }))
+      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    totals: {
+      propertiesCount: propertyKeys.size,
+      unitsCount: unitKeys.size,
+      tenantsCount: tenantKeys.size,
+      rentPaymentsCount: totals.rentPaymentsCount,
+      rentAmount: toMoneyString(totals.rentValue),
+      depositAmount: toMoneyString(totals.depositValue),
+      serviceChargeAmount: toMoneyString(totals.serviceChargeValue),
+      maintenanceAmount: toMoneyString(totals.maintenanceValue),
+      propertyExpenseAmount: toMoneyString(totals.propertyExpenseValue),
+      transactionsCount: totals.transactionsCount,
+      tasksCount: totals.tasksCount,
+      doneTasksCount: totals.doneTasksCount,
+      openTasksCount: totals.openTasksCount,
+      blockedTasksCount: totals.blockedTasksCount,
+      cashInAmount: toMoneyString(totals.cashInValue),
+      cashOutAmount: toMoneyString(totals.cashOutValue),
+      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
+      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      currency: "XOF" as const
+    }
+  };
+}
+
+type HotelReportBucket = {
+  serviceLine: string;
+  roomRef: string;
+  roomType: string;
+  bookingRef: string;
+  guestRef: string;
+  nightsCountValue: number;
+  guestCountValue: number;
+  roomRevenueValue: number;
+  depositValue: number;
+  restaurantValue: number;
+  serviceValue: number;
+  maintenanceValue: number;
+  commissionValue: number;
+  taxValue: number;
+  refundValue: number;
+  expenseValue: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+type HotelOperationBucket = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+function getHotelMetadataLabel(
+  metadata: Record<string, string>,
+  key: string,
+  fallback: string
+): string {
+  const value = metadata[key]?.trim();
+  return value || fallback;
+}
+
+function getHotelBucketKey(input: {
+  serviceLine: string;
+  roomRef: string;
+  roomType: string;
+  bookingRef: string;
+  guestRef: string;
+}): string {
+  return [input.serviceLine, input.roomRef, input.roomType, input.bookingRef, input.guestRef].join("|");
+}
+
+function getHotelReportBucket(
+  buckets: Map<string, HotelReportBucket>,
+  metadata: Record<string, string>
+): HotelReportBucket {
+  const input = {
+    serviceLine: getHotelMetadataLabel(metadata, "serviceLine", "Service non renseigne"),
+    roomRef: getHotelMetadataLabel(metadata, "roomRef", "Chambre non renseignee"),
+    roomType: getHotelMetadataLabel(metadata, "roomType", "Type non renseigne"),
+    bookingRef: getHotelMetadataLabel(metadata, "bookingRef", "Reservation non renseignee"),
+    guestRef: getHotelMetadataLabel(metadata, "guestRef", "Client non renseigne")
+  };
+  const key = getHotelBucketKey(input);
+  const existing = buckets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created: HotelReportBucket = {
+    ...input,
+    nightsCountValue: 0,
+    guestCountValue: 0,
+    roomRevenueValue: 0,
+    depositValue: 0,
+    restaurantValue: 0,
+    serviceValue: 0,
+    maintenanceValue: 0,
+    commissionValue: 0,
+    taxValue: 0,
+    refundValue: 0,
+    expenseValue: 0,
+    transactionsCount: 0,
+    tasksCount: 0,
+    doneTasksCount: 0,
+    openTasksCount: 0,
+    blockedTasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(key, created);
+  return created;
+}
+
+function getHotelOperationBucket(
+  buckets: Map<string, HotelOperationBucket>,
+  operationKind: string,
+  operationLabel: string
+): HotelOperationBucket {
+  const existing = buckets.get(operationKind);
+  if (existing) {
+    return existing;
+  }
+
+  const created: HotelOperationBucket = {
+    operationKind,
+    operationLabel,
+    transactionsCount: 0,
+    tasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(operationKind, created);
+  return created;
+}
+
+function getHotelTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+  const configuredKind = transaction.metadata.hotelOperationKind?.trim();
+  if (configuredKind) {
+    return configuredKind;
+  }
+  return transaction.type === "CASH_IN" ? "ROOM_PAYMENT" : "SUPPLIER_PAYMENT";
+}
+
+function getHotelTaskOperationKind(task: ReportOperationalTask): string {
+  const configuredKind = task.metadata.hotelTaskKind?.trim();
+  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+}
+
+function toHotelOperationLabel(operationKind: string): string {
+  if (HOTEL_OPERATION_LABELS[operationKind]) {
+    return HOTEL_OPERATION_LABELS[operationKind];
+  }
+  if (operationKind.startsWith("TASK_")) {
+    const taskKind = operationKind.slice("TASK_".length);
+    return `Tache: ${HOTEL_TASK_LABELS[taskKind] ?? taskKind}`;
+  }
+  return operationKind;
+}
+
+function toHotelPeriodLabel(
+  filters: ReportPeriodFilter,
+  _rows: HotelReportBucket[]
+): string {
+  if (!filters.dateFrom && !filters.dateTo) {
+    return "Toutes periodes";
+  }
+
+  if (!filters.dateFrom || !filters.dateTo) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const fromDate = new Date(filters.dateFrom);
+  const toDate = new Date(filters.dateTo);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const sameMonth =
+    fromDate.getFullYear() === toDate.getFullYear() &&
+    fromDate.getMonth() === toDate.getMonth();
+  if (!sameMonth) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  return fromDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function isHotelReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return (
+    transaction.activityCode === "HOTEL_LODGING" &&
+    transaction.currency === "XOF" &&
+    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+  );
+}
+
+function toAverageRoomRate(roomRevenue: number, nightsCount: number): number {
+  if (nightsCount <= 0) {
+    return 0;
+  }
+  return Number((roomRevenue / nightsCount).toFixed(2));
+}
+
+function buildHotelOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): HotelOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "HOTEL_LODGING") {
+    return null;
+  }
+
+  const hotelTransactions = transactions.filter(isHotelReportableTransaction);
+  const hotelTasks = tasks.filter((task) => task.activityCode === "HOTEL_LODGING");
+  if (!filters.activityCode && hotelTransactions.length === 0 && hotelTasks.length === 0) {
+    return null;
+  }
+
+  const rowBuckets = new Map<string, HotelReportBucket>();
+  const operationBuckets = new Map<string, HotelOperationBucket>();
+
+  for (const transaction of hotelTransactions) {
+    const operationKind = getHotelTransactionOperationKind(transaction);
+    const rowBucket = getHotelReportBucket(rowBuckets, transaction.metadata);
+    const amount = toNumberAmount(transaction.amount);
+    rowBucket.transactionsCount += 1;
+
+    if (operationKind === "ROOM_PAYMENT") {
+      rowBucket.nightsCountValue += getMetadataNumber(transaction.metadata, "nightsCount");
+      rowBucket.guestCountValue += getMetadataNumber(transaction.metadata, "guestCount");
+      rowBucket.roomRevenueValue += amount;
+    }
+    if (operationKind === "BOOKING_DEPOSIT") {
+      rowBucket.depositValue += amount;
+    }
+    if (operationKind === "RESTAURANT_SALE") {
+      rowBucket.restaurantValue += amount;
+    }
+    if (operationKind === "EVENT_SERVICE" || operationKind === "LAUNDRY_SERVICE") {
+      rowBucket.serviceValue += amount;
+    }
+    if (operationKind === "ROOM_MAINTENANCE") {
+      rowBucket.maintenanceValue += amount;
+    }
+    if (operationKind === "COMMISSION_FEE") {
+      rowBucket.commissionValue += amount;
+    }
+    if (operationKind === "TAX_PAYMENT") {
+      rowBucket.taxValue += amount;
+    }
+    if (operationKind === "GUEST_REFUND") {
+      rowBucket.refundValue += amount;
+    }
+    if (operationKind === "SUPPLIER_PAYMENT") {
+      rowBucket.expenseValue += amount;
+    }
+
+    if (transaction.type === "CASH_IN") {
+      rowBucket.cashInValue += amount;
+    } else {
+      rowBucket.cashOutValue += amount;
+    }
+
+    const operationBucket = getHotelOperationBucket(
+      operationBuckets,
+      operationKind,
+      toHotelOperationLabel(operationKind)
+    );
+    operationBucket.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") {
+      operationBucket.cashInValue += amount;
+    } else {
+      operationBucket.cashOutValue += amount;
+    }
+  }
+
+  for (const task of hotelTasks) {
+    const rowBucket = getHotelReportBucket(rowBuckets, task.metadata);
+    rowBucket.tasksCount += 1;
+    if (task.status === "DONE") {
+      rowBucket.doneTasksCount += 1;
+    } else {
+      rowBucket.openTasksCount += 1;
+    }
+    if (task.status === "BLOCKED") {
+      rowBucket.blockedTasksCount += 1;
+    }
+
+    const operationKind = getHotelTaskOperationKind(task);
+    const operationBucket = getHotelOperationBucket(
+      operationBuckets,
+      operationKind,
+      toHotelOperationLabel(operationKind)
+    );
+    operationBucket.tasksCount += 1;
+  }
+
+  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
+    return (
+      left.serviceLine.localeCompare(right.serviceLine) ||
+      left.roomRef.localeCompare(right.roomRef) ||
+      left.bookingRef.localeCompare(right.bookingRef) ||
+      left.guestRef.localeCompare(right.guestRef)
+    );
+  });
+
+  const totals = bucketRows.reduce(
+    (sum, row) => ({
+      nightsCountValue: sum.nightsCountValue + row.nightsCountValue,
+      guestCountValue: sum.guestCountValue + row.guestCountValue,
+      roomRevenueValue: sum.roomRevenueValue + row.roomRevenueValue,
+      depositValue: sum.depositValue + row.depositValue,
+      restaurantValue: sum.restaurantValue + row.restaurantValue,
+      serviceValue: sum.serviceValue + row.serviceValue,
+      maintenanceValue: sum.maintenanceValue + row.maintenanceValue,
+      commissionValue: sum.commissionValue + row.commissionValue,
+      taxValue: sum.taxValue + row.taxValue,
+      refundValue: sum.refundValue + row.refundValue,
+      expenseValue: sum.expenseValue + row.expenseValue,
+      transactionsCount: sum.transactionsCount + row.transactionsCount,
+      tasksCount: sum.tasksCount + row.tasksCount,
+      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
+      openTasksCount: sum.openTasksCount + row.openTasksCount,
+      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
+      cashInValue: sum.cashInValue + row.cashInValue,
+      cashOutValue: sum.cashOutValue + row.cashOutValue
+    }),
+    {
+      nightsCountValue: 0,
+      guestCountValue: 0,
+      roomRevenueValue: 0,
+      depositValue: 0,
+      restaurantValue: 0,
+      serviceValue: 0,
+      maintenanceValue: 0,
+      commissionValue: 0,
+      taxValue: 0,
+      refundValue: 0,
+      expenseValue: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInValue: 0,
+      cashOutValue: 0
+    }
+  );
+
+  const bookingKeys = new Set(bucketRows.map((row) => row.bookingRef));
+  const roomKeys = new Set(bucketRows.map((row) => row.roomRef));
+  const guestKeys = new Set(bucketRows.map((row) => row.guestRef));
+
+  return {
+    periodLabel: toHotelPeriodLabel(filters, bucketRows),
+    rows: bucketRows.map((row) => {
+      const netAmount = row.cashInValue - row.cashOutValue;
+      return {
+        serviceLine: row.serviceLine,
+        roomRef: row.roomRef,
+        roomType: row.roomType,
+        bookingRef: row.bookingRef,
+        guestRef: row.guestRef,
+        nightsCount: row.nightsCountValue,
+        guestCount: row.guestCountValue,
+        roomRevenue: toMoneyString(row.roomRevenueValue),
+        depositAmount: toMoneyString(row.depositValue),
+        restaurantAmount: toMoneyString(row.restaurantValue),
+        serviceAmount: toMoneyString(row.serviceValue),
+        maintenanceAmount: toMoneyString(row.maintenanceValue),
+        commissionAmount: toMoneyString(row.commissionValue),
+        taxAmount: toMoneyString(row.taxValue),
+        refundAmount: toMoneyString(row.refundValue),
+        expenseAmount: toMoneyString(row.expenseValue),
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        doneTasksCount: row.doneTasksCount,
+        openTasksCount: row.openTasksCount,
+        blockedTasksCount: row.blockedTasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(netAmount),
+        averageRoomRate: toAverageRoomRate(row.roomRevenueValue, row.nightsCountValue),
+        executionRate: toRate(row.doneTasksCount, row.tasksCount),
+        currency: "XOF" as const
+      };
+    }),
+    operationRows: Array.from(operationBuckets.values())
+      .map((row) => ({
+        operationKind: row.operationKind,
+        operationLabel: row.operationLabel,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
+        currency: "XOF" as const
+      }))
+      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    totals: {
+      bookingsCount: bookingKeys.size,
+      roomsCount: roomKeys.size,
+      guestsCount: guestKeys.size,
+      nightsCount: totals.nightsCountValue,
+      guestCount: totals.guestCountValue,
+      roomRevenue: toMoneyString(totals.roomRevenueValue),
+      depositAmount: toMoneyString(totals.depositValue),
+      restaurantAmount: toMoneyString(totals.restaurantValue),
+      serviceAmount: toMoneyString(totals.serviceValue),
+      maintenanceAmount: toMoneyString(totals.maintenanceValue),
+      commissionAmount: toMoneyString(totals.commissionValue),
+      taxAmount: toMoneyString(totals.taxValue),
+      refundAmount: toMoneyString(totals.refundValue),
+      expenseAmount: toMoneyString(totals.expenseValue),
+      transactionsCount: totals.transactionsCount,
+      tasksCount: totals.tasksCount,
+      doneTasksCount: totals.doneTasksCount,
+      openTasksCount: totals.openTasksCount,
+      blockedTasksCount: totals.blockedTasksCount,
+      cashInAmount: toMoneyString(totals.cashInValue),
+      cashOutAmount: toMoneyString(totals.cashOutValue),
+      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
+      averageRoomRate: toAverageRoomRate(totals.roomRevenueValue, totals.nightsCountValue),
+      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      currency: "XOF" as const
+    }
+  };
+}
+
+type WaterReportBucket = {
+  facilityRef: string;
+  networkZone: string;
+  productionLine: string;
+  producedVolumeValue: number;
+  billedVolumeValue: number;
+  waterRevenueValue: number;
+  bulkSaleValue: number;
+  connectionValue: number;
+  subsidyValue: number;
+  treatmentCostValue: number;
+  energyCostValue: number;
+  maintenanceCostValue: number;
+  qualityCostValue: number;
+  repairCostValue: number;
+  supplierPaymentValue: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+type WaterOperationBucket = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+function getWaterMetadataLabel(
+  metadata: Record<string, string>,
+  key: string,
+  fallback: string
+): string {
+  const value = metadata[key]?.trim();
+  return value ? value : fallback;
+}
+
+function getWaterBucketKey(metadata: Record<string, string>): string {
+  return [
+    getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigne"),
+    getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignee"),
+    getWaterMetadataLabel(metadata, "productionLine", "Exploitation")
+  ].join("::");
+}
+
+function getWaterReportBucket(
+  buckets: Map<string, WaterReportBucket>,
+  metadata: Record<string, string>
+): WaterReportBucket {
+  const key = getWaterBucketKey(metadata);
+  const existing = buckets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created: WaterReportBucket = {
+    facilityRef: getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigne"),
+    networkZone: getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignee"),
+    productionLine: getWaterMetadataLabel(metadata, "productionLine", "Exploitation"),
+    producedVolumeValue: 0,
+    billedVolumeValue: 0,
+    waterRevenueValue: 0,
+    bulkSaleValue: 0,
+    connectionValue: 0,
+    subsidyValue: 0,
+    treatmentCostValue: 0,
+    energyCostValue: 0,
+    maintenanceCostValue: 0,
+    qualityCostValue: 0,
+    repairCostValue: 0,
+    supplierPaymentValue: 0,
+    transactionsCount: 0,
+    tasksCount: 0,
+    doneTasksCount: 0,
+    openTasksCount: 0,
+    blockedTasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(key, created);
+  return created;
+}
+
+function getWaterOperationBucket(
+  buckets: Map<string, WaterOperationBucket>,
+  operationKind: string,
+  operationLabel: string
+): WaterOperationBucket {
+  const existing = buckets.get(operationKind);
+  if (existing) {
+    return existing;
+  }
+
+  const created: WaterOperationBucket = {
+    operationKind,
+    operationLabel,
+    transactionsCount: 0,
+    tasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(operationKind, created);
+  return created;
+}
+
+function getWaterTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+  const configuredKind = transaction.metadata.waterOperationKind?.trim();
+  if (configuredKind) {
+    return configuredKind;
+  }
+  return transaction.type === "CASH_IN" ? "WATER_BILLING" : "SUPPLIER_PAYMENT";
+}
+
+function getWaterTaskOperationKind(task: ReportOperationalTask): string {
+  const configuredKind = task.metadata.waterTaskKind?.trim();
+  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+}
+
+function toWaterOperationLabel(operationKind: string): string {
+  if (WATER_OPERATION_LABELS[operationKind]) {
+    return WATER_OPERATION_LABELS[operationKind];
+  }
+  if (operationKind.startsWith("TASK_")) {
+    const taskKind = operationKind.slice("TASK_".length);
+    return `Tache: ${WATER_TASK_LABELS[taskKind] ?? taskKind}`;
+  }
+  return operationKind;
+}
+
+function toWaterPeriodLabel(filters: ReportPeriodFilter): string {
+  if (!filters.dateFrom && !filters.dateTo) {
+    return "Toutes periodes";
+  }
+
+  if (!filters.dateFrom || !filters.dateTo) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const fromDate = new Date(filters.dateFrom);
+  const toDate = new Date(filters.dateTo);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const sameMonth =
+    fromDate.getFullYear() === toDate.getFullYear() &&
+    fromDate.getMonth() === toDate.getMonth();
+  if (!sameMonth) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  return fromDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function isWaterReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return (
+    transaction.activityCode === "WATER" &&
+    transaction.currency === "XOF" &&
+    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+  );
+}
+
+function toWaterLossRate(producedVolume: number, billedVolume: number): number {
+  if (producedVolume <= 0) {
+    return 0;
+  }
+  return Number(((Math.max(producedVolume - billedVolume, 0) / producedVolume) * 100).toFixed(2));
+}
+
+function buildWaterOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): WaterOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "WATER") {
+    return null;
+  }
+
+  const waterTransactions = transactions.filter(isWaterReportableTransaction);
+  const waterTasks = tasks.filter((task) => task.activityCode === "WATER");
+  if (!filters.activityCode && waterTransactions.length === 0 && waterTasks.length === 0) {
+    return null;
+  }
+
+  const rowBuckets = new Map<string, WaterReportBucket>();
+  const operationBuckets = new Map<string, WaterOperationBucket>();
+
+  for (const transaction of waterTransactions) {
+    const operationKind = getWaterTransactionOperationKind(transaction);
+    const rowBucket = getWaterReportBucket(rowBuckets, transaction.metadata);
+    const amount = toNumberAmount(transaction.amount);
+    const producedVolume = getMetadataNumber(transaction.metadata, "producedVolumeM3");
+    const volumeM3 = getMetadataNumber(transaction.metadata, "volumeM3");
+    rowBucket.transactionsCount += 1;
+    rowBucket.producedVolumeValue += producedVolume;
+
+    if (operationKind === "WATER_BILLING") {
+      rowBucket.billedVolumeValue += volumeM3;
+      rowBucket.waterRevenueValue += amount;
+    }
+    if (operationKind === "BULK_WATER_SALE") {
+      rowBucket.billedVolumeValue += volumeM3;
+      rowBucket.bulkSaleValue += amount;
+    }
+    if (operationKind === "CONNECTION_FEE") {
+      rowBucket.connectionValue += amount;
+    }
+    if (operationKind === "SUBSIDY_INCOME") {
+      rowBucket.subsidyValue += amount;
+    }
+    if (operationKind === "CHEMICAL_PURCHASE") {
+      rowBucket.treatmentCostValue += amount;
+    }
+    if (operationKind === "ENERGY_PAYMENT") {
+      rowBucket.energyCostValue += amount;
+    }
+    if (operationKind === "MAINTENANCE_EXPENSE") {
+      rowBucket.maintenanceCostValue += amount;
+    }
+    if (operationKind === "QUALITY_TEST_EXPENSE") {
+      rowBucket.qualityCostValue += amount;
+    }
+    if (operationKind === "NETWORK_REPAIR") {
+      rowBucket.repairCostValue += amount;
+    }
+    if (operationKind === "SUPPLIER_PAYMENT") {
+      rowBucket.supplierPaymentValue += amount;
+    }
+
+    if (transaction.type === "CASH_IN") {
+      rowBucket.cashInValue += amount;
+    } else {
+      rowBucket.cashOutValue += amount;
+    }
+
+    const operationBucket = getWaterOperationBucket(
+      operationBuckets,
+      operationKind,
+      toWaterOperationLabel(operationKind)
+    );
+    operationBucket.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") {
+      operationBucket.cashInValue += amount;
+    } else {
+      operationBucket.cashOutValue += amount;
+    }
+  }
+
+  for (const task of waterTasks) {
+    const rowBucket = getWaterReportBucket(rowBuckets, task.metadata);
+    rowBucket.tasksCount += 1;
+    if (task.status === "DONE") {
+      rowBucket.doneTasksCount += 1;
+    } else {
+      rowBucket.openTasksCount += 1;
+    }
+    if (task.status === "BLOCKED") {
+      rowBucket.blockedTasksCount += 1;
+    }
+
+    const operationKind = getWaterTaskOperationKind(task);
+    const operationBucket = getWaterOperationBucket(
+      operationBuckets,
+      operationKind,
+      toWaterOperationLabel(operationKind)
+    );
+    operationBucket.tasksCount += 1;
+  }
+
+  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
+    return (
+      left.facilityRef.localeCompare(right.facilityRef) ||
+      left.networkZone.localeCompare(right.networkZone) ||
+      left.productionLine.localeCompare(right.productionLine)
+    );
+  });
+
+  const totals = bucketRows.reduce(
+    (sum, row) => ({
+      producedVolumeValue: sum.producedVolumeValue + row.producedVolumeValue,
+      billedVolumeValue: sum.billedVolumeValue + row.billedVolumeValue,
+      waterRevenueValue: sum.waterRevenueValue + row.waterRevenueValue,
+      bulkSaleValue: sum.bulkSaleValue + row.bulkSaleValue,
+      connectionValue: sum.connectionValue + row.connectionValue,
+      subsidyValue: sum.subsidyValue + row.subsidyValue,
+      treatmentCostValue: sum.treatmentCostValue + row.treatmentCostValue,
+      energyCostValue: sum.energyCostValue + row.energyCostValue,
+      maintenanceCostValue: sum.maintenanceCostValue + row.maintenanceCostValue,
+      qualityCostValue: sum.qualityCostValue + row.qualityCostValue,
+      repairCostValue: sum.repairCostValue + row.repairCostValue,
+      supplierPaymentValue: sum.supplierPaymentValue + row.supplierPaymentValue,
+      transactionsCount: sum.transactionsCount + row.transactionsCount,
+      tasksCount: sum.tasksCount + row.tasksCount,
+      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
+      openTasksCount: sum.openTasksCount + row.openTasksCount,
+      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
+      cashInValue: sum.cashInValue + row.cashInValue,
+      cashOutValue: sum.cashOutValue + row.cashOutValue
+    }),
+    {
+      producedVolumeValue: 0,
+      billedVolumeValue: 0,
+      waterRevenueValue: 0,
+      bulkSaleValue: 0,
+      connectionValue: 0,
+      subsidyValue: 0,
+      treatmentCostValue: 0,
+      energyCostValue: 0,
+      maintenanceCostValue: 0,
+      qualityCostValue: 0,
+      repairCostValue: 0,
+      supplierPaymentValue: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInValue: 0,
+      cashOutValue: 0
+    }
+  );
+
+  const facilityKeys = new Set(bucketRows.map((row) => row.facilityRef));
+  const zoneKeys = new Set(bucketRows.map((row) => `${row.facilityRef}::${row.networkZone}`));
+
+  return {
+    periodLabel: toWaterPeriodLabel(filters),
+    rows: bucketRows.map((row) => {
+      const netAmount = row.cashInValue - row.cashOutValue;
+      return {
+        facilityRef: row.facilityRef,
+        networkZone: row.networkZone,
+        productionLine: row.productionLine,
+        producedVolumeM3: row.producedVolumeValue,
+        billedVolumeM3: row.billedVolumeValue,
+        waterRevenue: toMoneyString(row.waterRevenueValue),
+        bulkSaleAmount: toMoneyString(row.bulkSaleValue),
+        connectionAmount: toMoneyString(row.connectionValue),
+        subsidyAmount: toMoneyString(row.subsidyValue),
+        treatmentCost: toMoneyString(row.treatmentCostValue),
+        energyCost: toMoneyString(row.energyCostValue),
+        maintenanceCost: toMoneyString(row.maintenanceCostValue),
+        qualityCost: toMoneyString(row.qualityCostValue),
+        repairCost: toMoneyString(row.repairCostValue),
+        supplierPaymentAmount: toMoneyString(row.supplierPaymentValue),
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        doneTasksCount: row.doneTasksCount,
+        openTasksCount: row.openTasksCount,
+        blockedTasksCount: row.blockedTasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(netAmount),
+        lossRate: toWaterLossRate(row.producedVolumeValue, row.billedVolumeValue),
+        executionRate: toRate(row.doneTasksCount, row.tasksCount),
+        currency: "XOF" as const
+      };
+    }),
+    operationRows: Array.from(operationBuckets.values())
+      .map((row) => ({
+        operationKind: row.operationKind,
+        operationLabel: row.operationLabel,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
+        currency: "XOF" as const
+      }))
+      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    totals: {
+      facilitiesCount: facilityKeys.size,
+      zonesCount: zoneKeys.size,
+      producedVolumeM3: totals.producedVolumeValue,
+      billedVolumeM3: totals.billedVolumeValue,
+      waterRevenue: toMoneyString(totals.waterRevenueValue),
+      bulkSaleAmount: toMoneyString(totals.bulkSaleValue),
+      connectionAmount: toMoneyString(totals.connectionValue),
+      subsidyAmount: toMoneyString(totals.subsidyValue),
+      treatmentCost: toMoneyString(totals.treatmentCostValue),
+      energyCost: toMoneyString(totals.energyCostValue),
+      maintenanceCost: toMoneyString(totals.maintenanceCostValue),
+      qualityCost: toMoneyString(totals.qualityCostValue),
+      repairCost: toMoneyString(totals.repairCostValue),
+      supplierPaymentAmount: toMoneyString(totals.supplierPaymentValue),
+      transactionsCount: totals.transactionsCount,
+      tasksCount: totals.tasksCount,
+      doneTasksCount: totals.doneTasksCount,
+      openTasksCount: totals.openTasksCount,
+      blockedTasksCount: totals.blockedTasksCount,
+      cashInAmount: toMoneyString(totals.cashInValue),
+      cashOutAmount: toMoneyString(totals.cashOutValue),
+      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
+      lossRate: toWaterLossRate(totals.producedVolumeValue, totals.billedVolumeValue),
+      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      currency: "XOF" as const
+    }
+  };
+}
+
+type AgencyReportBucket = {
+  mandateRef: string;
+  propertyRef: string;
+  mandateType: string;
+  propertyType: string;
+  locationZone: string;
+  clientRef: string;
+  dealStage: string;
+  dealAmountValue: number;
+  saleCommissionValue: number;
+  rentalCommissionValue: number;
+  mandateFeeValue: number;
+  visitFeeValue: number;
+  fileFeeValue: number;
+  advertisingExpenseValue: number;
+  fieldVisitExpenseValue: number;
+  brokerPayoutValue: number;
+  documentExpenseValue: number;
+  officeExpenseValue: number;
+  refundValue: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+type AgencyOperationBucket = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+function getAgencyMetadataLabel(
+  metadata: Record<string, string>,
+  key: string,
+  fallback: string
+): string {
+  const value = metadata[key]?.trim();
+  return value ? value : fallback;
+}
+
+function getAgencyBucketKey(metadata: Record<string, string>): string {
+  return [
+    getAgencyMetadataLabel(metadata, "mandateRef", "Mandat non renseigne"),
+    getAgencyMetadataLabel(metadata, "propertyRef", "Bien non renseigne"),
+    getAgencyMetadataLabel(metadata, "mandateType", "Mandat"),
+    getAgencyMetadataLabel(metadata, "clientRef", "Client non renseigne"),
+    getAgencyMetadataLabel(metadata, "dealStage", "Etape non renseignee")
+  ].join("::");
+}
+
+function getAgencyReportBucket(
+  buckets: Map<string, AgencyReportBucket>,
+  metadata: Record<string, string>
+): AgencyReportBucket {
+  const key = getAgencyBucketKey(metadata);
+  const existing = buckets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created: AgencyReportBucket = {
+    mandateRef: getAgencyMetadataLabel(metadata, "mandateRef", "Mandat non renseigne"),
+    propertyRef: getAgencyMetadataLabel(metadata, "propertyRef", "Bien non renseigne"),
+    mandateType: getAgencyMetadataLabel(metadata, "mandateType", "Mandat"),
+    propertyType: getAgencyMetadataLabel(metadata, "propertyType", "Type non renseigne"),
+    locationZone: getAgencyMetadataLabel(metadata, "locationZone", "Zone non renseignee"),
+    clientRef: getAgencyMetadataLabel(metadata, "clientRef", getAgencyMetadataLabel(metadata, "prospectRef", "Client non renseigne")),
+    dealStage: getAgencyMetadataLabel(metadata, "dealStage", "Etape non renseignee"),
+    dealAmountValue: 0,
+    saleCommissionValue: 0,
+    rentalCommissionValue: 0,
+    mandateFeeValue: 0,
+    visitFeeValue: 0,
+    fileFeeValue: 0,
+    advertisingExpenseValue: 0,
+    fieldVisitExpenseValue: 0,
+    brokerPayoutValue: 0,
+    documentExpenseValue: 0,
+    officeExpenseValue: 0,
+    refundValue: 0,
+    transactionsCount: 0,
+    tasksCount: 0,
+    doneTasksCount: 0,
+    openTasksCount: 0,
+    blockedTasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(key, created);
+  return created;
+}
+
+function getAgencyOperationBucket(
+  buckets: Map<string, AgencyOperationBucket>,
+  operationKind: string,
+  operationLabel: string
+): AgencyOperationBucket {
+  const existing = buckets.get(operationKind);
+  if (existing) {
+    return existing;
+  }
+
+  const created: AgencyOperationBucket = {
+    operationKind,
+    operationLabel,
+    transactionsCount: 0,
+    tasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(operationKind, created);
+  return created;
+}
+
+function getAgencyTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+  const configuredKind = transaction.metadata.agencyOperationKind?.trim();
+  if (configuredKind) {
+    return configuredKind;
+  }
+  return transaction.type === "CASH_IN" ? "SALE_COMMISSION" : "OFFICE_EXPENSE";
+}
+
+function getAgencyTaskOperationKind(task: ReportOperationalTask): string {
+  const configuredKind = task.metadata.agencyTaskKind?.trim();
+  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+}
+
+function toAgencyOperationLabel(operationKind: string): string {
+  if (AGENCY_OPERATION_LABELS[operationKind]) {
+    return AGENCY_OPERATION_LABELS[operationKind];
+  }
+  if (operationKind.startsWith("TASK_")) {
+    const taskKind = operationKind.slice("TASK_".length);
+    return `Tache: ${AGENCY_TASK_LABELS[taskKind] ?? taskKind}`;
+  }
+  return operationKind;
+}
+
+function toAgencyPeriodLabel(filters: ReportPeriodFilter): string {
+  if (!filters.dateFrom && !filters.dateTo) {
+    return "Toutes periodes";
+  }
+  if (!filters.dateFrom || !filters.dateTo) {
+    return toDisplayPeriodLabel(filters);
+  }
+  const fromDate = new Date(filters.dateFrom);
+  const toDate = new Date(filters.dateTo);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return toDisplayPeriodLabel(filters);
+  }
+  const sameMonth =
+    fromDate.getFullYear() === toDate.getFullYear() &&
+    fromDate.getMonth() === toDate.getMonth();
+  if (!sameMonth) {
+    return toDisplayPeriodLabel(filters);
+  }
+  return fromDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function isAgencyReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return (
+    transaction.activityCode === "REAL_ESTATE_AGENCY" &&
+    transaction.currency === "XOF" &&
+    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+  );
+}
+
+function toAgencyCommissionRate(commissionAmount: number, dealAmount: number): number {
+  if (dealAmount <= 0) {
+    return 0;
+  }
+  return Number(((commissionAmount / dealAmount) * 100).toFixed(2));
+}
+
+function buildAgencyOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): AgencyOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "REAL_ESTATE_AGENCY") {
+    return null;
+  }
+
+  const agencyTransactions = transactions.filter(isAgencyReportableTransaction);
+  const agencyTasks = tasks.filter((task) => task.activityCode === "REAL_ESTATE_AGENCY");
+  if (!filters.activityCode && agencyTransactions.length === 0 && agencyTasks.length === 0) {
+    return null;
+  }
+
+  const rowBuckets = new Map<string, AgencyReportBucket>();
+  const operationBuckets = new Map<string, AgencyOperationBucket>();
+
+  for (const transaction of agencyTransactions) {
+    const operationKind = getAgencyTransactionOperationKind(transaction);
+    const rowBucket = getAgencyReportBucket(rowBuckets, transaction.metadata);
+    const amount = toNumberAmount(transaction.amount);
+    rowBucket.transactionsCount += 1;
+
+    if (operationKind === "SALE_COMMISSION" || operationKind === "RENTAL_COMMISSION") {
+      rowBucket.dealAmountValue += getMetadataNumber(transaction.metadata, "dealAmount");
+    }
+    if (operationKind === "SALE_COMMISSION") {
+      rowBucket.saleCommissionValue += amount;
+    }
+    if (operationKind === "RENTAL_COMMISSION") {
+      rowBucket.rentalCommissionValue += amount;
+    }
+    if (operationKind === "MANDATE_FEE") {
+      rowBucket.mandateFeeValue += amount;
+    }
+    if (operationKind === "VISIT_FEE") {
+      rowBucket.visitFeeValue += amount;
+    }
+    if (operationKind === "FILE_FEE") {
+      rowBucket.fileFeeValue += amount;
+    }
+    if (operationKind === "ADVERTISING_EXPENSE") {
+      rowBucket.advertisingExpenseValue += amount;
+    }
+    if (operationKind === "FIELD_VISIT_EXPENSE") {
+      rowBucket.fieldVisitExpenseValue += amount;
+    }
+    if (operationKind === "BROKER_PAYOUT") {
+      rowBucket.brokerPayoutValue += amount;
+    }
+    if (operationKind === "DOCUMENT_EXPENSE") {
+      rowBucket.documentExpenseValue += amount;
+    }
+    if (operationKind === "CUSTOMER_REFUND") {
+      rowBucket.refundValue += amount;
+    }
+    if (operationKind === "OFFICE_EXPENSE") {
+      rowBucket.officeExpenseValue += amount;
+    }
+
+    if (transaction.type === "CASH_IN") {
+      rowBucket.cashInValue += amount;
+    } else {
+      rowBucket.cashOutValue += amount;
+    }
+
+    const operationBucket = getAgencyOperationBucket(
+      operationBuckets,
+      operationKind,
+      toAgencyOperationLabel(operationKind)
+    );
+    operationBucket.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") {
+      operationBucket.cashInValue += amount;
+    } else {
+      operationBucket.cashOutValue += amount;
+    }
+  }
+
+  for (const task of agencyTasks) {
+    const rowBucket = getAgencyReportBucket(rowBuckets, task.metadata);
+    rowBucket.tasksCount += 1;
+    if (task.status === "DONE") {
+      rowBucket.doneTasksCount += 1;
+    } else {
+      rowBucket.openTasksCount += 1;
+    }
+    if (task.status === "BLOCKED") {
+      rowBucket.blockedTasksCount += 1;
+    }
+
+    const operationKind = getAgencyTaskOperationKind(task);
+    const operationBucket = getAgencyOperationBucket(
+      operationBuckets,
+      operationKind,
+      toAgencyOperationLabel(operationKind)
+    );
+    operationBucket.tasksCount += 1;
+  }
+
+  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
+    return (
+      left.mandateRef.localeCompare(right.mandateRef) ||
+      left.propertyRef.localeCompare(right.propertyRef) ||
+      left.clientRef.localeCompare(right.clientRef) ||
+      left.dealStage.localeCompare(right.dealStage)
+    );
+  });
+
+  const totals = bucketRows.reduce(
+    (sum, row) => ({
+      dealAmountValue: sum.dealAmountValue + row.dealAmountValue,
+      saleCommissionValue: sum.saleCommissionValue + row.saleCommissionValue,
+      rentalCommissionValue: sum.rentalCommissionValue + row.rentalCommissionValue,
+      mandateFeeValue: sum.mandateFeeValue + row.mandateFeeValue,
+      visitFeeValue: sum.visitFeeValue + row.visitFeeValue,
+      fileFeeValue: sum.fileFeeValue + row.fileFeeValue,
+      advertisingExpenseValue: sum.advertisingExpenseValue + row.advertisingExpenseValue,
+      fieldVisitExpenseValue: sum.fieldVisitExpenseValue + row.fieldVisitExpenseValue,
+      brokerPayoutValue: sum.brokerPayoutValue + row.brokerPayoutValue,
+      documentExpenseValue: sum.documentExpenseValue + row.documentExpenseValue,
+      officeExpenseValue: sum.officeExpenseValue + row.officeExpenseValue,
+      refundValue: sum.refundValue + row.refundValue,
+      transactionsCount: sum.transactionsCount + row.transactionsCount,
+      tasksCount: sum.tasksCount + row.tasksCount,
+      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
+      openTasksCount: sum.openTasksCount + row.openTasksCount,
+      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
+      cashInValue: sum.cashInValue + row.cashInValue,
+      cashOutValue: sum.cashOutValue + row.cashOutValue
+    }),
+    {
+      dealAmountValue: 0,
+      saleCommissionValue: 0,
+      rentalCommissionValue: 0,
+      mandateFeeValue: 0,
+      visitFeeValue: 0,
+      fileFeeValue: 0,
+      advertisingExpenseValue: 0,
+      fieldVisitExpenseValue: 0,
+      brokerPayoutValue: 0,
+      documentExpenseValue: 0,
+      officeExpenseValue: 0,
+      refundValue: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInValue: 0,
+      cashOutValue: 0
+    }
+  );
+
+  const mandateKeys = new Set(bucketRows.map((row) => row.mandateRef));
+  const propertyKeys = new Set(bucketRows.map((row) => row.propertyRef));
+  const clientKeys = new Set(bucketRows.map((row) => row.clientRef));
+
+  return {
+    periodLabel: toAgencyPeriodLabel(filters),
+    rows: bucketRows.map((row) => {
+      const netAmount = row.cashInValue - row.cashOutValue;
+      const commissionAmount = row.saleCommissionValue + row.rentalCommissionValue;
+      return {
+        mandateRef: row.mandateRef,
+        propertyRef: row.propertyRef,
+        mandateType: row.mandateType,
+        propertyType: row.propertyType,
+        locationZone: row.locationZone,
+        clientRef: row.clientRef,
+        dealStage: row.dealStage,
+        dealAmount: toMoneyString(row.dealAmountValue),
+        saleCommissionAmount: toMoneyString(row.saleCommissionValue),
+        rentalCommissionAmount: toMoneyString(row.rentalCommissionValue),
+        mandateFeeAmount: toMoneyString(row.mandateFeeValue),
+        visitFeeAmount: toMoneyString(row.visitFeeValue),
+        fileFeeAmount: toMoneyString(row.fileFeeValue),
+        advertisingExpenseAmount: toMoneyString(row.advertisingExpenseValue),
+        fieldVisitExpenseAmount: toMoneyString(row.fieldVisitExpenseValue),
+        brokerPayoutAmount: toMoneyString(row.brokerPayoutValue),
+        documentExpenseAmount: toMoneyString(row.documentExpenseValue),
+        officeExpenseAmount: toMoneyString(row.officeExpenseValue),
+        refundAmount: toMoneyString(row.refundValue),
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        doneTasksCount: row.doneTasksCount,
+        openTasksCount: row.openTasksCount,
+        blockedTasksCount: row.blockedTasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(netAmount),
+        commissionRate: toAgencyCommissionRate(commissionAmount, row.dealAmountValue),
+        executionRate: toRate(row.doneTasksCount, row.tasksCount),
+        currency: "XOF" as const
+      };
+    }),
+    operationRows: Array.from(operationBuckets.values())
+      .map((row) => ({
+        operationKind: row.operationKind,
+        operationLabel: row.operationLabel,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
+        currency: "XOF" as const
+      }))
+      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    totals: {
+      mandatesCount: mandateKeys.size,
+      propertiesCount: propertyKeys.size,
+      clientsCount: clientKeys.size,
+      dealAmount: toMoneyString(totals.dealAmountValue),
+      saleCommissionAmount: toMoneyString(totals.saleCommissionValue),
+      rentalCommissionAmount: toMoneyString(totals.rentalCommissionValue),
+      mandateFeeAmount: toMoneyString(totals.mandateFeeValue),
+      visitFeeAmount: toMoneyString(totals.visitFeeValue),
+      fileFeeAmount: toMoneyString(totals.fileFeeValue),
+      advertisingExpenseAmount: toMoneyString(totals.advertisingExpenseValue),
+      fieldVisitExpenseAmount: toMoneyString(totals.fieldVisitExpenseValue),
+      brokerPayoutAmount: toMoneyString(totals.brokerPayoutValue),
+      documentExpenseAmount: toMoneyString(totals.documentExpenseValue),
+      officeExpenseAmount: toMoneyString(totals.officeExpenseValue),
+      refundAmount: toMoneyString(totals.refundValue),
+      transactionsCount: totals.transactionsCount,
+      tasksCount: totals.tasksCount,
+      doneTasksCount: totals.doneTasksCount,
+      openTasksCount: totals.openTasksCount,
+      blockedTasksCount: totals.blockedTasksCount,
+      cashInAmount: toMoneyString(totals.cashInValue),
+      cashOutAmount: toMoneyString(totals.cashOutValue),
+      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
+      commissionRate: toAgencyCommissionRate(
+        totals.saleCommissionValue + totals.rentalCommissionValue,
+        totals.dealAmountValue
+      ),
+      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      currency: "XOF" as const
+    }
+  };
+}
+
+type BtpReportBucket = {
+  projectRef: string;
+  workPackage: string;
+  siteLocation: string;
+  clientRef: string;
+  progressPercentValue: number;
+  materialQuantityValue: number;
+  laborDaysValue: number;
+  equipmentHoursValue: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+type BtpOperationBucket = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInValue: number;
+  cashOutValue: number;
+};
+
+function getBtpMetadataLabel(
+  metadata: Record<string, string>,
+  key: string,
+  fallback: string
+): string {
+  const value = metadata[key]?.trim();
+  return value || fallback;
+}
+
+function getBtpBucketKey(input: {
+  projectRef: string;
+  workPackage: string;
+  siteLocation: string;
+  clientRef: string;
+}): string {
+  return [input.projectRef, input.workPackage, input.siteLocation, input.clientRef].join("|");
+}
+
+function getBtpReportBucket(
+  buckets: Map<string, BtpReportBucket>,
+  metadata: Record<string, string>
+): BtpReportBucket {
+  const input = {
+    projectRef: getBtpMetadataLabel(metadata, "projectRef", "Chantier non renseigne"),
+    workPackage: getBtpMetadataLabel(metadata, "workPackage", "Lot non renseigne"),
+    siteLocation: getBtpMetadataLabel(metadata, "siteLocation", "Localisation non renseignee"),
+    clientRef: getBtpMetadataLabel(metadata, "clientRef", "Client non renseigne")
+  };
+  const key = getBtpBucketKey(input);
+  const existing = buckets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created: BtpReportBucket = {
+    ...input,
+    progressPercentValue: 0,
+    materialQuantityValue: 0,
+    laborDaysValue: 0,
+    equipmentHoursValue: 0,
+    transactionsCount: 0,
+    tasksCount: 0,
+    doneTasksCount: 0,
+    openTasksCount: 0,
+    blockedTasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(key, created);
+  return created;
+}
+
+function getBtpOperationBucket(
+  buckets: Map<string, BtpOperationBucket>,
+  operationKind: string,
+  operationLabel: string
+): BtpOperationBucket {
+  const existing = buckets.get(operationKind);
+  if (existing) {
+    return existing;
+  }
+
+  const created: BtpOperationBucket = {
+    operationKind,
+    operationLabel,
+    transactionsCount: 0,
+    tasksCount: 0,
+    cashInValue: 0,
+    cashOutValue: 0
+  };
+  buckets.set(operationKind, created);
+  return created;
+}
+
+function getBtpTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+  const configuredKind = transaction.metadata.btpOperationKind?.trim();
+  if (configuredKind) {
+    return configuredKind;
+  }
+  return transaction.type === "CASH_IN" ? "CLIENT_PAYMENT" : "SITE_EXPENSE";
+}
+
+function getBtpTaskOperationKind(task: ReportOperationalTask): string {
+  const configuredKind = task.metadata.btpTaskKind?.trim();
+  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+}
+
+function toBtpOperationLabel(operationKind: string): string {
+  if (BTP_OPERATION_LABELS[operationKind]) {
+    return BTP_OPERATION_LABELS[operationKind];
+  }
+  if (operationKind.startsWith("TASK_")) {
+    const taskKind = operationKind.slice("TASK_".length);
+    return `Tache: ${BTP_TASK_LABELS[taskKind] ?? taskKind}`;
+  }
+  return operationKind;
+}
+
+function toBtpPeriodLabel(
+  filters: ReportPeriodFilter,
+  _rows: BtpReportBucket[]
+): string {
+  if (!filters.dateFrom && !filters.dateTo) {
+    return "Toutes periodes";
+  }
+
+  if (!filters.dateFrom || !filters.dateTo) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const fromDate = new Date(filters.dateFrom);
+  const toDate = new Date(filters.dateTo);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  const sameMonth =
+    fromDate.getFullYear() === toDate.getFullYear() &&
+    fromDate.getMonth() === toDate.getMonth();
+  if (!sameMonth) {
+    return toDisplayPeriodLabel(filters);
+  }
+
+  return fromDate.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function isBtpReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return (
+    transaction.activityCode === "BTP" &&
+    transaction.currency === "XOF" &&
+    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+  );
+}
+
+function buildBtpOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): BtpOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "BTP") {
+    return null;
+  }
+
+  const btpTransactions = transactions.filter(isBtpReportableTransaction);
+  const btpTasks = tasks.filter((task) => task.activityCode === "BTP");
+  if (!filters.activityCode && btpTransactions.length === 0 && btpTasks.length === 0) {
+    return null;
+  }
+
+  const rowBuckets = new Map<string, BtpReportBucket>();
+  const operationBuckets = new Map<string, BtpOperationBucket>();
+
+  for (const transaction of btpTransactions) {
+    const operationKind = getBtpTransactionOperationKind(transaction);
+    const rowBucket = getBtpReportBucket(rowBuckets, transaction.metadata);
+    const amount = toNumberAmount(transaction.amount);
+    rowBucket.transactionsCount += 1;
+    rowBucket.progressPercentValue = Math.max(
+      rowBucket.progressPercentValue,
+      getMetadataNumber(transaction.metadata, "progressPercent")
+    );
+    if (operationKind === "MATERIAL_PURCHASE") {
+      rowBucket.materialQuantityValue += getMetadataNumber(transaction.metadata, "quantity");
+    }
+    if (operationKind === "LABOR_PAYMENT") {
+      const workerCount = getMetadataNumber(transaction.metadata, "workerCount");
+      const workDays = getMetadataNumber(transaction.metadata, "workDays");
+      rowBucket.laborDaysValue += workerCount > 0 && workDays > 0 ? workerCount * workDays : workDays;
+    }
+    if (operationKind === "EQUIPMENT_RENTAL") {
+      rowBucket.equipmentHoursValue += getMetadataNumber(transaction.metadata, "equipmentHours");
+    }
+    if (transaction.type === "CASH_IN") {
+      rowBucket.cashInValue += amount;
+    } else {
+      rowBucket.cashOutValue += amount;
+    }
+
+    const operationBucket = getBtpOperationBucket(
+      operationBuckets,
+      operationKind,
+      toBtpOperationLabel(operationKind)
+    );
+    operationBucket.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") {
+      operationBucket.cashInValue += amount;
+    } else {
+      operationBucket.cashOutValue += amount;
+    }
+  }
+
+  for (const task of btpTasks) {
+    const rowBucket = getBtpReportBucket(rowBuckets, task.metadata);
+    rowBucket.tasksCount += 1;
+    rowBucket.progressPercentValue = Math.max(
+      rowBucket.progressPercentValue,
+      getMetadataNumber(task.metadata, "progressPercent")
+    );
+    if (task.status === "DONE") {
+      rowBucket.doneTasksCount += 1;
+    } else {
+      rowBucket.openTasksCount += 1;
+    }
+    if (task.status === "BLOCKED") {
+      rowBucket.blockedTasksCount += 1;
+    }
+
+    const operationKind = getBtpTaskOperationKind(task);
+    const operationBucket = getBtpOperationBucket(
+      operationBuckets,
+      operationKind,
+      toBtpOperationLabel(operationKind)
+    );
+    operationBucket.tasksCount += 1;
+  }
+
+  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
+    return (
+      left.projectRef.localeCompare(right.projectRef) ||
+      left.workPackage.localeCompare(right.workPackage) ||
+      left.siteLocation.localeCompare(right.siteLocation) ||
+      left.clientRef.localeCompare(right.clientRef)
+    );
+  });
+
+  const totals = bucketRows.reduce(
+    (sum, row) => ({
+      progressPercentValue: sum.progressPercentValue + row.progressPercentValue,
+      materialQuantityValue: sum.materialQuantityValue + row.materialQuantityValue,
+      laborDaysValue: sum.laborDaysValue + row.laborDaysValue,
+      equipmentHoursValue: sum.equipmentHoursValue + row.equipmentHoursValue,
+      transactionsCount: sum.transactionsCount + row.transactionsCount,
+      tasksCount: sum.tasksCount + row.tasksCount,
+      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
+      openTasksCount: sum.openTasksCount + row.openTasksCount,
+      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
+      cashInValue: sum.cashInValue + row.cashInValue,
+      cashOutValue: sum.cashOutValue + row.cashOutValue
+    }),
+    {
+      progressPercentValue: 0,
+      materialQuantityValue: 0,
+      laborDaysValue: 0,
+      equipmentHoursValue: 0,
+      transactionsCount: 0,
+      tasksCount: 0,
+      doneTasksCount: 0,
+      openTasksCount: 0,
+      blockedTasksCount: 0,
+      cashInValue: 0,
+      cashOutValue: 0
+    }
+  );
+
+  const projectKeys = new Set(bucketRows.map((row) => row.projectRef));
+  const workPackageKeys = new Set(bucketRows.map((row) => `${row.projectRef}|${row.workPackage}`));
+  const averageProgress = bucketRows.length > 0
+    ? Number((totals.progressPercentValue / bucketRows.length).toFixed(2))
+    : 0;
+
+  return {
+    periodLabel: toBtpPeriodLabel(filters, bucketRows),
+    rows: bucketRows.map((row) => {
+      const netAmount = row.cashInValue - row.cashOutValue;
+      return {
+        projectRef: row.projectRef,
+        workPackage: row.workPackage,
+        siteLocation: row.siteLocation,
+        clientRef: row.clientRef,
+        progressPercent: row.progressPercentValue,
+        materialQuantity: row.materialQuantityValue,
+        laborDays: row.laborDaysValue,
+        equipmentHours: row.equipmentHoursValue,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        doneTasksCount: row.doneTasksCount,
+        openTasksCount: row.openTasksCount,
+        blockedTasksCount: row.blockedTasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(netAmount),
+        executionRate: toRate(row.doneTasksCount, row.tasksCount),
+        currency: "XOF" as const
+      };
+    }),
+    operationRows: Array.from(operationBuckets.values())
+      .map((row) => ({
+        operationKind: row.operationKind,
+        operationLabel: row.operationLabel,
+        transactionsCount: row.transactionsCount,
+        tasksCount: row.tasksCount,
+        cashInAmount: toMoneyString(row.cashInValue),
+        cashOutAmount: toMoneyString(row.cashOutValue),
+        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
+        currency: "XOF" as const
+      }))
+      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    totals: {
+      projectsCount: projectKeys.size,
+      workPackagesCount: workPackageKeys.size,
+      progressPercent: averageProgress,
+      materialQuantity: totals.materialQuantityValue,
+      laborDays: totals.laborDaysValue,
+      equipmentHours: totals.equipmentHoursValue,
       transactionsCount: totals.transactionsCount,
       tasksCount: totals.tasksCount,
       doneTasksCount: totals.doneTasksCount,
@@ -4694,8 +10807,15 @@ export async function getCompanyReportsOverview(
     operationalPerformance: buildOperationalPerformance(operationalTransactions, operationalTasks),
     hardwareMonthlyReport: buildHardwareMonthlyReport(operationalTransactions, filters),
     agricultureOperationsReport: buildAgricultureOperationsReport(operationalTransactions, operationalTasks, filters),
+    generalStoreOperationsReport: buildGeneralStoreOperationsReport(operationalTransactions, operationalTasks, filters),
+    foodOperationsReport: buildFoodOperationsReport(operationalTransactions, operationalTasks, filters),
+    rentalOperationsReport: buildRentalOperationsReport(operationalTransactions, operationalTasks, filters),
+    btpOperationsReport: buildBtpOperationsReport(operationalTransactions, operationalTasks, filters),
     fishFarmingOperationsReport: buildFishFarmingOperationsReport(operationalTransactions, operationalTasks, filters),
     livestockOperationsReport: buildLivestockOperationsReport(operationalTransactions, operationalTasks, filters),
+    hotelOperationsReport: buildHotelOperationsReport(operationalTransactions, operationalTasks, filters),
+    waterOperationsReport: buildWaterOperationsReport(operationalTransactions, operationalTasks, filters),
+    agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
     roleDistribution: [],
     topAssignees: []
   };
@@ -4887,6 +11007,317 @@ export async function exportCompanyTransactionsExcel(
     {
       name: "AgriOperations",
       rows: buildAgricultureOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "Magasins",
+      rows: buildGeneralStoreOperationsReportRows(overview),
+      columns: [
+        "department",
+        "productFamily",
+        "itemName",
+        "skuRef",
+        "soldQuantity",
+        "purchaseQuantity",
+        "returnQuantity",
+        "adjustmentQuantity",
+        "transferQuantity",
+        "salesAmount",
+        "purchaseAmount",
+        "returnAmount",
+        "discountAmount",
+        "expenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "grossMargin",
+        "marginRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "MagasinOps",
+      rows: buildGeneralStoreOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "Alimentation",
+      rows: buildFoodOperationsReportRows(overview),
+      columns: [
+        "productFamily",
+        "productName",
+        "batchRef",
+        "storageArea",
+        "purchaseQuantity",
+        "soldQuantity",
+        "lossQuantity",
+        "purchaseAmount",
+        "salesAmount",
+        "lossAmount",
+        "expenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "grossMargin",
+        "marginRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "AlimOperations",
+      rows: buildFoodOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "Location",
+      rows: buildRentalOperationsReportRows(overview),
+      columns: [
+        "propertyRef",
+        "unitRef",
+        "tenantRef",
+        "leaseRef",
+        "propertyType",
+        "rentPaymentsCount",
+        "rentAmount",
+        "depositAmount",
+        "serviceChargeAmount",
+        "maintenanceAmount",
+        "propertyExpenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "LocationOps",
+      rows: buildRentalOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "Hotellerie",
+      rows: buildHotelOperationsReportRows(overview),
+      columns: [
+        "serviceLine",
+        "roomRef",
+        "roomType",
+        "bookingRef",
+        "guestRef",
+        "nightsCount",
+        "guestCount",
+        "roomRevenue",
+        "depositAmount",
+        "restaurantAmount",
+        "serviceAmount",
+        "maintenanceAmount",
+        "commissionAmount",
+        "taxAmount",
+        "refundAmount",
+        "expenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "averageRoomRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "HotelOps",
+      rows: buildHotelOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "EauPotable",
+      rows: buildWaterOperationsReportRows(overview),
+      columns: [
+        "facilityRef",
+        "networkZone",
+        "productionLine",
+        "producedVolumeM3",
+        "billedVolumeM3",
+        "waterRevenue",
+        "bulkSaleAmount",
+        "connectionAmount",
+        "subsidyAmount",
+        "treatmentCost",
+        "energyCost",
+        "maintenanceCost",
+        "qualityCost",
+        "repairCost",
+        "supplierPaymentAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "lossRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "EauOperations",
+      rows: buildWaterOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "AgenceImmo",
+      rows: buildAgencyOperationsReportRows(overview),
+      columns: [
+        "mandateRef",
+        "propertyRef",
+        "mandateType",
+        "propertyType",
+        "locationZone",
+        "clientRef",
+        "dealStage",
+        "dealAmount",
+        "saleCommissionAmount",
+        "rentalCommissionAmount",
+        "mandateFeeAmount",
+        "visitFeeAmount",
+        "fileFeeAmount",
+        "advertisingExpenseAmount",
+        "fieldVisitExpenseAmount",
+        "brokerPayoutAmount",
+        "documentExpenseAmount",
+        "officeExpenseAmount",
+        "refundAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "commissionRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "AgenceOps",
+      rows: buildAgencyOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "BTP",
+      rows: buildBtpOperationsReportRows(overview),
+      columns: [
+        "projectRef",
+        "workPackage",
+        "siteLocation",
+        "clientRef",
+        "progressPercent",
+        "materialQuantity",
+        "laborDays",
+        "equipmentHours",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "BTPOperations",
+      rows: buildBtpOperationsBreakdownRows(overview),
       columns: [
         "operationKind",
         "operationLabel",
@@ -5121,6 +11552,221 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
+      name: "Magasins",
+      rows: buildGeneralStoreOperationsReportRows(overview),
+      columns: [
+        "department",
+        "productFamily",
+        "itemName",
+        "skuRef",
+        "soldQuantity",
+        "purchaseQuantity",
+        "returnQuantity",
+        "adjustmentQuantity",
+        "transferQuantity",
+        "salesAmount",
+        "purchaseAmount",
+        "returnAmount",
+        "discountAmount",
+        "expenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "grossMargin",
+        "marginRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "MagasinOps",
+      rows: buildGeneralStoreOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "Alimentation",
+      rows: buildFoodOperationsReportRows(overview),
+      columns: [
+        "productFamily",
+        "productName",
+        "batchRef",
+        "storageArea",
+        "purchaseQuantity",
+        "soldQuantity",
+        "lossQuantity",
+        "purchaseAmount",
+        "salesAmount",
+        "lossAmount",
+        "expenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "grossMargin",
+        "marginRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "AlimOperations",
+      rows: buildFoodOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "Location",
+      rows: buildRentalOperationsReportRows(overview),
+      columns: [
+        "propertyRef",
+        "unitRef",
+        "tenantRef",
+        "leaseRef",
+        "propertyType",
+        "rentPaymentsCount",
+        "rentAmount",
+        "depositAmount",
+        "serviceChargeAmount",
+        "maintenanceAmount",
+        "propertyExpenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "LocationOps",
+      rows: buildRentalOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "Hotellerie",
+      rows: buildHotelOperationsReportRows(overview),
+      columns: [
+        "serviceLine",
+        "roomRef",
+        "roomType",
+        "bookingRef",
+        "guestRef",
+        "nightsCount",
+        "guestCount",
+        "roomRevenue",
+        "depositAmount",
+        "restaurantAmount",
+        "serviceAmount",
+        "maintenanceAmount",
+        "commissionAmount",
+        "taxAmount",
+        "refundAmount",
+        "expenseAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "averageRoomRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "HotelOps",
+      rows: buildHotelOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "BTP",
+      rows: buildBtpOperationsReportRows(overview),
+      columns: [
+        "projectRef",
+        "workPackage",
+        "siteLocation",
+        "clientRef",
+        "progressPercent",
+        "materialQuantity",
+        "laborDays",
+        "equipmentHours",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "BTPOperations",
+      rows: buildBtpOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
       name: "Pisciculture",
       rows: buildFishFarmingOperationsReportRows(overview),
       columns: [
@@ -5196,6 +11842,102 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
+      name: "EauPotable",
+      rows: buildWaterOperationsReportRows(overview),
+      columns: [
+        "facilityRef",
+        "networkZone",
+        "productionLine",
+        "producedVolumeM3",
+        "billedVolumeM3",
+        "waterRevenue",
+        "bulkSaleAmount",
+        "connectionAmount",
+        "subsidyAmount",
+        "treatmentCost",
+        "energyCost",
+        "maintenanceCost",
+        "qualityCost",
+        "repairCost",
+        "supplierPaymentAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "lossRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "EauOperations",
+      rows: buildWaterOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "AgenceImmo",
+      rows: buildAgencyOperationsReportRows(overview),
+      columns: [
+        "mandateRef",
+        "propertyRef",
+        "mandateType",
+        "propertyType",
+        "locationZone",
+        "clientRef",
+        "dealStage",
+        "dealAmount",
+        "saleCommissionAmount",
+        "rentalCommissionAmount",
+        "mandateFeeAmount",
+        "visitFeeAmount",
+        "fileFeeAmount",
+        "advertisingExpenseAmount",
+        "fieldVisitExpenseAmount",
+        "brokerPayoutAmount",
+        "documentExpenseAmount",
+        "officeExpenseAmount",
+        "refundAmount",
+        "transactionsCount",
+        "tasksCount",
+        "doneTasksCount",
+        "openTasksCount",
+        "blockedTasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "commissionRate",
+        "executionRate",
+        "currency"
+      ]
+    },
+    {
+      name: "AgenceOps",
+      rows: buildAgencyOperationsBreakdownRows(overview),
+      columns: [
+        "operationKind",
+        "operationLabel",
+        "transactionsCount",
+        "tasksCount",
+        "cashInAmount",
+        "cashOutAmount",
+        "netAmount",
+        "currency"
+      ]
+    },
+    {
       name: "Taches",
       columns: [
         "taskId",
@@ -5256,6 +11998,97 @@ export async function exportCompanyReportsPdf(
         pageNumber,
         totalPages,
         overview.agricultureOperationsReport?.periodLabel ?? periodLabel
+      );
+    });
+  }
+
+  if (filters.activityCode === "GENERAL_STORE") {
+    return buildPdfBuffer((doc) => {
+      renderGeneralStoreReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawGeneralStorePdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.generalStoreOperationsReport?.periodLabel ?? periodLabel
+      );
+    });
+  }
+
+  if (filters.activityCode === "FOOD") {
+    return buildPdfBuffer((doc) => {
+      renderFoodReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawFoodPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.foodOperationsReport?.periodLabel ?? periodLabel
+      );
+    });
+  }
+
+  if (filters.activityCode === "RENTAL") {
+    return buildPdfBuffer((doc) => {
+      renderRentalReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawRentalPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.rentalOperationsReport?.periodLabel ?? periodLabel
+      );
+    });
+  }
+
+  if (filters.activityCode === "HOTEL_LODGING") {
+    return buildPdfBuffer((doc) => {
+      renderHotelReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawHotelPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.hotelOperationsReport?.periodLabel ?? periodLabel
+      );
+    });
+  }
+
+  if (filters.activityCode === "WATER") {
+    return buildPdfBuffer((doc) => {
+      renderWaterReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawWaterPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.waterOperationsReport?.periodLabel ?? periodLabel
+      );
+    });
+  }
+
+  if (filters.activityCode === "REAL_ESTATE_AGENCY") {
+    return buildPdfBuffer((doc) => {
+      renderAgencyReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawAgencyPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.agencyOperationsReport?.periodLabel ?? periodLabel
+      );
+    });
+  }
+
+  if (filters.activityCode === "BTP") {
+    return buildPdfBuffer((doc) => {
+      renderBtpReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawBtpPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.btpOperationsReport?.periodLabel ?? periodLabel
       );
     });
   }
@@ -5342,6 +12175,22 @@ export async function exportCompanyReportsPdf(
           `TOTAL | quantite ${hardwareReport.totals.quantity} | vente ${hardwareReport.totals.salesAmount} XOF | versement ${hardwareReport.totals.paymentAmount} XOF | cout ${hardwareReport.totals.purchaseAmount} XOF | benefice ${hardwareReport.totals.grossProfit} XOF`
         ]),
         "Aucune vente quincaillerie soumise ou approuvee sur cette periode."
+      );
+    }
+
+    if (overview.btpOperationsReport) {
+      const btpReport = overview.btpOperationsReport;
+      writePdfSectionTitle(doc, `Rapport BTP - ${btpReport.periodLabel}`);
+      writePdfList(
+        doc,
+        limitPdfRows([
+          ...btpReport.rows.map(
+            (item) =>
+              `${item.projectRef} | ${item.workPackage} | ${item.siteLocation} | client ${item.clientRef} | avancement ${item.progressPercent}% | main-d'oeuvre ${item.laborDays} j/h | engins ${item.equipmentHours} h | recettes ${item.cashInAmount} XOF | depenses ${item.cashOutAmount} XOF | net ${item.netAmount} XOF | execution ${item.executionRate}% | blocages ${item.blockedTasksCount}`
+          ),
+          `TOTAL | chantiers ${btpReport.totals.projectsCount} | lots ${btpReport.totals.workPackagesCount} | avancement ${btpReport.totals.progressPercent}% | main-d'oeuvre ${btpReport.totals.laborDays} j/h | engins ${btpReport.totals.equipmentHours} h | recettes ${btpReport.totals.cashInAmount} XOF | depenses ${btpReport.totals.cashOutAmount} XOF | net ${btpReport.totals.netAmount} XOF`
+        ]),
+        "Aucune operation BTP sur cette periode."
       );
     }
 

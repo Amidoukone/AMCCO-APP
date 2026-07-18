@@ -9,8 +9,10 @@ import {
 import { createRoleTargetedAlerts, createUserTargetedAlerts } from "./alerts.service.js";
 import { ensureCompanyActivityEnabledOrThrow } from "./company-activities.service.js";
 import { HttpError } from "../errors/http-error.js";
+import { getImageKitUploadAuthParameters, resolveImageKitProofUrl } from "../lib/imagekit.js";
 import { createAuditLogRecord, listAuditLogsByEntity } from "../repositories/audit.repository.js";
 import {
+  addTaskAttachment,
   createOperationTask,
   deleteOperationTask,
   findCompanyTaskAssigneeByUserId,
@@ -19,6 +21,8 @@ import {
   findOperationTasksMinimalByIds,
   listCompanyTaskAssignees,
   listOperationsTasks,
+  listTaskAttachments,
+  type TaskAttachment,
   type TaskStatus,
   updateOperationTask,
   updateOperationTaskAssignment,
@@ -47,8 +51,13 @@ const TASK_TIMELINE_ACTIONS = [
   "TASK_UPDATED",
   "TASK_ASSIGNED",
   "TASK_UNASSIGNED",
-  "TASK_STATUS_CHANGED"
+  "TASK_STATUS_CHANGED",
+  "TASK_ATTACHMENT_ADDED"
 ];
+
+type TaskAttachmentItem = TaskAttachment & {
+  publicUrl: string | null;
+};
 
 function ensureOperationsAccess(role: RoleCode): void {
   if (!OPERATIONS_ACCESS_ROLES.includes(role)) {
@@ -80,6 +89,15 @@ function canViewTask(actor: ActorContext, task: { createdById: string; assignedT
     return true;
   }
   return task.createdById === actor.actorId || task.assignedToId === actor.actorId;
+}
+
+async function toTaskAttachmentItems(attachments: TaskAttachment[]): Promise<TaskAttachmentItem[]> {
+  return Promise.all(
+    attachments.map(async (attachment) => ({
+      ...attachment,
+      publicUrl: await resolveImageKitProofUrl(attachment.storageKey)
+    }))
+  );
 }
 
 function computeListFilters(actor: ActorContext, scope: TaskScope | undefined): {
@@ -799,4 +817,103 @@ export async function addCompanyTaskComment(
     throw new HttpError(500, "Impossible de recharger le commentaire cree.");
   }
   return created;
+}
+
+export async function listCompanyTaskAttachments(
+  actor: ActorContext,
+  input: {
+    taskId: string;
+  }
+) {
+  ensureOperationsAccess(actor.role);
+  const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
+  if (!task) {
+    throw new HttpError(404, "Tache introuvable.");
+  }
+  if (!canViewTask(actor, task)) {
+    throw new HttpError(403, "Permissions insuffisantes pour consulter les pieces jointes de cette tache.");
+  }
+
+  const attachments = await listTaskAttachments(task.id);
+  return toTaskAttachmentItems(attachments);
+}
+
+export async function addAttachmentToCompanyTask(
+  actor: ActorContext,
+  input: {
+    taskId: string;
+    storageKey: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  }
+) {
+  ensureOperationsAccess(actor.role);
+  if (isReadOnlyOwner(actor.role)) {
+    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+  }
+
+  const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
+  if (!task) {
+    throw new HttpError(404, "Tache introuvable.");
+  }
+  if (!canViewTask(actor, task)) {
+    throw new HttpError(403, "Permissions insuffisantes pour ajouter une piece jointe a cette tache.");
+  }
+
+  const attachmentId = randomUUID();
+  await addTaskAttachment({
+    id: attachmentId,
+    taskId: task.id,
+    storageKey: input.storageKey.trim(),
+    fileName: input.fileName.trim(),
+    mimeType: input.mimeType.trim(),
+    fileSize: input.fileSize,
+    uploadedById: actor.actorId
+  });
+
+  await createAuditLogRecord({
+    auditId: randomUUID(),
+    companyId: actor.companyId,
+    actorId: actor.actorId,
+    action: "TASK_ATTACHMENT_ADDED",
+    entityType: "TASK",
+    entityId: task.id,
+    metadataJson: JSON.stringify({
+      taskId: task.id,
+      attachmentId,
+      fileName: input.fileName.trim(),
+      mimeType: input.mimeType.trim(),
+      fileSize: input.fileSize
+    })
+  });
+
+  const attachments = await listTaskAttachments(task.id);
+  return toTaskAttachmentItems(attachments);
+}
+
+export async function getTaskAttachmentUploadAuth(
+  actor: ActorContext,
+  input: {
+    taskId: string;
+  }
+) {
+  ensureOperationsAccess(actor.role);
+  if (isReadOnlyOwner(actor.role)) {
+    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+  }
+
+  const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
+  if (!task) {
+    throw new HttpError(404, "Tache introuvable.");
+  }
+  if (!canViewTask(actor, task)) {
+    throw new HttpError(403, "Permissions insuffisantes pour ajouter une piece jointe a cette tache.");
+  }
+
+  const auth = getImageKitUploadAuthParameters();
+  return {
+    ...auth,
+    folder: `/amcco/${actor.companyId}/tasks/${task.id}`
+  };
 }

@@ -83,3 +83,35 @@ export type TaskCommentSingleResponse = {
 export type TaskCommentListResponse = {
   items: TaskComment[];
 };
+
+export type TaskAttachment = {
+  id: string;
+  taskId: string;
+  storageKey: string;
+  publicUrl: string | null;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedById: string;
+  uploadedByEmail: string;
+  uploadedByFullName: string;
+  uploadedAt: string;
+};
+
+export type TaskAttachmentListResponse = {
+  items: TaskAttachment[];
+};
+
+export type TaskAttachmentUploadAuth = {
+  uploadUrl: string;
+  publicKey: string;
+  urlEndpoint: string;
+  token: string;
+  expire: number;
+  signature: string;
+  folder: string;
+};
+
+export type TaskAttachmentUploadAuthResponse = {
+  item: TaskAttachmentUploadAuth;
+};

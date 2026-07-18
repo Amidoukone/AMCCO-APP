@@ -5,13 +5,16 @@ import { asyncHandler } from "../lib/async-handler.js";
 import { authenticateAccessToken, authorizeRoles } from "../middleware/auth.middleware.js";
 import { BUSINESS_ACTIVITY_CODES } from "../types/business-activity.js";
 import {
+  addAttachmentToCompanyTask,
   addCompanyTaskComment,
   assignCompanyTask,
   assignCompanyTasksBulk,
   createCompanyTask,
   deleteCompanyTask,
+  getTaskAttachmentUploadAuth,
   getCompanyTaskById,
   listCompanyTaskComments,
+  listCompanyTaskAttachments,
   listCompanyTaskMembers,
   listCompanyTasks,
   listCompanyTaskTimeline,
@@ -82,6 +85,13 @@ const changeStatusSchema = z.object({
 
 const createTaskCommentSchema = z.object({
   body: z.string().trim().min(1).max(5000)
+});
+
+const addTaskAttachmentSchema = z.object({
+  storageKey: z.string().trim().min(3).max(255),
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(3).max(100),
+  fileSize: z.number().int().min(1)
 });
 
 export const tasksRouter = Router();
@@ -184,6 +194,27 @@ tasksRouter.get(
 );
 
 tasksRouter.get(
+  "/operations/tasks/:taskId/attachments",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+    const params = taskIdParamSchema.parse(req.params);
+    const items = await listCompanyTaskAttachments(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role
+      },
+      {
+        taskId: params.taskId
+      }
+    );
+    res.status(200).json({ items });
+  })
+);
+
+tasksRouter.get(
   "/operations/members",
   authorizeRoles("OWNER", "SYS_ADMIN", "SUPERVISOR"),
   asyncHandler(async (req, res) => {
@@ -223,6 +254,55 @@ tasksRouter.post(
       }
     );
     res.status(201).json({ item });
+  })
+);
+
+tasksRouter.get(
+  "/operations/tasks/:taskId/attachments/upload-auth",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+    const params = taskIdParamSchema.parse(req.params);
+    const item = await getTaskAttachmentUploadAuth(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role
+      },
+      {
+        taskId: params.taskId
+      }
+    );
+    res.status(200).json({ item });
+  })
+);
+
+tasksRouter.post(
+  "/operations/tasks/:taskId/attachments",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+    const params = taskIdParamSchema.parse(req.params);
+    const body = addTaskAttachmentSchema.parse(req.body);
+    const items = await addAttachmentToCompanyTask(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role
+      },
+      {
+        taskId: params.taskId,
+        storageKey: body.storageKey,
+        fileName: body.fileName,
+        mimeType: body.mimeType,
+        fileSize: body.fileSize
+      }
+    );
+    res.status(201).json({ items });
   })
 );
 

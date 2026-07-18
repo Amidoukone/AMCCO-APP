@@ -18,10 +18,12 @@ import {
 import { matchesQuickSearch } from "../lib/quickSearch";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
+  addTaskAttachmentRequest,
   ApiError,
   assignOperationsTaskRequest,
   createOperationsTaskRequest,
   deleteOperationsTaskRequest,
+  getTaskAttachmentUploadAuthRequest,
   listOperationsMembersRequest,
   listOperationsTasksRequest,
   updateOperationsTaskRequest,
@@ -34,7 +36,7 @@ import {
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
-import type { OperationTask, OperationTaskMember, TaskScope, TaskStatus } from "../types/tasks";
+import type { OperationTask, OperationTaskMember, TaskAttachment, TaskScope, TaskStatus } from "../types/tasks";
 
 const TASKS_PAGE_SIZE = 200;
 const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
@@ -56,6 +58,202 @@ const AGRICULTURE_TASK_LABELS: Record<AgricultureTaskKind, string> = {
   HARVEST: "Recolte",
   STORAGE: "Stockage",
   FOLLOW_UP: "Suivi terrain"
+};
+const BTP_TASK_KIND_KEY = "btpTaskKind";
+type BtpTaskKind =
+  | "SITE_PREPARATION"
+  | "EARTHWORKS"
+  | "FOUNDATION"
+  | "STRUCTURAL_WORK"
+  | "MASONRY"
+  | "MEP"
+  | "FINISHING"
+  | "PROCUREMENT"
+  | "QUALITY_CONTROL"
+  | "RESERVE"
+  | "HANDOVER"
+  | "FOLLOW_UP";
+const BTP_TASK_LABELS: Record<BtpTaskKind, string> = {
+  SITE_PREPARATION: "Preparation chantier",
+  EARTHWORKS: "Terrassement",
+  FOUNDATION: "Fondation",
+  STRUCTURAL_WORK: "Structure",
+  MASONRY: "Maconnerie",
+  MEP: "Electricite / plomberie",
+  FINISHING: "Finition",
+  PROCUREMENT: "Approvisionnement",
+  QUALITY_CONTROL: "Controle qualite",
+  RESERVE: "Reserve / reprise",
+  HANDOVER: "Reception",
+  FOLLOW_UP: "Suivi chantier"
+};
+const STORE_TASK_KIND_KEY = "storeTaskKind";
+type StoreTaskKind =
+  | "OPENING_CASH"
+  | "CLOSING_CASH"
+  | "STOCK_CONTROL"
+  | "INVENTORY"
+  | "REPLENISHMENT"
+  | "MERCHANDISING"
+  | "PRICE_UPDATE"
+  | "SUPPLIER_FOLLOW_UP"
+  | "CUSTOMER_RETURN"
+  | "CLEANING"
+  | "SECURITY_CHECK"
+  | "FOLLOW_UP";
+const STORE_TASK_LABELS: Record<StoreTaskKind, string> = {
+  OPENING_CASH: "Ouverture caisse",
+  CLOSING_CASH: "Cloture caisse",
+  STOCK_CONTROL: "Controle stock",
+  INVENTORY: "Inventaire",
+  REPLENISHMENT: "Reassort rayon",
+  MERCHANDISING: "Implantation rayon",
+  PRICE_UPDATE: "Mise a jour prix",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  CUSTOMER_RETURN: "Retour client",
+  CLEANING: "Nettoyage rayon",
+  SECURITY_CHECK: "Controle securite",
+  FOLLOW_UP: "Suivi magasin"
+};
+const FOOD_TASK_KIND_KEY = "foodTaskKind";
+type FoodTaskKind =
+  | "RECEPTION"
+  | "STOCK_CONTROL"
+  | "EXPIRY_CHECK"
+  | "COLD_CHAIN_CHECK"
+  | "SHELF_ROTATION"
+  | "SUPPLIER_FOLLOW_UP"
+  | "PRODUCT_WITHDRAWAL"
+  | "CLEANING"
+  | "INVENTORY"
+  | "QUALITY_CONTROL"
+  | "DELIVERY"
+  | "FOLLOW_UP";
+const FOOD_TASK_LABELS: Record<FoodTaskKind, string> = {
+  RECEPTION: "Reception stock",
+  STOCK_CONTROL: "Controle stock",
+  EXPIRY_CHECK: "Controle DLC",
+  COLD_CHAIN_CHECK: "Controle froid",
+  SHELF_ROTATION: "Rotation rayon",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  PRODUCT_WITHDRAWAL: "Retrait produit",
+  CLEANING: "Nettoyage",
+  INVENTORY: "Inventaire",
+  QUALITY_CONTROL: "Controle qualite",
+  DELIVERY: "Livraison",
+  FOLLOW_UP: "Suivi alimentaire"
+};
+const RENTAL_TASK_KIND_KEY = "rentalTaskKind";
+type RentalTaskKind =
+  | "RENT_COLLECTION"
+  | "TENANT_FOLLOW_UP"
+  | "VISIT"
+  | "LEASE_RENEWAL"
+  | "MOVE_IN"
+  | "MOVE_OUT"
+  | "MAINTENANCE"
+  | "INSPECTION"
+  | "DOCUMENTS"
+  | "OWNER_REPORT"
+  | "LITIGATION"
+  | "FOLLOW_UP";
+const RENTAL_TASK_LABELS: Record<RentalTaskKind, string> = {
+  RENT_COLLECTION: "Recouvrement loyer",
+  TENANT_FOLLOW_UP: "Suivi locataire",
+  VISIT: "Visite",
+  LEASE_RENEWAL: "Renouvellement bail",
+  MOVE_IN: "Entree locataire",
+  MOVE_OUT: "Sortie locataire",
+  MAINTENANCE: "Maintenance",
+  INSPECTION: "Inspection",
+  DOCUMENTS: "Documents",
+  OWNER_REPORT: "Reporting proprietaire",
+  LITIGATION: "Litige",
+  FOLLOW_UP: "Suivi locatif"
+};
+const HOTEL_TASK_KIND_KEY = "hotelTaskKind";
+type HotelTaskKind =
+  | "CHECK_IN"
+  | "CHECK_OUT"
+  | "ROOM_PREPARATION"
+  | "HOUSEKEEPING"
+  | "MAINTENANCE"
+  | "RESTAURANT_SERVICE"
+  | "LAUNDRY"
+  | "EVENT_SETUP"
+  | "GUEST_FOLLOW_UP"
+  | "SUPPLIER_FOLLOW_UP"
+  | "NIGHT_AUDIT"
+  | "FOLLOW_UP";
+const HOTEL_TASK_LABELS: Record<HotelTaskKind, string> = {
+  CHECK_IN: "Check-in",
+  CHECK_OUT: "Check-out",
+  ROOM_PREPARATION: "Preparation chambre",
+  HOUSEKEEPING: "Menage",
+  MAINTENANCE: "Maintenance",
+  RESTAURANT_SERVICE: "Service restauration",
+  LAUNDRY: "Blanchisserie",
+  EVENT_SETUP: "Preparation evenement",
+  GUEST_FOLLOW_UP: "Suivi client",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  NIGHT_AUDIT: "Audit nuit",
+  FOLLOW_UP: "Suivi hotelier"
+};
+const WATER_TASK_KIND_KEY = "waterTaskKind";
+type WaterTaskKind =
+  | "PRODUCTION_READING"
+  | "QUALITY_CONTROL"
+  | "PUMP_MAINTENANCE"
+  | "NETWORK_INSPECTION"
+  | "LEAK_REPAIR"
+  | "METER_READING"
+  | "CONNECTION_WORK"
+  | "CHEMICAL_DOSING"
+  | "BILLING_FOLLOW_UP"
+  | "SUPPLIER_FOLLOW_UP"
+  | "SERVICE_RESTORE"
+  | "FOLLOW_UP";
+const WATER_TASK_LABELS: Record<WaterTaskKind, string> = {
+  PRODUCTION_READING: "Releve production",
+  QUALITY_CONTROL: "Controle qualite",
+  PUMP_MAINTENANCE: "Maintenance pompe",
+  NETWORK_INSPECTION: "Inspection reseau",
+  LEAK_REPAIR: "Reparation fuite",
+  METER_READING: "Releve compteur",
+  CONNECTION_WORK: "Branchement",
+  CHEMICAL_DOSING: "Dosage traitement",
+  BILLING_FOLLOW_UP: "Suivi facturation",
+  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
+  SERVICE_RESTORE: "Remise en service",
+  FOLLOW_UP: "Suivi eau"
+};
+const AGENCY_TASK_KIND_KEY = "agencyTaskKind";
+type AgencyTaskKind =
+  | "MANDATE_INTAKE"
+  | "PROPERTY_VALUATION"
+  | "LISTING_PUBLICATION"
+  | "CLIENT_PROSPECTING"
+  | "VISIT_SCHEDULE"
+  | "OFFER_FOLLOW_UP"
+  | "DOCUMENT_COLLECTION"
+  | "NOTARY_FOLLOW_UP"
+  | "CONTRACT_SIGNING"
+  | "OWNER_REPORTING"
+  | "COMMISSION_COLLECTION"
+  | "FOLLOW_UP";
+const AGENCY_TASK_LABELS: Record<AgencyTaskKind, string> = {
+  MANDATE_INTAKE: "Prise mandat",
+  PROPERTY_VALUATION: "Estimation bien",
+  LISTING_PUBLICATION: "Publication annonce",
+  CLIENT_PROSPECTING: "Prospection client",
+  VISIT_SCHEDULE: "Visite",
+  OFFER_FOLLOW_UP: "Suivi offre",
+  DOCUMENT_COLLECTION: "Collecte documents",
+  NOTARY_FOLLOW_UP: "Suivi notaire",
+  CONTRACT_SIGNING: "Signature contrat",
+  OWNER_REPORTING: "Reporting proprietaire",
+  COMMISSION_COLLECTION: "Recouvrement commission",
+  FOLLOW_UP: "Suivi dossier"
 };
 const FISH_FARMING_TASK_KIND_KEY = "fishTaskKind";
 type FishFarmingTaskKind =
@@ -101,6 +299,16 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Opération impossible. Vérifiez la connexion backend.";
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} o`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} Ko`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
 function statusLabel(status: TaskStatus): string {
@@ -172,6 +380,125 @@ function isAgricultureTaskKind(value: string | undefined): value is AgricultureT
   );
 }
 
+function isBtpTaskKind(value: string | undefined): value is BtpTaskKind {
+  return (
+    value === "SITE_PREPARATION" ||
+    value === "EARTHWORKS" ||
+    value === "FOUNDATION" ||
+    value === "STRUCTURAL_WORK" ||
+    value === "MASONRY" ||
+    value === "MEP" ||
+    value === "FINISHING" ||
+    value === "PROCUREMENT" ||
+    value === "QUALITY_CONTROL" ||
+    value === "RESERVE" ||
+    value === "HANDOVER" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isStoreTaskKind(value: string | undefined): value is StoreTaskKind {
+  return (
+    value === "OPENING_CASH" ||
+    value === "CLOSING_CASH" ||
+    value === "STOCK_CONTROL" ||
+    value === "INVENTORY" ||
+    value === "REPLENISHMENT" ||
+    value === "MERCHANDISING" ||
+    value === "PRICE_UPDATE" ||
+    value === "SUPPLIER_FOLLOW_UP" ||
+    value === "CUSTOMER_RETURN" ||
+    value === "CLEANING" ||
+    value === "SECURITY_CHECK" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isFoodTaskKind(value: string | undefined): value is FoodTaskKind {
+  return (
+    value === "RECEPTION" ||
+    value === "STOCK_CONTROL" ||
+    value === "EXPIRY_CHECK" ||
+    value === "COLD_CHAIN_CHECK" ||
+    value === "SHELF_ROTATION" ||
+    value === "SUPPLIER_FOLLOW_UP" ||
+    value === "PRODUCT_WITHDRAWAL" ||
+    value === "CLEANING" ||
+    value === "INVENTORY" ||
+    value === "QUALITY_CONTROL" ||
+    value === "DELIVERY" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isRentalTaskKind(value: string | undefined): value is RentalTaskKind {
+  return (
+    value === "RENT_COLLECTION" ||
+    value === "TENANT_FOLLOW_UP" ||
+    value === "VISIT" ||
+    value === "LEASE_RENEWAL" ||
+    value === "MOVE_IN" ||
+    value === "MOVE_OUT" ||
+    value === "MAINTENANCE" ||
+    value === "INSPECTION" ||
+    value === "DOCUMENTS" ||
+    value === "OWNER_REPORT" ||
+    value === "LITIGATION" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isHotelTaskKind(value: string | undefined): value is HotelTaskKind {
+  return (
+    value === "CHECK_IN" ||
+    value === "CHECK_OUT" ||
+    value === "ROOM_PREPARATION" ||
+    value === "HOUSEKEEPING" ||
+    value === "MAINTENANCE" ||
+    value === "RESTAURANT_SERVICE" ||
+    value === "LAUNDRY" ||
+    value === "EVENT_SETUP" ||
+    value === "GUEST_FOLLOW_UP" ||
+    value === "SUPPLIER_FOLLOW_UP" ||
+    value === "NIGHT_AUDIT" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isWaterTaskKind(value: string | undefined): value is WaterTaskKind {
+  return (
+    value === "PRODUCTION_READING" ||
+    value === "QUALITY_CONTROL" ||
+    value === "PUMP_MAINTENANCE" ||
+    value === "NETWORK_INSPECTION" ||
+    value === "LEAK_REPAIR" ||
+    value === "METER_READING" ||
+    value === "CONNECTION_WORK" ||
+    value === "CHEMICAL_DOSING" ||
+    value === "BILLING_FOLLOW_UP" ||
+    value === "SUPPLIER_FOLLOW_UP" ||
+    value === "SERVICE_RESTORE" ||
+    value === "FOLLOW_UP"
+  );
+}
+
+function isAgencyTaskKind(value: string | undefined): value is AgencyTaskKind {
+  return (
+    value === "MANDATE_INTAKE" ||
+    value === "PROPERTY_VALUATION" ||
+    value === "LISTING_PUBLICATION" ||
+    value === "CLIENT_PROSPECTING" ||
+    value === "VISIT_SCHEDULE" ||
+    value === "OFFER_FOLLOW_UP" ||
+    value === "DOCUMENT_COLLECTION" ||
+    value === "NOTARY_FOLLOW_UP" ||
+    value === "CONTRACT_SIGNING" ||
+    value === "OWNER_REPORTING" ||
+    value === "COMMISSION_COLLECTION" ||
+    value === "FOLLOW_UP"
+  );
+}
+
 function isFishFarmingTaskKind(value: string | undefined): value is FishFarmingTaskKind {
   return (
     value === "FEEDING" ||
@@ -200,6 +527,27 @@ function isLivestockTaskKind(value: string | undefined): value is LivestockTaskK
 function formatMetadataValue(key: string, value: string): string {
   if (key === AGRICULTURE_TASK_KIND_KEY && isAgricultureTaskKind(value)) {
     return AGRICULTURE_TASK_LABELS[value];
+  }
+  if (key === BTP_TASK_KIND_KEY && isBtpTaskKind(value)) {
+    return BTP_TASK_LABELS[value];
+  }
+  if (key === STORE_TASK_KIND_KEY && isStoreTaskKind(value)) {
+    return STORE_TASK_LABELS[value];
+  }
+  if (key === FOOD_TASK_KIND_KEY && isFoodTaskKind(value)) {
+    return FOOD_TASK_LABELS[value];
+  }
+  if (key === RENTAL_TASK_KIND_KEY && isRentalTaskKind(value)) {
+    return RENTAL_TASK_LABELS[value];
+  }
+  if (key === HOTEL_TASK_KIND_KEY && isHotelTaskKind(value)) {
+    return HOTEL_TASK_LABELS[value];
+  }
+  if (key === WATER_TASK_KIND_KEY && isWaterTaskKind(value)) {
+    return WATER_TASK_LABELS[value];
+  }
+  if (key === AGENCY_TASK_KIND_KEY && isAgencyTaskKind(value)) {
+    return AGENCY_TASK_LABELS[value];
   }
   if (key === FISH_FARMING_TASK_KIND_KEY && isFishFarmingTaskKind(value)) {
     return FISH_FARMING_TASK_LABELS[value];
@@ -266,6 +614,7 @@ export function OperationsTasksPage(): JSX.Element {
   const [hasMoreTasks, setHasMoreTasks] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSavingTaskForm, setIsSavingTaskForm] = useState(false);
 
   const tasksViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("operations-tasks", activeCompany?.id, user?.id);
@@ -291,6 +640,7 @@ export function OperationsTasksPage(): JSX.Element {
   const [visibleTasksPage, setVisibleTasksPage] = useState(1);
 
   const [createForm, setCreateForm] = useState(createDefaultTaskForm);
+  const [taskAttachmentFile, setTaskAttachmentFile] = useState<File | null>(null);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [assignmentNotes, setAssignmentNotes] = useState<Record<string, string>>({});
@@ -550,15 +900,73 @@ export function OperationsTasksPage(): JSX.Element {
     }));
   }, [taskMetadataFields]);
 
+  async function uploadTaskAttachment(
+    taskId: string,
+    selectedFile: File
+  ): Promise<TaskAttachment[]> {
+    const attachmentResponse = await withAuthorizedToken(async (accessToken) => {
+      const authResp = await getTaskAttachmentUploadAuthRequest(accessToken, taskId);
+      const auth = authResp.item;
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("fileName", selectedFile.name);
+      formData.append("useUniqueFileName", "true");
+      formData.append("folder", auth.folder);
+      formData.append("publicKey", auth.publicKey);
+      formData.append("token", auth.token);
+      formData.append("signature", auth.signature);
+      formData.append("expire", String(auth.expire));
+
+      const uploadResponse = await fetch(auth.uploadUrl, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        let detail = "Échec de l'upload sur ImageKit.";
+        try {
+          const payload = (await uploadResponse.json()) as { message?: string };
+          if (payload.message) {
+            detail = payload.message;
+          }
+        } catch {
+          // no-op
+        }
+        throw new ApiError(uploadResponse.status, detail);
+      }
+
+      const uploaded = (await uploadResponse.json()) as {
+        fileId?: string;
+        filePath?: string;
+        url?: string;
+        name?: string;
+        size?: number;
+        fileType?: string;
+      };
+
+      return addTaskAttachmentRequest(accessToken, taskId, {
+        storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
+        fileName: uploaded.name ?? selectedFile.name,
+        mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
+        fileSize: uploaded.size ?? selectedFile.size
+      });
+    });
+
+    return attachmentResponse.items;
+  }
+
   async function handleCreateTask(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!canCreateTasks || !selectedActivityCode) {
       return;
     }
+    const attachmentFileToUpload = editingTaskId ? null : taskAttachmentFile;
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingTaskForm(true);
     try {
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         editingTaskId
           ? updateOperationsTaskRequest(accessToken, editingTaskId, {
               title: createForm.title.trim(),
@@ -579,15 +987,39 @@ export function OperationsTasksPage(): JSX.Element {
                 : undefined
             })
       );
+      let attachmentUploadError: string | null = null;
+      if (!editingTaskId && attachmentFileToUpload) {
+        setBusyTaskId(response.item.id);
+        try {
+          await uploadTaskAttachment(response.item.id, attachmentFileToUpload);
+        } catch (error) {
+          attachmentUploadError = toErrorMessage(error);
+        } finally {
+          setBusyTaskId(null);
+        }
+      }
       setEditingTaskId(null);
       setCreateForm({
         ...createDefaultTaskForm(),
         metadata: syncMetadataState({}, taskMetadataFields)
       });
+      setTaskAttachmentFile(null);
       setSuccessMessage(editingTaskId ? "Tâche modifiée." : "Tâche créée.");
       await loadData();
+      if (attachmentUploadError) {
+        setErrorMessage(
+          `Tâche créée, mais la pièce jointe n'a pas pu être ajoutée. ${attachmentUploadError}`
+        );
+        setSuccessMessage("Tâche créée. Vous pouvez réessayer depuis le détail.");
+        return;
+      }
+      if (attachmentFileToUpload) {
+        setSuccessMessage("Tâche créée avec pièce jointe.");
+      }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingTaskForm(false);
     }
   }
 
@@ -632,6 +1064,7 @@ export function OperationsTasksPage(): JSX.Element {
     setEditingTaskId(task.id);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setTaskAttachmentFile(null);
     setCreateForm({
       title: task.title,
       description: task.description ?? "",
@@ -647,6 +1080,7 @@ export function OperationsTasksPage(): JSX.Element {
       ...createDefaultTaskForm(),
       metadata: syncMetadataState({}, taskMetadataFields)
     });
+    setTaskAttachmentFile(null);
     setErrorMessage(null);
     setSuccessMessage(null);
   }
@@ -965,6 +1399,216 @@ export function OperationsTasksPage(): JSX.Element {
                         <option value="STORAGE">{AGRICULTURE_TASK_LABELS.STORAGE}</option>
                         <option value="FOLLOW_UP">{AGRICULTURE_TASK_LABELS.FOLLOW_UP}</option>
                       </select>
+                    ) : field.key === BTP_TASK_KIND_KEY && selectedActivityCode === "BTP" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'action chantier</option>
+                        <option value="SITE_PREPARATION">{BTP_TASK_LABELS.SITE_PREPARATION}</option>
+                        <option value="EARTHWORKS">{BTP_TASK_LABELS.EARTHWORKS}</option>
+                        <option value="FOUNDATION">{BTP_TASK_LABELS.FOUNDATION}</option>
+                        <option value="STRUCTURAL_WORK">{BTP_TASK_LABELS.STRUCTURAL_WORK}</option>
+                        <option value="MASONRY">{BTP_TASK_LABELS.MASONRY}</option>
+                        <option value="MEP">{BTP_TASK_LABELS.MEP}</option>
+                        <option value="FINISHING">{BTP_TASK_LABELS.FINISHING}</option>
+                        <option value="PROCUREMENT">{BTP_TASK_LABELS.PROCUREMENT}</option>
+                        <option value="QUALITY_CONTROL">{BTP_TASK_LABELS.QUALITY_CONTROL}</option>
+                        <option value="RESERVE">{BTP_TASK_LABELS.RESERVE}</option>
+                        <option value="HANDOVER">{BTP_TASK_LABELS.HANDOVER}</option>
+                        <option value="FOLLOW_UP">{BTP_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === STORE_TASK_KIND_KEY && selectedActivityCode === "GENERAL_STORE" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'action magasin</option>
+                        <option value="OPENING_CASH">{STORE_TASK_LABELS.OPENING_CASH}</option>
+                        <option value="CLOSING_CASH">{STORE_TASK_LABELS.CLOSING_CASH}</option>
+                        <option value="STOCK_CONTROL">{STORE_TASK_LABELS.STOCK_CONTROL}</option>
+                        <option value="INVENTORY">{STORE_TASK_LABELS.INVENTORY}</option>
+                        <option value="REPLENISHMENT">{STORE_TASK_LABELS.REPLENISHMENT}</option>
+                        <option value="MERCHANDISING">{STORE_TASK_LABELS.MERCHANDISING}</option>
+                        <option value="PRICE_UPDATE">{STORE_TASK_LABELS.PRICE_UPDATE}</option>
+                        <option value="SUPPLIER_FOLLOW_UP">{STORE_TASK_LABELS.SUPPLIER_FOLLOW_UP}</option>
+                        <option value="CUSTOMER_RETURN">{STORE_TASK_LABELS.CUSTOMER_RETURN}</option>
+                        <option value="CLEANING">{STORE_TASK_LABELS.CLEANING}</option>
+                        <option value="SECURITY_CHECK">{STORE_TASK_LABELS.SECURITY_CHECK}</option>
+                        <option value="FOLLOW_UP">{STORE_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === FOOD_TASK_KIND_KEY && selectedActivityCode === "FOOD" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'action alimentaire</option>
+                        <option value="RECEPTION">{FOOD_TASK_LABELS.RECEPTION}</option>
+                        <option value="STOCK_CONTROL">{FOOD_TASK_LABELS.STOCK_CONTROL}</option>
+                        <option value="EXPIRY_CHECK">{FOOD_TASK_LABELS.EXPIRY_CHECK}</option>
+                        <option value="COLD_CHAIN_CHECK">{FOOD_TASK_LABELS.COLD_CHAIN_CHECK}</option>
+                        <option value="SHELF_ROTATION">{FOOD_TASK_LABELS.SHELF_ROTATION}</option>
+                        <option value="SUPPLIER_FOLLOW_UP">{FOOD_TASK_LABELS.SUPPLIER_FOLLOW_UP}</option>
+                        <option value="PRODUCT_WITHDRAWAL">{FOOD_TASK_LABELS.PRODUCT_WITHDRAWAL}</option>
+                        <option value="CLEANING">{FOOD_TASK_LABELS.CLEANING}</option>
+                        <option value="INVENTORY">{FOOD_TASK_LABELS.INVENTORY}</option>
+                        <option value="QUALITY_CONTROL">{FOOD_TASK_LABELS.QUALITY_CONTROL}</option>
+                        <option value="DELIVERY">{FOOD_TASK_LABELS.DELIVERY}</option>
+                        <option value="FOLLOW_UP">{FOOD_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === RENTAL_TASK_KIND_KEY && selectedActivityCode === "RENTAL" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'action locative</option>
+                        <option value="RENT_COLLECTION">{RENTAL_TASK_LABELS.RENT_COLLECTION}</option>
+                        <option value="TENANT_FOLLOW_UP">{RENTAL_TASK_LABELS.TENANT_FOLLOW_UP}</option>
+                        <option value="VISIT">{RENTAL_TASK_LABELS.VISIT}</option>
+                        <option value="LEASE_RENEWAL">{RENTAL_TASK_LABELS.LEASE_RENEWAL}</option>
+                        <option value="MOVE_IN">{RENTAL_TASK_LABELS.MOVE_IN}</option>
+                        <option value="MOVE_OUT">{RENTAL_TASK_LABELS.MOVE_OUT}</option>
+                        <option value="MAINTENANCE">{RENTAL_TASK_LABELS.MAINTENANCE}</option>
+                        <option value="INSPECTION">{RENTAL_TASK_LABELS.INSPECTION}</option>
+                        <option value="DOCUMENTS">{RENTAL_TASK_LABELS.DOCUMENTS}</option>
+                        <option value="OWNER_REPORT">{RENTAL_TASK_LABELS.OWNER_REPORT}</option>
+                        <option value="LITIGATION">{RENTAL_TASK_LABELS.LITIGATION}</option>
+                        <option value="FOLLOW_UP">{RENTAL_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === HOTEL_TASK_KIND_KEY && selectedActivityCode === "HOTEL_LODGING" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'action hoteliere</option>
+                        <option value="CHECK_IN">{HOTEL_TASK_LABELS.CHECK_IN}</option>
+                        <option value="CHECK_OUT">{HOTEL_TASK_LABELS.CHECK_OUT}</option>
+                        <option value="ROOM_PREPARATION">{HOTEL_TASK_LABELS.ROOM_PREPARATION}</option>
+                        <option value="HOUSEKEEPING">{HOTEL_TASK_LABELS.HOUSEKEEPING}</option>
+                        <option value="MAINTENANCE">{HOTEL_TASK_LABELS.MAINTENANCE}</option>
+                        <option value="RESTAURANT_SERVICE">{HOTEL_TASK_LABELS.RESTAURANT_SERVICE}</option>
+                        <option value="LAUNDRY">{HOTEL_TASK_LABELS.LAUNDRY}</option>
+                        <option value="EVENT_SETUP">{HOTEL_TASK_LABELS.EVENT_SETUP}</option>
+                        <option value="GUEST_FOLLOW_UP">{HOTEL_TASK_LABELS.GUEST_FOLLOW_UP}</option>
+                        <option value="SUPPLIER_FOLLOW_UP">{HOTEL_TASK_LABELS.SUPPLIER_FOLLOW_UP}</option>
+                        <option value="NIGHT_AUDIT">{HOTEL_TASK_LABELS.NIGHT_AUDIT}</option>
+                        <option value="FOLLOW_UP">{HOTEL_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === WATER_TASK_KIND_KEY && selectedActivityCode === "WATER" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'action eau</option>
+                        <option value="PRODUCTION_READING">{WATER_TASK_LABELS.PRODUCTION_READING}</option>
+                        <option value="QUALITY_CONTROL">{WATER_TASK_LABELS.QUALITY_CONTROL}</option>
+                        <option value="PUMP_MAINTENANCE">{WATER_TASK_LABELS.PUMP_MAINTENANCE}</option>
+                        <option value="NETWORK_INSPECTION">{WATER_TASK_LABELS.NETWORK_INSPECTION}</option>
+                        <option value="LEAK_REPAIR">{WATER_TASK_LABELS.LEAK_REPAIR}</option>
+                        <option value="METER_READING">{WATER_TASK_LABELS.METER_READING}</option>
+                        <option value="CONNECTION_WORK">{WATER_TASK_LABELS.CONNECTION_WORK}</option>
+                        <option value="CHEMICAL_DOSING">{WATER_TASK_LABELS.CHEMICAL_DOSING}</option>
+                        <option value="BILLING_FOLLOW_UP">{WATER_TASK_LABELS.BILLING_FOLLOW_UP}</option>
+                        <option value="SUPPLIER_FOLLOW_UP">{WATER_TASK_LABELS.SUPPLIER_FOLLOW_UP}</option>
+                        <option value="SERVICE_RESTORE">{WATER_TASK_LABELS.SERVICE_RESTORE}</option>
+                        <option value="FOLLOW_UP">{WATER_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === AGENCY_TASK_KIND_KEY && selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type d'action agence</option>
+                        <option value="MANDATE_INTAKE">{AGENCY_TASK_LABELS.MANDATE_INTAKE}</option>
+                        <option value="PROPERTY_VALUATION">{AGENCY_TASK_LABELS.PROPERTY_VALUATION}</option>
+                        <option value="LISTING_PUBLICATION">{AGENCY_TASK_LABELS.LISTING_PUBLICATION}</option>
+                        <option value="CLIENT_PROSPECTING">{AGENCY_TASK_LABELS.CLIENT_PROSPECTING}</option>
+                        <option value="VISIT_SCHEDULE">{AGENCY_TASK_LABELS.VISIT_SCHEDULE}</option>
+                        <option value="OFFER_FOLLOW_UP">{AGENCY_TASK_LABELS.OFFER_FOLLOW_UP}</option>
+                        <option value="DOCUMENT_COLLECTION">{AGENCY_TASK_LABELS.DOCUMENT_COLLECTION}</option>
+                        <option value="NOTARY_FOLLOW_UP">{AGENCY_TASK_LABELS.NOTARY_FOLLOW_UP}</option>
+                        <option value="CONTRACT_SIGNING">{AGENCY_TASK_LABELS.CONTRACT_SIGNING}</option>
+                        <option value="OWNER_REPORTING">{AGENCY_TASK_LABELS.OWNER_REPORTING}</option>
+                        <option value="COMMISSION_COLLECTION">{AGENCY_TASK_LABELS.COMMISSION_COLLECTION}</option>
+                        <option value="FOLLOW_UP">{AGENCY_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
                     ) : field.key === FISH_FARMING_TASK_KIND_KEY && selectedActivityCode === "FISH_FARMING" ? (
                       <select
                         key={field.key}
@@ -1039,14 +1683,64 @@ export function OperationsTasksPage(): JSX.Element {
                 </div>
               </details>
             ) : null}
+            {!editingTaskId ? (
+              <fieldset className="task-attachment-callout">
+                <legend>Pièce jointe</legend>
+                <div className="task-attachment-callout-copy">
+                  <strong>Ajouter un document ou une image maintenant</strong>
+                  <p className="hint">
+                    Le fichier sera envoyé automatiquement après l'enregistrement de la tâche.
+                    Formats acceptés: PDF, JPG ou PNG.
+                  </p>
+                </div>
+                <label className="task-attachment-upload" htmlFor="task-attachment-file">
+                  <span>Fichier joint</span>
+                  <input
+                    key={`${taskAttachmentFile?.name ?? "empty"}-${taskAttachmentFile?.size ?? 0}`}
+                    id="task-attachment-file"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                    onChange={(event) => setTaskAttachmentFile(event.target.files?.[0] ?? null)}
+                    disabled={isSavingTaskForm}
+                  />
+                </label>
+                <div className="task-attachment-selected">
+                  {taskAttachmentFile ? (
+                    <>
+                      <strong>{taskAttachmentFile.name}</strong>
+                      <span>{formatFileSize(taskAttachmentFile.size)}</span>
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => setTaskAttachmentFile(null)}
+                        disabled={isSavingTaskForm}
+                      >
+                        Retirer
+                      </button>
+                    </>
+                  ) : (
+                    <span>Aucun fichier sélectionné.</span>
+                  )}
+                </div>
+              </fieldset>
+            ) : null}
             <button
               type="submit"
-              disabled={!selectedActivityCode || isLoadingActivities}
+              disabled={!selectedActivityCode || isLoadingActivities || isSavingTaskForm}
             >
-              {editingTaskId ? "Enregistrer les modifications" : "Enregistrer la tâche"}
+              {isSavingTaskForm
+                ? "Enregistrement..."
+                : editingTaskId
+                  ? "Enregistrer les modifications"
+                  : "Enregistrer la tâche"}
             </button>
             {editingTaskId ? (
-              <button type="button" className="secondary-btn" onClick={handleCancelEditTask}>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={handleCancelEditTask}
+                disabled={isSavingTaskForm}
+              >
                 Annuler
               </button>
             ) : null}

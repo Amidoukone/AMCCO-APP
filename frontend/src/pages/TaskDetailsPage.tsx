@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
+  addTaskAttachmentRequest,
   addTaskCommentRequest,
   ApiError,
   assignOperationsTaskRequest,
+  getTaskAttachmentUploadAuthRequest,
   getOperationsTaskRequest,
   listOperationsMembersRequest,
+  listTaskAttachmentsRequest,
   listOperationsTaskTimelineRequest,
   listTaskCommentsRequest,
   updateOperationsTaskStatusRequest
@@ -19,11 +22,22 @@ import type {
   OperationTask,
   OperationTaskMember,
   OperationTaskTimelineEvent,
+  TaskAttachment,
   TaskComment,
   TaskStatus
 } from "../types/tasks";
 
 const TASK_DETAIL_PAGE_SIZE = 50;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} o`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} Ko`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -77,6 +91,9 @@ function timelineActionLabel(action: string): string {
   if (action === "TASK_COMMENT_ADDED") {
     return "Commentaire ajoute";
   }
+  if (action === "TASK_ATTACHMENT_ADDED") {
+    return "Piece jointe ajoutee";
+  }
   return action;
 }
 
@@ -107,6 +124,9 @@ function timelineDetail(event: OperationTaskTimelineEvent): string {
   }
   if (event.action === "TASK_CREATED") {
     return "Tâche créée.";
+  }
+  if (event.action === "TASK_ATTACHMENT_ADDED") {
+    return "Piece jointe ajoutee.";
   }
   return "";
 }
@@ -155,6 +175,7 @@ export function TaskDetailsPage(): JSX.Element {
   const [task, setTask] = useState<OperationTask | null>(null);
   const [timeline, setTimeline] = useState<OperationTaskTimelineEvent[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -166,6 +187,7 @@ export function TaskDetailsPage(): JSX.Element {
   const [assignment, setAssignment] = useState("");
   const [assignmentNote, setAssignmentNote] = useState("");
   const [newComment, setNewComment] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
 
   const canManageTasks = useMemo(() => {
     return user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
@@ -188,7 +210,7 @@ export function TaskDetailsPage(): JSX.Element {
     setErrorMessage(null);
     try {
       const data = await withAuthorizedToken(async (accessToken) => {
-        const [taskResponse, timelineResponse, commentsResponse] = await Promise.all([
+        const [taskResponse, timelineResponse, commentsResponse, attachmentsResponse] = await Promise.all([
           getOperationsTaskRequest(accessToken, taskId),
           listOperationsTaskTimelineRequest(accessToken, taskId, {
             limit: TASK_DETAIL_PAGE_SIZE,
@@ -197,7 +219,8 @@ export function TaskDetailsPage(): JSX.Element {
           listTaskCommentsRequest(accessToken, taskId, {
             limit: TASK_DETAIL_PAGE_SIZE,
             offset: options?.commentsOffset ?? 0
-          })
+          }),
+          append ? Promise.resolve({ items: [] as TaskAttachment[] }) : listTaskAttachmentsRequest(accessToken, taskId)
         ]);
         const membersResponse =
           !append && canManageTasks
@@ -209,6 +232,7 @@ export function TaskDetailsPage(): JSX.Element {
           task: taskResponse.item,
           timeline: timelineResponse.items,
           comments: commentsResponse.items,
+          attachments: attachmentsResponse.items,
           members: membersResponse.items
         };
       });
@@ -231,6 +255,7 @@ export function TaskDetailsPage(): JSX.Element {
       });
       if (!append) {
         setMembers(data.members);
+        setAttachments(data.attachments);
       }
       setAssignment(data.task.assignedToId ?? "");
       if (!append && data.task.activityCode) {
@@ -324,6 +349,87 @@ export function TaskDetailsPage(): JSX.Element {
       await withAuthorizedToken((accessToken) => addTaskCommentRequest(accessToken, taskId, body));
       setNewComment("");
       setSuccessMessage("Commentaire ajoute.");
+      await loadData();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function uploadTaskAttachment(
+    currentTaskId: string,
+    selectedFile: File
+  ): Promise<TaskAttachment[]> {
+    const attachmentResponse = await withAuthorizedToken(async (accessToken) => {
+      const authResp = await getTaskAttachmentUploadAuthRequest(accessToken, currentTaskId);
+      const auth = authResp.item;
+
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("fileName", selectedFile.name);
+      formData.append("useUniqueFileName", "true");
+      formData.append("folder", auth.folder);
+      formData.append("publicKey", auth.publicKey);
+      formData.append("token", auth.token);
+      formData.append("signature", auth.signature);
+      formData.append("expire", String(auth.expire));
+
+      const uploadResponse = await fetch(auth.uploadUrl, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        let detail = "Echec de l'upload sur ImageKit.";
+        try {
+          const payload = (await uploadResponse.json()) as { message?: string };
+          if (payload.message) {
+            detail = payload.message;
+          }
+        } catch {
+          // no-op
+        }
+        throw new ApiError(uploadResponse.status, detail);
+      }
+
+      const uploaded = (await uploadResponse.json()) as {
+        fileId?: string;
+        filePath?: string;
+        url?: string;
+        name?: string;
+        size?: number;
+        fileType?: string;
+      };
+
+      return addTaskAttachmentRequest(accessToken, currentTaskId, {
+        storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
+        fileName: uploaded.name ?? selectedFile.name,
+        mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
+        fileSize: uploaded.size ?? selectedFile.size
+      });
+    });
+
+    return attachmentResponse.items;
+  }
+
+  async function handleAddAttachment(): Promise<void> {
+    if (!taskId || isReadOnlyOwner) {
+      return;
+    }
+    if (!attachmentFile) {
+      setErrorMessage("Selectionne un fichier a joindre.");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const items = await uploadTaskAttachment(taskId, attachmentFile);
+      setAttachmentFile(null);
+      setAttachments(items);
+      setSuccessMessage("Piece jointe ajoutee.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -527,6 +633,62 @@ export function TaskDetailsPage(): JSX.Element {
               ) : null}
             </div>
           )}
+        </section>
+      ) : null}
+
+      {!isLoading && task ? (
+        <section className="panel">
+          <div className="task-detail-header">
+            <h3>Pièces jointes</h3>
+            <span className="hint">
+              {attachments.length} fichier{attachments.length > 1 ? "s" : ""}
+            </span>
+          </div>
+
+          <div className="proof-list task-attachment-list">
+            {attachments.length === 0 ? <p>Aucune pièce jointe ajoutée.</p> : null}
+            {attachments.length > 0 ? (
+              <ul>
+                {attachments.map((attachment) => (
+                  <li key={attachment.id}>
+                    {attachment.publicUrl ? (
+                      <a href={attachment.publicUrl} target="_blank" rel="noreferrer">
+                        {attachment.fileName}
+                      </a>
+                    ) : (
+                      <span>{attachment.fileName} (lien indisponible)</span>
+                    )}
+                    <small>
+                      {formatFileSize(attachment.fileSize)} |{" "}
+                      {new Date(attachment.uploadedAt).toLocaleString("fr-FR")} |{" "}
+                      {attachment.uploadedByFullName} ({attachment.uploadedByEmail})
+                    </small>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+
+          {!isReadOnlyOwner ? (
+            <div className="proof-inline-form task-attachment-inline-form">
+              <input
+                key={`${attachmentFile?.name ?? "empty"}-${attachmentFile?.size ?? 0}`}
+                type="file"
+                aria-label="Pièce jointe pour la tâche"
+                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
+                disabled={isSaving}
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleAddAttachment()}
+                disabled={isSaving || !attachmentFile}
+              >
+                Ajouter une pièce jointe
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 

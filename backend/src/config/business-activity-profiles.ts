@@ -216,7 +216,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   GENERAL_STORE: makeProfile("GENERAL_STORE", {
-    operationsModel: "Pilotage multi-rayons avec suivi transverse ventes, depenses et execution magasin.",
+    operationsModel: "Pilotage multi-rayons avec ventes caisse, achats stock, retours clients, remises, inventaires, transferts internes, fournisseurs et charges magasin.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -228,13 +228,39 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Contexte", false, "Rayon, famille produit ou fournisseur.")
       ],
       metadataFields: [
+        field("storeOperationKind", "Type d'operation magasin", false, "Vente, achat stock, paiement fournisseur, retour client, remise, inventaire, transfert ou charge."),
         field("department", "Rayon", false, "Rayon ou departement commercial."),
-        field("productFamily", "Famille produit", false, "Famille de produits ou categorie vendue.")
+        field("productFamily", "Famille produit", false, "Famille de produits ou categorie vendue."),
+        field("itemName", "Article", false, "Designation de l'article ou produit."),
+        field("skuRef", "Reference article", false, "SKU, code article ou reference interne."),
+        field("barcode", "Code-barres", false, "Code-barres ou reference de caisse."),
+        field("shelfRef", "Rayon / emplacement", false, "Rayon physique, etagere, gondole ou reserve."),
+        field("registerRef", "Caisse", false, "Caisse ou point d'encaissement."),
+        field("cashierRef", "Caissier", false, "Caissier, vendeur ou agent de vente."),
+        field("quantity", "Quantite", false, "Quantite vendue, achetee ou transferee."),
+        field("returnQuantity", "Quantite retour", false, "Quantite retournee par le client."),
+        field("adjustmentQuantity", "Ecart inventaire", false, "Quantite ajustee apres inventaire."),
+        field("unit", "Unite", false, "Piece, carton, paquet, metre, litre ou autre unite."),
+        field("purchaseUnitPrice", "Prix achat unitaire", false, "Cout unitaire d'achat de l'article."),
+        field("saleUnitPrice", "Prix vente unitaire", false, "Prix unitaire de vente."),
+        field("discountAmount", "Montant remise", false, "Remise, geste commercial ou ecart de caisse."),
+        field("returnAmount", "Montant retour", false, "Montant rembourse ou deduit au client."),
+        field("invoiceAmount", "Montant facture", false, "Montant facture ou charge magasin."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur ou grossiste."),
+        field("customerRef", "Client", false, "Client, commande ou dossier retour."),
+        field("invoiceRef", "Reference facture", false, "Facture, bon de livraison ou recu fournisseur."),
+        field("receiptRef", "Reference ticket", false, "Ticket de caisse, recu ou reference vente."),
+        field("transferRef", "Reference transfert", false, "Reference de transfert interne ou mouvement stock."),
+        field("sourceStoreRef", "Magasin source", false, "Magasin, depot ou rayon d'origine."),
+        field("destinationStoreRef", "Magasin destination", false, "Magasin, depot ou rayon destination."),
+        field("expenseLabel", "Nature charge", false, "Loyer, nettoyage, transport, manutention, emballage ou autre charge."),
+        field("paymentRef", "Reference paiement", false, "Reference caisse, virement ou mobile money.")
       ],
       workflow: [
-        workflow("CREATE", "Saisie", "Le personnel saisit les encaissements ou depenses."),
-        workflow("PROOF_OPTIONAL", "Preuve", "Le justificatif peut etre rattache sans bloquer le flux."),
-        workflow("OVERVIEW", "Suivi global", "Le flux reste visible directement dans le suivi financier.")
+        workflow("CREATE", "Saisie magasin", "Chaque flux precise le rayon, l'article, la reference et le type d'operation."),
+        workflow("TRACE", "Tracabilite caisse et stock", "Tickets, factures, fournisseurs, clients, caisses et emplacements restent rattaches au flux."),
+        workflow("CONTROL", "Controle stock", "Les retours, remises, ecarts inventaire et transferts sont isoles pour le suivi."),
+        workflow("REPORTING", "Rapport magasin", "Les ventes, achats, marges, charges et taches consolident le rapport par rayon et article.")
       ]
     },
     tasks: {
@@ -250,21 +276,31 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("assignedToId", "Responsable", false, "Responsable de rayon ou employe.")
       ],
       metadataFields: [
+        field("storeTaskKind", "Type d'action magasin", true, "Ouverture caisse, cloture caisse, inventaire, reassort, prix, fournisseur ou securite."),
         field("department", "Rayon", false, "Rayon ou departement commercial."),
-        field("productFamily", "Famille produit", false, "Famille de produits ou categorie vendue.")
+        field("productFamily", "Famille produit", false, "Famille de produits ou categorie vendue."),
+        field("itemName", "Article", false, "Article ou produit concerne."),
+        field("skuRef", "Reference article", false, "SKU, code article ou reference interne."),
+        field("shelfRef", "Rayon / emplacement", false, "Rayon physique, etagere, gondole ou reserve."),
+        field("registerRef", "Caisse", false, "Caisse ou point d'encaissement."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur ou grossiste concerne."),
+        field("issueRef", "Incident / anomalie", false, "Rupture, ecart caisse, retour, casse, securite ou inventaire.")
       ],
       workflow: [
-        workflow("PLAN", "Planification", "Le superviseur affecte les actions du magasin."),
-        workflow("TRACK", "Suivi", "L'avancement est mis a jour au fil de la journee."),
-        workflow("CLOSE", "Cloture", "La tache est fermee apres verification.")
+        workflow("PLAN", "Planification rayon", "Le superviseur affecte les actions par rayon, caisse ou article."),
+        workflow("EXECUTE", "Execution magasin", "Reassort, inventaire, controle prix, caisse, fournisseur ou securite."),
+        workflow("BLOCK", "Blocage", "Un blocage signale rupture, ecart caisse, anomalie stock ou validation en attente."),
+        workflow("CLOSE", "Cloture", "La tache est fermee apres verification du rayon, de la caisse ou du stock.")
       ]
     },
     reporting: {
-      focusArea: "Performance multi-rayons",
-      exportSections: ["transactions", "taches", "suivi rayon"],
+      focusArea: "Performance multi-rayons, marge article, caisse et rotation stock",
+      exportSections: ["ventes caisse", "achats stock", "retours", "remises", "inventaire", "transferts", "fournisseurs", "charges magasin"],
       operationalDimensions: [
         dimension("department", "Rayon", "Compare rentabilite, suivi et execution par rayon."),
-        dimension("productFamily", "Famille produit", "Analyse les volumes et blocages par famille de produits.")
+        dimension("productFamily", "Famille produit", "Analyse les volumes et blocages par famille de produits."),
+        dimension("itemName", "Article", "Suit ventes, achats, retours et marges par article."),
+        dimension("skuRef", "Reference article", "Controle les mouvements stock par reference.")
       ],
       highlights: [
         {
@@ -292,7 +328,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   FOOD: makeProfile("FOOD", {
-    operationsModel: "Suivi de produits alimentaires avec accent sur les achats, ruptures et execution rapide.",
+    operationsModel: "Gestion alimentaire detaillee par famille, produit, lot, DLC, achats, ventes, pertes, chaine du froid, fournisseurs et controles rapides.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -304,13 +340,30 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Lot ou produit", true, "Produit, lot, fournisseur ou nature de depense.")
       ],
       metadataFields: [
+        field("foodOperationKind", "Type d'operation alimentaire", false, "Vente, achat, paiement fournisseur, perte, chaine du froid, emballage ou remboursement."),
         field("productFamily", "Famille produit", true, "Categorie ou famille de produit concerne."),
-        field("batchRef", "Lot ou reference", false, "Numero de lot, DLC ou reference article.")
+        field("productName", "Produit", false, "Designation du produit alimentaire."),
+        field("batchRef", "Lot ou reference", false, "Numero de lot, DLC ou reference article."),
+        field("expiryDate", "DLC / DLUO", false, "Date limite de consommation ou d'utilisation optimale."),
+        field("storageArea", "Zone de stockage", false, "Rayon, chambre froide, congelateur, reserve ou vitrine."),
+        field("temperatureRange", "Temperature", false, "Plage ou temperature observee pour les produits sensibles."),
+        field("quantity", "Quantite", false, "Quantite achetee ou vendue."),
+        field("lossQuantity", "Quantite perdue", false, "Quantite retiree, perimee ou cassee."),
+        field("unit", "Unite", false, "Kg, carton, piece, paquet, litre ou autre unite."),
+        field("purchaseUnitPrice", "Prix achat unitaire", false, "Cout unitaire d'achat ou de valorisation du stock."),
+        field("saleUnitPrice", "Prix vente unitaire", false, "Prix unitaire de vente."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur, grossiste ou livreur."),
+        field("buyerRef", "Client", false, "Client, commande ou point de vente."),
+        field("invoiceRef", "Reference facture", false, "Facture, bon de livraison ou recu."),
+        field("invoiceAmount", "Montant facture", false, "Montant facture ou charge alimentaire."),
+        field("lossReason", "Motif perte", false, "Peremption, casse, rupture froid, retour, avarie ou ecart inventaire."),
+        field("paymentRef", "Reference paiement", false, "Reference caisse, quittance, virement ou mobile money.")
       ],
       workflow: [
-        workflow("CREATE", "Saisie rapide", "Le point de vente saisit ventes et achats."),
-        workflow("TRACE", "Traçabilite", "Le libelle identifie le produit ou le lot concerne."),
-        workflow("OVERVIEW", "Suivi global", "Le flux consolide remonte directement dans le suivi financier.")
+        workflow("CREATE", "Saisie alimentaire", "Chaque flux precise famille, produit, lot, quantite et operation."),
+        workflow("TRACE", "Tracabilite lot", "Le produit, le lot, la DLC, le fournisseur ou le client sont rattaches au flux."),
+        workflow("CONTROL", "Controle stock", "Les pertes, DLC, chaine du froid et charges sont isolees pour le suivi."),
+        workflow("REPORTING", "Rapport alimentaire", "Les ventes, achats, pertes et taches consolident le rapport par famille, produit et lot.")
       ]
     },
     tasks: {
@@ -326,21 +379,30 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Echeance", true, "Les actions alimentaires doivent etre datees.")
       ],
       metadataFields: [
+        field("foodTaskKind", "Type d'action alimentaire", true, "Reception, controle stock, DLC, froid, rotation, retrait, inventaire ou nettoyage."),
         field("productFamily", "Famille produit", true, "Produit ou famille impactee."),
-        field("batchRef", "Lot ou DLC", false, "Numero de lot, DLC ou reference de lot.")
+        field("productName", "Produit", false, "Designation du produit alimentaire."),
+        field("batchRef", "Lot ou DLC", false, "Numero de lot, DLC ou reference de lot."),
+        field("expiryDate", "DLC / DLUO", false, "Date limite a controler."),
+        field("storageArea", "Zone de stockage", false, "Rayon, chambre froide, congelateur, reserve ou vitrine."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur, grossiste ou livreur rattache."),
+        field("issueRef", "Incident / anomalie", false, "Rupture, avarie, temperature, peremption ou ecart inventaire.")
       ],
       workflow: [
-        workflow("PLAN", "Planification courte", "Les actions sont planifiees sur un delai court."),
-        workflow("EXECUTE", "Execution", "Controle stock, reception ou rotation."),
-        workflow("CLOSE", "Verification", "Cloture apres verification de conformite.")
+        workflow("PLAN", "Planification courte", "Les actions alimentaires sont planifiees avec echeance courte."),
+        workflow("EXECUTE", "Execution terrain", "Reception, controle DLC, rotation, retrait, inventaire ou froid."),
+        workflow("BLOCK", "Anomalie", "Un blocage signale avarie, rupture froid, peremption, ecart ou fournisseur en attente."),
+        workflow("CLOSE", "Verification", "Cloture apres verification de conformite, stock et tracabilite.")
       ]
     },
     reporting: {
-      focusArea: "Traçabilite des flux alimentaires",
-      exportSections: ["transactions", "taches", "suivi lots"],
+      focusArea: "Tracabilite, rotation et marge des produits alimentaires",
+      exportSections: ["ventes", "achats", "lots", "DLC", "pertes", "chaine du froid", "fournisseurs", "controles"],
       operationalDimensions: [
         dimension("productFamily", "Famille produit", "Mesure marge, rotations et controles par famille alimentaire."),
-        dimension("batchRef", "Lot ou reference", "Suit les anomalies et flux par lot ou reference.")
+        dimension("productName", "Produit", "Suit ventes, achats, pertes et controles par produit."),
+        dimension("batchRef", "Lot ou reference", "Suit les anomalies et flux par lot ou reference."),
+        dimension("storageArea", "Zone de stockage", "Controle stock, froid et rotation par zone.")
       ],
       highlights: [
         {
@@ -368,7 +430,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   RENTAL: makeProfile("RENTAL", {
-    operationsModel: "Gestion locative avec suivi rigoureux des encaissements, echeances et interventions.",
+    operationsModel: "Gestion locative detaillee par bien, lot, locataire, bail, loyer, caution, charges, interventions et relances.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -380,13 +442,32 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Bien ou locataire", true, "Reference du bien, du locataire ou de la charge.")
       ],
       metadataFields: [
+        field("rentalOperationKind", "Type d'operation locative", false, "Loyer, caution, avance, charge, maintenance ou reversement."),
         field("propertyRef", "Reference bien", true, "Reference interne du bien ou lot."),
-        field("tenantRef", "Reference locataire", false, "Identifiant du locataire ou dossier.")
+        field("unitRef", "Lot / appartement", false, "Numero du lot, appartement, bureau ou magasin."),
+        field("tenantRef", "Reference locataire", false, "Identifiant du locataire ou dossier."),
+        field("leaseRef", "Reference bail", false, "Contrat de bail rattache a l'operation."),
+        field("propertyType", "Type de bien", false, "Villa, appartement, bureau, magasin ou terrain."),
+        field("locationZone", "Zone / adresse", false, "Quartier, commune ou adresse du bien."),
+        field("periodRef", "Periode locative", false, "Mois ou periode concernee par le flux."),
+        field("monthsCount", "Nombre de mois", false, "Nombre de mois couverts par le loyer ou l'avance."),
+        field("monthlyRent", "Loyer mensuel", false, "Montant du loyer mensuel hors charges."),
+        field("serviceCharge", "Charges locatives", false, "Charges recuperees ou facturees au locataire."),
+        field("depositAmount", "Montant caution", false, "Montant du depot de garantie encaisse."),
+        field("chargeLabel", "Nature charge", false, "Syndic, eau, electricite, taxe, gardiennage ou autre charge."),
+        field("maintenanceType", "Type maintenance", false, "Plomberie, electricite, peinture, serrure, climatisation ou autre intervention."),
+        field("supplierRef", "Prestataire", false, "Entreprise, artisan ou fournisseur intervenant."),
+        field("invoiceRef", "Reference facture", false, "Facture, recu ou bon rattache a la charge."),
+        field("invoiceAmount", "Montant facture", false, "Montant de la facture ou depense locative."),
+        field("ownerRef", "Proprietaire", false, "Proprietaire concerne par le reversement."),
+        field("payoutAmount", "Montant reverse", false, "Montant reverse au proprietaire."),
+        field("paymentRef", "Reference paiement", false, "Reference recu, quittance, virement ou mobile money.")
       ],
       workflow: [
-        workflow("CREATE", "Enregistrement", "Le flux est saisi en mentionnant bien ou locataire."),
-        workflow("PROOF_OPTIONAL", "Justificatif", "Le recu, l'avis ou la piece peuvent etre rattaches."),
-        workflow("OVERVIEW", "Suivi global", "Le flux locatif remonte directement dans le suivi financier.")
+        workflow("CREATE", "Saisie locative", "Chaque flux precise le bien, le lot, le locataire et le type d'operation."),
+        workflow("PROOF_OPTIONAL", "Quittance ou preuve", "Le recu, la quittance, la facture ou l'avis peuvent etre rattaches."),
+        workflow("PORTFOLIO", "Suivi portefeuille", "Les loyers, cautions, charges, interventions et reversements alimentent le suivi par bien."),
+        workflow("REPORTING", "Rapport locatif", "Les donnees consolident les recettes, depenses, soldes et blocages par bien et locataire.")
       ]
     },
     tasks: {
@@ -402,21 +483,31 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Echeance", true, "Les engagements locatifs doivent etre dates.")
       ],
       metadataFields: [
+        field("rentalTaskKind", "Type d'action locative", true, "Relance, visite, bail, entree, sortie, maintenance, inspection ou reporting."),
         field("propertyRef", "Reference bien", true, "Bien ou lot concerne."),
-        field("tenantRef", "Reference locataire", false, "Locataire, client ou dossier rattache.")
+        field("unitRef", "Lot / appartement", false, "Numero du lot, appartement, bureau ou magasin."),
+        field("tenantRef", "Reference locataire", false, "Locataire, client ou dossier rattache."),
+        field("leaseRef", "Reference bail", false, "Contrat de bail ou dossier administratif."),
+        field("propertyType", "Type de bien", false, "Villa, appartement, bureau, magasin ou terrain."),
+        field("locationZone", "Zone / adresse", false, "Quartier, commune ou adresse du bien."),
+        field("periodRef", "Periode concernee", false, "Mois, echeance ou periode rattachee a l'action."),
+        field("issueRef", "Incident / dossier", false, "Reference relance, incident, litige ou intervention.")
       ],
       workflow: [
-        workflow("PLAN", "Planification", "Chaque action locative est planifiee avec echeance."),
-        workflow("EXECUTE", "Traitement", "Relance, visite ou intervention."),
-        workflow("CLOSE", "Cloture", "Cloture avec suivi du dossier locatif.")
+        workflow("PLAN", "Planification locative", "Chaque action est planifiee avec bien, locataire et echeance."),
+        workflow("EXECUTE", "Traitement", "Relance, visite, bail, intervention ou inspection du bien."),
+        workflow("BLOCK", "Blocage", "Un dossier bloque signale impaye, litige, travaux ou validation en attente."),
+        workflow("CLOSE", "Cloture", "Cloture avec trace du dossier locatif et impact sur le rapport.")
       ]
     },
     reporting: {
       focusArea: "Suivi du portefeuille locatif",
-      exportSections: ["encaissements", "interventions", "relances"],
+      exportSections: ["loyers", "cautions", "charges", "maintenance", "relances", "baux", "interventions"],
       operationalDimensions: [
         dimension("propertyRef", "Bien", "Mesure rentabilite et suivi par bien ou lot."),
-        dimension("tenantRef", "Locataire", "Suit les flux, relances et interventions par dossier locataire.")
+        dimension("unitRef", "Lot", "Isole le suivi par appartement, bureau, magasin ou lot."),
+        dimension("tenantRef", "Locataire", "Suit les flux, relances et interventions par dossier locataire."),
+        dimension("leaseRef", "Bail", "Controle les operations rattachees a chaque contrat.")
       ],
       highlights: [
         {
@@ -541,7 +632,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   BTP: makeProfile("BTP", {
-    operationsModel: "Gestion de chantiers BTP avec suivi des devis, achats, main-d'oeuvre, avancement et reserves.",
+    operationsModel: "Gestion de chantiers BTP avec suivi par chantier, contrat, client, lot de travaux, achats, main-d'oeuvre, engins, sous-traitance, avancement et reserves.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -553,13 +644,32 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Chantier ou lot", true, "Chantier, devis, fournisseur, lot technique ou client concerne.")
       ],
       metadataFields: [
+        field("btpOperationKind", "Operation BTP", false, "CLIENT_PAYMENT, MATERIAL_PURCHASE, LABOR_PAYMENT, EQUIPMENT_RENTAL, SUBCONTRACTING ou SITE_EXPENSE."),
         field("projectRef", "Reference chantier", true, "Nom, code ou reference du chantier."),
+        field("contractRef", "Reference marche/devis", false, "Numero de devis, marche, bon de commande ou contrat."),
+        field("clientRef", "Client / maitre d'ouvrage", false, "Client, promoteur, maitre d'ouvrage ou beneficiaire."),
         field("workPackage", "Lot de travaux", true, "Gros oeuvre, second oeuvre, terrassement, finition ou autre lot."),
-        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier.")
+        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier."),
+        field("materialName", "Materiau / fourniture", false, "Ciment, fer, sable, gravier, plomberie, electricite ou autre fourniture."),
+        field("quantity", "Quantite", false, "Quantite achetee, posee ou facturee."),
+        field("unit", "Unite", false, "Sac, tonne, m3, m2, jour, heure, lot ou autre unite."),
+        field("unitPrice", "Prix unitaire", false, "Prix unitaire pour calculer automatiquement le montant."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur, depot ou prestataire d'approvisionnement."),
+        field("teamRef", "Equipe / corps de metier", false, "Equipe interne, macons, ferrailleurs, electriciens ou autre corps de metier."),
+        field("workerCount", "Nombre d'ouvriers", false, "Effectif concerne par le paiement de main-d'oeuvre."),
+        field("workDays", "Jours travailles", false, "Nombre de jours ou vacations payes."),
+        field("dailyRate", "Taux journalier", false, "Cout journalier par ouvrier."),
+        field("equipmentRef", "Engin / materiel", false, "Betonniere, camion, pelle, grue, compacteur ou autre equipement."),
+        field("equipmentHours", "Heures engin", false, "Nombre d'heures ou vacations d'utilisation."),
+        field("hourlyRate", "Taux horaire", false, "Cout horaire ou vacation de l'engin."),
+        field("subcontractorRef", "Sous-traitant", false, "Entreprise ou artisan sous-traitant."),
+        field("invoiceRef", "Facture / situation", false, "Numero de facture, situation de travaux, bon ou piece associee."),
+        field("progressPercent", "Avancement (%)", false, "Pourcentage d'avancement constate sur le chantier ou le lot."),
+        field("retentionAmount", "Retenue / garantie", false, "Retenue de garantie, reserve ou montant conserve.")
       ],
       workflow: [
         workflow("CREATE", "Saisie chantier", "Le flux est saisi avec reference chantier et lot de travaux."),
-        workflow("TRACE", "Suivi couts", "Les depenses et recettes restent reliees au chantier."),
+        workflow("TRACE", "Suivi couts", "Les recettes, achats, main-d'oeuvre, engins et sous-traitants restent relies au chantier."),
         workflow("OVERVIEW", "Suivi global", "Les flux alimentent le tableau de bord et les rapports BTP.")
       ]
     },
@@ -577,23 +687,33 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Echeance", true, "Les actions chantier doivent etre planifiees.")
       ],
       metadataFields: [
+        field("btpTaskKind", "Type d'action BTP", true, "Preparation, terrassement, fondation, structure, second oeuvre, finition, controle, reserve ou reception."),
         field("projectRef", "Reference chantier", true, "Nom, code ou reference du chantier."),
+        field("contractRef", "Reference marche/devis", false, "Numero de devis, marche, bon de commande ou contrat."),
+        field("clientRef", "Client / maitre d'ouvrage", false, "Client, promoteur, maitre d'ouvrage ou beneficiaire."),
         field("workPackage", "Lot de travaux", true, "Gros oeuvre, second oeuvre, terrassement, finition ou autre lot."),
-        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier.")
+        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier."),
+        field("teamRef", "Equipe / corps de metier", false, "Equipe interne ou corps de metier responsable."),
+        field("materialName", "Materiau / fourniture", false, "Materiau ou fourniture a controler, poser ou receptionner."),
+        field("progressPercent", "Avancement (%)", false, "Avancement constate pour l'action ou le lot."),
+        field("issueRef", "Reserve / point bloquant", false, "Reserve, malfacon, retard, rupture ou point a arbitrer.")
       ],
       workflow: [
         workflow("PLAN", "Planification chantier", "L'action est affectee, datee et rattachee a un lot."),
         workflow("EXECUTE", "Execution terrain", "L'equipe execute et met a jour l'avancement."),
+        workflow("CONTROL", "Controle qualite", "Les controles, reserves et reprises restent rattaches au chantier."),
         workflow("ESCALATE", "Alerte blocage", "Tout blocage chantier remonte pour arbitrage."),
-        workflow("CLOSE", "Reception interne", "Cloture apres verification de l'action.")
+        workflow("CLOSE", "Reception interne", "Cloture apres verification de l'action ou levee de reserve.")
       ]
     },
     reporting: {
-      focusArea: "Couts, avancement et blocages par chantier",
-      exportSections: ["flux chantier", "lots de travaux", "actions chantier", "blocages"],
+      focusArea: "Couts, recettes, avancement, main-d'oeuvre, engins, sous-traitance et blocages par chantier",
+      exportSections: ["flux chantier", "lots de travaux", "achats materiaux", "main-d'oeuvre", "engins", "sous-traitance", "actions chantier", "blocages"],
       operationalDimensions: [
         dimension("projectRef", "Chantier", "Mesure rentabilite, avancement et alertes par chantier."),
-        dimension("workPackage", "Lot de travaux", "Compare les couts et l'execution par lot de travaux.")
+        dimension("workPackage", "Lot de travaux", "Compare les couts et l'execution par lot de travaux."),
+        dimension("teamRef", "Equipe / corps de metier", "Suit l'execution et les blocages par equipe ou corps de metier."),
+        dimension("supplierRef", "Fournisseur", "Suit les achats et depenses par fournisseur chantier.")
       ],
       highlights: [
         {
@@ -606,7 +726,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         {
           code: "btp-open-actions",
           label: "Actions chantier ouvertes",
-          description: "Taches de chantier encore a traiter.",
+          description: "Taches de chantier, reserves ou controles encore a traiter.",
           metric: "openTasksCount",
           thresholds: { warningAt: 5, criticalAt: 10 }
         },
@@ -994,7 +1114,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   HOTEL_LODGING: makeProfile("HOTEL_LODGING", {
-    operationsModel: "Hotellerie et auberge avec suivi des reservations, chambres, encaissements, charges et maintenance.",
+    operationsModel: "Hotellerie et auberge avec suivi detaille des reservations, sejours, chambres, nuitees, restauration, blanchisserie, evenements, charges et maintenance.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -1006,14 +1126,36 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Reservation ou service", true, "Client, chambre, reservation ou charge concernee.")
       ],
       metadataFields: [
+        field("hotelOperationKind", "Type d'operation hoteliere", false, "Nuitee, acompte, restauration, evenement, blanchisserie, maintenance, commission, taxe ou remboursement."),
         field("bookingRef", "Reference reservation", true, "Reservation, client ou facture."),
+        field("stayRef", "Reference sejour", false, "Sejour, dossier client ou folio."),
+        field("guestRef", "Client / hote", false, "Nom, reference client ou organisme."),
         field("roomRef", "Chambre ou unite", false, "Numero de chambre, dortoir ou unite louee."),
-        field("serviceLine", "Service", true, "Hebergement, restauration, entretien, evenement ou charge.")
+        field("roomType", "Type chambre", false, "Simple, double, suite, dortoir ou bungalow."),
+        field("serviceLine", "Service", true, "Hebergement, restauration, entretien, evenement ou charge."),
+        field("checkInDate", "Date arrivee", false, "Date d'arrivee ou debut de sejour."),
+        field("checkOutDate", "Date depart", false, "Date de depart ou fin de sejour."),
+        field("nightsCount", "Nombre de nuitees", false, "Nombre de nuits facturees."),
+        field("roomRate", "Tarif nuitee", false, "Prix par nuit ou tarif chambre."),
+        field("guestCount", "Nombre de clients", false, "Nombre de personnes rattachees au sejour."),
+        field("mealCount", "Repas / consommations", false, "Nombre de repas, petits dejeuners ou consommations."),
+        field("mealUnitPrice", "Prix unitaire repas", false, "Prix unitaire restauration ou consommation."),
+        field("serviceQuantity", "Quantite service", false, "Quantite de service hors chambre."),
+        field("serviceUnitPrice", "Prix unitaire service", false, "Prix unitaire blanchisserie, evenement ou autre service."),
+        field("eventRef", "Evenement", false, "Reference evenement, salle ou prestation groupe."),
+        field("supplierRef", "Fournisseur", false, "Prestataire, fournisseur ou agence partenaire."),
+        field("invoiceRef", "Reference facture", false, "Facture, recu, bon ou folio."),
+        field("invoiceAmount", "Montant facture", false, "Montant facture ou charge hoteliere."),
+        field("commissionAmount", "Commission", false, "Commission agence, plateforme ou intermediaire."),
+        field("taxAmount", "Taxe", false, "Taxe de sejour, impot ou taxe appliquee."),
+        field("refundAmount", "Montant remboursement", false, "Montant rembourse au client."),
+        field("paymentRef", "Reference paiement", false, "Reference caisse, virement ou mobile money.")
       ],
       workflow: [
-        workflow("CREATE", "Saisie reception", "Le flux est rattache a la reservation ou au service."),
-        workflow("TRACE", "Suivi sejour", "Les encaissements et charges gardent le contexte client."),
-        workflow("OVERVIEW", "Suivi global", "Le rapport consolide exploitation, recettes et charges.")
+        workflow("CREATE", "Saisie reception", "Chaque flux precise reservation, sejour, chambre, client et type d'operation."),
+        workflow("TRACE", "Suivi sejour", "Les encaissements, charges, services, taxes et remboursements gardent le contexte client."),
+        workflow("CONTROL", "Controle exploitation", "Les nuitees, restauration, maintenance, commissions et taxes sont isolees pour le suivi."),
+        workflow("REPORTING", "Rapport hotelier", "Les recettes, charges, occupation et taches consolident le rapport par chambre et service.")
       ]
     },
     tasks: {
@@ -1030,24 +1172,35 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Echeance", true, "Les actions hotelieres doivent etre datees.")
       ],
       metadataFields: [
+        field("hotelTaskKind", "Type d'action hoteliere", true, "Check-in, check-out, preparation chambre, menage, maintenance, restauration ou audit."),
         field("bookingRef", "Reference reservation", true, "Reservation, client ou facture."),
+        field("stayRef", "Reference sejour", false, "Sejour, dossier client ou folio."),
+        field("guestRef", "Client / hote", false, "Nom, reference client ou organisme."),
         field("roomRef", "Chambre ou unite", false, "Numero de chambre, dortoir ou unite louee."),
-        field("serviceLine", "Service", true, "Hebergement, restauration, entretien, evenement ou charge.")
+        field("roomType", "Type chambre", false, "Simple, double, suite, dortoir ou bungalow."),
+        field("serviceLine", "Service", true, "Hebergement, restauration, entretien, evenement ou charge."),
+        field("checkInDate", "Date arrivee", false, "Date d'arrivee ou debut de sejour."),
+        field("checkOutDate", "Date depart", false, "Date de depart ou fin de sejour."),
+        field("eventRef", "Evenement", false, "Reference evenement, salle ou prestation groupe."),
+        field("supplierRef", "Fournisseur", false, "Prestataire, fournisseur ou agence partenaire."),
+        field("issueRef", "Incident / anomalie", false, "Blocage chambre, maintenance, plainte client ou ecart reception.")
       ],
       workflow: [
-        workflow("PLAN", "Planification sejour", "L'action est rattachee a une reservation ou chambre."),
-        workflow("EXECUTE", "Execution service", "Reception, menage, maintenance ou service client."),
-        workflow("ESCALATE", "Alerte exploitation", "Blocage chambre ou service remonte au management."),
-        workflow("CLOSE", "Cloture sejour", "Cloture apres verification du service rendu.")
+        workflow("PLAN", "Planification sejour", "L'action est rattachee a une reservation, chambre, client ou service."),
+        workflow("EXECUTE", "Execution service", "Reception, menage, maintenance, restauration, blanchisserie ou service client."),
+        workflow("ESCALATE", "Alerte exploitation", "Blocage chambre, plainte client ou service critique remonte au management."),
+        workflow("CLOSE", "Cloture sejour", "Cloture apres verification du service rendu et mise a jour du rapport.")
       ]
     },
     reporting: {
-      focusArea: "Occupation, recettes, charges et qualite de service",
-      exportSections: ["reservations", "chambres", "hebergement", "restauration", "maintenance", "blocages"],
+      focusArea: "Occupation, recettes, charges, nuitees et qualite de service",
+      exportSections: ["reservations", "chambres", "sejours", "nuitees", "restauration", "blanchisserie", "maintenance", "commissions", "taxes", "blocages"],
       operationalDimensions: [
         dimension("serviceLine", "Service hotelier", "Compare hebergement, restauration, entretien et evenements."),
         dimension("roomRef", "Chambre ou unite", "Suit rentabilite et interventions par chambre."),
-        dimension("bookingRef", "Reservation", "Mesure encaissements et suivi par reservation.")
+        dimension("bookingRef", "Reservation", "Mesure encaissements et suivi par reservation."),
+        dimension("guestRef", "Client", "Suit recettes, remboursements et qualite de service par client."),
+        dimension("roomType", "Type chambre", "Analyse occupation et rentabilite par type de chambre.")
       ],
       highlights: [
         {
@@ -1229,7 +1382,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   WATER: makeProfile("WATER", {
-    operationsModel: "Production d'eau potable avec contraintes de continuité de service et forte discipline d'execution.",
+    operationsModel: "Production d'eau potable avec suivi detaille des stations, forages, zones reseau, volumes produits, volumes factures, branchements, analyses qualite, energie, produits de traitement, maintenance et reparations.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF"],
@@ -1241,13 +1394,39 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Site, reseau ou equipement", true, "Station, reseau, intervention ou equipement.")
       ],
       metadataFields: [
+        field("waterOperationKind", "Type d'operation eau", false, "Facture eau, vente en gros, branchement, subvention, produits de traitement, energie, maintenance, analyse qualite, reparation reseau ou fournisseur."),
         field("facilityRef", "Reference site", true, "Station, forage ou reseau concerne."),
-        field("networkZone", "Zone reseau", false, "Secteur ou zone de distribution.")
+        field("networkZone", "Zone reseau", false, "Secteur ou zone de distribution."),
+        field("productionLine", "Ligne exploitation", false, "Production, traitement, distribution, branchement, qualite ou maintenance."),
+        field("meterRef", "Compteur / point de comptage", false, "Compteur client, compteur production ou point de mesure."),
+        field("customerRef", "Abonne / client", false, "Abonne, client institutionnel ou acheteur en gros."),
+        field("billingPeriod", "Periode facture", false, "Mois, cycle ou periode de facturation."),
+        field("meterStart", "Index depart", false, "Index compteur en debut de periode."),
+        field("meterEnd", "Index fin", false, "Index compteur en fin de periode."),
+        field("producedVolumeM3", "Volume produit m3", false, "Volume produit ou pompe sur la periode."),
+        field("volumeM3", "Volume facture m3", false, "Volume facture, vendu ou distribue."),
+        field("unitPrice", "Prix unitaire", false, "Prix du m3, prix unitaire produit ou tarif applicable."),
+        field("connectionRef", "Reference branchement", false, "Dossier de nouveau branchement, extension ou raccordement."),
+        field("connectionFee", "Frais branchement", false, "Montant encaisse pour le raccordement."),
+        field("treatmentProduct", "Produit traitement", false, "Chlore, reactif, filtre, sel ou autre intrant de traitement."),
+        field("chemicalQuantity", "Quantite traitement", false, "Quantite de produit de traitement utilisee ou achetee."),
+        field("energySource", "Source energie", false, "Electricite, carburant, solaire, groupe ou autre source."),
+        field("energyQuantity", "Quantite energie", false, "KWh, litres ou unite consommee."),
+        field("equipmentRef", "Equipement", false, "Pompe, groupe, reservoir, conduite, vanne ou compteur."),
+        field("maintenanceType", "Type maintenance", false, "Preventif, curatif, pompe, reseau, compteur ou reservoir."),
+        field("testRef", "Reference analyse", false, "Reference analyse laboratoire ou controle terrain."),
+        field("waterQuality", "Qualite eau", false, "pH, chlore residuel, turbidite, bacteriologie ou observation."),
+        field("issueRef", "Incident / fuite", false, "Fuite, rupture, baisse pression, panne ou reclamation."),
+        field("supplierRef", "Fournisseur / prestataire", false, "Fournisseur, laboratoire, technicien ou prestataire."),
+        field("invoiceRef", "Reference facture", false, "Facture fournisseur, facture client ou piece justificative."),
+        field("invoiceAmount", "Montant facture", false, "Montant facture fournisseur ou charge rattachee."),
+        field("paymentRef", "Reference paiement", false, "Reference encaissement, quittance ou paiement.")
       ],
       workflow: [
-        workflow("CREATE", "Declaration exploitation", "Le flux est declare avec le site ou reseau concerne."),
-        workflow("TRACE", "Justification", "Le contexte technique documente le flux quand c'est necessaire."),
-        workflow("OVERVIEW", "Suivi global", "Le flux d'exploitation remonte directement dans le suivi financier.")
+        workflow("CREATE", "Saisie exploitation eau", "Le flux est rattache au site, a la zone reseau, au compteur ou a l'equipement concerne."),
+        workflow("TRACE", "Tracabilite technique", "Volumes, compteurs, factures, analyses et interventions documentent les flux."),
+        workflow("CONTROL", "Controle exploitation", "Les charges critiques, pertes apparentes et blocages reseau sont suivis."),
+        workflow("REPORTING", "Rapport eau", "Les volumes, recettes, charges et interventions alimentent le rapport sectoriel.")
       ]
     },
     tasks: {
@@ -1264,22 +1443,34 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Echeance", true, "Les interventions d'exploitation doivent etre datees.")
       ],
       metadataFields: [
+        field("waterTaskKind", "Type d'action eau", true, "Releve production, controle qualite, maintenance pompe, inspection reseau, fuite, releve compteur, branchement, dosage, recouvrement ou remise en service."),
         field("facilityRef", "Reference site", true, "Station, reseau ou forage concerne."),
-        field("networkZone", "Zone reseau", false, "Secteur ou zone de distribution.")
+        field("networkZone", "Zone reseau", false, "Secteur ou zone de distribution."),
+        field("productionLine", "Ligne exploitation", false, "Production, traitement, distribution, branchement, qualite ou maintenance."),
+        field("meterRef", "Compteur / point de comptage", false, "Compteur client, compteur production ou point de mesure."),
+        field("customerRef", "Abonne / client", false, "Abonne, dossier client ou acheteur concerne."),
+        field("equipmentRef", "Equipement", false, "Pompe, reservoir, conduite, compteur, vanne ou groupe."),
+        field("testRef", "Reference analyse", false, "Controle terrain ou analyse laboratoire."),
+        field("waterQuality", "Qualite eau", false, "pH, chlore residuel, turbidite, bacteriologie ou observation."),
+        field("issueRef", "Incident / fuite", false, "Fuite, panne, rupture, baisse pression ou reclamation."),
+        field("connectionRef", "Reference branchement", false, "Dossier de branchement, extension ou raccordement."),
+        field("supplierRef", "Fournisseur / prestataire", false, "Technicien, laboratoire, fournisseur ou prestataire.")
       ],
       workflow: [
         workflow("PLAN", "Planification exploitation", "Intervention planifiee et affectee."),
         workflow("EXECUTE", "Intervention", "Execution sur site ou reseau."),
-        workflow("ESCALATE", "Escalade continuité", "Blocage remonte en priorite pour continuité de service."),
+        workflow("ESCALATE", "Escalade continuite", "Blocage remonte en priorite pour continuite de service."),
         workflow("CLOSE", "Remise en service", "Cloture apres verification de remise en service.")
       ]
     },
     reporting: {
-      focusArea: "Continuité de service et discipline d'exploitation",
-      exportSections: ["flux exploitation", "interventions reseau", "blocages critiques"],
+      focusArea: "Production, distribution, facturation, qualite et continuite de service",
+      exportSections: ["volumes produits", "volumes factures", "recettes eau", "charges exploitation", "qualite", "maintenance", "reparations reseau", "blocages critiques"],
       operationalDimensions: [
         dimension("facilityRef", "Site eau", "Mesure couts, interventions et continuite par station ou forage."),
-        dimension("networkZone", "Zone reseau", "Suit les blocages et interventions par zone de distribution.")
+        dimension("networkZone", "Zone reseau", "Suit les blocages et interventions par zone de distribution."),
+        dimension("productionLine", "Ligne exploitation", "Compare production, traitement, distribution, qualite et maintenance."),
+        dimension("meterRef", "Compteur", "Isole les volumes factures et releves par compteur.")
       ],
       highlights: [
         {
@@ -1298,8 +1489,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         },
         {
           code: "water-critical-blockers",
-          label: "Blocages de continuité",
-          description: "Blocages techniques menaçant la continuité du service.",
+          label: "Blocages de continuite",
+          description: "Blocages techniques menacant la continuite du service.",
           metric: "blockedTasksCount",
           thresholds: { warningAt: 1, criticalAt: 2 }
         }
@@ -1307,7 +1498,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   REAL_ESTATE_AGENCY: makeProfile("REAL_ESTATE_AGENCY", {
-    operationsModel: "Agence immobiliere avec suivi d'affaires, mandats, visites et encaissements documentes.",
+    operationsModel: "Agence immobiliere avec suivi detaille des mandats, biens, proprietaires, prospects, visites, offres, dossiers de vente ou location, commissions, frais commerciaux, documents et closing.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -1319,13 +1510,37 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Mandat ou bien", true, "Reference du mandat, bien ou dossier commercial.")
       ],
       metadataFields: [
+        field("agencyOperationKind", "Type d'operation agence", false, "Commission vente, commission location, frais mandat, visite, dossier, publicite, deplacement, reversement courtier, documents ou remboursement."),
         field("mandateRef", "Reference mandat", true, "Mandat ou dossier commercial."),
-        field("propertyRef", "Reference bien", true, "Bien ou lot concerne.")
+        field("propertyRef", "Reference bien", true, "Bien, lot, terrain, villa, appartement ou local concerne."),
+        field("mandateType", "Type mandat", false, "Vente, location, gestion, recherche ou exclusivite."),
+        field("propertyType", "Type de bien", false, "Villa, appartement, terrain, bureau, magasin, immeuble ou local."),
+        field("locationZone", "Zone / quartier", false, "Quartier, commune ou zone commerciale."),
+        field("ownerRef", "Proprietaire", false, "Proprietaire, bailleur ou vendeur."),
+        field("clientRef", "Client / acquereur", false, "Client, locataire, acquereur ou entreprise interessee."),
+        field("prospectRef", "Prospect", false, "Prospect, contact ou lead commercial."),
+        field("dealRef", "Reference affaire", false, "Offre, compromis, bail, promesse ou dossier de closing."),
+        field("dealStage", "Etape affaire", false, "Prospection, visite, offre, negociation, compromis, bail, acte ou cloture."),
+        field("dealAmount", "Montant affaire", false, "Prix de vente, loyer annuel, valeur du bail ou base de commission."),
+        field("commissionRate", "Taux commission %", false, "Taux de commission applique au dossier."),
+        field("commissionAmount", "Montant commission", false, "Commission agence encaissee ou attendue."),
+        field("feeAmount", "Montant frais", false, "Frais de dossier, visite, mandat ou service."),
+        field("visitCount", "Nombre visites", false, "Nombre de visites facturees ou realisees."),
+        field("unitPrice", "Prix unitaire", false, "Prix par visite, annonce ou prestation."),
+        field("advertisingChannel", "Canal publicite", false, "Facebook, portail immobilier, panneau, radio, affichage ou autre canal."),
+        field("documentRef", "Reference document", false, "Titre foncier, attestation, bail, compromis, acte ou dossier administratif."),
+        field("supplierRef", "Prestataire / courtier", false, "Courtier partenaire, photographe, imprimeur, notaire, geometre ou prestataire."),
+        field("invoiceRef", "Reference facture", false, "Facture, recu, note de frais ou piece commerciale."),
+        field("expenseAmount", "Montant depense", false, "Depense commerciale, publicite, deplacement, document ou charge agence."),
+        field("payoutAmount", "Montant reverse", false, "Part courtier, apporteur, partenaire ou retrocession."),
+        field("refundAmount", "Montant rembourse", false, "Remboursement client ou annulation de frais."),
+        field("paymentRef", "Reference paiement", false, "Reference encaissement, quittance, recu ou virement.")
       ],
       workflow: [
-        workflow("CREATE", "Enregistrement dossier", "Le flux est rattache a un mandat ou un bien."),
-        workflow("TRACE", "Traçabilite commerciale", "La reference dossier garde la tracabilite commerciale du flux."),
-        workflow("OVERVIEW", "Suivi global", "Le flux commercial remonte directement dans le suivi financier.")
+        workflow("CREATE", "Saisie dossier agence", "Le flux est rattache au mandat, au bien, au client et a l'etape commerciale."),
+        workflow("TRACE", "Tracabilite commerciale", "Mandat, affaire, paiement, facture et document conservent le suivi du dossier."),
+        workflow("CONTROL", "Controle commission", "Les commissions, frais, retrocessions et charges commerciales sont controles."),
+        workflow("REPORTING", "Rapport agence", "Les mandats, biens, recettes, depenses et actions alimentent le rapport sectoriel.")
       ]
     },
     tasks: {
@@ -1342,8 +1557,20 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("dueDate", "Echeance", true, "Les actions commerciales doivent etre planifiees.")
       ],
       metadataFields: [
+        field("agencyTaskKind", "Type d'action agence", true, "Mandat, estimation, publication, prospection, visite, offre, documents, notaire, signature, recouvrement commission ou reporting proprietaire."),
         field("mandateRef", "Reference mandat", true, "Mandat ou dossier commercial."),
-        field("propertyRef", "Reference bien", true, "Bien ou lot concerne.")
+        field("propertyRef", "Reference bien", true, "Bien, lot, terrain, villa, appartement ou local concerne."),
+        field("mandateType", "Type mandat", false, "Vente, location, gestion, recherche ou exclusivite."),
+        field("propertyType", "Type de bien", false, "Villa, appartement, terrain, bureau, magasin, immeuble ou local."),
+        field("locationZone", "Zone / quartier", false, "Quartier, commune ou zone commerciale."),
+        field("ownerRef", "Proprietaire", false, "Proprietaire, bailleur ou vendeur."),
+        field("clientRef", "Client / acquereur", false, "Client, locataire, acquereur ou entreprise interessee."),
+        field("prospectRef", "Prospect", false, "Prospect, contact ou lead commercial."),
+        field("dealRef", "Reference affaire", false, "Offre, compromis, bail, promesse ou dossier de closing."),
+        field("dealStage", "Etape affaire", false, "Prospection, visite, offre, negociation, compromis, bail, acte ou cloture."),
+        field("documentRef", "Reference document", false, "Titre foncier, attestation, bail, compromis, acte ou dossier administratif."),
+        field("issueRef", "Blocage dossier", false, "Document manquant, client indisponible, litige, prix, notaire ou validation proprietaire."),
+        field("supplierRef", "Prestataire / courtier", false, "Courtier partenaire, notaire, geometre, photographe ou prestataire.")
       ],
       workflow: [
         workflow("PLAN", "Planification commerciale", "Le dossier est affecte et date."),
@@ -1353,11 +1580,13 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ]
     },
     reporting: {
-      focusArea: "Pilotage de portefeuille commercial",
-      exportSections: ["encaissements", "actions commerciales", "blocages dossier"],
+      focusArea: "Mandats, biens, pipeline commercial, commissions et rentabilite agence",
+      exportSections: ["mandats", "biens", "pipeline", "visites", "offres", "commissions", "frais commerciaux", "documents", "blocages dossier"],
       operationalDimensions: [
         dimension("mandateRef", "Mandat", "Suit rentabilite et execution par mandat commercial."),
-        dimension("propertyRef", "Bien", "Mesure les flux et actions par bien.")
+        dimension("propertyRef", "Bien", "Mesure les flux et actions par bien."),
+        dimension("dealStage", "Etape affaire", "Compare les dossiers par etape commerciale."),
+        dimension("clientRef", "Client", "Suit prospects, clients, acquereurs ou locataires.")
       ],
       highlights: [
         {

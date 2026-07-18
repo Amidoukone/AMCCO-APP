@@ -49,6 +49,154 @@ const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
 const TRANSACTIONS_PAGE_SIZE = 100;
 const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 25;
+const STORE_OPERATION_KIND_KEY = "storeOperationKind";
+type StoreOperationKind =
+  | "STORE_SALE"
+  | "STOCK_PURCHASE"
+  | "SUPPLIER_PAYMENT"
+  | "CUSTOMER_RETURN"
+  | "DISCOUNT_ADJUSTMENT"
+  | "INVENTORY_ADJUSTMENT"
+  | "INTERNAL_TRANSFER"
+  | "STORE_EXPENSE";
+const STORE_OPERATION_LABELS: Record<StoreOperationKind, string> = {
+  STORE_SALE: "Vente caisse",
+  STOCK_PURCHASE: "Achat stock",
+  SUPPLIER_PAYMENT: "Paiement fournisseur",
+  CUSTOMER_RETURN: "Retour client",
+  DISCOUNT_ADJUSTMENT: "Remise / ecart",
+  INVENTORY_ADJUSTMENT: "Ajustement inventaire",
+  INTERNAL_TRANSFER: "Transfert interne",
+  STORE_EXPENSE: "Charge magasin"
+};
+const STORE_NUMERIC_METADATA_FIELDS = new Set([
+  "quantity",
+  "returnQuantity",
+  "adjustmentQuantity",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "discountAmount",
+  "returnAmount",
+  "invoiceAmount"
+]);
+const STORE_AMOUNT_METADATA_FIELDS = new Set([
+  "quantity",
+  "returnQuantity",
+  "adjustmentQuantity",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "discountAmount",
+  "returnAmount",
+  "invoiceAmount"
+]);
+const STORE_COMMON_METADATA_FIELDS = new Set([
+  "department",
+  "productFamily",
+  "itemName",
+  "skuRef",
+  "barcode",
+  "shelfRef"
+]);
+const STORE_SALE_METADATA_FIELDS = new Set([
+  ...STORE_COMMON_METADATA_FIELDS,
+  "registerRef",
+  "cashierRef",
+  "quantity",
+  "unit",
+  "saleUnitPrice",
+  "discountAmount",
+  "customerRef",
+  "receiptRef",
+  "paymentRef"
+]);
+const STORE_PURCHASE_METADATA_FIELDS = new Set([
+  ...STORE_COMMON_METADATA_FIELDS,
+  "quantity",
+  "unit",
+  "purchaseUnitPrice",
+  "supplierRef",
+  "invoiceRef"
+]);
+const STORE_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
+  "department",
+  "productFamily",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const STORE_CUSTOMER_RETURN_METADATA_FIELDS = new Set([
+  ...STORE_COMMON_METADATA_FIELDS,
+  "registerRef",
+  "cashierRef",
+  "returnQuantity",
+  "unit",
+  "saleUnitPrice",
+  "returnAmount",
+  "customerRef",
+  "receiptRef",
+  "paymentRef"
+]);
+const STORE_DISCOUNT_ADJUSTMENT_METADATA_FIELDS = new Set([
+  ...STORE_COMMON_METADATA_FIELDS,
+  "registerRef",
+  "cashierRef",
+  "discountAmount",
+  "customerRef",
+  "receiptRef"
+]);
+const STORE_INVENTORY_ADJUSTMENT_METADATA_FIELDS = new Set([
+  ...STORE_COMMON_METADATA_FIELDS,
+  "adjustmentQuantity",
+  "unit",
+  "purchaseUnitPrice",
+  "expenseLabel"
+]);
+const STORE_INTERNAL_TRANSFER_METADATA_FIELDS = new Set([
+  ...STORE_COMMON_METADATA_FIELDS,
+  "quantity",
+  "unit",
+  "transferRef",
+  "sourceStoreRef",
+  "destinationStoreRef"
+]);
+const STORE_EXPENSE_METADATA_FIELDS = new Set([
+  "department",
+  "expenseLabel",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const STORE_METADATA_FIELDS = new Set([
+  STORE_OPERATION_KIND_KEY,
+  "department",
+  "productFamily",
+  "itemName",
+  "skuRef",
+  "barcode",
+  "shelfRef",
+  "registerRef",
+  "cashierRef",
+  "quantity",
+  "returnQuantity",
+  "adjustmentQuantity",
+  "unit",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "discountAmount",
+  "returnAmount",
+  "invoiceAmount",
+  "supplierRef",
+  "customerRef",
+  "invoiceRef",
+  "receiptRef",
+  "transferRef",
+  "sourceStoreRef",
+  "destinationStoreRef",
+  "expenseLabel",
+  "paymentRef"
+]);
 const HARDWARE_OPERATION_KIND_KEY = "hardwareOperationKind";
 type HardwareOperationKind = "GLOBAL" | "ITEM_ENTRY" | "ITEM_EXIT";
 const HARDWARE_OPERATION_LABELS: Record<HardwareOperationKind, string> = {
@@ -92,6 +240,709 @@ const HARDWARE_METADATA_FIELDS = new Set([
   "dailyPayment",
   "paymentAmount",
   "supplierRef"
+]);
+const FOOD_OPERATION_KIND_KEY = "foodOperationKind";
+type FoodOperationKind =
+  | "PRODUCT_SALE"
+  | "PRODUCT_PURCHASE"
+  | "SUPPLIER_PAYMENT"
+  | "STOCK_LOSS"
+  | "COLD_CHAIN_EXPENSE"
+  | "PACKAGING_EXPENSE"
+  | "CUSTOMER_REFUND";
+const FOOD_OPERATION_LABELS: Record<FoodOperationKind, string> = {
+  PRODUCT_SALE: "Vente produit",
+  PRODUCT_PURCHASE: "Achat stock",
+  SUPPLIER_PAYMENT: "Paiement fournisseur",
+  STOCK_LOSS: "Perte / peremption",
+  COLD_CHAIN_EXPENSE: "Chaine du froid",
+  PACKAGING_EXPENSE: "Emballage",
+  CUSTOMER_REFUND: "Remboursement client"
+};
+const FOOD_NUMERIC_METADATA_FIELDS = new Set([
+  "quantity",
+  "lossQuantity",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "invoiceAmount"
+]);
+const FOOD_AMOUNT_METADATA_FIELDS = new Set([
+  "quantity",
+  "lossQuantity",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "invoiceAmount"
+]);
+const FOOD_COMMON_METADATA_FIELDS = new Set([
+  "productFamily",
+  "productName",
+  "batchRef",
+  "expiryDate",
+  "storageArea"
+]);
+const FOOD_PRODUCT_SALE_METADATA_FIELDS = new Set([
+  ...FOOD_COMMON_METADATA_FIELDS,
+  "quantity",
+  "unit",
+  "saleUnitPrice",
+  "buyerRef",
+  "paymentRef"
+]);
+const FOOD_PRODUCT_PURCHASE_METADATA_FIELDS = new Set([
+  ...FOOD_COMMON_METADATA_FIELDS,
+  "quantity",
+  "unit",
+  "purchaseUnitPrice",
+  "supplierRef",
+  "invoiceRef"
+]);
+const FOOD_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
+  ...FOOD_COMMON_METADATA_FIELDS,
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const FOOD_STOCK_LOSS_METADATA_FIELDS = new Set([
+  ...FOOD_COMMON_METADATA_FIELDS,
+  "lossQuantity",
+  "unit",
+  "purchaseUnitPrice",
+  "lossReason"
+]);
+const FOOD_COLD_CHAIN_EXPENSE_METADATA_FIELDS = new Set([
+  ...FOOD_COMMON_METADATA_FIELDS,
+  "temperatureRange",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const FOOD_PACKAGING_EXPENSE_METADATA_FIELDS = new Set([
+  "productFamily",
+  "productName",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const FOOD_CUSTOMER_REFUND_METADATA_FIELDS = new Set([
+  ...FOOD_COMMON_METADATA_FIELDS,
+  "quantity",
+  "unit",
+  "saleUnitPrice",
+  "buyerRef",
+  "paymentRef"
+]);
+const FOOD_METADATA_FIELDS = new Set([
+  FOOD_OPERATION_KIND_KEY,
+  "productFamily",
+  "productName",
+  "batchRef",
+  "expiryDate",
+  "storageArea",
+  "temperatureRange",
+  "quantity",
+  "lossQuantity",
+  "unit",
+  "purchaseUnitPrice",
+  "saleUnitPrice",
+  "supplierRef",
+  "buyerRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "lossReason",
+  "paymentRef"
+]);
+const RENTAL_OPERATION_KIND_KEY = "rentalOperationKind";
+type RentalOperationKind =
+  | "RENT_PAYMENT"
+  | "SECURITY_DEPOSIT"
+  | "ADVANCE_PAYMENT"
+  | "SERVICE_CHARGE_INCOME"
+  | "MAINTENANCE_EXPENSE"
+  | "PROPERTY_EXPENSE"
+  | "OWNER_PAYOUT";
+const RENTAL_OPERATION_LABELS: Record<RentalOperationKind, string> = {
+  RENT_PAYMENT: "Paiement loyer",
+  SECURITY_DEPOSIT: "Caution",
+  ADVANCE_PAYMENT: "Avance loyer",
+  SERVICE_CHARGE_INCOME: "Charges recuperees",
+  MAINTENANCE_EXPENSE: "Maintenance",
+  PROPERTY_EXPENSE: "Charge bien",
+  OWNER_PAYOUT: "Reversement proprietaire"
+};
+const RENTAL_NUMERIC_METADATA_FIELDS = new Set([
+  "monthsCount",
+  "monthlyRent",
+  "serviceCharge",
+  "depositAmount",
+  "invoiceAmount",
+  "payoutAmount"
+]);
+const RENTAL_AMOUNT_METADATA_FIELDS = new Set([
+  "monthsCount",
+  "monthlyRent",
+  "serviceCharge",
+  "depositAmount",
+  "invoiceAmount",
+  "payoutAmount"
+]);
+const RENTAL_COMMON_METADATA_FIELDS = new Set([
+  "propertyRef",
+  "unitRef",
+  "tenantRef",
+  "leaseRef",
+  "propertyType",
+  "locationZone"
+]);
+const RENTAL_RENT_PAYMENT_METADATA_FIELDS = new Set([
+  ...RENTAL_COMMON_METADATA_FIELDS,
+  "periodRef",
+  "monthsCount",
+  "monthlyRent",
+  "serviceCharge",
+  "paymentRef"
+]);
+const RENTAL_SECURITY_DEPOSIT_METADATA_FIELDS = new Set([
+  ...RENTAL_COMMON_METADATA_FIELDS,
+  "depositAmount",
+  "paymentRef"
+]);
+const RENTAL_ADVANCE_PAYMENT_METADATA_FIELDS = new Set([
+  ...RENTAL_COMMON_METADATA_FIELDS,
+  "periodRef",
+  "monthsCount",
+  "monthlyRent",
+  "paymentRef"
+]);
+const RENTAL_SERVICE_CHARGE_INCOME_METADATA_FIELDS = new Set([
+  ...RENTAL_COMMON_METADATA_FIELDS,
+  "periodRef",
+  "chargeLabel",
+  "serviceCharge",
+  "paymentRef"
+]);
+const RENTAL_MAINTENANCE_EXPENSE_METADATA_FIELDS = new Set([
+  ...RENTAL_COMMON_METADATA_FIELDS,
+  "maintenanceType",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const RENTAL_PROPERTY_EXPENSE_METADATA_FIELDS = new Set([
+  ...RENTAL_COMMON_METADATA_FIELDS,
+  "chargeLabel",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const RENTAL_OWNER_PAYOUT_METADATA_FIELDS = new Set([
+  ...RENTAL_COMMON_METADATA_FIELDS,
+  "ownerRef",
+  "periodRef",
+  "payoutAmount",
+  "paymentRef"
+]);
+const RENTAL_METADATA_FIELDS = new Set([
+  RENTAL_OPERATION_KIND_KEY,
+  "propertyRef",
+  "unitRef",
+  "tenantRef",
+  "leaseRef",
+  "propertyType",
+  "locationZone",
+  "periodRef",
+  "monthsCount",
+  "monthlyRent",
+  "serviceCharge",
+  "depositAmount",
+  "chargeLabel",
+  "maintenanceType",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "ownerRef",
+  "payoutAmount",
+  "paymentRef"
+]);
+const HOTEL_OPERATION_KIND_KEY = "hotelOperationKind";
+type HotelOperationKind =
+  | "ROOM_PAYMENT"
+  | "BOOKING_DEPOSIT"
+  | "RESTAURANT_SALE"
+  | "EVENT_SERVICE"
+  | "LAUNDRY_SERVICE"
+  | "ROOM_MAINTENANCE"
+  | "SUPPLIER_PAYMENT"
+  | "COMMISSION_FEE"
+  | "TAX_PAYMENT"
+  | "GUEST_REFUND";
+const HOTEL_OPERATION_LABELS: Record<HotelOperationKind, string> = {
+  ROOM_PAYMENT: "Paiement chambre",
+  BOOKING_DEPOSIT: "Acompte reservation",
+  RESTAURANT_SALE: "Restauration",
+  EVENT_SERVICE: "Evenement / salle",
+  LAUNDRY_SERVICE: "Blanchisserie",
+  ROOM_MAINTENANCE: "Maintenance chambre",
+  SUPPLIER_PAYMENT: "Paiement fournisseur",
+  COMMISSION_FEE: "Commission",
+  TAX_PAYMENT: "Taxe sejour",
+  GUEST_REFUND: "Remboursement client"
+};
+const HOTEL_NUMERIC_METADATA_FIELDS = new Set([
+  "nightsCount",
+  "roomRate",
+  "guestCount",
+  "mealCount",
+  "mealUnitPrice",
+  "serviceQuantity",
+  "serviceUnitPrice",
+  "invoiceAmount",
+  "commissionAmount",
+  "taxAmount",
+  "refundAmount"
+]);
+const HOTEL_AMOUNT_METADATA_FIELDS = new Set([
+  "nightsCount",
+  "roomRate",
+  "mealCount",
+  "mealUnitPrice",
+  "serviceQuantity",
+  "serviceUnitPrice",
+  "invoiceAmount",
+  "commissionAmount",
+  "taxAmount",
+  "refundAmount"
+]);
+const HOTEL_COMMON_METADATA_FIELDS = new Set([
+  "bookingRef",
+  "stayRef",
+  "guestRef",
+  "roomRef",
+  "roomType",
+  "serviceLine"
+]);
+const HOTEL_ROOM_PAYMENT_METADATA_FIELDS = new Set([
+  ...HOTEL_COMMON_METADATA_FIELDS,
+  "checkInDate",
+  "checkOutDate",
+  "nightsCount",
+  "roomRate",
+  "guestCount",
+  "invoiceRef",
+  "paymentRef"
+]);
+const HOTEL_BOOKING_DEPOSIT_METADATA_FIELDS = new Set([
+  ...HOTEL_COMMON_METADATA_FIELDS,
+  "checkInDate",
+  "checkOutDate",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const HOTEL_RESTAURANT_SALE_METADATA_FIELDS = new Set([
+  ...HOTEL_COMMON_METADATA_FIELDS,
+  "mealCount",
+  "mealUnitPrice",
+  "invoiceRef",
+  "paymentRef"
+]);
+const HOTEL_EVENT_SERVICE_METADATA_FIELDS = new Set([
+  ...HOTEL_COMMON_METADATA_FIELDS,
+  "eventRef",
+  "serviceQuantity",
+  "serviceUnitPrice",
+  "invoiceRef",
+  "paymentRef"
+]);
+const HOTEL_LAUNDRY_SERVICE_METADATA_FIELDS = new Set([
+  ...HOTEL_COMMON_METADATA_FIELDS,
+  "serviceQuantity",
+  "serviceUnitPrice",
+  "invoiceRef",
+  "paymentRef"
+]);
+const HOTEL_ROOM_MAINTENANCE_METADATA_FIELDS = new Set([
+  ...HOTEL_COMMON_METADATA_FIELDS,
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const HOTEL_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
+  "bookingRef",
+  "roomRef",
+  "serviceLine",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const HOTEL_COMMISSION_FEE_METADATA_FIELDS = new Set([
+  "bookingRef",
+  "stayRef",
+  "guestRef",
+  "supplierRef",
+  "commissionAmount",
+  "paymentRef"
+]);
+const HOTEL_TAX_PAYMENT_METADATA_FIELDS = new Set([
+  "bookingRef",
+  "stayRef",
+  "guestRef",
+  "serviceLine",
+  "taxAmount",
+  "paymentRef"
+]);
+const HOTEL_GUEST_REFUND_METADATA_FIELDS = new Set([
+  ...HOTEL_COMMON_METADATA_FIELDS,
+  "refundAmount",
+  "paymentRef"
+]);
+const HOTEL_METADATA_FIELDS = new Set([
+  HOTEL_OPERATION_KIND_KEY,
+  "bookingRef",
+  "stayRef",
+  "guestRef",
+  "roomRef",
+  "roomType",
+  "serviceLine",
+  "checkInDate",
+  "checkOutDate",
+  "nightsCount",
+  "roomRate",
+  "guestCount",
+  "mealCount",
+  "mealUnitPrice",
+  "serviceQuantity",
+  "serviceUnitPrice",
+  "eventRef",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "commissionAmount",
+  "taxAmount",
+  "refundAmount",
+  "paymentRef"
+]);
+const WATER_OPERATION_KIND_KEY = "waterOperationKind";
+type WaterOperationKind =
+  | "WATER_BILLING"
+  | "BULK_WATER_SALE"
+  | "CONNECTION_FEE"
+  | "SUBSIDY_INCOME"
+  | "CHEMICAL_PURCHASE"
+  | "ENERGY_PAYMENT"
+  | "MAINTENANCE_EXPENSE"
+  | "QUALITY_TEST_EXPENSE"
+  | "NETWORK_REPAIR"
+  | "SUPPLIER_PAYMENT";
+const WATER_OPERATION_LABELS: Record<WaterOperationKind, string> = {
+  WATER_BILLING: "Facture eau",
+  BULK_WATER_SALE: "Vente eau en gros",
+  CONNECTION_FEE: "Frais branchement",
+  SUBSIDY_INCOME: "Subvention / appui",
+  CHEMICAL_PURCHASE: "Produit traitement",
+  ENERGY_PAYMENT: "Energie",
+  MAINTENANCE_EXPENSE: "Maintenance",
+  QUALITY_TEST_EXPENSE: "Analyse qualite",
+  NETWORK_REPAIR: "Reparation reseau",
+  SUPPLIER_PAYMENT: "Paiement fournisseur"
+};
+const WATER_NUMERIC_METADATA_FIELDS = new Set([
+  "meterStart",
+  "meterEnd",
+  "producedVolumeM3",
+  "volumeM3",
+  "unitPrice",
+  "connectionFee",
+  "chemicalQuantity",
+  "energyQuantity",
+  "invoiceAmount"
+]);
+const WATER_AMOUNT_METADATA_FIELDS = new Set([
+  "volumeM3",
+  "unitPrice",
+  "connectionFee",
+  "chemicalQuantity",
+  "energyQuantity",
+  "invoiceAmount"
+]);
+const WATER_COMMON_METADATA_FIELDS = new Set([
+  "facilityRef",
+  "networkZone",
+  "productionLine"
+]);
+const WATER_BILLING_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "meterRef",
+  "customerRef",
+  "billingPeriod",
+  "meterStart",
+  "meterEnd",
+  "producedVolumeM3",
+  "volumeM3",
+  "unitPrice",
+  "invoiceRef",
+  "paymentRef"
+]);
+const WATER_BULK_SALE_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "customerRef",
+  "producedVolumeM3",
+  "volumeM3",
+  "unitPrice",
+  "invoiceRef",
+  "paymentRef"
+]);
+const WATER_CONNECTION_FEE_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "customerRef",
+  "connectionRef",
+  "connectionFee",
+  "paymentRef"
+]);
+const WATER_SUBSIDY_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "customerRef",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const WATER_CHEMICAL_PURCHASE_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "treatmentProduct",
+  "chemicalQuantity",
+  "unitPrice",
+  "supplierRef",
+  "invoiceRef"
+]);
+const WATER_ENERGY_PAYMENT_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "energySource",
+  "energyQuantity",
+  "unitPrice",
+  "supplierRef",
+  "invoiceRef"
+]);
+const WATER_MAINTENANCE_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "equipmentRef",
+  "maintenanceType",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const WATER_QUALITY_TEST_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "testRef",
+  "waterQuality",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const WATER_NETWORK_REPAIR_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "equipmentRef",
+  "issueRef",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount"
+]);
+const WATER_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
+  ...WATER_COMMON_METADATA_FIELDS,
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const WATER_METADATA_FIELDS = new Set([
+  WATER_OPERATION_KIND_KEY,
+  "facilityRef",
+  "networkZone",
+  "productionLine",
+  "meterRef",
+  "customerRef",
+  "billingPeriod",
+  "meterStart",
+  "meterEnd",
+  "producedVolumeM3",
+  "volumeM3",
+  "unitPrice",
+  "connectionRef",
+  "connectionFee",
+  "treatmentProduct",
+  "chemicalQuantity",
+  "energySource",
+  "energyQuantity",
+  "equipmentRef",
+  "maintenanceType",
+  "testRef",
+  "waterQuality",
+  "issueRef",
+  "supplierRef",
+  "invoiceRef",
+  "invoiceAmount",
+  "paymentRef"
+]);
+const AGENCY_OPERATION_KIND_KEY = "agencyOperationKind";
+type AgencyOperationKind =
+  | "SALE_COMMISSION"
+  | "RENTAL_COMMISSION"
+  | "MANDATE_FEE"
+  | "VISIT_FEE"
+  | "FILE_FEE"
+  | "ADVERTISING_EXPENSE"
+  | "FIELD_VISIT_EXPENSE"
+  | "BROKER_PAYOUT"
+  | "DOCUMENT_EXPENSE"
+  | "CUSTOMER_REFUND"
+  | "OFFICE_EXPENSE";
+const AGENCY_OPERATION_LABELS: Record<AgencyOperationKind, string> = {
+  SALE_COMMISSION: "Commission vente",
+  RENTAL_COMMISSION: "Commission location",
+  MANDATE_FEE: "Frais mandat",
+  VISIT_FEE: "Frais visite",
+  FILE_FEE: "Frais dossier",
+  ADVERTISING_EXPENSE: "Publicite",
+  FIELD_VISIT_EXPENSE: "Deplacement visite",
+  BROKER_PAYOUT: "Reversement courtier",
+  DOCUMENT_EXPENSE: "Frais document",
+  CUSTOMER_REFUND: "Remboursement client",
+  OFFICE_EXPENSE: "Charge agence"
+};
+const AGENCY_NUMERIC_METADATA_FIELDS = new Set([
+  "dealAmount",
+  "commissionRate",
+  "commissionAmount",
+  "feeAmount",
+  "visitCount",
+  "unitPrice",
+  "expenseAmount",
+  "payoutAmount",
+  "refundAmount"
+]);
+const AGENCY_AMOUNT_METADATA_FIELDS = new Set([
+  "dealAmount",
+  "commissionRate",
+  "commissionAmount",
+  "feeAmount",
+  "visitCount",
+  "unitPrice",
+  "expenseAmount",
+  "payoutAmount",
+  "refundAmount"
+]);
+const AGENCY_COMMON_METADATA_FIELDS = new Set([
+  "mandateRef",
+  "propertyRef",
+  "mandateType",
+  "propertyType",
+  "locationZone",
+  "ownerRef",
+  "clientRef",
+  "prospectRef",
+  "dealRef",
+  "dealStage"
+]);
+const AGENCY_SALE_COMMISSION_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "dealAmount",
+  "commissionRate",
+  "commissionAmount",
+  "invoiceRef",
+  "paymentRef"
+]);
+const AGENCY_RENTAL_COMMISSION_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "dealAmount",
+  "commissionRate",
+  "commissionAmount",
+  "invoiceRef",
+  "paymentRef"
+]);
+const AGENCY_MANDATE_FEE_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "feeAmount",
+  "documentRef",
+  "paymentRef"
+]);
+const AGENCY_VISIT_FEE_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "visitCount",
+  "unitPrice",
+  "paymentRef"
+]);
+const AGENCY_FILE_FEE_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "feeAmount",
+  "documentRef",
+  "paymentRef"
+]);
+const AGENCY_ADVERTISING_EXPENSE_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "advertisingChannel",
+  "supplierRef",
+  "invoiceRef",
+  "expenseAmount"
+]);
+const AGENCY_FIELD_VISIT_EXPENSE_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "visitCount",
+  "unitPrice",
+  "supplierRef",
+  "invoiceRef",
+  "expenseAmount"
+]);
+const AGENCY_BROKER_PAYOUT_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "supplierRef",
+  "payoutAmount",
+  "paymentRef"
+]);
+const AGENCY_DOCUMENT_EXPENSE_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "documentRef",
+  "supplierRef",
+  "invoiceRef",
+  "expenseAmount"
+]);
+const AGENCY_CUSTOMER_REFUND_METADATA_FIELDS = new Set([
+  ...AGENCY_COMMON_METADATA_FIELDS,
+  "refundAmount",
+  "paymentRef"
+]);
+const AGENCY_OFFICE_EXPENSE_METADATA_FIELDS = new Set([
+  "mandateRef",
+  "propertyRef",
+  "locationZone",
+  "supplierRef",
+  "invoiceRef",
+  "expenseAmount",
+  "paymentRef"
+]);
+const AGENCY_METADATA_FIELDS = new Set([
+  AGENCY_OPERATION_KIND_KEY,
+  "mandateRef",
+  "propertyRef",
+  "mandateType",
+  "propertyType",
+  "locationZone",
+  "ownerRef",
+  "clientRef",
+  "prospectRef",
+  "dealRef",
+  "dealStage",
+  "dealAmount",
+  "commissionRate",
+  "commissionAmount",
+  "feeAmount",
+  "visitCount",
+  "unitPrice",
+  "advertisingChannel",
+  "documentRef",
+  "supplierRef",
+  "invoiceRef",
+  "expenseAmount",
+  "payoutAmount",
+  "refundAmount",
+  "paymentRef"
 ]);
 const AGRICULTURE_OPERATION_KIND_KEY = "agricultureOperationKind";
 type AgricultureOperationKind = "INPUT_PURCHASE" | "FIELD_EXPENSE" | "HARVEST_SALE" | "SUPPORT_INCOME";
@@ -159,6 +1010,123 @@ const AGRICULTURE_METADATA_FIELDS = new Set([
   "supplierRef",
   "buyerRef",
   "sourceRef"
+]);
+const BTP_OPERATION_KIND_KEY = "btpOperationKind";
+type BtpOperationKind =
+  | "CLIENT_PAYMENT"
+  | "MATERIAL_PURCHASE"
+  | "LABOR_PAYMENT"
+  | "EQUIPMENT_RENTAL"
+  | "SUBCONTRACTING"
+  | "SITE_EXPENSE";
+const BTP_OPERATION_LABELS: Record<BtpOperationKind, string> = {
+  CLIENT_PAYMENT: "Encaissement client",
+  MATERIAL_PURCHASE: "Achat materiaux",
+  LABOR_PAYMENT: "Main-d'oeuvre",
+  EQUIPMENT_RENTAL: "Location engin",
+  SUBCONTRACTING: "Sous-traitance",
+  SITE_EXPENSE: "Charge chantier"
+};
+const BTP_NUMERIC_METADATA_FIELDS = new Set([
+  "quantity",
+  "unitPrice",
+  "workerCount",
+  "workDays",
+  "dailyRate",
+  "equipmentHours",
+  "hourlyRate",
+  "progressPercent",
+  "retentionAmount"
+]);
+const BTP_AMOUNT_METADATA_FIELDS = new Set([
+  "quantity",
+  "unitPrice",
+  "workerCount",
+  "workDays",
+  "dailyRate",
+  "equipmentHours",
+  "hourlyRate"
+]);
+const BTP_COMMON_METADATA_FIELDS = new Set([
+  "projectRef",
+  "contractRef",
+  "clientRef",
+  "workPackage",
+  "siteLocation"
+]);
+const BTP_CLIENT_PAYMENT_METADATA_FIELDS = new Set([
+  ...BTP_COMMON_METADATA_FIELDS,
+  "invoiceRef",
+  "progressPercent",
+  "retentionAmount"
+]);
+const BTP_MATERIAL_PURCHASE_METADATA_FIELDS = new Set([
+  ...BTP_COMMON_METADATA_FIELDS,
+  "materialName",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "supplierRef",
+  "invoiceRef"
+]);
+const BTP_LABOR_PAYMENT_METADATA_FIELDS = new Set([
+  ...BTP_COMMON_METADATA_FIELDS,
+  "teamRef",
+  "workerCount",
+  "workDays",
+  "dailyRate"
+]);
+const BTP_EQUIPMENT_RENTAL_METADATA_FIELDS = new Set([
+  ...BTP_COMMON_METADATA_FIELDS,
+  "equipmentRef",
+  "equipmentHours",
+  "hourlyRate",
+  "supplierRef",
+  "invoiceRef"
+]);
+const BTP_SUBCONTRACTING_METADATA_FIELDS = new Set([
+  ...BTP_COMMON_METADATA_FIELDS,
+  "subcontractorRef",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "progressPercent",
+  "invoiceRef",
+  "retentionAmount"
+]);
+const BTP_SITE_EXPENSE_METADATA_FIELDS = new Set([
+  ...BTP_COMMON_METADATA_FIELDS,
+  "materialName",
+  "teamRef",
+  "equipmentRef",
+  "supplierRef",
+  "invoiceRef",
+  "progressPercent",
+  "retentionAmount"
+]);
+const BTP_METADATA_FIELDS = new Set([
+  BTP_OPERATION_KIND_KEY,
+  "projectRef",
+  "contractRef",
+  "clientRef",
+  "workPackage",
+  "siteLocation",
+  "materialName",
+  "quantity",
+  "unit",
+  "unitPrice",
+  "supplierRef",
+  "teamRef",
+  "workerCount",
+  "workDays",
+  "dailyRate",
+  "equipmentRef",
+  "equipmentHours",
+  "hourlyRate",
+  "subcontractorRef",
+  "invoiceRef",
+  "progressPercent",
+  "retentionAmount"
 ]);
 const FISH_FARMING_OPERATION_KIND_KEY = "fishOperationKind";
 type FishFarmingOperationKind =
@@ -403,7 +1371,28 @@ function isMoneyMetadataField(key: string): boolean {
     key === "saleUnitPrice" ||
     key === "dailyPayment" ||
     key === "paymentAmount" ||
-    key === "unitPrice"
+    key === "unitPrice" ||
+    key === "dailyRate" ||
+    key === "hourlyRate" ||
+    key === "retentionAmount" ||
+    key === "monthlyRent" ||
+    key === "serviceCharge" ||
+    key === "depositAmount" ||
+    key === "invoiceAmount" ||
+    key === "payoutAmount" ||
+    key === "discountAmount" ||
+    key === "returnAmount" ||
+    key === "roomRate" ||
+    key === "mealUnitPrice" ||
+    key === "serviceUnitPrice" ||
+    key === "commissionAmount" ||
+    key === "taxAmount" ||
+    key === "refundAmount" ||
+    key === "connectionFee" ||
+    key === "dealAmount" ||
+    key === "feeAmount" ||
+    key === "expenseAmount" ||
+    key === "payoutAmount"
   );
 }
 
@@ -434,6 +1423,307 @@ function deriveAgricultureAmount(
     return null;
   }
   return (quantity * unitPrice).toFixed(2);
+}
+
+function deriveStoreAmount(
+  operationKind: StoreOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind === "STORE_SALE") {
+    const quantity = toAmountNumber(metadata.quantity ?? "");
+    const saleUnitPrice = toAmountNumber(metadata.saleUnitPrice ?? "");
+    const discountAmount = toAmountNumber(metadata.discountAmount ?? "");
+    if (quantity <= 0 || saleUnitPrice <= 0) {
+      return discountAmount > 0 ? discountAmount.toFixed(2) : null;
+    }
+    return Math.max(quantity * saleUnitPrice - discountAmount, 0).toFixed(2);
+  }
+
+  if (operationKind === "STOCK_PURCHASE") {
+    const quantity = toAmountNumber(metadata.quantity ?? "");
+    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
+    if (quantity <= 0 || purchaseUnitPrice <= 0) {
+      return null;
+    }
+    return (quantity * purchaseUnitPrice).toFixed(2);
+  }
+
+  if (operationKind === "CUSTOMER_RETURN") {
+    const returnAmount = toAmountNumber(metadata.returnAmount ?? "");
+    if (returnAmount > 0) {
+      return returnAmount.toFixed(2);
+    }
+    const returnQuantity = toAmountNumber(metadata.returnQuantity ?? "");
+    const saleUnitPrice = toAmountNumber(metadata.saleUnitPrice ?? "");
+    if (returnQuantity <= 0 || saleUnitPrice <= 0) {
+      return null;
+    }
+    return (returnQuantity * saleUnitPrice).toFixed(2);
+  }
+
+  if (operationKind === "DISCOUNT_ADJUSTMENT") {
+    const discountAmount = toAmountNumber(metadata.discountAmount ?? "");
+    return discountAmount > 0 ? discountAmount.toFixed(2) : null;
+  }
+
+  if (operationKind === "INVENTORY_ADJUSTMENT") {
+    const adjustmentQuantity = Math.abs(toAmountNumber(metadata.adjustmentQuantity ?? ""));
+    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
+    if (adjustmentQuantity <= 0 || purchaseUnitPrice <= 0) {
+      return null;
+    }
+    return (adjustmentQuantity * purchaseUnitPrice).toFixed(2);
+  }
+
+  if (operationKind === "INTERNAL_TRANSFER") {
+    return null;
+  }
+
+  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
+  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
+}
+
+function deriveFoodAmount(
+  operationKind: FoodOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind === "PRODUCT_SALE" || operationKind === "CUSTOMER_REFUND") {
+    const quantity = toAmountNumber(metadata.quantity ?? "");
+    const saleUnitPrice = toAmountNumber(metadata.saleUnitPrice ?? "");
+    if (quantity <= 0 || saleUnitPrice <= 0) {
+      return null;
+    }
+    return (quantity * saleUnitPrice).toFixed(2);
+  }
+
+  if (operationKind === "PRODUCT_PURCHASE") {
+    const quantity = toAmountNumber(metadata.quantity ?? "");
+    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
+    if (quantity <= 0 || purchaseUnitPrice <= 0) {
+      return null;
+    }
+    return (quantity * purchaseUnitPrice).toFixed(2);
+  }
+
+  if (operationKind === "STOCK_LOSS") {
+    const lossQuantity = toAmountNumber(metadata.lossQuantity ?? "");
+    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
+    if (lossQuantity <= 0 || purchaseUnitPrice <= 0) {
+      return null;
+    }
+    return (lossQuantity * purchaseUnitPrice).toFixed(2);
+  }
+
+  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
+  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
+}
+
+function deriveBtpAmount(
+  operationKind: BtpOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind === "MATERIAL_PURCHASE" || operationKind === "SUBCONTRACTING") {
+    const quantity = toAmountNumber(metadata.quantity ?? "");
+    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+    if (quantity <= 0 || unitPrice <= 0) {
+      return null;
+    }
+    return (quantity * unitPrice).toFixed(2);
+  }
+
+  if (operationKind === "LABOR_PAYMENT") {
+    const workerCount = toAmountNumber(metadata.workerCount ?? "");
+    const workDays = toAmountNumber(metadata.workDays ?? "");
+    const dailyRate = toAmountNumber(metadata.dailyRate ?? "");
+    if (workerCount <= 0 || workDays <= 0 || dailyRate <= 0) {
+      return null;
+    }
+    return (workerCount * workDays * dailyRate).toFixed(2);
+  }
+
+  if (operationKind === "EQUIPMENT_RENTAL") {
+    const equipmentHours = toAmountNumber(metadata.equipmentHours ?? "");
+    const hourlyRate = toAmountNumber(metadata.hourlyRate ?? "");
+    if (equipmentHours <= 0 || hourlyRate <= 0) {
+      return null;
+    }
+    return (equipmentHours * hourlyRate).toFixed(2);
+  }
+
+  return null;
+}
+
+function deriveRentalAmount(
+  operationKind: RentalOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind === "RENT_PAYMENT") {
+    const monthsCount = toAmountNumber(metadata.monthsCount ?? "");
+    const monthlyRent = toAmountNumber(metadata.monthlyRent ?? "");
+    const serviceCharge = toAmountNumber(metadata.serviceCharge ?? "");
+    if (monthsCount <= 0 || monthlyRent <= 0) {
+      return serviceCharge > 0 ? serviceCharge.toFixed(2) : null;
+    }
+    return (monthsCount * monthlyRent + serviceCharge).toFixed(2);
+  }
+
+  if (operationKind === "ADVANCE_PAYMENT") {
+    const monthsCount = toAmountNumber(metadata.monthsCount ?? "");
+    const monthlyRent = toAmountNumber(metadata.monthlyRent ?? "");
+    if (monthsCount <= 0 || monthlyRent <= 0) {
+      return null;
+    }
+    return (monthsCount * monthlyRent).toFixed(2);
+  }
+
+  if (operationKind === "SECURITY_DEPOSIT") {
+    const depositAmount = toAmountNumber(metadata.depositAmount ?? "");
+    return depositAmount > 0 ? depositAmount.toFixed(2) : null;
+  }
+
+  if (operationKind === "SERVICE_CHARGE_INCOME") {
+    const serviceCharge = toAmountNumber(metadata.serviceCharge ?? "");
+    return serviceCharge > 0 ? serviceCharge.toFixed(2) : null;
+  }
+
+  if (operationKind === "MAINTENANCE_EXPENSE" || operationKind === "PROPERTY_EXPENSE") {
+    const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
+    return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
+  }
+
+  const payoutAmount = toAmountNumber(metadata.payoutAmount ?? "");
+  return payoutAmount > 0 ? payoutAmount.toFixed(2) : null;
+}
+
+function deriveHotelAmount(
+  operationKind: HotelOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind === "ROOM_PAYMENT") {
+    const nightsCount = toAmountNumber(metadata.nightsCount ?? "");
+    const roomRate = toAmountNumber(metadata.roomRate ?? "");
+    if (nightsCount <= 0 || roomRate <= 0) {
+      return null;
+    }
+    return (nightsCount * roomRate).toFixed(2);
+  }
+
+  if (operationKind === "RESTAURANT_SALE") {
+    const mealCount = toAmountNumber(metadata.mealCount ?? "");
+    const mealUnitPrice = toAmountNumber(metadata.mealUnitPrice ?? "");
+    if (mealCount <= 0 || mealUnitPrice <= 0) {
+      return null;
+    }
+    return (mealCount * mealUnitPrice).toFixed(2);
+  }
+
+  if (operationKind === "EVENT_SERVICE" || operationKind === "LAUNDRY_SERVICE") {
+    const serviceQuantity = toAmountNumber(metadata.serviceQuantity ?? "");
+    const serviceUnitPrice = toAmountNumber(metadata.serviceUnitPrice ?? "");
+    if (serviceQuantity <= 0 || serviceUnitPrice <= 0) {
+      return null;
+    }
+    return (serviceQuantity * serviceUnitPrice).toFixed(2);
+  }
+
+  if (operationKind === "COMMISSION_FEE") {
+    const commissionAmount = toAmountNumber(metadata.commissionAmount ?? "");
+    return commissionAmount > 0 ? commissionAmount.toFixed(2) : null;
+  }
+
+  if (operationKind === "TAX_PAYMENT") {
+    const taxAmount = toAmountNumber(metadata.taxAmount ?? "");
+    return taxAmount > 0 ? taxAmount.toFixed(2) : null;
+  }
+
+  if (operationKind === "GUEST_REFUND") {
+    const refundAmount = toAmountNumber(metadata.refundAmount ?? "");
+    return refundAmount > 0 ? refundAmount.toFixed(2) : null;
+  }
+
+  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
+  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
+}
+
+function deriveWaterAmount(
+  operationKind: WaterOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind === "WATER_BILLING" || operationKind === "BULK_WATER_SALE") {
+    const volumeM3 = toAmountNumber(metadata.volumeM3 ?? "");
+    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+    if (volumeM3 > 0 && unitPrice > 0) {
+      return (volumeM3 * unitPrice).toFixed(2);
+    }
+  }
+
+  if (operationKind === "CONNECTION_FEE") {
+    const connectionFee = toAmountNumber(metadata.connectionFee ?? "");
+    return connectionFee > 0 ? connectionFee.toFixed(2) : null;
+  }
+
+  if (operationKind === "CHEMICAL_PURCHASE") {
+    const chemicalQuantity = toAmountNumber(metadata.chemicalQuantity ?? "");
+    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+    if (chemicalQuantity > 0 && unitPrice > 0) {
+      return (chemicalQuantity * unitPrice).toFixed(2);
+    }
+  }
+
+  if (operationKind === "ENERGY_PAYMENT") {
+    const energyQuantity = toAmountNumber(metadata.energyQuantity ?? "");
+    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+    if (energyQuantity > 0 && unitPrice > 0) {
+      return (energyQuantity * unitPrice).toFixed(2);
+    }
+  }
+
+  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
+  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
+}
+
+function deriveAgencyAmount(
+  operationKind: AgencyOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind === "SALE_COMMISSION" || operationKind === "RENTAL_COMMISSION") {
+    const commissionAmount = toAmountNumber(metadata.commissionAmount ?? "");
+    if (commissionAmount > 0) {
+      return commissionAmount.toFixed(2);
+    }
+    const dealAmount = toAmountNumber(metadata.dealAmount ?? "");
+    const commissionRate = toAmountNumber(metadata.commissionRate ?? "");
+    if (dealAmount > 0 && commissionRate > 0) {
+      return ((dealAmount * commissionRate) / 100).toFixed(2);
+    }
+    return null;
+  }
+
+  if (operationKind === "MANDATE_FEE" || operationKind === "FILE_FEE") {
+    const feeAmount = toAmountNumber(metadata.feeAmount ?? "");
+    return feeAmount > 0 ? feeAmount.toFixed(2) : null;
+  }
+
+  if (operationKind === "VISIT_FEE" || operationKind === "FIELD_VISIT_EXPENSE") {
+    const visitCount = toAmountNumber(metadata.visitCount ?? "");
+    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+    if (visitCount > 0 && unitPrice > 0) {
+      return (visitCount * unitPrice).toFixed(2);
+    }
+  }
+
+  if (operationKind === "BROKER_PAYOUT") {
+    const payoutAmount = toAmountNumber(metadata.payoutAmount ?? "");
+    return payoutAmount > 0 ? payoutAmount.toFixed(2) : null;
+  }
+
+  if (operationKind === "CUSTOMER_REFUND") {
+    const refundAmount = toAmountNumber(metadata.refundAmount ?? "");
+    return refundAmount > 0 ? refundAmount.toFixed(2) : null;
+  }
+
+  const expenseAmount = toAmountNumber(metadata.expenseAmount ?? "");
+  return expenseAmount > 0 ? expenseAmount.toFixed(2) : null;
 }
 
 function deriveFishFarmingAmount(
@@ -480,8 +1770,15 @@ function deriveLivestockAmount(
 }
 
 function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
-  return HARDWARE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+  return STORE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    HARDWARE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    FOOD_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    RENTAL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    HOTEL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    WATER_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    AGENCY_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     AGRICULTURE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    BTP_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     FISH_FARMING_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     LIVESTOCK_NUMERIC_METADATA_FIELDS.has(fieldKey)
     ? "decimal"
@@ -492,8 +1789,36 @@ function shouldDeriveHardwareAmount(fieldKey: string): boolean {
   return HARDWARE_AMOUNT_METADATA_FIELDS.has(fieldKey);
 }
 
+function shouldDeriveStoreAmount(fieldKey: string): boolean {
+  return STORE_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveFoodAmount(fieldKey: string): boolean {
+  return FOOD_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveRentalAmount(fieldKey: string): boolean {
+  return RENTAL_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveHotelAmount(fieldKey: string): boolean {
+  return HOTEL_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveWaterAmount(fieldKey: string): boolean {
+  return WATER_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveAgencyAmount(fieldKey: string): boolean {
+  return AGENCY_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
 function shouldDeriveAgricultureAmount(fieldKey: string): boolean {
   return AGRICULTURE_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveBtpAmount(fieldKey: string): boolean {
+  return BTP_AMOUNT_METADATA_FIELDS.has(fieldKey);
 }
 
 function shouldDeriveFishFarmingAmount(fieldKey: string): boolean {
@@ -507,7 +1832,15 @@ function shouldDeriveLivestockAmount(fieldKey: string): boolean {
 function getDefaultTransactionType(
   activityCode: BusinessActivityCode | null
 ): "CASH_IN" | "CASH_OUT" {
-  return activityCode === "HARDWARE" ? "CASH_IN" : "CASH_OUT";
+  return activityCode === "GENERAL_STORE" ||
+    activityCode === "HARDWARE" ||
+    activityCode === "FOOD" ||
+    activityCode === "RENTAL" ||
+    activityCode === "HOTEL_LODGING" ||
+    activityCode === "WATER" ||
+    activityCode === "REAL_ESTATE_AGENCY"
+    ? "CASH_IN"
+    : "CASH_OUT";
 }
 
 function isHardwareOperationKind(value: string | undefined): value is HardwareOperationKind {
@@ -547,6 +1880,555 @@ function getHardwareOperationType(kind: HardwareOperationKind): "CASH_IN" | "CAS
     return "CASH_IN";
   }
   return null;
+}
+
+function isStoreOperationKind(value: string | undefined): value is StoreOperationKind {
+  return (
+    value === "STORE_SALE" ||
+    value === "STOCK_PURCHASE" ||
+    value === "SUPPLIER_PAYMENT" ||
+    value === "CUSTOMER_RETURN" ||
+    value === "DISCOUNT_ADJUSTMENT" ||
+    value === "INVENTORY_ADJUSTMENT" ||
+    value === "INTERNAL_TRANSFER" ||
+    value === "STORE_EXPENSE"
+  );
+}
+
+function hasStoreMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "department",
+    "productFamily",
+    "itemName",
+    "skuRef",
+    "barcode",
+    "shelfRef",
+    "registerRef",
+    "cashierRef",
+    "quantity",
+    "returnQuantity",
+    "adjustmentQuantity",
+    "purchaseUnitPrice",
+    "saleUnitPrice",
+    "discountAmount",
+    "returnAmount",
+    "invoiceAmount",
+    "supplierRef",
+    "customerRef",
+    "invoiceRef",
+    "receiptRef",
+    "transferRef",
+    "sourceStoreRef",
+    "destinationStoreRef",
+    "expenseLabel",
+    "paymentRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getStoreOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): StoreOperationKind {
+  const configuredKind = metadata[STORE_OPERATION_KIND_KEY]?.trim();
+  if (isStoreOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasStoreMetadata(metadata)) {
+    return type === "CASH_IN" ? "STORE_SALE" : "STOCK_PURCHASE";
+  }
+  return type === "CASH_IN" ? "STORE_SALE" : "STORE_EXPENSE";
+}
+
+function getStoreOperationType(kind: StoreOperationKind): "CASH_IN" | "CASH_OUT" {
+  return kind === "STORE_SALE" ? "CASH_IN" : "CASH_OUT";
+}
+
+function getStoreVisibleKeys(kind: StoreOperationKind): Set<string> {
+  if (kind === "STORE_SALE") {
+    return STORE_SALE_METADATA_FIELDS;
+  }
+  if (kind === "STOCK_PURCHASE") {
+    return STORE_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "SUPPLIER_PAYMENT") {
+    return STORE_SUPPLIER_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "CUSTOMER_RETURN") {
+    return STORE_CUSTOMER_RETURN_METADATA_FIELDS;
+  }
+  if (kind === "DISCOUNT_ADJUSTMENT") {
+    return STORE_DISCOUNT_ADJUSTMENT_METADATA_FIELDS;
+  }
+  if (kind === "INVENTORY_ADJUSTMENT") {
+    return STORE_INVENTORY_ADJUSTMENT_METADATA_FIELDS;
+  }
+  if (kind === "INTERNAL_TRANSFER") {
+    return STORE_INTERNAL_TRANSFER_METADATA_FIELDS;
+  }
+  return STORE_EXPENSE_METADATA_FIELDS;
+}
+
+function isFoodOperationKind(value: string | undefined): value is FoodOperationKind {
+  return (
+    value === "PRODUCT_SALE" ||
+    value === "PRODUCT_PURCHASE" ||
+    value === "SUPPLIER_PAYMENT" ||
+    value === "STOCK_LOSS" ||
+    value === "COLD_CHAIN_EXPENSE" ||
+    value === "PACKAGING_EXPENSE" ||
+    value === "CUSTOMER_REFUND"
+  );
+}
+
+function hasFoodMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "productFamily",
+    "productName",
+    "batchRef",
+    "expiryDate",
+    "storageArea",
+    "temperatureRange",
+    "quantity",
+    "lossQuantity",
+    "purchaseUnitPrice",
+    "saleUnitPrice",
+    "supplierRef",
+    "buyerRef",
+    "invoiceRef",
+    "invoiceAmount",
+    "lossReason",
+    "paymentRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getFoodOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): FoodOperationKind {
+  const configuredKind = metadata[FOOD_OPERATION_KIND_KEY]?.trim();
+  if (isFoodOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasFoodMetadata(metadata)) {
+    return type === "CASH_IN" ? "PRODUCT_SALE" : "PRODUCT_PURCHASE";
+  }
+  return type === "CASH_IN" ? "PRODUCT_SALE" : "SUPPLIER_PAYMENT";
+}
+
+function getFoodOperationType(kind: FoodOperationKind): "CASH_IN" | "CASH_OUT" {
+  return kind === "PRODUCT_SALE" ? "CASH_IN" : "CASH_OUT";
+}
+
+function getFoodVisibleKeys(kind: FoodOperationKind): Set<string> {
+  if (kind === "PRODUCT_SALE") {
+    return FOOD_PRODUCT_SALE_METADATA_FIELDS;
+  }
+  if (kind === "PRODUCT_PURCHASE") {
+    return FOOD_PRODUCT_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "SUPPLIER_PAYMENT") {
+    return FOOD_SUPPLIER_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "STOCK_LOSS") {
+    return FOOD_STOCK_LOSS_METADATA_FIELDS;
+  }
+  if (kind === "COLD_CHAIN_EXPENSE") {
+    return FOOD_COLD_CHAIN_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "PACKAGING_EXPENSE") {
+    return FOOD_PACKAGING_EXPENSE_METADATA_FIELDS;
+  }
+  return FOOD_CUSTOMER_REFUND_METADATA_FIELDS;
+}
+
+function isRentalOperationKind(value: string | undefined): value is RentalOperationKind {
+  return (
+    value === "RENT_PAYMENT" ||
+    value === "SECURITY_DEPOSIT" ||
+    value === "ADVANCE_PAYMENT" ||
+    value === "SERVICE_CHARGE_INCOME" ||
+    value === "MAINTENANCE_EXPENSE" ||
+    value === "PROPERTY_EXPENSE" ||
+    value === "OWNER_PAYOUT"
+  );
+}
+
+function hasRentalMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "propertyRef",
+    "unitRef",
+    "tenantRef",
+    "leaseRef",
+    "propertyType",
+    "locationZone",
+    "periodRef",
+    "monthsCount",
+    "monthlyRent",
+    "serviceCharge",
+    "depositAmount",
+    "chargeLabel",
+    "maintenanceType",
+    "supplierRef",
+    "invoiceRef",
+    "invoiceAmount",
+    "ownerRef",
+    "payoutAmount",
+    "paymentRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getRentalOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): RentalOperationKind {
+  const configuredKind = metadata[RENTAL_OPERATION_KIND_KEY]?.trim();
+  if (isRentalOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasRentalMetadata(metadata)) {
+    return type === "CASH_IN" ? "RENT_PAYMENT" : "MAINTENANCE_EXPENSE";
+  }
+  return type === "CASH_IN" ? "RENT_PAYMENT" : "PROPERTY_EXPENSE";
+}
+
+function getRentalOperationType(kind: RentalOperationKind): "CASH_IN" | "CASH_OUT" {
+  return (
+    kind === "RENT_PAYMENT" ||
+    kind === "SECURITY_DEPOSIT" ||
+    kind === "ADVANCE_PAYMENT" ||
+    kind === "SERVICE_CHARGE_INCOME"
+  )
+    ? "CASH_IN"
+    : "CASH_OUT";
+}
+
+function getRentalVisibleKeys(kind: RentalOperationKind): Set<string> {
+  if (kind === "RENT_PAYMENT") {
+    return RENTAL_RENT_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "SECURITY_DEPOSIT") {
+    return RENTAL_SECURITY_DEPOSIT_METADATA_FIELDS;
+  }
+  if (kind === "ADVANCE_PAYMENT") {
+    return RENTAL_ADVANCE_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "SERVICE_CHARGE_INCOME") {
+    return RENTAL_SERVICE_CHARGE_INCOME_METADATA_FIELDS;
+  }
+  if (kind === "MAINTENANCE_EXPENSE") {
+    return RENTAL_MAINTENANCE_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "PROPERTY_EXPENSE") {
+    return RENTAL_PROPERTY_EXPENSE_METADATA_FIELDS;
+  }
+  return RENTAL_OWNER_PAYOUT_METADATA_FIELDS;
+}
+
+function isHotelOperationKind(value: string | undefined): value is HotelOperationKind {
+  return (
+    value === "ROOM_PAYMENT" ||
+    value === "BOOKING_DEPOSIT" ||
+    value === "RESTAURANT_SALE" ||
+    value === "EVENT_SERVICE" ||
+    value === "LAUNDRY_SERVICE" ||
+    value === "ROOM_MAINTENANCE" ||
+    value === "SUPPLIER_PAYMENT" ||
+    value === "COMMISSION_FEE" ||
+    value === "TAX_PAYMENT" ||
+    value === "GUEST_REFUND"
+  );
+}
+
+function hasHotelMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "bookingRef",
+    "stayRef",
+    "guestRef",
+    "roomRef",
+    "roomType",
+    "serviceLine",
+    "checkInDate",
+    "checkOutDate",
+    "nightsCount",
+    "roomRate",
+    "guestCount",
+    "mealCount",
+    "mealUnitPrice",
+    "serviceQuantity",
+    "serviceUnitPrice",
+    "eventRef",
+    "supplierRef",
+    "invoiceRef",
+    "invoiceAmount",
+    "commissionAmount",
+    "taxAmount",
+    "refundAmount",
+    "paymentRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getHotelOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): HotelOperationKind {
+  const configuredKind = metadata[HOTEL_OPERATION_KIND_KEY]?.trim();
+  if (isHotelOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasHotelMetadata(metadata)) {
+    return type === "CASH_IN" ? "ROOM_PAYMENT" : "ROOM_MAINTENANCE";
+  }
+  return type === "CASH_IN" ? "ROOM_PAYMENT" : "SUPPLIER_PAYMENT";
+}
+
+function getHotelOperationType(kind: HotelOperationKind): "CASH_IN" | "CASH_OUT" {
+  return (
+    kind === "ROOM_PAYMENT" ||
+    kind === "BOOKING_DEPOSIT" ||
+    kind === "RESTAURANT_SALE" ||
+    kind === "EVENT_SERVICE" ||
+    kind === "LAUNDRY_SERVICE"
+  )
+    ? "CASH_IN"
+    : "CASH_OUT";
+}
+
+function getHotelVisibleKeys(kind: HotelOperationKind): Set<string> {
+  if (kind === "ROOM_PAYMENT") {
+    return HOTEL_ROOM_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "BOOKING_DEPOSIT") {
+    return HOTEL_BOOKING_DEPOSIT_METADATA_FIELDS;
+  }
+  if (kind === "RESTAURANT_SALE") {
+    return HOTEL_RESTAURANT_SALE_METADATA_FIELDS;
+  }
+  if (kind === "EVENT_SERVICE") {
+    return HOTEL_EVENT_SERVICE_METADATA_FIELDS;
+  }
+  if (kind === "LAUNDRY_SERVICE") {
+    return HOTEL_LAUNDRY_SERVICE_METADATA_FIELDS;
+  }
+  if (kind === "ROOM_MAINTENANCE") {
+    return HOTEL_ROOM_MAINTENANCE_METADATA_FIELDS;
+  }
+  if (kind === "SUPPLIER_PAYMENT") {
+    return HOTEL_SUPPLIER_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "COMMISSION_FEE") {
+    return HOTEL_COMMISSION_FEE_METADATA_FIELDS;
+  }
+  if (kind === "TAX_PAYMENT") {
+    return HOTEL_TAX_PAYMENT_METADATA_FIELDS;
+  }
+  return HOTEL_GUEST_REFUND_METADATA_FIELDS;
+}
+
+function isWaterOperationKind(value: string | undefined): value is WaterOperationKind {
+  return (
+    value === "WATER_BILLING" ||
+    value === "BULK_WATER_SALE" ||
+    value === "CONNECTION_FEE" ||
+    value === "SUBSIDY_INCOME" ||
+    value === "CHEMICAL_PURCHASE" ||
+    value === "ENERGY_PAYMENT" ||
+    value === "MAINTENANCE_EXPENSE" ||
+    value === "QUALITY_TEST_EXPENSE" ||
+    value === "NETWORK_REPAIR" ||
+    value === "SUPPLIER_PAYMENT"
+  );
+}
+
+function hasWaterMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "facilityRef",
+    "networkZone",
+    "productionLine",
+    "meterRef",
+    "customerRef",
+    "billingPeriod",
+    "meterStart",
+    "meterEnd",
+    "producedVolumeM3",
+    "volumeM3",
+    "unitPrice",
+    "connectionRef",
+    "connectionFee",
+    "treatmentProduct",
+    "chemicalQuantity",
+    "energySource",
+    "energyQuantity",
+    "equipmentRef",
+    "maintenanceType",
+    "testRef",
+    "waterQuality",
+    "issueRef",
+    "supplierRef",
+    "invoiceRef",
+    "invoiceAmount",
+    "paymentRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getWaterOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): WaterOperationKind {
+  const configuredKind = metadata[WATER_OPERATION_KIND_KEY]?.trim();
+  if (isWaterOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasWaterMetadata(metadata)) {
+    return type === "CASH_IN" ? "WATER_BILLING" : "MAINTENANCE_EXPENSE";
+  }
+  return type === "CASH_IN" ? "WATER_BILLING" : "SUPPLIER_PAYMENT";
+}
+
+function getWaterOperationType(kind: WaterOperationKind): "CASH_IN" | "CASH_OUT" {
+  return (
+    kind === "WATER_BILLING" ||
+    kind === "BULK_WATER_SALE" ||
+    kind === "CONNECTION_FEE" ||
+    kind === "SUBSIDY_INCOME"
+  )
+    ? "CASH_IN"
+    : "CASH_OUT";
+}
+
+function getWaterVisibleKeys(kind: WaterOperationKind): Set<string> {
+  if (kind === "WATER_BILLING") {
+    return WATER_BILLING_METADATA_FIELDS;
+  }
+  if (kind === "BULK_WATER_SALE") {
+    return WATER_BULK_SALE_METADATA_FIELDS;
+  }
+  if (kind === "CONNECTION_FEE") {
+    return WATER_CONNECTION_FEE_METADATA_FIELDS;
+  }
+  if (kind === "SUBSIDY_INCOME") {
+    return WATER_SUBSIDY_METADATA_FIELDS;
+  }
+  if (kind === "CHEMICAL_PURCHASE") {
+    return WATER_CHEMICAL_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "ENERGY_PAYMENT") {
+    return WATER_ENERGY_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "MAINTENANCE_EXPENSE") {
+    return WATER_MAINTENANCE_METADATA_FIELDS;
+  }
+  if (kind === "QUALITY_TEST_EXPENSE") {
+    return WATER_QUALITY_TEST_METADATA_FIELDS;
+  }
+  if (kind === "NETWORK_REPAIR") {
+    return WATER_NETWORK_REPAIR_METADATA_FIELDS;
+  }
+  return WATER_SUPPLIER_PAYMENT_METADATA_FIELDS;
+}
+
+function isAgencyOperationKind(value: string | undefined): value is AgencyOperationKind {
+  return (
+    value === "SALE_COMMISSION" ||
+    value === "RENTAL_COMMISSION" ||
+    value === "MANDATE_FEE" ||
+    value === "VISIT_FEE" ||
+    value === "FILE_FEE" ||
+    value === "ADVERTISING_EXPENSE" ||
+    value === "FIELD_VISIT_EXPENSE" ||
+    value === "BROKER_PAYOUT" ||
+    value === "DOCUMENT_EXPENSE" ||
+    value === "CUSTOMER_REFUND" ||
+    value === "OFFICE_EXPENSE"
+  );
+}
+
+function hasAgencyMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "mandateRef",
+    "propertyRef",
+    "mandateType",
+    "propertyType",
+    "locationZone",
+    "ownerRef",
+    "clientRef",
+    "prospectRef",
+    "dealRef",
+    "dealStage",
+    "dealAmount",
+    "commissionRate",
+    "commissionAmount",
+    "feeAmount",
+    "visitCount",
+    "unitPrice",
+    "advertisingChannel",
+    "documentRef",
+    "supplierRef",
+    "invoiceRef",
+    "expenseAmount",
+    "payoutAmount",
+    "refundAmount",
+    "paymentRef"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getAgencyOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): AgencyOperationKind {
+  const configuredKind = metadata[AGENCY_OPERATION_KIND_KEY]?.trim();
+  if (isAgencyOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasAgencyMetadata(metadata)) {
+    return type === "CASH_IN" ? "SALE_COMMISSION" : "ADVERTISING_EXPENSE";
+  }
+  return type === "CASH_IN" ? "SALE_COMMISSION" : "OFFICE_EXPENSE";
+}
+
+function getAgencyOperationType(kind: AgencyOperationKind): "CASH_IN" | "CASH_OUT" {
+  return (
+    kind === "SALE_COMMISSION" ||
+    kind === "RENTAL_COMMISSION" ||
+    kind === "MANDATE_FEE" ||
+    kind === "VISIT_FEE" ||
+    kind === "FILE_FEE"
+  )
+    ? "CASH_IN"
+    : "CASH_OUT";
+}
+
+function getAgencyVisibleKeys(kind: AgencyOperationKind): Set<string> {
+  if (kind === "SALE_COMMISSION") {
+    return AGENCY_SALE_COMMISSION_METADATA_FIELDS;
+  }
+  if (kind === "RENTAL_COMMISSION") {
+    return AGENCY_RENTAL_COMMISSION_METADATA_FIELDS;
+  }
+  if (kind === "MANDATE_FEE") {
+    return AGENCY_MANDATE_FEE_METADATA_FIELDS;
+  }
+  if (kind === "VISIT_FEE") {
+    return AGENCY_VISIT_FEE_METADATA_FIELDS;
+  }
+  if (kind === "FILE_FEE") {
+    return AGENCY_FILE_FEE_METADATA_FIELDS;
+  }
+  if (kind === "ADVERTISING_EXPENSE") {
+    return AGENCY_ADVERTISING_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "FIELD_VISIT_EXPENSE") {
+    return AGENCY_FIELD_VISIT_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "BROKER_PAYOUT") {
+    return AGENCY_BROKER_PAYOUT_METADATA_FIELDS;
+  }
+  if (kind === "DOCUMENT_EXPENSE") {
+    return AGENCY_DOCUMENT_EXPENSE_METADATA_FIELDS;
+  }
+  if (kind === "CUSTOMER_REFUND") {
+    return AGENCY_CUSTOMER_REFUND_METADATA_FIELDS;
+  }
+  return AGENCY_OFFICE_EXPENSE_METADATA_FIELDS;
 }
 
 function isAgricultureOperationKind(value: string | undefined): value is AgricultureOperationKind {
@@ -604,6 +2486,79 @@ function getAgricultureVisibleKeys(kind: AgricultureOperationKind): Set<string> 
     return AGRICULTURE_HARVEST_SALE_METADATA_FIELDS;
   }
   return AGRICULTURE_SUPPORT_INCOME_METADATA_FIELDS;
+}
+
+function isBtpOperationKind(value: string | undefined): value is BtpOperationKind {
+  return (
+    value === "CLIENT_PAYMENT" ||
+    value === "MATERIAL_PURCHASE" ||
+    value === "LABOR_PAYMENT" ||
+    value === "EQUIPMENT_RENTAL" ||
+    value === "SUBCONTRACTING" ||
+    value === "SITE_EXPENSE"
+  );
+}
+
+function hasBtpMetadata(metadata: Record<string, string>): boolean {
+  return [
+    "projectRef",
+    "contractRef",
+    "clientRef",
+    "workPackage",
+    "siteLocation",
+    "materialName",
+    "quantity",
+    "unitPrice",
+    "supplierRef",
+    "teamRef",
+    "workerCount",
+    "workDays",
+    "dailyRate",
+    "equipmentRef",
+    "equipmentHours",
+    "hourlyRate",
+    "subcontractorRef",
+    "invoiceRef",
+    "progressPercent",
+    "retentionAmount"
+  ].some((key) => metadata[key]?.trim());
+}
+
+function getBtpOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): BtpOperationKind {
+  const configuredKind = metadata[BTP_OPERATION_KIND_KEY]?.trim();
+  if (isBtpOperationKind(configuredKind)) {
+    return configuredKind;
+  }
+  if (!hasBtpMetadata(metadata)) {
+    return type === "CASH_IN" ? "CLIENT_PAYMENT" : "MATERIAL_PURCHASE";
+  }
+  return type === "CASH_IN" ? "CLIENT_PAYMENT" : "SITE_EXPENSE";
+}
+
+function getBtpOperationType(kind: BtpOperationKind): "CASH_IN" | "CASH_OUT" {
+  return kind === "CLIENT_PAYMENT" ? "CASH_IN" : "CASH_OUT";
+}
+
+function getBtpVisibleKeys(kind: BtpOperationKind): Set<string> {
+  if (kind === "CLIENT_PAYMENT") {
+    return BTP_CLIENT_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "MATERIAL_PURCHASE") {
+    return BTP_MATERIAL_PURCHASE_METADATA_FIELDS;
+  }
+  if (kind === "LABOR_PAYMENT") {
+    return BTP_LABOR_PAYMENT_METADATA_FIELDS;
+  }
+  if (kind === "EQUIPMENT_RENTAL") {
+    return BTP_EQUIPMENT_RENTAL_METADATA_FIELDS;
+  }
+  if (kind === "SUBCONTRACTING") {
+    return BTP_SUBCONTRACTING_METADATA_FIELDS;
+  }
+  return BTP_SITE_EXPENSE_METADATA_FIELDS;
 }
 
 function isFishFarmingOperationKind(value: string | undefined): value is FishFarmingOperationKind {
@@ -760,6 +2715,48 @@ function getVisibleFinanceMetadataFields(
     return fields.filter((field) => visibleKeys.has(field.key));
   }
 
+  if (activityCode === "BTP") {
+    const operationKind = getBtpOperationKind(type, metadata);
+    const visibleKeys = getBtpVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "GENERAL_STORE") {
+    const operationKind = getStoreOperationKind(type, metadata);
+    const visibleKeys = getStoreVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "FOOD") {
+    const operationKind = getFoodOperationKind(type, metadata);
+    const visibleKeys = getFoodVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "RENTAL") {
+    const operationKind = getRentalOperationKind(type, metadata);
+    const visibleKeys = getRentalVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "HOTEL_LODGING") {
+    const operationKind = getHotelOperationKind(type, metadata);
+    const visibleKeys = getHotelVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "WATER") {
+    const operationKind = getWaterOperationKind(type, metadata);
+    const visibleKeys = getWaterVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "REAL_ESTATE_AGENCY") {
+    const operationKind = getAgencyOperationKind(type, metadata);
+    const visibleKeys = getAgencyVisibleKeys(operationKind);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
   if (activityCode === "AGRICULTURE") {
     const operationKind = getAgricultureOperationKind(type, metadata);
     const visibleKeys = getAgricultureVisibleKeys(operationKind);
@@ -814,6 +2811,132 @@ function cleanSectorFinanceMetadata(
         key,
         FISH_FARMING_METADATA_FIELDS.has(key) &&
         key !== FISH_FARMING_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "BTP") {
+    const operationKind = getBtpOperationKind(type, metadata);
+    const visibleKeys = getBtpVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [BTP_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        BTP_METADATA_FIELDS.has(key) &&
+        key !== BTP_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "GENERAL_STORE") {
+    const operationKind = getStoreOperationKind(type, metadata);
+    const visibleKeys = getStoreVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [STORE_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        STORE_METADATA_FIELDS.has(key) &&
+        key !== STORE_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "FOOD") {
+    const operationKind = getFoodOperationKind(type, metadata);
+    const visibleKeys = getFoodVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [FOOD_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        FOOD_METADATA_FIELDS.has(key) &&
+        key !== FOOD_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "RENTAL") {
+    const operationKind = getRentalOperationKind(type, metadata);
+    const visibleKeys = getRentalVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [RENTAL_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        RENTAL_METADATA_FIELDS.has(key) &&
+        key !== RENTAL_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "HOTEL_LODGING") {
+    const operationKind = getHotelOperationKind(type, metadata);
+    const visibleKeys = getHotelVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [HOTEL_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        HOTEL_METADATA_FIELDS.has(key) &&
+        key !== HOTEL_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "WATER") {
+    const operationKind = getWaterOperationKind(type, metadata);
+    const visibleKeys = getWaterVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [WATER_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        WATER_METADATA_FIELDS.has(key) &&
+        key !== WATER_OPERATION_KIND_KEY &&
+        !visibleKeys.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
+  if (activityCode === "REAL_ESTATE_AGENCY") {
+    const operationKind = getAgencyOperationKind(type, metadata);
+    const visibleKeys = getAgencyVisibleKeys(operationKind);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [AGENCY_OPERATION_KIND_KEY]: operationKind
+      }).map(([key, value]) => [
+        key,
+        AGENCY_METADATA_FIELDS.has(key) &&
+        key !== AGENCY_OPERATION_KIND_KEY &&
         !visibleKeys.has(key)
           ? ""
           : value
@@ -877,6 +3000,27 @@ function deriveSectorAmount(
   if (activityCode === "AGRICULTURE") {
     return deriveAgricultureAmount(getAgricultureOperationKind(type, metadata), metadata);
   }
+  if (activityCode === "BTP") {
+    return deriveBtpAmount(getBtpOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "GENERAL_STORE") {
+    return deriveStoreAmount(getStoreOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "FOOD") {
+    return deriveFoodAmount(getFoodOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "RENTAL") {
+    return deriveRentalAmount(getRentalOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "HOTEL_LODGING") {
+    return deriveHotelAmount(getHotelOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "WATER") {
+    return deriveWaterAmount(getWaterOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "REAL_ESTATE_AGENCY") {
+    return deriveAgencyAmount(getAgencyOperationKind(type, metadata), metadata);
+  }
   if (activityCode === "FISH_FARMING") {
     return deriveFishFarmingAmount(getFishFarmingOperationKind(type, metadata), metadata);
   }
@@ -894,6 +3038,53 @@ function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
       : "Transaction globale: renseignez seulement le montant et la description utile.";
 }
 
+function getStoreFormModeLabel(kind: StoreOperationKind): string {
+  if (kind === "STORE_SALE") {
+    return "Vente caisse: rayon, article, reference, caisse, caissier, quantite, prix de vente, remise et ticket.";
+  }
+  if (kind === "STOCK_PURCHASE") {
+    return "Achat stock: rayon, article, quantite, prix d'achat, fournisseur et facture.";
+  }
+  if (kind === "SUPPLIER_PAYMENT") {
+    return "Paiement fournisseur: fournisseur, facture, montant et reference de paiement.";
+  }
+  if (kind === "CUSTOMER_RETURN") {
+    return "Retour client: article, ticket, quantite retour, montant et client concerne.";
+  }
+  if (kind === "DISCOUNT_ADJUSTMENT") {
+    return "Remise / ecart: caisse, caissier, article ou ticket et montant de la remise.";
+  }
+  if (kind === "INVENTORY_ADJUSTMENT") {
+    return "Ajustement inventaire: article, emplacement, ecart de quantite, cout unitaire et motif.";
+  }
+  if (kind === "INTERNAL_TRANSFER") {
+    return "Transfert interne: article, quantite, reference transfert, origine et destination.";
+  }
+  return "Charge magasin: nature de charge, fournisseur, facture, montant et reference de paiement.";
+}
+
+function getFoodFormModeLabel(kind: FoodOperationKind): string {
+  if (kind === "PRODUCT_SALE") {
+    return "Vente produit: famille, produit, lot, DLC, quantite, prix de vente, client et reference paiement.";
+  }
+  if (kind === "PRODUCT_PURCHASE") {
+    return "Achat stock: famille, produit, lot, DLC, quantite, prix d'achat, fournisseur et facture.";
+  }
+  if (kind === "SUPPLIER_PAYMENT") {
+    return "Paiement fournisseur: fournisseur, facture, montant et reference de paiement.";
+  }
+  if (kind === "STOCK_LOSS") {
+    return "Perte / peremption: lot, DLC, quantite perdue, cout unitaire et motif de retrait.";
+  }
+  if (kind === "COLD_CHAIN_EXPENSE") {
+    return "Chaine du froid: zone de stockage, temperature, prestataire, facture et montant.";
+  }
+  if (kind === "PACKAGING_EXPENSE") {
+    return "Emballage: famille, produit, fournisseur, facture et montant.";
+  }
+  return "Remboursement client: produit, lot, quantite, prix de vente, client et reference paiement.";
+}
+
 function getAgricultureFormModeLabel(kind: AgricultureOperationKind): string {
   if (kind === "INPUT_PURCHASE") {
     return "Achat intrants: campagne, parcelle, type de champ, intrant, quantite et prix unitaire.";
@@ -905,6 +3096,143 @@ function getAgricultureFormModeLabel(kind: AgricultureOperationKind): string {
     return "Vente recolte: culture, quantite vendue, prix unitaire et acheteur.";
   }
   return "Appui / subvention: campagne, parcelle et source de financement.";
+}
+
+function getBtpFormModeLabel(kind: BtpOperationKind): string {
+  if (kind === "CLIENT_PAYMENT") {
+    return "Encaissement client: chantier, marche/devis, client, situation de travaux et avancement.";
+  }
+  if (kind === "MATERIAL_PURCHASE") {
+    return "Achat materiaux: chantier, lot, materiau, quantite, prix unitaire et fournisseur.";
+  }
+  if (kind === "LABOR_PAYMENT") {
+    return "Main-d'oeuvre: chantier, lot, equipe, nombre d'ouvriers, jours travailles et taux journalier.";
+  }
+  if (kind === "EQUIPMENT_RENTAL") {
+    return "Location engin: chantier, engin, heures ou vacations, taux horaire et fournisseur.";
+  }
+  if (kind === "SUBCONTRACTING") {
+    return "Sous-traitance: chantier, lot, sous-traitant, quantite ou avancement, facture et retenue.";
+  }
+  return "Charge chantier: depense generale, reserve, approvisionnement ou autre charge rattachee au chantier.";
+}
+
+function getRentalFormModeLabel(kind: RentalOperationKind): string {
+  if (kind === "RENT_PAYMENT") {
+    return "Paiement loyer: bien, lot, locataire, bail, periode, nombre de mois, loyer mensuel et charges.";
+  }
+  if (kind === "SECURITY_DEPOSIT") {
+    return "Caution: bien, lot, locataire, bail, montant caution et reference du paiement.";
+  }
+  if (kind === "ADVANCE_PAYMENT") {
+    return "Avance loyer: periode couverte, nombre de mois, loyer mensuel et reference du paiement.";
+  }
+  if (kind === "SERVICE_CHARGE_INCOME") {
+    return "Charges recuperees: periode, nature de charge, montant des charges et reference du paiement.";
+  }
+  if (kind === "MAINTENANCE_EXPENSE") {
+    return "Maintenance: type d'intervention, prestataire, facture et montant de la depense.";
+  }
+  if (kind === "PROPERTY_EXPENSE") {
+    return "Charge bien: nature de charge, prestataire, facture et montant rattache au bien.";
+  }
+  return "Reversement proprietaire: proprietaire, periode, montant reverse et reference du paiement.";
+}
+
+function getHotelFormModeLabel(kind: HotelOperationKind): string {
+  if (kind === "ROOM_PAYMENT") {
+    return "Paiement chambre: reservation, sejour, client, chambre, dates, nuitees et tarif par nuit.";
+  }
+  if (kind === "BOOKING_DEPOSIT") {
+    return "Acompte reservation: reservation, client, chambre, dates et montant de l'acompte.";
+  }
+  if (kind === "RESTAURANT_SALE") {
+    return "Restauration: reservation ou client, nombre de repas, prix unitaire et reference de paiement.";
+  }
+  if (kind === "EVENT_SERVICE") {
+    return "Evenement / salle: evenement, quantite de service, prix unitaire et facture.";
+  }
+  if (kind === "LAUNDRY_SERVICE") {
+    return "Blanchisserie: quantite de service, prix unitaire, chambre ou sejour rattache.";
+  }
+  if (kind === "ROOM_MAINTENANCE") {
+    return "Maintenance chambre: chambre, service, fournisseur, facture et montant de charge.";
+  }
+  if (kind === "SUPPLIER_PAYMENT") {
+    return "Paiement fournisseur: service, fournisseur, facture, montant et reference de paiement.";
+  }
+  if (kind === "COMMISSION_FEE") {
+    return "Commission: reservation, agence ou plateforme, montant commission et paiement.";
+  }
+  if (kind === "TAX_PAYMENT") {
+    return "Taxe sejour: reservation, client, service, montant taxe et reference de paiement.";
+  }
+  return "Remboursement client: reservation, sejour, client, chambre, montant et reference de paiement.";
+}
+
+function getWaterFormModeLabel(kind: WaterOperationKind): string {
+  if (kind === "WATER_BILLING") {
+    return "Facture eau: site, zone, compteur, abonne, periode, index, volume m3, prix du m3 et paiement.";
+  }
+  if (kind === "BULK_WATER_SALE") {
+    return "Vente en gros: site, zone, client, volume m3, prix unitaire, facture et paiement.";
+  }
+  if (kind === "CONNECTION_FEE") {
+    return "Branchement: site, zone, abonne, dossier de raccordement, frais et reference paiement.";
+  }
+  if (kind === "SUBSIDY_INCOME") {
+    return "Subvention / appui: site, zone, source, montant et reference de paiement.";
+  }
+  if (kind === "CHEMICAL_PURCHASE") {
+    return "Produit de traitement: site, produit, quantite, prix unitaire, fournisseur et facture.";
+  }
+  if (kind === "ENERGY_PAYMENT") {
+    return "Energie: site, source energie, quantite, prix unitaire, fournisseur et facture.";
+  }
+  if (kind === "MAINTENANCE_EXPENSE") {
+    return "Maintenance: site, equipement, type de maintenance, prestataire, facture et montant.";
+  }
+  if (kind === "QUALITY_TEST_EXPENSE") {
+    return "Analyse qualite: site, reference analyse, resultat qualite, laboratoire et montant.";
+  }
+  if (kind === "NETWORK_REPAIR") {
+    return "Reparation reseau: zone, equipement ou conduite, incident, prestataire, facture et montant.";
+  }
+  return "Paiement fournisseur: site, zone, fournisseur, facture, montant et reference paiement.";
+}
+
+function getAgencyFormModeLabel(kind: AgencyOperationKind): string {
+  if (kind === "SALE_COMMISSION") {
+    return "Commission vente: mandat, bien, vendeur, acquereur, prix de vente, taux et reference paiement.";
+  }
+  if (kind === "RENTAL_COMMISSION") {
+    return "Commission location: mandat, bien, bailleur, locataire, valeur du bail ou loyer, taux et paiement.";
+  }
+  if (kind === "MANDATE_FEE") {
+    return "Frais mandat: mandat, bien, proprietaire, document rattache, montant frais et paiement.";
+  }
+  if (kind === "VISIT_FEE") {
+    return "Frais visite: mandat, bien, prospect, nombre de visites, prix unitaire et reference paiement.";
+  }
+  if (kind === "FILE_FEE") {
+    return "Frais dossier: mandat, client, document ou affaire, montant et paiement.";
+  }
+  if (kind === "ADVERTISING_EXPENSE") {
+    return "Publicite: mandat, bien, canal publicitaire, prestataire, facture et montant de depense.";
+  }
+  if (kind === "FIELD_VISIT_EXPENSE") {
+    return "Deplacement visite: mandat, bien, nombre de sorties, cout unitaire, prestataire et facture.";
+  }
+  if (kind === "BROKER_PAYOUT") {
+    return "Reversement courtier: mandat, affaire, courtier ou apporteur, montant reverse et paiement.";
+  }
+  if (kind === "DOCUMENT_EXPENSE") {
+    return "Frais document: mandat, bien, document administratif, prestataire, facture et montant.";
+  }
+  if (kind === "CUSTOMER_REFUND") {
+    return "Remboursement client: mandat, client, affaire, montant rembourse et reference paiement.";
+  }
+  return "Charge agence: mandat ou bien rattache, fournisseur, facture, montant et paiement.";
 }
 
 function getFishFarmingFormModeLabel(kind: FishFarmingOperationKind): string {
@@ -1030,8 +3358,29 @@ function formatMetadataValue(key: string, value: string): string {
   if (key === HARDWARE_OPERATION_KIND_KEY && isHardwareOperationKind(value)) {
     return HARDWARE_OPERATION_LABELS[value];
   }
+  if (key === STORE_OPERATION_KIND_KEY && isStoreOperationKind(value)) {
+    return STORE_OPERATION_LABELS[value];
+  }
+  if (key === FOOD_OPERATION_KIND_KEY && isFoodOperationKind(value)) {
+    return FOOD_OPERATION_LABELS[value];
+  }
   if (key === AGRICULTURE_OPERATION_KIND_KEY && isAgricultureOperationKind(value)) {
     return AGRICULTURE_OPERATION_LABELS[value];
+  }
+  if (key === BTP_OPERATION_KIND_KEY && isBtpOperationKind(value)) {
+    return BTP_OPERATION_LABELS[value];
+  }
+  if (key === RENTAL_OPERATION_KIND_KEY && isRentalOperationKind(value)) {
+    return RENTAL_OPERATION_LABELS[value];
+  }
+  if (key === HOTEL_OPERATION_KIND_KEY && isHotelOperationKind(value)) {
+    return HOTEL_OPERATION_LABELS[value];
+  }
+  if (key === WATER_OPERATION_KIND_KEY && isWaterOperationKind(value)) {
+    return WATER_OPERATION_LABELS[value];
+  }
+  if (key === AGENCY_OPERATION_KIND_KEY && isAgencyOperationKind(value)) {
+    return AGENCY_OPERATION_LABELS[value];
   }
   if (key === FISH_FARMING_OPERATION_KIND_KEY && isFishFarmingOperationKind(value)) {
     return FISH_FARMING_OPERATION_LABELS[value];
@@ -1227,9 +3576,30 @@ export function FinanceTransactionsPage(): JSX.Element {
   const hardwareOperationKind = selectedActivityCode === "HARDWARE"
     ? getHardwareOperationKind(transactionForm.type, transactionForm.metadata)
     : "GLOBAL";
+  const storeOperationKind = selectedActivityCode === "GENERAL_STORE"
+    ? getStoreOperationKind(transactionForm.type, transactionForm.metadata)
+    : "STORE_SALE";
+  const foodOperationKind = selectedActivityCode === "FOOD"
+    ? getFoodOperationKind(transactionForm.type, transactionForm.metadata)
+    : "PRODUCT_SALE";
   const agricultureOperationKind = selectedActivityCode === "AGRICULTURE"
     ? getAgricultureOperationKind(transactionForm.type, transactionForm.metadata)
     : "INPUT_PURCHASE";
+  const btpOperationKind = selectedActivityCode === "BTP"
+    ? getBtpOperationKind(transactionForm.type, transactionForm.metadata)
+    : "MATERIAL_PURCHASE";
+  const rentalOperationKind = selectedActivityCode === "RENTAL"
+    ? getRentalOperationKind(transactionForm.type, transactionForm.metadata)
+    : "RENT_PAYMENT";
+  const hotelOperationKind = selectedActivityCode === "HOTEL_LODGING"
+    ? getHotelOperationKind(transactionForm.type, transactionForm.metadata)
+    : "ROOM_PAYMENT";
+  const waterOperationKind = selectedActivityCode === "WATER"
+    ? getWaterOperationKind(transactionForm.type, transactionForm.metadata)
+    : "WATER_BILLING";
+  const agencyOperationKind = selectedActivityCode === "REAL_ESTATE_AGENCY"
+    ? getAgencyOperationKind(transactionForm.type, transactionForm.metadata)
+    : "SALE_COMMISSION";
   const fishFarmingOperationKind = selectedActivityCode === "FISH_FARMING"
     ? getFishFarmingOperationKind(transactionForm.type, transactionForm.metadata)
     : "FINGERLING_PURCHASE";
@@ -1240,7 +3610,14 @@ export function FinanceTransactionsPage(): JSX.Element {
     selectedProfile?.finance.requiresDescription ||
       visibleFinanceMetadataFields.some((field) => field.required) ||
       selectedActivityCode === "HARDWARE" ||
+      selectedActivityCode === "GENERAL_STORE" ||
+      selectedActivityCode === "FOOD" ||
       selectedActivityCode === "AGRICULTURE" ||
+      selectedActivityCode === "BTP" ||
+      selectedActivityCode === "RENTAL" ||
+      selectedActivityCode === "HOTEL_LODGING" ||
+      selectedActivityCode === "WATER" ||
+      selectedActivityCode === "REAL_ESTATE_AGENCY" ||
       selectedActivityCode === "FISH_FARMING" ||
       selectedActivityCode === "LIVESTOCK"
   );
@@ -2324,7 +4701,53 @@ export function FinanceTransactionsPage(): JSX.Element {
               </select>
             </label>
 
-            {selectedActivityCode === "HARDWARE" ? (
+            {selectedActivityCode === "GENERAL_STORE" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation magasin</span>
+                  <select
+                    value={storeOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as StoreOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getStoreOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [STORE_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveStoreAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="STORE_SALE">{STORE_OPERATION_LABELS.STORE_SALE}</option>
+                    <option value="STOCK_PURCHASE">{STORE_OPERATION_LABELS.STOCK_PURCHASE}</option>
+                    <option value="SUPPLIER_PAYMENT">{STORE_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
+                    <option value="CUSTOMER_RETURN">{STORE_OPERATION_LABELS.CUSTOMER_RETURN}</option>
+                    <option value="DISCOUNT_ADJUSTMENT">{STORE_OPERATION_LABELS.DISCOUNT_ADJUSTMENT}</option>
+                    <option value="INVENTORY_ADJUSTMENT">{STORE_OPERATION_LABELS.INVENTORY_ADJUSTMENT}</option>
+                    <option value="INTERNAL_TRANSFER">{STORE_OPERATION_LABELS.INTERNAL_TRANSFER}</option>
+                    <option value="STORE_EXPENSE">{STORE_OPERATION_LABELS.STORE_EXPENSE}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette magasin" : "Depense magasin"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "HARDWARE" ? (
               <>
                 <label className="operations-inline-group">
                   <span>Nature quincaillerie</span>
@@ -2396,6 +4819,51 @@ export function FinanceTransactionsPage(): JSX.Element {
                   </div>
                 )}
               </>
+            ) : selectedActivityCode === "FOOD" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation alimentaire</span>
+                  <select
+                    value={foodOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as FoodOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getFoodOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [FOOD_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveFoodAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="PRODUCT_SALE">{FOOD_OPERATION_LABELS.PRODUCT_SALE}</option>
+                    <option value="PRODUCT_PURCHASE">{FOOD_OPERATION_LABELS.PRODUCT_PURCHASE}</option>
+                    <option value="SUPPLIER_PAYMENT">{FOOD_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
+                    <option value="STOCK_LOSS">{FOOD_OPERATION_LABELS.STOCK_LOSS}</option>
+                    <option value="COLD_CHAIN_EXPENSE">{FOOD_OPERATION_LABELS.COLD_CHAIN_EXPENSE}</option>
+                    <option value="PACKAGING_EXPENSE">{FOOD_OPERATION_LABELS.PACKAGING_EXPENSE}</option>
+                    <option value="CUSTOMER_REFUND">{FOOD_OPERATION_LABELS.CUSTOMER_REFUND}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette alimentaire" : "Depense alimentaire"}
+                  </strong>
+                </div>
+              </>
             ) : selectedActivityCode === "AGRICULTURE" ? (
               <>
                 <label className="operations-inline-group">
@@ -2435,6 +4903,240 @@ export function FinanceTransactionsPage(): JSX.Element {
                   <span>Flux financier</span>
                   <strong>
                     {transactionForm.type === "CASH_IN" ? "Recette agricole" : "Depense agricole"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "BTP" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation BTP</span>
+                  <select
+                    value={btpOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as BtpOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getBtpOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [BTP_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveBtpAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="CLIENT_PAYMENT">{BTP_OPERATION_LABELS.CLIENT_PAYMENT}</option>
+                    <option value="MATERIAL_PURCHASE">{BTP_OPERATION_LABELS.MATERIAL_PURCHASE}</option>
+                    <option value="LABOR_PAYMENT">{BTP_OPERATION_LABELS.LABOR_PAYMENT}</option>
+                    <option value="EQUIPMENT_RENTAL">{BTP_OPERATION_LABELS.EQUIPMENT_RENTAL}</option>
+                    <option value="SUBCONTRACTING">{BTP_OPERATION_LABELS.SUBCONTRACTING}</option>
+                    <option value="SITE_EXPENSE">{BTP_OPERATION_LABELS.SITE_EXPENSE}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette chantier" : "Depense chantier"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "RENTAL" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation locative</span>
+                  <select
+                    value={rentalOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as RentalOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getRentalOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [RENTAL_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveRentalAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="RENT_PAYMENT">{RENTAL_OPERATION_LABELS.RENT_PAYMENT}</option>
+                    <option value="SECURITY_DEPOSIT">{RENTAL_OPERATION_LABELS.SECURITY_DEPOSIT}</option>
+                    <option value="ADVANCE_PAYMENT">{RENTAL_OPERATION_LABELS.ADVANCE_PAYMENT}</option>
+                    <option value="SERVICE_CHARGE_INCOME">{RENTAL_OPERATION_LABELS.SERVICE_CHARGE_INCOME}</option>
+                    <option value="MAINTENANCE_EXPENSE">{RENTAL_OPERATION_LABELS.MAINTENANCE_EXPENSE}</option>
+                    <option value="PROPERTY_EXPENSE">{RENTAL_OPERATION_LABELS.PROPERTY_EXPENSE}</option>
+                    <option value="OWNER_PAYOUT">{RENTAL_OPERATION_LABELS.OWNER_PAYOUT}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette locative" : "Depense locative"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "HOTEL_LODGING" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation hoteliere</span>
+                  <select
+                    value={hotelOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as HotelOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getHotelOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [HOTEL_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveHotelAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="ROOM_PAYMENT">{HOTEL_OPERATION_LABELS.ROOM_PAYMENT}</option>
+                    <option value="BOOKING_DEPOSIT">{HOTEL_OPERATION_LABELS.BOOKING_DEPOSIT}</option>
+                    <option value="RESTAURANT_SALE">{HOTEL_OPERATION_LABELS.RESTAURANT_SALE}</option>
+                    <option value="EVENT_SERVICE">{HOTEL_OPERATION_LABELS.EVENT_SERVICE}</option>
+                    <option value="LAUNDRY_SERVICE">{HOTEL_OPERATION_LABELS.LAUNDRY_SERVICE}</option>
+                    <option value="ROOM_MAINTENANCE">{HOTEL_OPERATION_LABELS.ROOM_MAINTENANCE}</option>
+                    <option value="SUPPLIER_PAYMENT">{HOTEL_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
+                    <option value="COMMISSION_FEE">{HOTEL_OPERATION_LABELS.COMMISSION_FEE}</option>
+                    <option value="TAX_PAYMENT">{HOTEL_OPERATION_LABELS.TAX_PAYMENT}</option>
+                    <option value="GUEST_REFUND">{HOTEL_OPERATION_LABELS.GUEST_REFUND}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette hoteliere" : "Depense hoteliere"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "WATER" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation eau potable</span>
+                  <select
+                    value={waterOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as WaterOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getWaterOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [WATER_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveWaterAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="WATER_BILLING">{WATER_OPERATION_LABELS.WATER_BILLING}</option>
+                    <option value="BULK_WATER_SALE">{WATER_OPERATION_LABELS.BULK_WATER_SALE}</option>
+                    <option value="CONNECTION_FEE">{WATER_OPERATION_LABELS.CONNECTION_FEE}</option>
+                    <option value="SUBSIDY_INCOME">{WATER_OPERATION_LABELS.SUBSIDY_INCOME}</option>
+                    <option value="CHEMICAL_PURCHASE">{WATER_OPERATION_LABELS.CHEMICAL_PURCHASE}</option>
+                    <option value="ENERGY_PAYMENT">{WATER_OPERATION_LABELS.ENERGY_PAYMENT}</option>
+                    <option value="MAINTENANCE_EXPENSE">{WATER_OPERATION_LABELS.MAINTENANCE_EXPENSE}</option>
+                    <option value="QUALITY_TEST_EXPENSE">{WATER_OPERATION_LABELS.QUALITY_TEST_EXPENSE}</option>
+                    <option value="NETWORK_REPAIR">{WATER_OPERATION_LABELS.NETWORK_REPAIR}</option>
+                    <option value="SUPPLIER_PAYMENT">{WATER_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette eau" : "Depense exploitation eau"}
+                  </strong>
+                </div>
+              </>
+            ) : selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Operation agence immobiliere</span>
+                  <select
+                    value={agencyOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as AgencyOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = getAgencyOperationType(nextKind);
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          nextType,
+                          {
+                            ...prev.metadata,
+                            [AGENCY_OPERATION_KIND_KEY]: nextKind
+                          }
+                        );
+                        const derivedAmount = deriveAgencyAmount(nextKind, nextMetadata);
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(derivedAmount ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="SALE_COMMISSION">{AGENCY_OPERATION_LABELS.SALE_COMMISSION}</option>
+                    <option value="RENTAL_COMMISSION">{AGENCY_OPERATION_LABELS.RENTAL_COMMISSION}</option>
+                    <option value="MANDATE_FEE">{AGENCY_OPERATION_LABELS.MANDATE_FEE}</option>
+                    <option value="VISIT_FEE">{AGENCY_OPERATION_LABELS.VISIT_FEE}</option>
+                    <option value="FILE_FEE">{AGENCY_OPERATION_LABELS.FILE_FEE}</option>
+                    <option value="ADVERTISING_EXPENSE">{AGENCY_OPERATION_LABELS.ADVERTISING_EXPENSE}</option>
+                    <option value="FIELD_VISIT_EXPENSE">{AGENCY_OPERATION_LABELS.FIELD_VISIT_EXPENSE}</option>
+                    <option value="BROKER_PAYOUT">{AGENCY_OPERATION_LABELS.BROKER_PAYOUT}</option>
+                    <option value="DOCUMENT_EXPENSE">{AGENCY_OPERATION_LABELS.DOCUMENT_EXPENSE}</option>
+                    <option value="CUSTOMER_REFUND">{AGENCY_OPERATION_LABELS.CUSTOMER_REFUND}</option>
+                    <option value="OFFICE_EXPENSE">{AGENCY_OPERATION_LABELS.OFFICE_EXPENSE}</option>
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>
+                    {transactionForm.type === "CASH_IN" ? "Recette agence" : "Depense agence"}
                   </strong>
                 </div>
               </>
@@ -2645,9 +5347,44 @@ export function FinanceTransactionsPage(): JSX.Element {
                   {getHardwareFormModeLabel(hardwareOperationKind)}
                 </p>
               ) : null}
+              {selectedActivityCode === "GENERAL_STORE" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getStoreFormModeLabel(storeOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "FOOD" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getFoodFormModeLabel(foodOperationKind)}
+                </p>
+              ) : null}
               {selectedActivityCode === "AGRICULTURE" ? (
                 <p className="hint finance-form-mode-hint">
                   {getAgricultureFormModeLabel(agricultureOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "BTP" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getBtpFormModeLabel(btpOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "RENTAL" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getRentalFormModeLabel(rentalOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "HOTEL_LODGING" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getHotelFormModeLabel(hotelOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "WATER" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getWaterFormModeLabel(waterOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getAgencyFormModeLabel(agencyOperationKind)}
                 </p>
               ) : null}
               {selectedActivityCode === "FISH_FARMING" ? (
@@ -2710,7 +5447,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                         };
                         const shouldDeriveAmount =
                           (selectedActivityCode === "HARDWARE" && shouldDeriveHardwareAmount(field.key)) ||
+                          (selectedActivityCode === "GENERAL_STORE" && shouldDeriveStoreAmount(field.key)) ||
+                          (selectedActivityCode === "FOOD" && shouldDeriveFoodAmount(field.key)) ||
                           (selectedActivityCode === "AGRICULTURE" && shouldDeriveAgricultureAmount(field.key)) ||
+                          (selectedActivityCode === "BTP" && shouldDeriveBtpAmount(field.key)) ||
+                          (selectedActivityCode === "RENTAL" && shouldDeriveRentalAmount(field.key)) ||
+                          (selectedActivityCode === "HOTEL_LODGING" && shouldDeriveHotelAmount(field.key)) ||
+                          (selectedActivityCode === "WATER" && shouldDeriveWaterAmount(field.key)) ||
+                          (selectedActivityCode === "REAL_ESTATE_AGENCY" && shouldDeriveAgencyAmount(field.key)) ||
                           (selectedActivityCode === "FISH_FARMING" && shouldDeriveFishFarmingAmount(field.key)) ||
                           (selectedActivityCode === "LIVESTOCK" && shouldDeriveLivestockAmount(field.key));
                         const derivedAmount = shouldDeriveAmount

@@ -61,7 +61,12 @@ export function getTaskNavigationTarget(
     return null;
   }
 
-  if (normalizedEntityType && normalizedEntityType !== "TASK" && normalizedEntityType !== "TASK_COMMENT") {
+  if (
+    normalizedEntityType &&
+    normalizedEntityType !== "TASK" &&
+    normalizedEntityType !== "TASK_COMMENT" &&
+    normalizedEntityType !== "TASK_ATTACHMENT"
+  ) {
     return null;
   }
 
@@ -84,6 +89,7 @@ export function getTaskTraceLines(action: string, metadata: unknown): string[] {
   const activityCode = asString(root.activityCode);
   const note = asString(root.note);
   const bodyPreview = asString(root.bodyPreview);
+  const fileName = asString(root.fileName);
   const dueDate = asString(root.dueDate);
   const previousStatus = asTaskStatusLabel(asString(root.previousStatus));
   const nextStatus = asTaskStatusLabel(asString(root.nextStatus));
@@ -110,6 +116,10 @@ export function getTaskTraceLines(action: string, metadata: unknown): string[] {
 
   if (action === "TASK_COMMENT_ADDED" && bodyPreview) {
     lines.push(`Commentaire: ${bodyPreview}`);
+  }
+
+  if (action === "TASK_ATTACHMENT_ADDED" && fileName) {
+    lines.push(`Pièce jointe: ${fileName}`);
   }
 
   return lines;

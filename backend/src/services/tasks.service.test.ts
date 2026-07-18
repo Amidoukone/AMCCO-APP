@@ -24,6 +24,7 @@ import {
 } from "./tasks.service.js";
 
 vi.mock("../repositories/tasks.repository.js", () => ({
+  addTaskAttachment: vi.fn(),
   createOperationTask: vi.fn(),
   deleteOperationTask: vi.fn(),
   findCompanyTaskAssigneeByUserId: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock("../repositories/tasks.repository.js", () => ({
   findOperationTasksMinimalByIds: vi.fn(),
   listCompanyTaskAssignees: vi.fn(),
   listOperationsTasks: vi.fn(),
+  listTaskAttachments: vi.fn(),
   updateOperationTask: vi.fn(),
   updateOperationTaskAssignment: vi.fn(),
   updateOperationTaskStatus: vi.fn()
@@ -78,13 +80,13 @@ describe("tasks.service", () => {
         description: "Suivre le paiement",
         activityCode: "SERVICES",
         metadata: {},
-        status: "TODO",
+        status: "IN_PROGRESS",
         createdById: "accountant-1",
         createdByEmail: "accountant@example.com",
         createdByFullName: "Comptable Test",
-        assignedToId: null,
-        assignedToEmail: null,
-        assignedToFullName: null,
+        assignedToId: "accountant-1",
+        assignedToEmail: "accountant@example.com",
+        assignedToFullName: "Comptable Test",
         dueDate: null,
         createdAt: "2026-04-20T08:00:00.000Z",
         updatedAt: "2026-04-20T08:00:00.000Z"
@@ -106,8 +108,8 @@ describe("tasks.service", () => {
       expect(createOperationTask).toHaveBeenCalledWith(
         expect.objectContaining({
           createdById: "accountant-1",
-          assignedToId: null,
-          status: "TODO",
+          assignedToId: "accountant-1",
+          status: "IN_PROGRESS",
           title: "Relancer fournisseur"
         })
       );
@@ -159,7 +161,7 @@ describe("tasks.service", () => {
         recipientRoles: ["SUPERVISOR"],
         excludeUserIds: ["employee-1"],
         code: "TASK_CREATED_BY_EMPLOYEE",
-        message: "Une nouvelle tache a ete creee par Employee One: Pointage terrain",
+        message: "Une nouvelle tâche a été créée par Employee One : Pointage terrain",
         severity: "INFO",
         entityType: "TASK",
         entityId: "task-employee",
@@ -242,7 +244,7 @@ describe("tasks.service", () => {
         companyId: actor.companyId,
         recipientUserIds: ["employee-1"],
         code: "TASK_ASSIGNED",
-        message: "Une nouvelle tache Magasins (commerce general) vous a ete assignee: Relancer client",
+        message: "Une nouvelle tâche Magasins (commerce general) vous a été assignée : Relancer client",
         severity: "INFO",
         entityType: "TASK",
         entityId: "task-1",
@@ -355,7 +357,7 @@ describe("tasks.service", () => {
         companyId: actor.companyId,
         recipientUserIds: ["employee-2"],
         code: "TASK_ASSIGNED",
-        message: "Une tache vous a ete assignee: Verifier dossier. Note: A traiter aujourd'hui",
+        message: "Une tâche vous a été assignée : Verifier dossier. Note : A traiter aujourd'hui",
         severity: "INFO",
         entityType: "TASK",
         entityId: "task-2",
@@ -633,7 +635,7 @@ describe("tasks.service", () => {
         recipientRoles: ["OWNER", "SYS_ADMIN", "SUPERVISOR"],
         excludeUserIds: [actor.actorId],
         code: "TASK_BLOCKED",
-        message: "Une tache Production d'eau potable est bloquee et requiert une attention management: Document manquant",
+        message: "Une tâche Production d'eau potable est bloquée et requiert une attention management : Document manquant",
         severity: "CRITICAL",
         entityType: "TASK",
         entityId: "task-4",

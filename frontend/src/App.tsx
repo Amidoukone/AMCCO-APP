@@ -3,8 +3,6 @@ import { AppLayout } from "./components/AppLayout";
 import { AuthGuard } from "./components/AuthGuard";
 import { PublicOnlyRoute } from "./components/PublicOnlyRoute";
 import { RoleGuard } from "./components/RoleGuard";
-import { getDefaultRouteForRole } from "./config/permissions";
-import { useAuth } from "./context/AuthContext";
 import { BusinessActivityProvider } from "./context/BusinessActivityContext";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminActivitiesPage } from "./pages/AdminActivitiesPage";
@@ -14,6 +12,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { FinanceSalariesPage } from "./pages/FinanceSalariesPage";
 import { FinanceTransactionsPage } from "./pages/FinanceTransactionsPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
+import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MyWorkPage } from "./pages/MyWorkPage";
 import { OperationsTasksPage } from "./pages/OperationsTasksPage";
@@ -22,23 +21,9 @@ import { SecuritySettingsPage } from "./pages/SecuritySettingsPage";
 import { TaskDetailsPage } from "./pages/TaskDetailsPage";
 
 export function App(): JSX.Element {
-  const { activeCompany, isAuthenticated, user } = useAuth();
-  const defaultAuthenticatedPath = !isAuthenticated
-    ? "/login"
-    : activeCompany
-      ? user
-        ? getDefaultRouteForRole(user.role)
-        : "/dashboard"
-      : user?.role === "SYS_ADMIN"
-        ? "/admin/companies"
-        : "/dashboard";
-
   return (
     <Routes>
-      <Route
-        path="/"
-        element={<Navigate to={defaultAuthenticatedPath} replace />}
-      />
+      <Route path="/" element={<HomePage />} />
       <Route
         path="/login"
         element={

@@ -51,6 +51,8 @@ import type {
   OperationTaskListResponse,
   OperationTaskMembersResponse,
   OperationTaskSingleResponse,
+  TaskAttachmentListResponse,
+  TaskAttachmentUploadAuthResponse,
   TaskCommentListResponse,
   TaskCommentSingleResponse,
   OperationTaskTimelineResponse,
@@ -1049,6 +1051,46 @@ export function addTaskCommentRequest(
     body: { body },
     accessToken
   });
+}
+
+export function listTaskAttachmentsRequest(
+  accessToken: string,
+  taskId: string
+): Promise<TaskAttachmentListResponse> {
+  return request<TaskAttachmentListResponse>(`/operations/tasks/${taskId}/attachments`, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function addTaskAttachmentRequest(
+  accessToken: string,
+  taskId: string,
+  input: {
+    storageKey: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  }
+): Promise<TaskAttachmentListResponse> {
+  return request<TaskAttachmentListResponse>(`/operations/tasks/${taskId}/attachments`, {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function getTaskAttachmentUploadAuthRequest(
+  accessToken: string,
+  taskId: string
+): Promise<TaskAttachmentUploadAuthResponse> {
+  return request<TaskAttachmentUploadAuthResponse>(
+    `/operations/tasks/${taskId}/attachments/upload-auth`,
+    {
+      method: "GET",
+      accessToken
+    }
+  );
 }
 
 export function assignOperationsTasksBulkRequest(

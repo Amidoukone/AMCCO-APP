@@ -46,6 +46,19 @@ type TaskAssigneeRow = RowDataPacket & {
   totalAssignedTasksCount: number;
 };
 
+type TaskAttachmentRow = RowDataPacket & {
+  id: string;
+  taskId: string;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedById: string;
+  uploadedByEmail: string;
+  uploadedByFullName: string;
+  uploadedAt: Date;
+};
+
 export type OperationTask = {
   id: string;
   companyId: string;
@@ -85,6 +98,19 @@ export type TaskAssignee = {
   todoTasksCount: number;
   doneTasksCount: number;
   totalAssignedTasksCount: number;
+};
+
+export type TaskAttachment = {
+  id: string;
+  taskId: string;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedById: string;
+  uploadedByEmail: string;
+  uploadedByFullName: string;
+  uploadedAt: string;
 };
 
 function toMetadataMap(value: unknown): Record<string, string> {
@@ -153,6 +179,21 @@ function toTaskAssignee(row: TaskAssigneeRow): TaskAssignee {
     todoTasksCount: row.todoTasksCount ?? 0,
     doneTasksCount: row.doneTasksCount ?? 0,
     totalAssignedTasksCount: row.totalAssignedTasksCount ?? 0
+  };
+}
+
+function toTaskAttachment(row: TaskAttachmentRow): TaskAttachment {
+  return {
+    id: row.id,
+    taskId: row.taskId,
+    storageKey: row.storageKey,
+    fileName: row.fileName,
+    mimeType: row.mimeType,
+    fileSize: row.fileSize,
+    uploadedById: row.uploadedById,
+    uploadedByEmail: row.uploadedByEmail,
+    uploadedByFullName: row.uploadedByFullName,
+    uploadedAt: new Date(row.uploadedAt).toISOString()
   };
 }
 
@@ -518,4 +559,56 @@ export async function findOperationTasksMinimalByIds(
     [companyId, ...taskIds]
   );
   return rows.map(toOperationTaskMinimal);
+}
+
+export async function addTaskAttachment(input: {
+  id: string;
+  taskId: string;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedById: string;
+}): Promise<void> {
+  await getDbPool().execute<ResultSetHeader>(
+    `
+      INSERT INTO task_attachments (
+        id, task_id, storage_key, file_name, mime_type, file_size, uploaded_by_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      input.id,
+      input.taskId,
+      input.storageKey,
+      input.fileName,
+      input.mimeType,
+      input.fileSize,
+      input.uploadedById
+    ]
+  );
+}
+
+export async function listTaskAttachments(taskId: string): Promise<TaskAttachment[]> {
+  const rows = await queryRows<TaskAttachmentRow[]>(
+    `
+      SELECT
+        ta.id AS id,
+        ta.task_id AS taskId,
+        ta.storage_key AS storageKey,
+        ta.file_name AS fileName,
+        ta.mime_type AS mimeType,
+        ta.file_size AS fileSize,
+        ta.uploaded_by_id AS uploadedById,
+        u.email AS uploadedByEmail,
+        u.full_name AS uploadedByFullName,
+        ta.uploaded_at AS uploadedAt
+      FROM task_attachments ta
+      INNER JOIN users u ON u.id = ta.uploaded_by_id
+      WHERE ta.task_id = ?
+      ORDER BY ta.uploaded_at DESC
+    `,
+    [taskId]
+  );
+  return rows.map(toTaskAttachment);
 }

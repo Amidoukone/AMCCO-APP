@@ -186,6 +186,489 @@ export type AgricultureOperationsReport = {
   };
 };
 
+export type GeneralStoreOperationsReportRow = {
+  department: string;
+  productFamily: string;
+  itemName: string;
+  skuRef: string;
+  soldQuantity: number;
+  purchaseQuantity: number;
+  returnQuantity: number;
+  adjustmentQuantity: number;
+  transferQuantity: number;
+  salesAmount: string;
+  purchaseAmount: string;
+  returnAmount: string;
+  discountAmount: string;
+  expenseAmount: string;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  grossMargin: string;
+  marginRate: number;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type GeneralStoreOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type GeneralStoreOperationsReport = {
+  periodLabel: string;
+  rows: GeneralStoreOperationsReportRow[];
+  operationRows: GeneralStoreOperationsReportOperationRow[];
+  totals: {
+    departmentsCount: number;
+    productFamiliesCount: number;
+    itemsCount: number;
+    soldQuantity: number;
+    purchaseQuantity: number;
+    returnQuantity: number;
+    adjustmentQuantity: number;
+    transferQuantity: number;
+    salesAmount: string;
+    purchaseAmount: string;
+    returnAmount: string;
+    discountAmount: string;
+    expenseAmount: string;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    grossMargin: string;
+    marginRate: number;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type FoodOperationsReportRow = {
+  productFamily: string;
+  productName: string;
+  batchRef: string;
+  storageArea: string;
+  purchaseQuantity: number;
+  soldQuantity: number;
+  lossQuantity: number;
+  purchaseAmount: string;
+  salesAmount: string;
+  lossAmount: string;
+  expenseAmount: string;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  grossMargin: string;
+  marginRate: number;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type FoodOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type FoodOperationsReport = {
+  periodLabel: string;
+  rows: FoodOperationsReportRow[];
+  operationRows: FoodOperationsReportOperationRow[];
+  totals: {
+    productFamiliesCount: number;
+    productsCount: number;
+    batchesCount: number;
+    purchaseQuantity: number;
+    soldQuantity: number;
+    lossQuantity: number;
+    purchaseAmount: string;
+    salesAmount: string;
+    lossAmount: string;
+    expenseAmount: string;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    grossMargin: string;
+    marginRate: number;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type RentalOperationsReportRow = {
+  propertyRef: string;
+  unitRef: string;
+  tenantRef: string;
+  leaseRef: string;
+  propertyType: string;
+  rentPaymentsCount: number;
+  rentAmount: string;
+  depositAmount: string;
+  serviceChargeAmount: string;
+  maintenanceAmount: string;
+  propertyExpenseAmount: string;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type RentalOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type RentalOperationsReport = {
+  periodLabel: string;
+  rows: RentalOperationsReportRow[];
+  operationRows: RentalOperationsReportOperationRow[];
+  totals: {
+    propertiesCount: number;
+    unitsCount: number;
+    tenantsCount: number;
+    rentPaymentsCount: number;
+    rentAmount: string;
+    depositAmount: string;
+    serviceChargeAmount: string;
+    maintenanceAmount: string;
+    propertyExpenseAmount: string;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type HotelOperationsReportRow = {
+  serviceLine: string;
+  roomRef: string;
+  roomType: string;
+  bookingRef: string;
+  guestRef: string;
+  nightsCount: number;
+  guestCount: number;
+  roomRevenue: string;
+  depositAmount: string;
+  restaurantAmount: string;
+  serviceAmount: string;
+  maintenanceAmount: string;
+  commissionAmount: string;
+  taxAmount: string;
+  refundAmount: string;
+  expenseAmount: string;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  averageRoomRate: number;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type HotelOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type HotelOperationsReport = {
+  periodLabel: string;
+  rows: HotelOperationsReportRow[];
+  operationRows: HotelOperationsReportOperationRow[];
+  totals: {
+    bookingsCount: number;
+    roomsCount: number;
+    guestsCount: number;
+    nightsCount: number;
+    guestCount: number;
+    roomRevenue: string;
+    depositAmount: string;
+    restaurantAmount: string;
+    serviceAmount: string;
+    maintenanceAmount: string;
+    commissionAmount: string;
+    taxAmount: string;
+    refundAmount: string;
+    expenseAmount: string;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    averageRoomRate: number;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type WaterOperationsReportRow = {
+  facilityRef: string;
+  networkZone: string;
+  productionLine: string;
+  producedVolumeM3: number;
+  billedVolumeM3: number;
+  waterRevenue: string;
+  bulkSaleAmount: string;
+  connectionAmount: string;
+  subsidyAmount: string;
+  treatmentCost: string;
+  energyCost: string;
+  maintenanceCost: string;
+  qualityCost: string;
+  repairCost: string;
+  supplierPaymentAmount: string;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  lossRate: number;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type WaterOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type WaterOperationsReport = {
+  periodLabel: string;
+  rows: WaterOperationsReportRow[];
+  operationRows: WaterOperationsReportOperationRow[];
+  totals: {
+    facilitiesCount: number;
+    zonesCount: number;
+    producedVolumeM3: number;
+    billedVolumeM3: number;
+    waterRevenue: string;
+    bulkSaleAmount: string;
+    connectionAmount: string;
+    subsidyAmount: string;
+    treatmentCost: string;
+    energyCost: string;
+    maintenanceCost: string;
+    qualityCost: string;
+    repairCost: string;
+    supplierPaymentAmount: string;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    lossRate: number;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type AgencyOperationsReportRow = {
+  mandateRef: string;
+  propertyRef: string;
+  mandateType: string;
+  propertyType: string;
+  locationZone: string;
+  clientRef: string;
+  dealStage: string;
+  dealAmount: string;
+  saleCommissionAmount: string;
+  rentalCommissionAmount: string;
+  mandateFeeAmount: string;
+  visitFeeAmount: string;
+  fileFeeAmount: string;
+  advertisingExpenseAmount: string;
+  fieldVisitExpenseAmount: string;
+  brokerPayoutAmount: string;
+  documentExpenseAmount: string;
+  officeExpenseAmount: string;
+  refundAmount: string;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  commissionRate: number;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type AgencyOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type AgencyOperationsReport = {
+  periodLabel: string;
+  rows: AgencyOperationsReportRow[];
+  operationRows: AgencyOperationsReportOperationRow[];
+  totals: {
+    mandatesCount: number;
+    propertiesCount: number;
+    clientsCount: number;
+    dealAmount: string;
+    saleCommissionAmount: string;
+    rentalCommissionAmount: string;
+    mandateFeeAmount: string;
+    visitFeeAmount: string;
+    fileFeeAmount: string;
+    advertisingExpenseAmount: string;
+    fieldVisitExpenseAmount: string;
+    brokerPayoutAmount: string;
+    documentExpenseAmount: string;
+    officeExpenseAmount: string;
+    refundAmount: string;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    commissionRate: number;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
+export type BtpOperationsReportRow = {
+  projectRef: string;
+  workPackage: string;
+  siteLocation: string;
+  clientRef: string;
+  progressPercent: number;
+  materialQuantity: number;
+  laborDays: number;
+  equipmentHours: number;
+  transactionsCount: number;
+  tasksCount: number;
+  doneTasksCount: number;
+  openTasksCount: number;
+  blockedTasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  executionRate: number;
+  currency: "XOF";
+};
+
+export type BtpOperationsReportOperationRow = {
+  operationKind: string;
+  operationLabel: string;
+  transactionsCount: number;
+  tasksCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+  currency: "XOF";
+};
+
+export type BtpOperationsReport = {
+  periodLabel: string;
+  rows: BtpOperationsReportRow[];
+  operationRows: BtpOperationsReportOperationRow[];
+  totals: {
+    projectsCount: number;
+    workPackagesCount: number;
+    progressPercent: number;
+    materialQuantity: number;
+    laborDays: number;
+    equipmentHours: number;
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+    executionRate: number;
+    currency: "XOF";
+  };
+};
+
 export type FishFarmingOperationsReportRow = {
   pondRef: string;
   cycleRef: string;
@@ -400,8 +883,15 @@ export type ReportsOverview = {
   operationalPerformance: ReportOperationalMetric[];
   hardwareMonthlyReport: HardwareMonthlyReport | null;
   agricultureOperationsReport: AgricultureOperationsReport | null;
+  generalStoreOperationsReport: GeneralStoreOperationsReport | null;
+  foodOperationsReport: FoodOperationsReport | null;
+  rentalOperationsReport: RentalOperationsReport | null;
+  btpOperationsReport: BtpOperationsReport | null;
   fishFarmingOperationsReport: FishFarmingOperationsReport | null;
   livestockOperationsReport: LivestockOperationsReport | null;
+  hotelOperationsReport: HotelOperationsReport | null;
+  waterOperationsReport: WaterOperationsReport | null;
+  agencyOperationsReport: AgencyOperationsReport | null;
   roleDistribution: ReportRoleDistribution[];
   topAssignees: DashboardWorkloadItem[];
 };
