@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
-const LOGIN_BACKEND_ERROR = "Connexion impossible. V\u00e9rifiez le backend.";
+const LOGIN_BACKEND_ERROR = "Connexion impossible. Vérifiez le backend.";
 
 export function LoginPage(): JSX.Element {
   const navigate = useNavigate();

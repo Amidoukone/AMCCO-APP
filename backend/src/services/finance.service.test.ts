@@ -175,7 +175,7 @@ describe("finance.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 409,
-        message: "Un salaire existe deja pour ce collaborateur sur cette periode."
+        message: "Un salaire existe déjà pour ce collaborateur sur cette période."
       });
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });
@@ -627,7 +627,7 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_SALARY_UPDATED",
-        message: "Le salaire Agent Test | 2026-04 a ete modifie par l'admin systeme.",
+        message: "Le salaire Agent Test | 2026-04 a été modifié par l'admin système.",
         severity: "WARNING",
         entityType: "SALARY",
         entityId: "salary-4",
@@ -773,7 +773,7 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_SALARY_DELETED",
-        message: "Le salaire Agent Test | 2026-04 a ete supprime par l'admin systeme.",
+        message: "Le salaire Agent Test | 2026-04 a été supprimé par l'admin système.",
         severity: "WARNING",
         entityType: "SALARY",
         entityId: "salary-6",
@@ -1150,7 +1150,7 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_TRANSACTION_SUBMITTED",
-        message: "Une transaction Magasins (commerce general) a ete enregistree et est disponible dans le suivi financier.",
+        message: "Une transaction Magasins (commerce général) a été enregistrée et est disponible dans le suivi financier.",
         severity: "INFO",
         entityType: "TRANSACTION",
         entityId: "txn-1",
@@ -1165,7 +1165,7 @@ describe("finance.service", () => {
           }),
           account: expect.objectContaining({
             scopeType: "RESTRICTED",
-            scopeLabel: "Restreint: Magasins (commerce general), Alimentation"
+            scopeLabel: "Restreint: Magasins (commerce général), Alimentation"
           })
         })
       });
@@ -1265,7 +1265,7 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_SALARY_SUBMITTED",
-        message: "Le salaire Agent Test | 2026-04 a ete finalise et est disponible dans le suivi de paie.",
+        message: "Le salaire Agent Test | 2026-04 a été finalisé et est disponible dans le suivi de paie.",
         severity: "INFO",
         entityType: "SALARY",
         entityId: "salary-1",
@@ -1287,7 +1287,7 @@ describe("finance.service", () => {
         recipientUserIds: ["employee-1"],
         code: "FINANCE_SALARY_SUBMITTED",
         message:
-          "Votre salaire Agent Test | 2026-04 a ete enregistre par la comptabilite et est disponible dans votre suivi.",
+          "Votre salaire Agent Test | 2026-04 a été enregistré par la comptabilité et est disponible dans votre suivi.",
         severity: "INFO",
         entityType: "SALARY",
         entityId: "salary-1",
@@ -1324,7 +1324,7 @@ describe("finance.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
-        message: "La confirmation employe n'est plus requise pour les salaires."
+        message: "La confirmation employé n'est plus requise pour les salaires."
       });
       expect(confirmSalaryReceipt).not.toHaveBeenCalled();
       expect(createRoleTargetedAlerts).not.toHaveBeenCalled();
@@ -1357,7 +1357,7 @@ describe("finance.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
-        message: "Le compte financier Caisse mine n'est pas autorise pour le secteur Alimentation."
+        message: "Le compte financier Caisse mine n'est pas autorisé pour le secteur Alimentation."
       });
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });
@@ -1386,7 +1386,7 @@ describe("finance.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
-        message: "Le secteur Exploitation miniere exige une description metier pour chaque transaction."
+        message: "Le secteur Exploitation minière exige une description métier pour chaque transaction."
       });
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });
@@ -1417,7 +1417,7 @@ describe("finance.service", () => {
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
         message:
-          "Le secteur Location immobiliere exige le champ reference bien pour chaque transaction."
+          "Le secteur Location immobilière exige le champ référence bien pour chaque transaction."
       });
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });
@@ -1458,7 +1458,7 @@ describe("finance.service", () => {
           updatedAt: "2026-04-20T08:00:00.000Z",
           proofsCount: 1
         })
-        .mockResolvedValueOnce({
+        .mockResolvedValue({
           id: "txn-3",
           companyId: actor.companyId,
           accountId: "account-2",
@@ -1490,6 +1490,15 @@ describe("finance.service", () => {
           updatedAt: "2026-04-21T09:00:00.000Z",
           proofsCount: 1
         });
+      vi.mocked(findTransactionById).mockResolvedValue({
+        id: "txn-3",
+        companyId: actor.companyId,
+        createdById: "cashier-1",
+        activityCode: "SERVICES",
+        status: "DRAFT",
+        requiresProof: false,
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
       vi.mocked(findFinancialAccountById).mockResolvedValue({
         id: "account-2",
         companyId: actor.companyId,
@@ -1581,7 +1590,7 @@ describe("finance.service", () => {
           updatedAt: "2026-04-20T08:00:00.000Z",
           proofsCount: 0
         })
-        .mockResolvedValueOnce({
+        .mockResolvedValue({
           id: "txn-7",
           companyId: actor.companyId,
           accountId: "account-6",
@@ -1611,6 +1620,15 @@ describe("finance.service", () => {
           updatedAt: "2026-04-21T08:00:00.000Z",
           proofsCount: 0
         });
+      vi.mocked(findTransactionById).mockResolvedValue({
+        id: "txn-7",
+        companyId: actor.companyId,
+        createdById: "cashier-7",
+        activityCode: "SERVICES",
+        status: "DRAFT",
+        requiresProof: false,
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
       vi.mocked(findFinancialAccountById).mockResolvedValue({
         id: "account-6",
         companyId: actor.companyId,
@@ -1647,7 +1665,7 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_TRANSACTION_UPDATED",
-        message: "La transaction Services divers 20000.00 XOF a ete modifiee par l'admin systeme.",
+        message: "La transaction Services divers 20000.00 XOF a été modifiée par l'admin système.",
         severity: "WARNING",
         entityType: "TRANSACTION",
         entityId: "txn-7",
@@ -1775,7 +1793,7 @@ describe("finance.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 403,
-        message: "Seul l'admin systeme peut supprimer une transaction deja approuvee."
+        message: "Seul l'admin système peut supprimer une transaction déjà approuvée."
       });
       expect(deleteFinancialTransaction).not.toHaveBeenCalled();
     });
@@ -1849,7 +1867,7 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_TRANSACTION_DELETED",
-        message: "La transaction Services divers 120000.00 XOF a ete supprimee par l'admin systeme.",
+        message: "La transaction Services divers 120000.00 XOF a été supprimée par l'admin système.",
         severity: "WARNING",
         entityType: "TRANSACTION",
         entityId: "txn-6",
@@ -1881,7 +1899,7 @@ describe("finance.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 403,
-        message: "Permissions insuffisantes pour creer un compte financier."
+        message: "Permissions insuffisantes pour créer un compte financier."
       });
       expect(createFinancialAccount).not.toHaveBeenCalled();
     });
@@ -1928,7 +1946,7 @@ describe("finance.service", () => {
         expect.objectContaining({
           action: "FINANCE_ACCOUNT_CREATED",
           entityType: "FINANCIAL_ACCOUNT",
-          metadataJson: expect.stringContaining("\"scopeLabel\":\"Restreint: Magasins (commerce general), Alimentation\"")
+          metadataJson: expect.stringContaining("\"scopeLabel\":\"Restreint: Magasins (commerce général), Alimentation\"")
         })
       );
       expect(result.scopeType).toBe("RESTRICTED");
@@ -1958,7 +1976,7 @@ describe("finance.service", () => {
         },
         {
           accountId: "account-global-1",
-          name: "Banque siege modifiee",
+          name: "Banque siege modifiée",
           openingBalance: "100000.00",
           scopeType: "GLOBAL"
         }
@@ -2035,7 +2053,7 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_ACCOUNT_UPDATED",
-        message: "Le compte financier Caisse mobile terrain a ete modifie par l'admin systeme.",
+        message: "Le compte financier Caisse mobile terrain a été modifié par l'admin système.",
         severity: "WARNING",
         entityType: "FINANCIAL_ACCOUNT",
         entityId: "account-7",
@@ -2080,7 +2098,7 @@ describe("finance.service", () => {
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
         message:
-          "Ce compte financier est deja utilise par des transactions et ne peut plus etre modifie."
+          "Ce compte financier est déjà utilisé par des transactions et ne peut plus être modifié."
       });
       expect(updateFinancialAccount).not.toHaveBeenCalled();
     });
@@ -2114,7 +2132,7 @@ describe("finance.service", () => {
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
         message:
-          "Ce compte financier est deja utilise par des transactions et ne peut pas etre supprime."
+          "Ce compte financier est déjà utilisé par des transactions et ne peut pas être supprimé."
       });
       expect(deleteFinancialAccount).not.toHaveBeenCalled();
     });
@@ -2123,7 +2141,7 @@ describe("finance.service", () => {
       vi.mocked(findFinancialAccountById).mockResolvedValue({
         id: "account-10",
         companyId: actor.companyId,
-        name: "Banque reserve",
+        name: "Banque réserve",
         accountRef: "RES-01",
         balance: "0.00",
         scopeType: "GLOBAL",
@@ -2158,13 +2176,13 @@ describe("finance.service", () => {
         recipientRoles: ["OWNER"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_ACCOUNT_DELETED",
-        message: "Le compte financier Banque reserve a ete supprime par l'admin systeme.",
+        message: "Le compte financier Banque réserve a été supprimé par l'admin système.",
         severity: "WARNING",
         entityType: "FINANCIAL_ACCOUNT",
         entityId: "account-10",
         metadata: expect.objectContaining({
           accountId: "account-10",
-          accountName: "Banque reserve",
+          accountName: "Banque réserve",
           actorRole: "SYS_ADMIN"
         })
       });
@@ -2279,7 +2297,7 @@ describe("finance.service", () => {
         companyId: actor.companyId,
         recipientUserIds: ["payroll-1", "employee-1"],
         code: "FINANCE_SALARY_APPROVED",
-        message: "Le salaire Agent Test | 2026-04 a ete approuve par Awa Comptable.",
+        message: "Le salaire Agent Test | 2026-04 a été approuvé par Awa Comptable.",
         severity: "INFO",
         entityType: "SALARY",
         entityId: "salary-2",
@@ -2377,7 +2395,7 @@ describe("finance.service", () => {
         companyId: actor.companyId,
         recipientUserIds: ["user-owner"],
         code: "FINANCE_TRANSACTION_APPROVED",
-        message: "Votre transaction Services divers a ete approuvee par Awa Comptable.",
+        message: "Votre transaction Services divers a été approuvée par Awa Comptable.",
         severity: "INFO",
         entityType: "TRANSACTION",
         entityId: "txn-2",

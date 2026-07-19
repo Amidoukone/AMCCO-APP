@@ -181,7 +181,7 @@ export async function login(input: {
     };
   }
   if (!record.userIsActive || !record.companyIsActive) {
-    throw new HttpError(403, "Le compte utilisateur ou l'entreprise est desactive.");
+    throw new HttpError(403, "Le compte utilisateur ou l'entreprise est désactivé.");
   }
 
   const isPasswordValid = await verifyPassword(input.password, record.passwordHash);
@@ -263,7 +263,7 @@ export async function refresh(input: {
 
   const expectedCompanyId = session.companyId ?? BOOTSTRAP_COMPANY_ID;
   if (session.userId !== payload.userId || expectedCompanyId !== payload.companyId) {
-    throw new HttpError(401, "Jeton de rafraichissement hors perimetre.");
+    throw new HttpError(401, "Jeton de rafraichissement hors périmètre.");
   }
 
   if (isBootstrapCompanyId(payload.companyId)) {
@@ -311,7 +311,7 @@ export async function refresh(input: {
 
   const currentProfile = await findUserProfileForCompany(payload.userId, payload.companyId);
   if (!currentProfile) {
-    throw new HttpError(403, "L'utilisateur n'a plus acces a cette entreprise.");
+    throw new HttpError(403, "L'utilisateur n'a plus accès à cette entreprise.");
   }
 
   const auth: AuthContext = {
@@ -379,7 +379,7 @@ export async function switchCompany(input: {
     companyId: input.targetCompanyId
   });
   if (!targetMembership || !targetMembership.company.isActive) {
-    throw new HttpError(403, "Aucun acces a l'entreprise cible.");
+    throw new HttpError(403, "Aucun accès à l'entreprise cible.");
   }
 
   const auth: AuthContext = {
@@ -466,7 +466,7 @@ export async function changeOwnPassword(input: {
   }
 
   if (currentPassword === newPassword) {
-    throw new HttpError(400, "Le nouveau mot de passe doit etre different de l'ancien.");
+    throw new HttpError(400, "Le nouveau mot de passe doit être différent de l'ancien.");
   }
 
   const isPasswordValid = await verifyPassword(currentPassword, user.passwordHash);

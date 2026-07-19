@@ -6177,3 +6177,458 @@ textarea:focus,
     white-space: normal;
   }
 }
+
+/* Final UI polish: page structure, text resilience and responsive density. */
+:root {
+  --ui-content-max: 1520px;
+  --ui-page-gap: clamp(16px, 2vw, 24px);
+  --ui-panel-padding: clamp(16px, 2vw, 22px);
+}
+
+.app-content {
+  display: grid;
+  align-content: start;
+  gap: var(--ui-page-gap);
+}
+
+.app-content > * {
+  width: 100%;
+  max-width: var(--ui-content-max);
+  margin-inline: auto;
+}
+
+.app-content > .confirm-dialog-backdrop {
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+
+.workspace-toolbar,
+.section-header,
+.dashboard-panel-header,
+.reports-table-header,
+.operations-status-panel-header,
+.company-admin-top,
+.admin-users-management-header,
+.list-pagination {
+  min-width: 0;
+}
+
+.workspace-toolbar {
+  gap: 12px;
+}
+
+.panel,
+.reports-control-panel,
+.reports-overview-panel,
+.reports-export-panel,
+.reports-table-panel,
+.finance-page-panel,
+.operations-collapsible-panel,
+.operations-status-panel,
+.security-personal-panel,
+.company-admin-card,
+.admin-users-panel,
+.admin-users-create-panel,
+.finance-transaction-detail-panel,
+.task-detail-lite-panel,
+.salary-detail-panel {
+  min-width: 0;
+  padding: var(--ui-panel-padding);
+}
+
+.panel > *,
+.reports-control-panel > *,
+.reports-overview-panel > *,
+.reports-export-panel > *,
+.reports-table-panel > *,
+.finance-page-panel > *,
+.operations-collapsible-panel > *,
+.operations-task-card > *,
+.alert-card > *,
+.dashboard-action-card > *,
+.dashboard-priority-item > *,
+.company-admin-card > * {
+  min-width: 0;
+}
+
+.section-header,
+.dashboard-panel-header,
+.reports-table-header,
+.operations-status-panel-header,
+.topbar,
+.my-work-header,
+.company-admin-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.section-header h2,
+.dashboard-panel-header h3,
+.reports-table-header h4,
+.panel h3,
+.operations-task-title,
+.alert-message,
+.task-timeline-title,
+.company-admin-top h4,
+.finance-section-summary span,
+.dashboard-section-summary span {
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.hint,
+.feedback-banner,
+.empty-state p,
+.operations-task-description,
+.operations-task-metadata,
+.operations-task-meta p,
+.metadata-detail-list,
+.table-inline-content,
+.alert-context-preview,
+.task-timeline-detail,
+.task-comment-body,
+.proof-list small,
+.finance-detail-block p,
+.reports-focus-note span {
+  overflow-wrap: anywhere;
+}
+
+.route-loading {
+  min-height: min(48vh, 420px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  padding: 32px 16px;
+  color: var(--theme-text-soft);
+}
+
+.route-loading-indicator {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--theme-gold);
+  border-radius: 999px;
+  animation: route-loading-spin 0.9s linear infinite;
+}
+
+@keyframes route-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-table {
+  table-layout: auto;
+}
+
+.admin-table th,
+.admin-table td {
+  line-height: 1.45;
+}
+
+.admin-table td {
+  overflow-wrap: anywhere;
+}
+
+.admin-table td:last-child {
+  min-width: max-content;
+}
+
+.actions-inline,
+.admin-user-actions-row,
+.finance-transactions-pagination-actions,
+.list-view-pagination-actions,
+.reports-export-grid,
+.quick-actions {
+  min-width: 0;
+}
+
+.secondary-btn,
+.danger-btn,
+.form button,
+.admin-form button,
+.audit-filter-form button,
+.reports-filter-form button,
+.alerts-filter-form button,
+.finance-account-form button,
+.finance-transaction-form button,
+.operations-filter-form button,
+.operations-task-form button,
+.operations-bulk-form button,
+.company-admin-form button,
+.dashboard-inline-button,
+.home-primary-action,
+.home-secondary-action {
+  min-height: 40px;
+  gap: 8px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+textarea {
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.admin-form,
+.admin-users-create-form,
+.admin-users-filters,
+.audit-filter-form,
+.reports-filter-form,
+.alerts-filter-form,
+.finance-account-form,
+.finance-transaction-form,
+.operations-filter-form,
+.operations-task-form,
+.operations-bulk-form,
+.company-admin-form,
+.proof-inline-form {
+  min-width: 0;
+}
+
+.empty-state {
+  min-width: 0;
+  align-items: start;
+}
+
+.feedback-banner-stack {
+  width: 100%;
+}
+
+@media (max-width: 980px) {
+  .app-content {
+    padding: 16px;
+  }
+
+  .app-content > * {
+    max-width: 100%;
+  }
+
+  .section-header,
+  .dashboard-panel-header,
+  .reports-table-header,
+  .operations-status-panel-header,
+  .topbar,
+  .my-work-header,
+  .company-admin-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-actions,
+  .header-actions,
+  .quick-actions,
+  .reports-export-grid,
+  .actions-inline,
+  .admin-user-actions-row {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-content {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .panel,
+  .reports-control-panel,
+  .reports-overview-panel,
+  .reports-export-panel,
+  .reports-table-panel,
+  .finance-page-panel,
+  .operations-collapsible-panel,
+  .operations-status-panel,
+  .security-personal-panel,
+  .company-admin-card,
+  .admin-users-panel,
+  .admin-users-create-panel,
+  .finance-transaction-detail-panel,
+  .task-detail-lite-panel,
+  .salary-detail-panel {
+    padding: 14px;
+  }
+
+  .secondary-btn,
+  .danger-btn,
+  .admin-form button,
+  .reports-filter-form button,
+  .alerts-filter-form button,
+  .finance-account-form button,
+  .finance-transaction-form button,
+  .operations-filter-form button,
+  .operations-task-form button,
+  .operations-bulk-form button,
+  .company-admin-form button,
+  .dashboard-inline-button {
+    width: 100%;
+    white-space: normal;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 12px 10px;
+  }
+}
+
+/* Regression fixes: prevent right-side card clipping and hidden page endings. */
+.app-content {
+  overflow-x: auto;
+  padding-bottom: clamp(28px, 4vh, 48px);
+}
+
+.grid,
+.reports-summary-grid,
+.reports-profile-grid,
+.reports-data-grid,
+.reports-kpi-grid,
+.operations-status-grid,
+.dashboard-action-grid,
+.dashboard-kpi-grid,
+.dashboard-highlight-grid,
+.owner-command-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.dashboard-priority-grid {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  align-items: start;
+  overflow: visible;
+}
+
+.dashboard-priority-card,
+.dashboard-priority-list {
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.dashboard-priority-card {
+  align-content: start;
+}
+
+.dashboard-priority-list {
+  width: 100%;
+}
+
+.dashboard-priority-item {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.dashboard-priority-main {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.dashboard-priority-side {
+  min-width: 0;
+  flex: 0 1 190px;
+  max-width: 100%;
+}
+
+.my-work-grid {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: start;
+}
+
+.dashboard-priority-main strong,
+.dashboard-priority-main span,
+.dashboard-priority-side strong,
+.dashboard-priority-side span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-priority-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-priority-side {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 1100px) {
+  .my-work-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dashboard hero regression fix: keep all "Pilotage du jour" content visible. */
+.dashboard-overview-panel {
+  align-items: stretch;
+  overflow: visible;
+}
+
+.dashboard-overview-panel::after {
+  display: none;
+}
+
+.dashboard-overview-panel .dashboard-panel-header,
+.dashboard-overview-panel .dashboard-action-grid,
+.dashboard-overview-panel .dashboard-summary-strip {
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-overview-panel .dashboard-panel-header > *,
+.dashboard-overview-panel .dashboard-action-card,
+.dashboard-overview-panel .dashboard-summary-pill,
+.dashboard-overview-panel .dashboard-focus-note {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-overview-panel .dashboard-focus-note {
+  flex: 1 1 260px;
+}
+
+.dashboard-overview-panel .dashboard-action-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  overflow: visible;
+}
+
+.dashboard-overview-panel .dashboard-action-card {
+  overflow: visible;
+  align-content: start;
+}
+
+.dashboard-overview-panel .dashboard-summary-strip {
+  overflow: visible;
+}
+
+.dashboard-overview-panel .dashboard-summary-pill {
+  flex: 1 1 150px;
+}
+
+.dashboard-overview-panel .dashboard-action-eyebrow,
+.dashboard-overview-panel .dashboard-action-card strong,
+.dashboard-overview-panel .dashboard-action-note,
+.dashboard-overview-panel .dashboard-action-link,
+.dashboard-overview-panel .dashboard-summary-pill strong,
+.dashboard-overview-panel .dashboard-summary-pill span,
+.dashboard-overview-panel .dashboard-focus-note strong,
+.dashboard-overview-panel .dashboard-focus-note span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

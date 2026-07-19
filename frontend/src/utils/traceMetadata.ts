@@ -227,7 +227,7 @@ export function getFinanceTraceLines(metadata: unknown): string[] {
     const employeeFullName = asString(salary.employeeFullName);
     const payPeriod = asString(salary.payPeriod);
     if (employeeFullName) {
-      lines.push(`Employe: ${employeeFullName}`);
+      lines.push(`Employé: ${employeeFullName}`);
     }
     if (payPeriod) {
       lines.push(`Période: ${payPeriod}`);

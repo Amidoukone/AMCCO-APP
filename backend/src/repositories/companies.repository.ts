@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDbPool, queryRows } from "../lib/db.js";
 import type { CompanyMembershipSummary, CompanyProfile } from "../types/company.js";
 import type { RoleCode } from "../types/role.js";
+import { repairMojibakeText } from "../utils/text-encoding.js";
 
 type CompanyRow = RowDataPacket & {
   id: string;
@@ -38,27 +39,31 @@ type CompanyMembershipRow = RowDataPacket & {
 function toCompanyProfile(row: CompanyRow): CompanyProfile {
   return {
     id: row.id,
-    name: row.name,
+    name: repairMojibakeText(row.name),
     code: row.code,
-    legalName: row.legalName,
-    registrationNumber: row.registrationNumber,
+    legalName: cleanNullableText(row.legalName),
+    registrationNumber: cleanNullableText(row.registrationNumber),
     taxId: row.taxId,
     email: row.email,
     phone: row.phone,
     website: row.website,
-    addressLine1: row.addressLine1,
-    addressLine2: row.addressLine2,
-    city: row.city,
-    stateRegion: row.stateRegion,
-    postalCode: row.postalCode,
-    country: row.country,
-    businessSector: row.businessSector,
-    contactFullName: row.contactFullName,
-    contactJobTitle: row.contactJobTitle,
+    addressLine1: cleanNullableText(row.addressLine1),
+    addressLine2: cleanNullableText(row.addressLine2),
+    city: cleanNullableText(row.city),
+    stateRegion: cleanNullableText(row.stateRegion),
+    postalCode: cleanNullableText(row.postalCode),
+    country: cleanNullableText(row.country),
+    businessSector: cleanNullableText(row.businessSector),
+    contactFullName: cleanNullableText(row.contactFullName),
+    contactJobTitle: cleanNullableText(row.contactJobTitle),
     isActive: row.isActive === 1,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString()
   };
+}
+
+function cleanNullableText(value: string | null): string | null {
+  return value === null ? null : repairMojibakeText(value);
 }
 
 export async function listAllCompanyIds(): Promise<string[]> {

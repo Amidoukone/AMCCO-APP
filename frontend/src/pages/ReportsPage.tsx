@@ -327,18 +327,18 @@ function normalizePeriodQuery(form: PeriodFormState): ReportPeriodQuery {
 
 function validatePeriodForm(form: PeriodFormState): string | null {
   if (!form.activityCode) {
-    return "Selectionnez un secteur pour afficher le rapport.";
+    return "Sélectionnez un secteur pour afficher le rapport.";
   }
 
   if (form.periodMode === "CUSTOM") {
     if (form.dateFrom && form.dateTo && form.dateFrom > form.dateTo) {
-      return "La date de debut doit etre inferieure ou egale a la date de fin.";
+      return "La date de début doit être inférieure ou égale à la date de fin.";
     }
     return null;
   }
 
   if (form.periodMode === "MONTH" && !isValidMonthInputValue(form.month)) {
-    return "Selectionnez un mois valide pour le rapport.";
+    return "Sélectionnez un mois valide pour le rapport.";
   }
 
   if ((form.periodMode === "QUARTER" || form.periodMode === "YEAR") && !isValidYearValue(form.year)) {
@@ -346,7 +346,7 @@ function validatePeriodForm(form: PeriodFormState): string | null {
   }
 
   if (form.periodMode === "QUARTER" && !["1", "2", "3", "4"].includes(form.quarter)) {
-    return "Selectionnez un trimestre valide pour le rapport.";
+    return "Sélectionnez un trimestre valide pour le rapport.";
   }
 
   return null;
@@ -377,7 +377,7 @@ function formatAppliedRange(overview: ReportsOverview): string {
   if (!overview.filters.dateFrom && !overview.filters.dateTo) {
     return overview.filters.activityCode
       ? `Toutes périodes | ${getBusinessActivityLabel(overview.filters.activityCode)}`
-      : "Toutes périodes | Secteur non selectionne";
+      : "Toutes périodes | Secteur non sélectionné";
   }
 
   const fromLabel = overview.filters.dateFrom
@@ -389,7 +389,7 @@ function formatAppliedRange(overview: ReportsOverview): string {
 
   const periodLabel = `${fromLabel} -> ${toLabel}`;
   if (!overview.filters.activityCode) {
-    return `${periodLabel} | Secteur non selectionne`;
+    return `${periodLabel} | Secteur non sélectionné`;
   }
   return `${periodLabel} | ${getBusinessActivityLabel(overview.filters.activityCode)}`;
 }
@@ -506,7 +506,7 @@ export function ReportsPage(): JSX.Element {
       );
       triggerBlobDownload(blob, buildExportFileName(exportPeriod));
 
-      setSuccessMessage("Export PDF du rapport genere pour la periode selectionnee.");
+      setSuccessMessage("Export PDF du rapport généré pour la période sélectionnée.");
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -518,12 +518,12 @@ export function ReportsPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Rapports PDF</h2>
-        <p>Donnees du secteur choisi, calculees depuis les transactions, taches et comptes.</p>
+        <p>Données du secteur choisi, calculées depuis les transactions, tâches et comptes.</p>
       </header>
 
       <section className="panel">
         <h3>Filtres du rapport</h3>
-        <div className="reports-period-presets" role="group" aria-label="Type de periode">
+        <div className="reports-period-presets" role="group" aria-label="Type de période">
           {REPORT_PERIOD_MODE_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -545,7 +545,7 @@ export function ReportsPage(): JSX.Element {
           {periodForm.periodMode === "CUSTOM" ? (
             <>
               <label className="reports-filter-field" htmlFor="reports-date-from">
-                <span>Date debut</span>
+                <span>Date début</span>
                 <input
                   id="reports-date-from"
                   type="date"
@@ -621,10 +621,10 @@ export function ReportsPage(): JSX.Element {
                     }))
                   }
                 >
-                  <option value="1">T1 - Janvier a Mars</option>
-                  <option value="2">T2 - Avril a Juin</option>
-                  <option value="3">T3 - Juillet a Septembre</option>
-                  <option value="4">T4 - Octobre a Decembre</option>
+                  <option value="1">T1 - Janvier à Mars</option>
+                  <option value="2">T2 - Avril à Juin</option>
+                  <option value="3">T3 - Juillet à Septembre</option>
+                  <option value="4">T4 - Octobre a Décembre</option>
                 </select>
               </label>
             </>
@@ -677,7 +677,7 @@ export function ReportsPage(): JSX.Element {
           </button>
         </form>
         <p className="hint">
-          Secteur applique: {selectedActivity?.label ?? "aucun secteur actif"}.
+          Secteur appliqué: {selectedActivity?.label ?? "aucun secteur actif"}.
         </p>
       </section>
 
@@ -730,13 +730,13 @@ export function ReportsPage(): JSX.Element {
           <section className="panel reports-export-panel">
             <div className="dashboard-panel-header">
               <div>
-                <h3>Export PDF avec les filtres selectionnes</h3>
-                <p className="hint">Le fichier PDF reprend la periode et le secteur choisis dans les filtres.</p>
+                <h3>Export PDF avec les filtres sélectionnés</h3>
+                <p className="hint">Le fichier PDF reprend la période et le secteur choisis dans les filtres.</p>
               </div>
               <div className="reports-export-grid">
                 <article className="reports-export-card">
                   <strong className="reports-export-card-title">Rapport PDF</strong>
-                  <p className="hint">Synthese, flux financiers, comptes et taches du secteur.</p>
+                  <p className="hint">Synthèse, flux financiers, comptes et tâches du secteur.</p>
                   <button
                     type="button"
                     className="secondary-btn"
@@ -759,7 +759,7 @@ export function ReportsPage(): JSX.Element {
                 <p className="hint">
                   {overview.activityProfile
                     ? `${overview.activityProfile.label} | ${overview.activityProfile.reporting.focusArea}`
-                    : "Aucun secteur selectionne."}
+                    : "Aucun secteur sélectionné."}
                 </p>
               </div>
             </div>
@@ -780,7 +780,7 @@ export function ReportsPage(): JSX.Element {
                 </article>
               </div>
             ) : (
-              <p className="hint">Selectionnez un secteur actif pour afficher son profil.</p>
+              <p className="hint">Sélectionnez un secteur actif pour afficher son profil.</p>
             )}
 
             {overview.activityHighlights.length > 0 ? (
@@ -869,7 +869,7 @@ export function ReportsPage(): JSX.Element {
                 <div>
                   <h3>Rapport quincaillerie</h3>
                   <p className="hint">
-                    {overview.hardwareMonthlyReport.periodLabel} | ventes soumises ou approuvees en XOF.
+                    {overview.hardwareMonthlyReport.periodLabel} | ventes soumises ou approuvées en XOF.
                   </p>
                 </div>
               </div>
@@ -878,12 +878,12 @@ export function ReportsPage(): JSX.Element {
                   <thead>
                     <tr>
                       <th>Date</th>
-                      <th>Designation</th>
-                      <th>Quantite</th>
+                      <th>Désignation</th>
+                      <th>Quantité</th>
                       <th>Vente par jour</th>
                       <th>Versement</th>
-                      <th>Cout achat</th>
-                      <th>Benefice</th>
+                      <th>Coût achat</th>
+                      <th>Bénéfice</th>
                       <th>Marge</th>
                     </tr>
                   </thead>
@@ -891,7 +891,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.hardwareMonthlyReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={8}>
-                          Aucune vente quincaillerie soumise ou approuvee sur la periode filtree.
+                          Aucune vente quincaillerie soumise ou approuvée sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -949,7 +949,7 @@ export function ReportsPage(): JSX.Element {
             <section className="panel">
               <div className="dashboard-panel-header">
                 <div>
-                  <h3>Rapport activite agricole</h3>
+                  <h3>Rapport activité agricole</h3>
                   <p className="hint">
                     {overview.agricultureOperationsReport.periodLabel} | suivi par campagne, parcelle,
                     type de champ et culture.
@@ -974,14 +974,14 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    Recettes - depenses sur les operations agricoles.
+                    Recettes - dépenses sur les opérations agricoles.
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Execution terrain</span>
+                  <span>Exécution terrain</span>
                   <strong>{formatRate(overview.agricultureOperationsReport.totals.executionRate)}</strong>
                   <small>
-                    {formatCount(overview.agricultureOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.agricultureOperationsReport.totals.doneTasksCount)} terminées,{" "}
                     {formatCount(overview.agricultureOperationsReport.totals.openTasksCount)} ouvertes
                   </small>
                 </article>
@@ -990,25 +990,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.agricultureOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.agricultureOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation agricole sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération agricole sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.agricultureOperationsReport.operationRows.map((row) => (
@@ -1038,9 +1038,9 @@ export function ReportsPage(): JSX.Element {
                       <th>Culture</th>
                       <th>Surface</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -1048,7 +1048,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.agricultureOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={10}>
-                          Aucune parcelle agricole alimentee sur la periode filtree.
+                          Aucune parcelle agricole alimentée sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -1147,25 +1147,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.generalStoreOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.generalStoreOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation magasin sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération magasin sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.generalStoreOperationsReport.operationRows.map((row) => (
@@ -1192,7 +1192,7 @@ export function ReportsPage(): JSX.Element {
                       <th>Rayon</th>
                       <th>Famille</th>
                       <th>Article</th>
-                      <th>Reference</th>
+                      <th>Référence</th>
                       <th>Ventes qte</th>
                       <th>Achats qte</th>
                       <th>Retours qte</th>
@@ -1205,7 +1205,7 @@ export function ReportsPage(): JSX.Element {
                       <th>Charges</th>
                       <th>Net</th>
                       <th>Marge</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -1213,7 +1213,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.generalStoreOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={18}>
-                          Aucun article magasin alimente sur la periode filtree.
+                          Aucun article magasin alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -1272,7 +1272,7 @@ export function ReportsPage(): JSX.Element {
                   <h3>Rapport alimentation</h3>
                   <p className="hint">
                     {overview.foodOperationsReport.periodLabel} | suivi par famille, produit,
-                    lot, zone de stockage, achats, ventes, pertes et controles.
+                    lot, zone de stockage, achats, ventes, pertes et contrôles.
                   </p>
                 </div>
               </div>
@@ -1313,25 +1313,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.foodOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.foodOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation alimentaire sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération alimentaire sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.foodOperationsReport.operationRows.map((row) => (
@@ -1368,7 +1368,7 @@ export function ReportsPage(): JSX.Element {
                       <th>Charges</th>
                       <th>Net</th>
                       <th>Marge</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -1376,7 +1376,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.foodOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={15}>
-                          Aucun produit alimentaire alimente sur la periode filtree.
+                          Aucun produit alimentaire alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -1451,7 +1451,7 @@ export function ReportsPage(): JSX.Element {
             <section className="panel">
               <div className="dashboard-panel-header">
                 <div>
-                  <h3>Rapport location immobiliere</h3>
+                  <h3>Rapport location immobilière</h3>
                   <p className="hint">
                     {overview.rentalOperationsReport.periodLabel} | suivi par bien, lot,
                     locataire, bail, loyers, cautions, charges et interventions.
@@ -1477,14 +1477,14 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    Loyers, cautions et charges moins depenses locatives.
+                    Loyers, cautions et charges moins dépenses locatives.
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Execution locative</span>
+                  <span>Exécution locative</span>
                   <strong>{formatRate(overview.rentalOperationsReport.totals.executionRate)}</strong>
                   <small>
-                    {formatCount(overview.rentalOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.rentalOperationsReport.totals.doneTasksCount)} terminées,{" "}
                     {formatCount(overview.rentalOperationsReport.totals.openTasksCount)} ouvertes
                   </small>
                 </article>
@@ -1493,25 +1493,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.rentalOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.rentalOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation locative sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération locative sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.rentalOperationsReport.operationRows.map((row) => (
@@ -1544,11 +1544,11 @@ export function ReportsPage(): JSX.Element {
                       <th>Cautions</th>
                       <th>Charges</th>
                       <th>Maintenance</th>
-                      <th>Autres depenses</th>
+                      <th>Autres dépenses</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -1556,7 +1556,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.rentalOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={15}>
-                          Aucun bien locatif alimente sur la periode filtree.
+                          Aucun bien locatif alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -1645,17 +1645,17 @@ export function ReportsPage(): JSX.Element {
             <section className="panel">
               <div className="dashboard-panel-header">
                 <div>
-                  <h3>Rapport hotellerie / auberge</h3>
+                  <h3>Rapport hôtellerie / auberge</h3>
                   <p className="hint">
                     {overview.hotelOperationsReport.periodLabel} | suivi par service, chambre,
-                    reservation, client, nuitees, restauration, services et charges.
+                    réservation, client, nuitées, restauration, services et charges.
                   </p>
                 </div>
               </div>
 
               <div className="reports-summary-grid">
                 <article className="reports-kpi-card">
-                  <span>Reservations suivies</span>
+                  <span>Réservations suivies</span>
                   <strong>{formatCount(overview.hotelOperationsReport.totals.bookingsCount)}</strong>
                   <small>
                     {formatCount(overview.hotelOperationsReport.totals.roomsCount)} chambre(s),{" "}
@@ -1671,7 +1671,7 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    Hebergement, restauration et services moins charges hotelieres.
+                    Hebergement, restauration et services moins charges hôtelières.
                   </small>
                 </article>
                 <article className="reports-kpi-card">
@@ -1683,8 +1683,8 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    {formatCount(overview.hotelOperationsReport.totals.nightsCount)} nuitee(s),{" "}
-                    execution {formatRate(overview.hotelOperationsReport.totals.executionRate)}
+                    {formatCount(overview.hotelOperationsReport.totals.nightsCount)} nuitée(s),{" "}
+                    exécution {formatRate(overview.hotelOperationsReport.totals.executionRate)}
                   </small>
                 </article>
               </div>
@@ -1692,25 +1692,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.hotelOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.hotelOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation hoteliere sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération hôtelière sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.hotelOperationsReport.operationRows.map((row) => (
@@ -1751,10 +1751,10 @@ export function ReportsPage(): JSX.Element {
                       <th>Remboursements</th>
                       <th>Autres charges</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
                       <th>Tarif moyen</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -1762,7 +1762,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.hotelOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={22}>
-                          Aucune activite hoteliere alimentee sur la periode filtree.
+                          Aucune activité hôtelière alimentée sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -1892,8 +1892,8 @@ export function ReportsPage(): JSX.Element {
                 <div>
                   <h3>Rapport production d'eau potable</h3>
                   <p className="hint">
-                    {overview.waterOperationsReport.periodLabel} | suivi par site, zone reseau,
-                    ligne d'exploitation, volumes, facturation, qualite, maintenance et blocages.
+                    {overview.waterOperationsReport.periodLabel} | suivi par site, zone réseau,
+                    ligne d'exploitation, volumes, facturation, qualité, maintenance et blocages.
                   </p>
                 </div>
               </div>
@@ -1903,7 +1903,7 @@ export function ReportsPage(): JSX.Element {
                   <span>Sites suivis</span>
                   <strong>{formatCount(overview.waterOperationsReport.totals.facilitiesCount)}</strong>
                   <small>
-                    {formatCount(overview.waterOperationsReport.totals.zonesCount)} zone(s) reseau
+                    {formatCount(overview.waterOperationsReport.totals.zonesCount)} zone(s) réseau
                   </small>
                 </article>
                 <article className="reports-kpi-card">
@@ -1930,25 +1930,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.waterOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.waterOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation eau potable sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération eau potable sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.waterOperationsReport.operationRows.map((row) => (
@@ -1982,16 +1982,16 @@ export function ReportsPage(): JSX.Element {
                       <th>Branchements</th>
                       <th>Subventions</th>
                       <th>Traitement</th>
-                      <th>Energie</th>
+                      <th>Énergie</th>
                       <th>Maintenance</th>
-                      <th>Qualite</th>
-                      <th>Reparations</th>
+                      <th>Qualité</th>
+                      <th>Réparations</th>
                       <th>Fournisseurs</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
                       <th>Pertes</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -1999,7 +1999,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.waterOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={21}>
-                          Aucune activite eau potable alimentee sur la periode filtree.
+                          Aucune activité eau potable alimentée sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -2127,10 +2127,10 @@ export function ReportsPage(): JSX.Element {
             <section className="panel">
               <div className="dashboard-panel-header">
                 <div>
-                  <h3>Rapport agence immobiliere</h3>
+                  <h3>Rapport agence immobilière</h3>
                   <p className="hint">
                     {overview.agencyOperationsReport.periodLabel} | suivi par mandat, bien,
-                    client, etape commerciale, commissions, frais et blocages dossier.
+                    client, étape commerciale, commissions, frais et blocages dossier.
                   </p>
                 </div>
               </div>
@@ -2165,7 +2165,7 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    Execution {formatRate(overview.agencyOperationsReport.totals.executionRate)}
+                    Exécution {formatRate(overview.agencyOperationsReport.totals.executionRate)}
                   </small>
                 </article>
               </div>
@@ -2173,25 +2173,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.agencyOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.agencyOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation agence sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération agence sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.agencyOperationsReport.operationRows.map((row) => (
@@ -2221,24 +2221,24 @@ export function ReportsPage(): JSX.Element {
                       <th>Type bien</th>
                       <th>Zone</th>
                       <th>Client</th>
-                      <th>Etape</th>
+                      <th>Étape</th>
                       <th>Affaire</th>
                       <th>Comm. vente</th>
                       <th>Comm. location</th>
                       <th>Frais mandat</th>
                       <th>Frais visite</th>
                       <th>Frais dossier</th>
-                      <th>Publicite</th>
-                      <th>Deplacements</th>
+                      <th>Publicité</th>
+                      <th>Déplacements</th>
                       <th>Courtiers</th>
                       <th>Documents</th>
                       <th>Charges agence</th>
                       <th>Remb.</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
                       <th>Commission</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -2246,7 +2246,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.agencyOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={25}>
-                          Aucun mandat agence immobiliere alimente sur la periode filtree.
+                          Aucun mandat agence immobilière alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -2338,14 +2338,14 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    Recettes - depenses sur les chantiers BTP.
+                    Recettes - dépenses sur les chantiers BTP.
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Execution chantier</span>
+                  <span>Exécution chantier</span>
                   <strong>{formatRate(overview.btpOperationsReport.totals.executionRate)}</strong>
                   <small>
-                    {formatCount(overview.btpOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.btpOperationsReport.totals.doneTasksCount)} terminées,{" "}
                     {formatCount(overview.btpOperationsReport.totals.openTasksCount)} ouvertes
                   </small>
                 </article>
@@ -2354,25 +2354,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.btpOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.btpOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation BTP sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération BTP sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.btpOperationsReport.operationRows.map((row) => (
@@ -2401,13 +2401,13 @@ export function ReportsPage(): JSX.Element {
                       <th>Localisation</th>
                       <th>Client</th>
                       <th>Avancement</th>
-                      <th>Materiaux</th>
+                      <th>Matériaux</th>
                       <th>Main-d'oeuvre</th>
                       <th>Engins</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -2415,7 +2415,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.btpOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={13}>
-                          Aucun chantier BTP alimente sur la periode filtree.
+                          Aucun chantier BTP alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -2479,7 +2479,7 @@ export function ReportsPage(): JSX.Element {
                   <h3>Rapport pisciculture</h3>
                   <p className="hint">
                     {overview.fishFarmingOperationsReport.periodLabel} | suivi par bassin, cycle
-                    d'elevage, espece, aliments, ventes et alertes.
+                    d'élevage, espèce, aliments, ventes et alertes.
                   </p>
                 </div>
               </div>
@@ -2501,14 +2501,14 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    Recettes - depenses sur les cycles piscicoles.
+                    Recettes - dépenses sur les cycles piscicoles.
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Execution bassin</span>
+                  <span>Exécution bassin</span>
                   <strong>{formatRate(overview.fishFarmingOperationsReport.totals.executionRate)}</strong>
                   <small>
-                    {formatCount(overview.fishFarmingOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.fishFarmingOperationsReport.totals.doneTasksCount)} terminées,{" "}
                     {formatCount(overview.fishFarmingOperationsReport.totals.openTasksCount)} ouvertes
                   </small>
                 </article>
@@ -2517,25 +2517,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.fishFarmingOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.fishFarmingOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation piscicole sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération piscicole sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.fishFarmingOperationsReport.operationRows.map((row) => (
@@ -2561,15 +2561,15 @@ export function ReportsPage(): JSX.Element {
                     <tr>
                       <th>Bassin</th>
                       <th>Cycle</th>
-                      <th>Espece</th>
+                      <th>Espèce</th>
                       <th>Alevins</th>
                       <th>Aliment</th>
                       <th>Ventes</th>
-                      <th>Mortalite</th>
+                      <th>Mortalité</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -2577,7 +2577,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.fishFarmingOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={12}>
-                          Aucun bassin piscicole alimente sur la periode filtree.
+                          Aucun bassin piscicole alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -2637,10 +2637,10 @@ export function ReportsPage(): JSX.Element {
             <section className="panel">
               <div className="dashboard-panel-header">
                 <div>
-                  <h3>Rapport elevage</h3>
+                  <h3>Rapport élevage</h3>
                   <p className="hint">
                     {overview.livestockOperationsReport.periodLabel} | suivi par troupeau, lot,
-                    espece, alimentation, soins, ventes et mortalite.
+                    espèce, alimentation, soins, ventes et mortalité.
                   </p>
                 </div>
               </div>
@@ -2654,7 +2654,7 @@ export function ReportsPage(): JSX.Element {
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Solde elevage</span>
+                  <span>Solde élevage</span>
                   <strong>
                     {formatAmount(
                       overview.livestockOperationsReport.totals.netAmount,
@@ -2662,14 +2662,14 @@ export function ReportsPage(): JSX.Element {
                     )}
                   </strong>
                   <small>
-                    Recettes - depenses sur les lots d'elevage.
+                    Recettes - dépenses sur les lots d'élevage.
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Execution elevage</span>
+                  <span>Exécution élevage</span>
                   <strong>{formatRate(overview.livestockOperationsReport.totals.executionRate)}</strong>
                   <small>
-                    {formatCount(overview.livestockOperationsReport.totals.doneTasksCount)} terminees,{" "}
+                    {formatCount(overview.livestockOperationsReport.totals.doneTasksCount)} terminées,{" "}
                     {formatCount(overview.livestockOperationsReport.totals.openTasksCount)} ouvertes
                   </small>
                 </article>
@@ -2678,25 +2678,25 @@ export function ReportsPage(): JSX.Element {
               <div className="reports-data-grid">
                 <article className="reports-table-panel">
                   <div className="reports-table-header">
-                    <h4>Types d'operations</h4>
+                    <h4>Types d'opérations</h4>
                     <span>{formatCount(overview.livestockOperationsReport.operationRows.length)} type(s)</span>
                   </div>
                   <div className="table-wrap">
                     <table className="admin-table">
                       <thead>
                         <tr>
-                          <th>Operation</th>
+                          <th>Opération</th>
                           <th>Transactions</th>
-                          <th>Taches</th>
+                          <th>Tâches</th>
                           <th>Recettes</th>
-                          <th>Depenses</th>
+                          <th>Dépenses</th>
                           <th>Net</th>
                         </tr>
                       </thead>
                       <tbody>
                         {overview.livestockOperationsReport.operationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>Aucune operation d'elevage sur la periode filtree.</td>
+                            <td colSpan={6}>Aucune opération d'élevage sur la période filtrée.</td>
                           </tr>
                         ) : (
                           overview.livestockOperationsReport.operationRows.map((row) => (
@@ -2722,16 +2722,16 @@ export function ReportsPage(): JSX.Element {
                     <tr>
                       <th>Troupeau</th>
                       <th>Lot</th>
-                      <th>Espece</th>
+                      <th>Espèce</th>
                       <th>Achats</th>
                       <th>Aliment</th>
                       <th>Ventes</th>
                       <th>Produits</th>
-                      <th>Mortalite</th>
+                      <th>Mortalité</th>
                       <th>Recettes</th>
-                      <th>Depenses</th>
+                      <th>Dépenses</th>
                       <th>Net</th>
-                      <th>Execution</th>
+                      <th>Exécution</th>
                       <th>Blocages</th>
                     </tr>
                   </thead>
@@ -2739,7 +2739,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.livestockOperationsReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={13}>
-                          Aucun lot d'elevage alimente sur la periode filtree.
+                          Aucun lot d'élevage alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -2930,7 +2930,7 @@ export function ReportsPage(): JSX.Element {
                 <h3>Comptes financiers</h3>
                 <p className="hint">
                   {formatCount(overview.financeAccountsSummary.totalCount)} compte(s) disponible(s)
-                  pour le secteur applique.
+                  pour le secteur appliqué.
                 </p>
               </div>
               <div className="reports-inline-metrics">
@@ -2973,7 +2973,7 @@ export function ReportsPage(): JSX.Element {
             <div className="dashboard-panel-header">
               <div>
                 <h3>Rapport opérationnel</h3>
-                <p className="hint">Taches consolidees par statut pour le secteur applique.</p>
+                <p className="hint">Tâches consolidées par statut pour le secteur appliqué.</p>
               </div>
             </div>
 

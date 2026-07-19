@@ -18,9 +18,19 @@ import {
 } from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import type { AuthContext } from "../types/auth.js";
+import { repairMojibakeText } from "../utils/text-encoding.js";
 
 function normalizeOptional(value?: string | null): string | null {
   const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeHumanText(value: string): string {
+  return repairMojibakeText(value).trim();
+}
+
+function normalizeOptionalHumanText(value?: string | null): string | null {
+  const normalized = value ? normalizeHumanText(value) : "";
   return normalized ? normalized : null;
 }
 
@@ -81,22 +91,22 @@ export async function createCompanyForActor(
   }
 ) {
   if (actor.role !== "OWNER" && actor.role !== "SYS_ADMIN") {
-    throw new HttpError(403, "Permissions insuffisantes pour creer une entreprise.");
+    throw new HttpError(403, "Permissions insuffisantes pour créer une entreprise.");
   }
 
-  const name = input.name.trim();
+  const name = normalizeHumanText(input.name);
   if (!name) {
     throw new HttpError(400, "Le nom de l'entreprise est obligatoire.");
   }
 
-  const code = normalizeCompanyCode(input.code || input.name);
+  const code = normalizeCompanyCode(input.code || name);
   if (!code || code.length < 2) {
     throw new HttpError(400, "Le code entreprise est invalide.");
   }
 
   const existingCompany = await findCompanyByCode(code);
   if (existingCompany) {
-    throw new HttpError(409, "Une entreprise avec ce code existe deja.");
+    throw new HttpError(409, "Une entreprise avec ce code existe déjà.");
   }
 
   const companyId = randomUUID();
@@ -104,21 +114,21 @@ export async function createCompanyForActor(
     id: companyId,
     name,
     code,
-    legalName: normalizeOptional(input.legalName),
-    registrationNumber: normalizeOptional(input.registrationNumber),
+    legalName: normalizeOptionalHumanText(input.legalName),
+    registrationNumber: normalizeOptionalHumanText(input.registrationNumber),
     taxId: normalizeOptional(input.taxId),
     email: normalizeOptional(input.email),
     phone: normalizeOptional(input.phone),
     website: normalizeOptional(input.website),
-    addressLine1: normalizeOptional(input.addressLine1),
-    addressLine2: normalizeOptional(input.addressLine2),
-    city: normalizeOptional(input.city),
-    stateRegion: normalizeOptional(input.stateRegion),
+    addressLine1: normalizeOptionalHumanText(input.addressLine1),
+    addressLine2: normalizeOptionalHumanText(input.addressLine2),
+    city: normalizeOptionalHumanText(input.city),
+    stateRegion: normalizeOptionalHumanText(input.stateRegion),
     postalCode: normalizeOptional(input.postalCode),
-    country: normalizeOptional(input.country),
-    businessSector: normalizeOptional(input.businessSector),
-    contactFullName: normalizeOptional(input.contactFullName),
-    contactJobTitle: normalizeOptional(input.contactJobTitle)
+    country: normalizeOptionalHumanText(input.country),
+    businessSector: normalizeOptionalHumanText(input.businessSector),
+    contactFullName: normalizeOptionalHumanText(input.contactFullName),
+    contactJobTitle: normalizeOptionalHumanText(input.contactJobTitle)
   });
 
   const sourceMembers = isBootstrapCompanyId(actor.companyId)
@@ -151,28 +161,28 @@ export async function createCompanyForActor(
       code,
       name,
       inheritedUsersCount: sourceMembers.length,
-      legalName: normalizeOptional(input.legalName),
-      registrationNumber: normalizeOptional(input.registrationNumber),
+      legalName: normalizeOptionalHumanText(input.legalName),
+      registrationNumber: normalizeOptionalHumanText(input.registrationNumber),
       taxId: normalizeOptional(input.taxId),
       email: normalizeOptional(input.email),
       phone: normalizeOptional(input.phone),
       website: normalizeOptional(input.website),
-      addressLine1: normalizeOptional(input.addressLine1),
-      addressLine2: normalizeOptional(input.addressLine2),
-      city: normalizeOptional(input.city),
-      stateRegion: normalizeOptional(input.stateRegion),
+      addressLine1: normalizeOptionalHumanText(input.addressLine1),
+      addressLine2: normalizeOptionalHumanText(input.addressLine2),
+      city: normalizeOptionalHumanText(input.city),
+      stateRegion: normalizeOptionalHumanText(input.stateRegion),
       postalCode: normalizeOptional(input.postalCode),
-      country: normalizeOptional(input.country),
-      businessSector: normalizeOptional(input.businessSector),
-      contactFullName: normalizeOptional(input.contactFullName),
-      contactJobTitle: normalizeOptional(input.contactJobTitle)
+      country: normalizeOptionalHumanText(input.country),
+      businessSector: normalizeOptionalHumanText(input.businessSector),
+      contactFullName: normalizeOptionalHumanText(input.contactFullName),
+      contactJobTitle: normalizeOptionalHumanText(input.contactJobTitle)
     })
   });
 
   const items = await listCompaniesForUser(actor.userId);
   const created = items.find((item) => item.company.id === companyId);
   if (!created) {
-    throw new HttpError(500, "Impossible de recharger l'entreprise creee.");
+    throw new HttpError(500, "Impossible de recharger l'entreprise créée.");
   }
 
   return created;
@@ -204,10 +214,10 @@ export async function updateCompanyForActor(
   const existing = managedCompany.company;
 
   if (!existing.isActive) {
-    throw new HttpError(400, "Cette entreprise est inactive et ne peut pas etre modifiee.");
+    throw new HttpError(400, "Cette entreprise est inactive et ne peut pas être modifiée.");
   }
 
-  const nextName = input.name?.trim() || existing.name;
+  const nextName = input.name !== undefined ? normalizeHumanText(input.name) || existing.name : existing.name;
   if (!nextName) {
     throw new HttpError(400, "Le nom de l'entreprise est obligatoire.");
   }
@@ -216,36 +226,40 @@ export async function updateCompanyForActor(
     companyId: existing.id,
     name: nextName,
     legalName:
-      input.legalName !== undefined ? normalizeOptional(input.legalName) : existing.legalName,
+      input.legalName !== undefined ? normalizeOptionalHumanText(input.legalName) : existing.legalName,
     registrationNumber:
       input.registrationNumber !== undefined
-        ? normalizeOptional(input.registrationNumber)
+        ? normalizeOptionalHumanText(input.registrationNumber)
         : existing.registrationNumber,
     taxId: input.taxId !== undefined ? normalizeOptional(input.taxId) : existing.taxId,
     email: input.email !== undefined ? normalizeOptional(input.email) : existing.email,
     phone: input.phone !== undefined ? normalizeOptional(input.phone) : existing.phone,
     website: input.website !== undefined ? normalizeOptional(input.website) : existing.website,
     addressLine1:
-      input.addressLine1 !== undefined ? normalizeOptional(input.addressLine1) : existing.addressLine1,
+      input.addressLine1 !== undefined
+        ? normalizeOptionalHumanText(input.addressLine1)
+        : existing.addressLine1,
     addressLine2:
-      input.addressLine2 !== undefined ? normalizeOptional(input.addressLine2) : existing.addressLine2,
-    city: input.city !== undefined ? normalizeOptional(input.city) : existing.city,
+      input.addressLine2 !== undefined
+        ? normalizeOptionalHumanText(input.addressLine2)
+        : existing.addressLine2,
+    city: input.city !== undefined ? normalizeOptionalHumanText(input.city) : existing.city,
     stateRegion:
-      input.stateRegion !== undefined ? normalizeOptional(input.stateRegion) : existing.stateRegion,
+      input.stateRegion !== undefined ? normalizeOptionalHumanText(input.stateRegion) : existing.stateRegion,
     postalCode:
       input.postalCode !== undefined ? normalizeOptional(input.postalCode) : existing.postalCode,
-    country: input.country !== undefined ? normalizeOptional(input.country) : existing.country,
+    country: input.country !== undefined ? normalizeOptionalHumanText(input.country) : existing.country,
     businessSector:
       input.businessSector !== undefined
-        ? normalizeOptional(input.businessSector)
+        ? normalizeOptionalHumanText(input.businessSector)
         : existing.businessSector,
     contactFullName:
       input.contactFullName !== undefined
-        ? normalizeOptional(input.contactFullName)
+        ? normalizeOptionalHumanText(input.contactFullName)
         : existing.contactFullName,
     contactJobTitle:
       input.contactJobTitle !== undefined
-        ? normalizeOptional(input.contactJobTitle)
+        ? normalizeOptionalHumanText(input.contactJobTitle)
         : existing.contactJobTitle
   });
 
@@ -255,7 +269,7 @@ export async function updateCompanyForActor(
   });
 
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger l'entreprise modifiee.");
+    throw new HttpError(500, "Impossible de recharger l'entreprise modifiée.");
   }
 
   await createAuditLogRecord({
@@ -342,7 +356,7 @@ export async function deleteCompanyForActor(
   }
 
   if (existing.code === "AMCCO") {
-    throw new HttpError(400, "L'entreprise par defaut AMCCO ne peut pas etre supprimee.");
+    throw new HttpError(400, "L'entreprise par défaut AMCCO ne peut pas être supprimée.");
   }
 
   if (existing.isActive) {

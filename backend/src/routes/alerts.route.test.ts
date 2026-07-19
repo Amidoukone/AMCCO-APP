@@ -70,7 +70,7 @@ describe("alertsRouter", () => {
           companyId: "company-1",
           targetUserId: "user-1",
           code: "TASK_ASSIGNED",
-          message: "Une tache vous a ete assignee.",
+          message: "Une tâche vous a ete assignée.",
           severity: "INFO",
           entityType: "TASK",
           entityId: "task-1",

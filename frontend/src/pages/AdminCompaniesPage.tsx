@@ -12,6 +12,7 @@ import { ROLE_LABELS } from "../config/permissions";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
+import { repairMojibakeText } from "../utils/textEncoding";
 
 function createInitialFormState(): CreateCompanyInput {
   return {
@@ -37,7 +38,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
   }
-  return "Op\u00e9ration impossible. V\u00e9rifiez la connexion backend.";
+  return "Opération impossible. Vérifiez la connexion backend.";
 }
 
 function formatCompanyAddress(item: AdminCompanyItem): string {
@@ -48,28 +49,35 @@ function formatCompanyAddress(item: AdminCompanyItem): string {
     item.company.stateRegion,
     item.company.postalCode,
     item.company.country
-  ].filter((value): value is string => Boolean(value && value.trim()));
+  ]
+    .map((value) => (value ? repairMojibakeText(value).trim() : ""))
+    .filter((value): value is string => Boolean(value));
 
-  return parts.length > 0 ? parts.join(", ") : "Adresse non renseign\u00e9e";
+  return parts.length > 0 ? parts.join(", ") : "Adresse non renseignée";
+}
+
+function displayText(value: string | null | undefined, fallback = "Non renseigné"): string {
+  const normalized = value ? repairMojibakeText(value).trim() : "";
+  return normalized || fallback;
 }
 
 function createFormStateFromCompany(item: AdminCompanyItem): CreateCompanyInput {
   return {
-    name: item.company.name,
+    name: displayText(item.company.name, ""),
     code: item.company.code,
-    registrationNumber: item.company.registrationNumber ?? "",
+    registrationNumber: displayText(item.company.registrationNumber, ""),
     email: item.company.email ?? "",
     phone: item.company.phone ?? "",
     website: item.company.website ?? "",
-    addressLine1: item.company.addressLine1 ?? "",
-    addressLine2: item.company.addressLine2 ?? "",
-    city: item.company.city ?? "",
-    stateRegion: item.company.stateRegion ?? "",
+    addressLine1: displayText(item.company.addressLine1, ""),
+    addressLine2: displayText(item.company.addressLine2, ""),
+    city: displayText(item.company.city, ""),
+    stateRegion: displayText(item.company.stateRegion, ""),
     postalCode: item.company.postalCode ?? "",
-    country: item.company.country ?? "Mali",
-    businessSector: item.company.businessSector ?? "",
-    contactFullName: item.company.contactFullName ?? "",
-    contactJobTitle: item.company.contactJobTitle ?? ""
+    country: displayText(item.company.country, "Mali"),
+    businessSector: displayText(item.company.businessSector, ""),
+    contactFullName: displayText(item.company.contactFullName, ""),
+    contactJobTitle: displayText(item.company.contactJobTitle, "")
   };
 }
 
@@ -132,7 +140,7 @@ export function AdminCompaniesPage(): JSX.Element {
 
   function getCompanyUpdateLockMessage(item: AdminCompanyItem): string | null {
     if (!item.company.isActive) {
-      return "Cette entreprise est inactive et ne peut plus \u00eatre modifi\u00e9e.";
+      return "Cette entreprise est inactive et ne peut plus être modifiée.";
     }
 
     if (user?.role !== "OWNER" && user?.role !== "SYS_ADMIN") {
@@ -152,7 +160,7 @@ export function AdminCompaniesPage(): JSX.Element {
     }
 
     if (item.company.code === "AMCCO") {
-      return "L'entreprise par d\u00e9faut AMCCO ne peut pas \u00eatre supprim\u00e9e.";
+      return "L'entreprise par défaut AMCCO ne peut pas être supprimée.";
     }
 
     return null;
@@ -175,7 +183,7 @@ export function AdminCompaniesPage(): JSX.Element {
         const response = await withAuthorizedToken((accessToken) =>
           updateAdminCompanyRequest(accessToken, editingCompanyId, payload as UpdateCompanyInput)
         );
-        setSuccessMessage(`Entreprise ${response.item.company.name} modifi\u00e9e.`);
+        setSuccessMessage(`Entreprise ${displayText(response.item.company.name, "")} modifiée.`);
         await reloadProfile();
       } else {
         const response = await withAuthorizedToken((accessToken) =>
@@ -184,11 +192,11 @@ export function AdminCompaniesPage(): JSX.Element {
         if (!activeCompany) {
           await switchCompany(response.item.company.id);
           setSuccessMessage(
-            `Entreprise ${response.item.company.name} cr\u00e9\u00e9e et activ\u00e9e. L'application est maintenant initialis\u00e9e.`
+            `Entreprise ${displayText(response.item.company.name, "")} créée et activée. L'application est maintenant initialisée.`
           );
         } else {
           setSuccessMessage(
-            `Entreprise ${response.item.company.name} cr\u00e9\u00e9e. Elle est maintenant disponible dans votre liste.`
+            `Entreprise ${displayText(response.item.company.name, "")} créée. Elle est maintenant disponible dans votre liste.`
           );
           await reloadProfile();
         }
@@ -250,7 +258,7 @@ export function AdminCompaniesPage(): JSX.Element {
       if (editingCompanyId === companyPendingDelete.company.id) {
         resetCompanyForm();
       }
-      setSuccessMessage(`Entreprise ${item.company.name} d\u00e9sactiv\u00e9e.`);
+      setSuccessMessage(`Entreprise ${displayText(item.company.name, "")} désactivée.`);
       setCompanyPendingDelete(null);
       await reloadProfile();
       await loadCompanies();
@@ -267,7 +275,7 @@ export function AdminCompaniesPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await switchCompany(companyId);
-      setSuccessMessage("Entreprise active mise \u00e0 jour.");
+      setSuccessMessage("Entreprise active mise à jour.");
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -279,7 +287,7 @@ export function AdminCompaniesPage(): JSX.Element {
     return (
       <section className="panel">
         <h2>Administration entreprises</h2>
-        <p>Votre r\u00f4le ne permet pas d'administrer les entreprises.</p>
+        <p>Votre rôle ne permet pas d'administrer les entreprises.</p>
       </section>
     );
   }
@@ -302,7 +310,7 @@ export function AdminCompaniesPage(): JSX.Element {
             <h3>Entreprises accessibles</h3>
           </div>
           <div className="company-active-badge">
-            Entreprise active: <strong>{activeCompany?.name ?? "Non d\u00e9finie"}</strong>
+            Entreprise active: <strong>{displayText(activeCompany?.name, "Non définie")}</strong>
           </div>
         </div>
 
@@ -321,7 +329,7 @@ export function AdminCompaniesPage(): JSX.Element {
                 >
                   <div className="company-admin-top">
                     <div>
-                      <h4>{item.company.name}</h4>
+                      <h4>{displayText(item.company.name, "")}</h4>
                       <p className="hint">{ROLE_LABELS[item.role]}</p>
                     </div>
                     <span
@@ -333,24 +341,24 @@ export function AdminCompaniesPage(): JSX.Element {
 
                   <div className="company-admin-details">
                     <p>
-                      <strong>Secteur:</strong> {item.company.businessSector ?? "Non renseign\u00e9"}
+                      <strong>Secteur:</strong> {displayText(item.company.businessSector)}
                     </p>
                     <p>
-                      <strong>Email:</strong> {item.company.email ?? "Non renseign\u00e9"}
+                      <strong>Email:</strong> {item.company.email ?? "Non renseigné"}
                     </p>
                     <p>
-                      <strong>T\u00e9l\u00e9phone:</strong> {item.company.phone ?? "Non renseign\u00e9"}
+                      <strong>Téléphone:</strong> {item.company.phone ?? "Non renseigné"}
                     </p>
                     <p>
-                      <strong>Site web:</strong> {item.company.website ?? "Non renseign\u00e9"}
+                      <strong>Site web:</strong> {item.company.website ?? "Non renseigné"}
                     </p>
                     <p>
                       <strong>Contact:</strong>{" "}
                       {item.company.contactFullName
-                        ? `${item.company.contactFullName}${
-                            item.company.contactJobTitle ? ` (${item.company.contactJobTitle})` : ""
+                        ? `${displayText(item.company.contactFullName, "")}${
+                            item.company.contactJobTitle ? ` (${displayText(item.company.contactJobTitle, "")})` : ""
                           }`
-                        : "Non renseign\u00e9"}
+                        : "Non renseigné"}
                     </p>
                     <p className="company-admin-address">
                       <strong>Adresse:</strong> {formatCompanyAddress(item)}
@@ -359,18 +367,18 @@ export function AdminCompaniesPage(): JSX.Element {
 
                   <div className="admin-impact-block">
                     <p className="hint">
-                      <strong>\u00c9tat:</strong>{" "}
+                      <strong>État:</strong>{" "}
                       {item.company.isActive
                         ? isActive
                           ? "Entreprise active dans votre session."
                           : "Entreprise disponible pour bascule."
-                        : "Entreprise d\u00e9sactiv\u00e9e (non utilisable en op\u00e9ration)."}
+                        : "Entreprise désactivée (non utilisable en opération)."}
                     </p>
                     <p className="hint">
                       <strong>Impact:</strong>{" "}
                       {item.company.isActive
-                        ? "Les utilisateurs peuvent continuer \u00e0 cr\u00e9er et traiter des donn\u00e9es."
-                        : "Plus aucune cr\u00e9ation ni ex\u00e9cution m\u00e9tier sur cette entreprise; seul l'historique reste consultable."}
+                        ? "Les utilisateurs peuvent continuer à créer et traiter des données."
+                        : "Plus aucune création ni exécution métier sur cette entreprise; seul l'historique reste consultable."}
                     </p>
                   </div>
 
@@ -395,7 +403,7 @@ export function AdminCompaniesPage(): JSX.Element {
                         disabled={isBusy}
                         title={deleteLockMessage ?? undefined}
                       >
-                        {item.company.isActive ? "D\u00e9sactiver" : "Supprimer d\u00e9finitivement"}
+                        {item.company.isActive ? "Désactiver" : "Supprimer définitivement"}
                       </button>
                     </div> : null}
 
@@ -420,7 +428,7 @@ export function AdminCompaniesPage(): JSX.Element {
       </section>
 
       {canManageCompanies ? <section className="panel">
-        <h3>{isEditingCompany ? "Modifier une entreprise" : "Cr\u00e9er une entreprise"}</h3>
+        <h3>{isEditingCompany ? "Modifier une entreprise" : "Créer une entreprise"}</h3>
         <div className="company-admin-form">
           <input
             type="text"
@@ -437,7 +445,7 @@ export function AdminCompaniesPage(): JSX.Element {
           />
           <input
             type="text"
-            placeholder="Num\u00e9ro RCCM / registre"
+            placeholder="Numéro RCCM / registre"
             value={form.registrationNumber ?? ""}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, registrationNumber: event.target.value }))
@@ -451,7 +459,7 @@ export function AdminCompaniesPage(): JSX.Element {
           />
           <input
             type="tel"
-            placeholder="T\u00e9l\u00e9phone"
+            placeholder="Téléphone"
             value={form.phone ?? ""}
             onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
           />
@@ -490,10 +498,10 @@ export function AdminCompaniesPage(): JSX.Element {
             onChange={(event) => setForm((prev) => ({ ...prev, country: event.target.value }))}
           >
             <option value="Mali">Mali</option>
-            <option value="Cote d'Ivoire">Cote d'Ivoire</option>
-            <option value="S\u00e9n\u00e9gal">S\u00e9n\u00e9gal</option>
+            <option value="Côte d'Ivoire">Côte d'Ivoire</option>
+            <option value="Sénégal">Sénégal</option>
             <option value="Burkina Faso">Burkina Faso</option>
-            <option value="Guin\u00e9e">Guin\u00e9e</option>
+            <option value="Guinée">Guinée</option>
             <option value="Niger">Niger</option>
           </select>
           <button
@@ -520,15 +528,15 @@ export function AdminCompaniesPage(): JSX.Element {
         title="Confirmer la suppression"
         description={
           companyPendingDelete?.company.isActive
-            ? "Cette action d\u00e9sactive l'entreprise dans l'interface et interrompt son usage courant."
-            : "Cette action supprime d\u00e9finitivement l'entreprise et ses donn\u00e9es associ\u00e9es."
+            ? "Cette action désactive l'entreprise dans l'interface et interrompt son usage courant."
+            : "Cette action supprimera définitivement l'entreprise et ses données associées."
         }
-        objectLabel="Entreprise concern\u00e9e"
-        objectName={companyPendingDelete?.company.name ?? ""}
+        objectLabel="Entreprise concernée"
+        objectName={displayText(companyPendingDelete?.company.name, "")}
         impactText={
           companyPendingDelete?.company.isActive
-            ? "Les utilisateurs ne pourront plus travailler sur cette entreprise tant qu'elle ne sera pas r\u00e9activ\u00e9e."
-            : "L'entreprise inactive sera retir\u00e9e d\u00e9finitivement de l'application."
+            ? "Les utilisateurs ne pourront plus travailler sur cette entreprise tant qu'elle ne sera pas réactivée."
+            : "L'entreprise inactive sera retirée définitivement de l'application."
         }
         isConfirming={busyCompanyId === companyPendingDelete?.company.id}
         onCancel={() => {

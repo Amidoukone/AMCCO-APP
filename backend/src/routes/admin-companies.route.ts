@@ -55,7 +55,7 @@ const updateCompanySchema = z
     contactJobTitle: z.string().trim().max(255).optional()
   })
   .refine((value) => Object.keys(value).length > 0, {
-    message: "Au moins un champ doit etre fourni."
+    message: "Au moins un champ doit être fourni."
   });
 
 export const adminCompaniesRouter = Router();

@@ -121,7 +121,7 @@ describe("tasks.service", () => {
         id: "task-employee",
         companyId: actor.companyId,
         title: "Pointage terrain",
-        description: "Verifier la zone",
+        description: "Vérifier la zone",
         activityCode: "SERVICES",
         metadata: {},
         status: "IN_PROGRESS",
@@ -144,7 +144,7 @@ describe("tasks.service", () => {
         },
         {
           title: "Pointage terrain",
-          description: "Verifier la zone",
+          description: "Vérifier la zone",
           activityCode: "SERVICES"
         }
       );
@@ -174,7 +174,7 @@ describe("tasks.service", () => {
       expect(result.assignedToId).toBe("employee-1");
     });
 
-    it("creates an assigned task, audits it, and alerts the assignee", async () => {
+    it("creates an assigned task, audits it, and alerts the assignée", async () => {
       vi.mocked(findCompanyTaskAssigneeByUserId).mockResolvedValue({
         userId: "employee-1",
         email: "employee@example.com",
@@ -209,6 +209,9 @@ describe("tasks.service", () => {
         title: " Relancer client ",
         description: " Avant la fin de semaine ",
         activityCode: "GENERAL_STORE",
+        metadata: {
+          storeTaskKind: "Relance client"
+        },
         assignedToId: "employee-1",
         dueDate: "2026-04-25"
       });
@@ -244,7 +247,7 @@ describe("tasks.service", () => {
         companyId: actor.companyId,
         recipientUserIds: ["employee-1"],
         code: "TASK_ASSIGNED",
-        message: "Une nouvelle tâche Magasins (commerce general) vous a été assignée : Relancer client",
+        message: "Une nouvelle tâche Magasins (commerce général) vous a été assignée : Relancer client",
         severity: "INFO",
         entityType: "TASK",
         entityId: "task-1",
@@ -259,7 +262,7 @@ describe("tasks.service", () => {
 
     it("rejects mining task creation without assignee", async () => {
       const promise = createCompanyTask(actor, {
-        title: "Controle site",
+        title: "Contrôle site",
         description: "Zone Nord",
         activityCode: "MINING",
         dueDate: "2026-04-25T00:00:00.000Z"
@@ -267,7 +270,7 @@ describe("tasks.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
-        message: "Le secteur Exploitation miniere exige qu'une tache soit assignee des sa creation."
+        message: "Le secteur Exploitation minière exige qu'une tâche soit assignée dès sa création."
       });
       expect(createOperationTask).not.toHaveBeenCalled();
     });
@@ -275,7 +278,7 @@ describe("tasks.service", () => {
     it("rejects agriculture task creation without parcel metadata", async () => {
       const promise = createCompanyTask(actor, {
         title: "Suivi campagne",
-        description: "Controle intrants",
+        description: "Contrôle intrants",
         activityCode: "AGRICULTURE",
         dueDate: "2026-04-25T00:00:00.000Z",
         metadata: {
@@ -286,7 +289,7 @@ describe("tasks.service", () => {
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400
       });
-      await expect(promise).rejects.toThrow("reference parcelle");
+      await expect(promise).rejects.toThrow("référence parcelle");
       expect(createOperationTask).not.toHaveBeenCalled();
     });
   });
@@ -316,7 +319,7 @@ describe("tasks.service", () => {
       vi.mocked(findOperationTaskById).mockResolvedValue({
         id: "task-2",
         companyId: actor.companyId,
-        title: "Verifier dossier",
+        title: "Vérifier dossier",
         description: null,
         activityCode: "AGRICULTURE",
         status: "IN_PROGRESS",
@@ -334,7 +337,7 @@ describe("tasks.service", () => {
       const result = await assignCompanyTask(actor, {
         taskId: "task-2",
         assignedToId: "employee-2",
-        note: "A traiter aujourd'hui"
+        note: "À traiter aujourd'hui"
       });
 
       expect(updateOperationTaskAssignment).toHaveBeenCalledWith({
@@ -357,14 +360,14 @@ describe("tasks.service", () => {
         companyId: actor.companyId,
         recipientUserIds: ["employee-2"],
         code: "TASK_ASSIGNED",
-        message: "Une tâche vous a été assignée : Verifier dossier. Note : A traiter aujourd'hui",
+        message: "Une tâche vous a été assignée : Vérifier dossier. Note : À traiter aujourd'hui",
         severity: "INFO",
         entityType: "TASK",
         entityId: "task-2",
         metadata: {
           taskId: "task-2",
-          title: "Verifier dossier",
-          note: "A traiter aujourd'hui"
+          title: "Vérifier dossier",
+          note: "À traiter aujourd'hui"
         }
       });
       expect(result.status).toBe("IN_PROGRESS");
@@ -389,10 +392,12 @@ describe("tasks.service", () => {
         .mockResolvedValueOnce({
           id: "task-6",
           companyId: actor.companyId,
-          title: "Controle stock",
+          title: "Contrôle stock",
           description: "Version initiale",
           activityCode: "GENERAL_STORE",
-          metadata: {},
+          metadata: {
+            storeTaskKind: "Inventaire"
+          },
           status: "TODO",
           createdById: "employee-1",
           createdByEmail: "employee@example.com",
@@ -407,10 +412,12 @@ describe("tasks.service", () => {
         .mockResolvedValueOnce({
           id: "task-6",
           companyId: actor.companyId,
-          title: "Controle stock urgent",
+          title: "Contrôle stock urgent",
           description: "Version ajustee",
           activityCode: "GENERAL_STORE",
-          metadata: {},
+          metadata: {
+            storeTaskKind: "Inventaire"
+          },
           status: "TODO",
           createdById: "employee-1",
           createdByEmail: "employee@example.com",
@@ -431,7 +438,7 @@ describe("tasks.service", () => {
         },
         {
           taskId: "task-6",
-          title: "Controle stock urgent",
+          title: "Contrôle stock urgent",
           description: "Version ajustee"
         }
       );
@@ -439,9 +446,11 @@ describe("tasks.service", () => {
       expect(updateOperationTask).toHaveBeenCalledWith({
         companyId: actor.companyId,
         taskId: "task-6",
-        title: "Controle stock urgent",
+        title: "Contrôle stock urgent",
         description: "Version ajustee",
-        metadata: {},
+        metadata: {
+          storeTaskKind: "Inventaire"
+        },
         dueDate: null
       });
       expect(createAuditLogRecord).toHaveBeenCalledWith(
@@ -450,14 +459,14 @@ describe("tasks.service", () => {
           entityId: "task-6"
         })
       );
-      expect(result.title).toBe("Controle stock urgent");
+      expect(result.title).toBe("Contrôle stock urgent");
     });
 
     it("rejects update when the actor did not create the task", async () => {
       vi.mocked(findOperationTaskById).mockResolvedValue({
         id: "task-6b",
         companyId: actor.companyId,
-        title: "Controle stock",
+        title: "Contrôle stock",
         description: "Version initiale",
         activityCode: "GENERAL_STORE",
         metadata: {},
@@ -475,13 +484,13 @@ describe("tasks.service", () => {
 
       const promise = updateCompanyTask(actor, {
         taskId: "task-6b",
-        title: "Controle stock urgent",
+        title: "Contrôle stock urgent",
         description: "Version ajustee"
       });
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 403,
-        message: "Permissions insuffisantes pour modifier cette tache."
+        message: "Permissions insuffisantes pour modifier cette tâche."
       });
       expect(updateOperationTask).not.toHaveBeenCalled();
     });
@@ -557,7 +566,7 @@ describe("tasks.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 403,
-        message: "Permissions insuffisantes pour supprimer cette tache."
+        message: "Permissions insuffisantes pour supprimer cette tâche."
       });
       expect(deleteOperationTask).not.toHaveBeenCalled();
     });
@@ -664,7 +673,7 @@ describe("tasks.service", () => {
 
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
-        message: "Le secteur Location immobiliere interdit de terminer une tache non assignee."
+        message: "Le secteur Location immobilière interdit de terminer une tâche non assignée."
       });
       expect(updateOperationTaskStatus).not.toHaveBeenCalled();
     });

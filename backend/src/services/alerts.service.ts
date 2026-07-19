@@ -177,7 +177,7 @@ export async function deleteManyCurrentUserAlerts(
   );
 
   if (alertIds.length === 0) {
-    throw new HttpError(400, "Selectionne au moins une alerte a supprimer.");
+    throw new HttpError(400, "Sélectionne au moins une alerte à supprimer.");
   }
 
   await deleteManyUserAlerts({

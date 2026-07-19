@@ -5,17 +5,17 @@ import { FeedbackBanner } from "../components/FeedbackBanner";
 import { ApiError, changeOwnPasswordRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 
-const SECURITY_PAGE_TITLE = "S\u00e9curit\u00e9 et acc\u00e8s";
-const SECURITY_PANEL_TITLE = "S\u00e9curit\u00e9 personnelle";
-const OWNER_SECURITY_HINT = "G\u00e9rez votre mot de passe et votre session propri\u00e9taire.";
-const USER_SECURITY_HINT = "G\u00e9rez votre mot de passe et votre session active.";
-const PASSWORD_LENGTH_ERROR = "Le nouveau mot de passe doit contenir au moins 8 caract\u00e8res.";
+const SECURITY_PAGE_TITLE = "Sécurité et accès";
+const SECURITY_PANEL_TITLE = "Sécurité personnelle";
+const OWNER_SECURITY_HINT = "Gérez votre mot de passe et votre session propriétaire.";
+const USER_SECURITY_HINT = "Gérez votre mot de passe et votre session active.";
+const PASSWORD_LENGTH_ERROR = "Le nouveau mot de passe doit contenir au moins 8 caractères.";
 const PASSWORD_CONFIRMATION_ERROR = "La confirmation ne correspond pas au nouveau mot de passe.";
-const PASSWORD_UPDATE_SUCCESS = "Mot de passe mis \u00e0 jour.";
+const PASSWORD_UPDATE_SUCCESS = "Mot de passe mis à jour.";
 const PASSWORD_UPDATE_FAILURE = "Impossible de modifier le mot de passe.";
-const PASSWORD_UPDATE_PENDING = "Mise \u00e0 jour...";
+const PASSWORD_UPDATE_PENDING = "Mise à jour...";
 const CHANGE_PASSWORD_LABEL = "Modifier le mot de passe";
-const LOGOUT_LABEL = "Se d\u00e9connecter";
+const LOGOUT_LABEL = "Se déconnecter";
 
 export function SecuritySettingsPage(): JSX.Element {
   const navigate = useNavigate();

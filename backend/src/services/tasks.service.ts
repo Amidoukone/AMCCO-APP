@@ -61,7 +61,7 @@ type TaskAttachmentItem = TaskAttachment & {
 
 function ensureOperationsAccess(role: RoleCode): void {
   if (!OPERATIONS_ACCESS_ROLES.includes(role)) {
-    throw new HttpError(403, "Permissions insuffisantes pour acceder au module operations.");
+    throw new HttpError(403, "Permissions insuffisantes pour acceder au module opérations.");
   }
 }
 
@@ -175,10 +175,10 @@ export async function getCompanyTaskById(
   ensureOperationsAccess(actor.role);
   const task = await findOperationTaskById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canViewTask(actor, task)) {
-    throw new HttpError(403, "Permissions insuffisantes pour consulter cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour consulter cette tâche.");
   }
   return task;
 }
@@ -195,7 +195,7 @@ export async function createCompanyTask(
   }
 ) {
   if (!canCreateTasks(actor.role)) {
-    throw new HttpError(403, "Permissions insuffisantes pour creer une tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour créer une tâche.");
   }
 
   await ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode);
@@ -209,7 +209,7 @@ export async function createCompanyTask(
       metadata
     });
   } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+    throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
   }
   const profile = getBusinessActivityProfile(input.activityCode);
 
@@ -219,7 +219,7 @@ export async function createCompanyTask(
   } else if (input.assignedToId) {
     const assignee = await findCompanyTaskAssigneeByUserId(actor.companyId, input.assignedToId);
     if (!assignee) {
-      throw new HttpError(400, "Utilisateur assigne invalide ou inactif.");
+      throw new HttpError(400, "Utilisateur assigné invalide ou inactif.");
     }
     assignedToId = assignee.userId;
   }
@@ -279,7 +279,7 @@ export async function createCompanyTask(
 
   const created = await findOperationTaskById(actor.companyId, taskId);
   if (!created) {
-    throw new HttpError(500, "Impossible de recharger la tache creee.");
+    throw new HttpError(500, "Impossible de recharger la tâche créée.");
   }
 
   if (assignedToId && assignedToId !== actor.actorId) {
@@ -328,19 +328,19 @@ export async function assignCompanyTask(
   }
 ) {
   if (!canManageTasks(actor.role)) {
-    throw new HttpError(403, "Permissions insuffisantes pour assigner une tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour assigner une tâche.");
   }
 
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
 
   let nextAssignedToId: string | null = null;
   if (input.assignedToId) {
     const assignee = await findCompanyTaskAssigneeByUserId(actor.companyId, input.assignedToId);
     if (!assignee) {
-      throw new HttpError(400, "Utilisateur assigne invalide ou inactif.");
+      throw new HttpError(400, "Utilisateur assigné invalide ou inactif.");
     }
     nextAssignedToId = assignee.userId;
   }
@@ -350,19 +350,19 @@ export async function assignCompanyTask(
     if (profile.tasks.requiresAssignee && !nextAssignedToId) {
       throw new HttpError(
         400,
-        `Le secteur ${profile.label} impose qu'une tache conserve un responsable assigne.`
+        `Le secteur ${profile.label} impose qu'une tâche conserve un responsable assigné.`
       );
     }
   }
 
   if (task.status === "DONE" && task.assignedToId !== nextAssignedToId) {
-    throw new HttpError(400, "Une tache terminee ne peut pas etre re-assignee.");
+    throw new HttpError(400, "Une tâche terminée ne peut pas être re-assignée.");
   }
 
   if (task.assignedToId === nextAssignedToId) {
     const current = await findOperationTaskById(actor.companyId, task.id);
     if (!current) {
-      throw new HttpError(500, "Impossible de recharger la tache.");
+      throw new HttpError(500, "Impossible de recharger la tâche.");
     }
     return current;
   }
@@ -410,7 +410,7 @@ export async function assignCompanyTask(
 
   const updated = await findOperationTaskById(actor.companyId, task.id);
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger la tache mise a jour.");
+    throw new HttpError(500, "Impossible de recharger la tâche mise à jour.");
   }
 
   if (nextAssignedToId && nextAssignedToId !== actor.actorId) {
@@ -445,32 +445,32 @@ export async function assignCompanyTasksBulk(
   }
 ) {
   if (!canManageTasks(actor.role)) {
-    throw new HttpError(403, "Permissions insuffisantes pour assigner des taches.");
+    throw new HttpError(403, "Permissions insuffisantes pour assigner des tâches.");
   }
 
   const uniqueTaskIds = Array.from(new Set(input.taskIds.map((id) => id.trim()).filter(Boolean)));
   if (uniqueTaskIds.length === 0) {
-    throw new HttpError(400, "Aucune tache valide fournie.");
+    throw new HttpError(400, "Aucune tâche valide fournie.");
   }
   if (uniqueTaskIds.length > 100) {
-    throw new HttpError(400, "Maximum 100 taches par assignation en lot.");
+    throw new HttpError(400, "Maximum 100 tâches par assignation en lot.");
   }
 
   const tasks = await findOperationTasksMinimalByIds(actor.companyId, uniqueTaskIds);
   if (tasks.length !== uniqueTaskIds.length) {
-    throw new HttpError(404, "Au moins une tache est introuvable.");
+    throw new HttpError(404, "Au moins une tâche est introuvable.");
   }
 
   if (input.assignedToId) {
     const assignee = await findCompanyTaskAssigneeByUserId(actor.companyId, input.assignedToId);
     if (!assignee) {
-      throw new HttpError(400, "Utilisateur assigne invalide ou inactif.");
+      throw new HttpError(400, "Utilisateur assigné invalide ou inactif.");
     }
   }
 
   for (const task of tasks) {
     if (task.status === "DONE" && task.assignedToId !== input.assignedToId) {
-      throw new HttpError(400, "Le lot contient une tache terminee qui ne peut pas etre re-assignee.");
+      throw new HttpError(400, "Le lot contient une tâche terminée qui ne peut pas être re-assignée.");
     }
   }
 
@@ -498,29 +498,29 @@ export async function updateCompanyTask(
 ) {
   ensureOperationsAccess(actor.role);
   if (isReadOnlyOwner(actor.role)) {
-    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+    throw new HttpError(403, "Le propriétaire est en lecture seule sur les tâches.");
   }
 
   const existing = await findOperationTaskById(actor.companyId, input.taskId);
   if (!existing) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canEditTask(actor, existing)) {
-    throw new HttpError(403, "Permissions insuffisantes pour modifier cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour modifier cette tâche.");
   }
   if (existing.status === "DONE") {
-    throw new HttpError(400, "Une tache terminee ne peut plus etre modifiee.");
+    throw new HttpError(400, "Une tâche terminée ne peut plus être modifiée.");
   }
   if (!existing.activityCode) {
-    throw new HttpError(400, "L'activite de cette tache est introuvable.");
+    throw new HttpError(400, "L'activité de cette tâche est introuvable.");
   }
 
   const title = input.title.trim();
   if (!title) {
-    throw new HttpError(400, "Le titre de la tache est obligatoire.");
+    throw new HttpError(400, "Le titre de la tâche est obligatoire.");
   }
 
-  const metadata = normalizeActivityMetadata(input.metadata);
+  const metadata = normalizeActivityMetadata(input.metadata ?? existing.metadata);
   const dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
   try {
@@ -531,7 +531,7 @@ export async function updateCompanyTask(
       metadata
     });
   } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+    throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
   }
 
   await updateOperationTask({
@@ -564,7 +564,7 @@ export async function updateCompanyTask(
 
   const updated = await findOperationTaskById(actor.companyId, existing.id);
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger la tache modifiee.");
+    throw new HttpError(500, "Impossible de recharger la tâche modifiée.");
   }
 
   return updated;
@@ -578,19 +578,19 @@ export async function deleteCompanyTask(
 ): Promise<void> {
   ensureOperationsAccess(actor.role);
   if (isReadOnlyOwner(actor.role)) {
-    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+    throw new HttpError(403, "Le propriétaire est en lecture seule sur les tâches.");
   }
 
   const existing = await findOperationTaskById(actor.companyId, input.taskId);
   if (!existing) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   const canDelete = actor.role === "SYS_ADMIN" || canEditTask(actor, existing);
   if (!canDelete) {
-    throw new HttpError(403, "Permissions insuffisantes pour supprimer cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour supprimer cette tâche.");
   }
   if (existing.status === "DONE" && actor.role !== "SYS_ADMIN") {
-    throw new HttpError(400, "Une tache terminee ne peut plus etre supprimee.");
+    throw new HttpError(400, "Une tâche terminée ne peut plus être supprimée.");
   }
 
   await createAuditLogRecord({
@@ -626,12 +626,12 @@ export async function updateCompanyTaskStatus(
 ) {
   ensureOperationsAccess(actor.role);
   if (isReadOnlyOwner(actor.role)) {
-    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+    throw new HttpError(403, "Le propriétaire est en lecture seule sur les tâches.");
   }
 
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
 
   const canUpdate = canManageTasks(actor.role) || task.assignedToId === actor.actorId;
@@ -642,7 +642,7 @@ export async function updateCompanyTaskStatus(
   try {
     assertTaskStatusMatchesActivityProfile(task.activityCode, task, input.status);
   } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+    throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
   }
 
   const profile = task.activityCode ? getBusinessActivityProfile(task.activityCode) : null;
@@ -672,7 +672,7 @@ export async function updateCompanyTaskStatus(
 
   const updated = await findOperationTaskById(actor.companyId, task.id);
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger la tache apres changement de statut.");
+    throw new HttpError(500, "Impossible de recharger la tâche après changement de statut.");
   }
 
   if (input.status === "BLOCKED") {
@@ -722,10 +722,10 @@ export async function listCompanyTaskTimeline(
   ensureOperationsAccess(actor.role);
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canViewTask(actor, task)) {
-    throw new HttpError(403, "Permissions insuffisantes pour consulter l'historique de cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour consulter l'historique de cette tâche.");
   }
 
   const limit = Math.min(Math.max(input.limit ?? 100, 1), 200);
@@ -752,10 +752,10 @@ export async function listCompanyTaskComments(
   ensureOperationsAccess(actor.role);
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canViewTask(actor, task)) {
-    throw new HttpError(403, "Permissions insuffisantes pour consulter les commentaires de cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour consulter les commentaires de cette tâche.");
   }
 
   const limit = Math.min(Math.max(input.limit ?? 100, 1), 200);
@@ -778,14 +778,14 @@ export async function addCompanyTaskComment(
 ) {
   ensureOperationsAccess(actor.role);
   if (isReadOnlyOwner(actor.role)) {
-    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+    throw new HttpError(403, "Le propriétaire est en lecture seule sur les tâches.");
   }
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canViewTask(actor, task)) {
-    throw new HttpError(403, "Permissions insuffisantes pour commenter cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour commenter cette tâche.");
   }
 
   const commentId = randomUUID();
@@ -814,7 +814,7 @@ export async function addCompanyTaskComment(
 
   const created = await findTaskCommentById(actor.companyId, commentId);
   if (!created) {
-    throw new HttpError(500, "Impossible de recharger le commentaire cree.");
+    throw new HttpError(500, "Impossible de recharger le commentaire créé.");
   }
   return created;
 }
@@ -828,10 +828,10 @@ export async function listCompanyTaskAttachments(
   ensureOperationsAccess(actor.role);
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canViewTask(actor, task)) {
-    throw new HttpError(403, "Permissions insuffisantes pour consulter les pieces jointes de cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour consulter les pièces jointes de cette tâche.");
   }
 
   const attachments = await listTaskAttachments(task.id);
@@ -850,15 +850,15 @@ export async function addAttachmentToCompanyTask(
 ) {
   ensureOperationsAccess(actor.role);
   if (isReadOnlyOwner(actor.role)) {
-    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+    throw new HttpError(403, "Le propriétaire est en lecture seule sur les tâches.");
   }
 
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canViewTask(actor, task)) {
-    throw new HttpError(403, "Permissions insuffisantes pour ajouter une piece jointe a cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour ajouter une pièce jointe à cette tâche.");
   }
 
   const attachmentId = randomUUID();
@@ -900,15 +900,15 @@ export async function getTaskAttachmentUploadAuth(
 ) {
   ensureOperationsAccess(actor.role);
   if (isReadOnlyOwner(actor.role)) {
-    throw new HttpError(403, "Le proprietaire est en lecture seule sur les taches.");
+    throw new HttpError(403, "Le propriétaire est en lecture seule sur les tâches.");
   }
 
   const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
-    throw new HttpError(404, "Tache introuvable.");
+    throw new HttpError(404, "Tâche introuvable.");
   }
   if (!canViewTask(actor, task)) {
-    throw new HttpError(403, "Permissions insuffisantes pour ajouter une piece jointe a cette tache.");
+    throw new HttpError(403, "Permissions insuffisantes pour ajouter une pièce jointe à cette tâche.");
   }
 
   const auth = getImageKitUploadAuthParameters();

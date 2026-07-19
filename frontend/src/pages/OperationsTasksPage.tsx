@@ -1,4 +1,4 @@
-﻿import {
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -51,11 +51,11 @@ type AgricultureTaskKind =
   | "STORAGE"
   | "FOLLOW_UP";
 const AGRICULTURE_TASK_LABELS: Record<AgricultureTaskKind, string> = {
-  PREPARATION: "Preparation",
+  PREPARATION: "Préparation",
   SOWING: "Semis",
   MAINTENANCE: "Entretien",
   TREATMENT: "Traitement",
-  HARVEST: "Recolte",
+  HARVEST: "Récolte",
   STORAGE: "Stockage",
   FOLLOW_UP: "Suivi terrain"
 };
@@ -74,7 +74,7 @@ type BtpTaskKind =
   | "HANDOVER"
   | "FOLLOW_UP";
 const BTP_TASK_LABELS: Record<BtpTaskKind, string> = {
-  SITE_PREPARATION: "Preparation chantier",
+  SITE_PREPARATION: "Préparation chantier",
   EARTHWORKS: "Terrassement",
   FOUNDATION: "Fondation",
   STRUCTURAL_WORK: "Structure",
@@ -82,9 +82,9 @@ const BTP_TASK_LABELS: Record<BtpTaskKind, string> = {
   MEP: "Electricite / plomberie",
   FINISHING: "Finition",
   PROCUREMENT: "Approvisionnement",
-  QUALITY_CONTROL: "Controle qualite",
-  RESERVE: "Reserve / reprise",
-  HANDOVER: "Reception",
+  QUALITY_CONTROL: "Contrôle qualité",
+  RESERVE: "Réserve / reprise",
+  HANDOVER: "Réception",
   FOLLOW_UP: "Suivi chantier"
 };
 const STORE_TASK_KIND_KEY = "storeTaskKind";
@@ -103,16 +103,16 @@ type StoreTaskKind =
   | "FOLLOW_UP";
 const STORE_TASK_LABELS: Record<StoreTaskKind, string> = {
   OPENING_CASH: "Ouverture caisse",
-  CLOSING_CASH: "Cloture caisse",
-  STOCK_CONTROL: "Controle stock",
+  CLOSING_CASH: "Clôture caisse",
+  STOCK_CONTROL: "Contrôle stock",
   INVENTORY: "Inventaire",
-  REPLENISHMENT: "Reassort rayon",
+  REPLENISHMENT: "Réassort rayon",
   MERCHANDISING: "Implantation rayon",
-  PRICE_UPDATE: "Mise a jour prix",
+  PRICE_UPDATE: "Mise à jour prix",
   SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
   CUSTOMER_RETURN: "Retour client",
   CLEANING: "Nettoyage rayon",
-  SECURITY_CHECK: "Controle securite",
+  SECURITY_CHECK: "Contrôle sécurité",
   FOLLOW_UP: "Suivi magasin"
 };
 const FOOD_TASK_KIND_KEY = "foodTaskKind";
@@ -130,16 +130,16 @@ type FoodTaskKind =
   | "DELIVERY"
   | "FOLLOW_UP";
 const FOOD_TASK_LABELS: Record<FoodTaskKind, string> = {
-  RECEPTION: "Reception stock",
-  STOCK_CONTROL: "Controle stock",
-  EXPIRY_CHECK: "Controle DLC",
-  COLD_CHAIN_CHECK: "Controle froid",
+  RECEPTION: "Réception stock",
+  STOCK_CONTROL: "Contrôle stock",
+  EXPIRY_CHECK: "Contrôle DLC",
+  COLD_CHAIN_CHECK: "Contrôle froid",
   SHELF_ROTATION: "Rotation rayon",
   SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
   PRODUCT_WITHDRAWAL: "Retrait produit",
   CLEANING: "Nettoyage",
   INVENTORY: "Inventaire",
-  QUALITY_CONTROL: "Controle qualite",
+  QUALITY_CONTROL: "Contrôle qualité",
   DELIVERY: "Livraison",
   FOLLOW_UP: "Suivi alimentaire"
 };
@@ -167,7 +167,7 @@ const RENTAL_TASK_LABELS: Record<RentalTaskKind, string> = {
   MAINTENANCE: "Maintenance",
   INSPECTION: "Inspection",
   DOCUMENTS: "Documents",
-  OWNER_REPORT: "Reporting proprietaire",
+  OWNER_REPORT: "Reporting propriétaire",
   LITIGATION: "Litige",
   FOLLOW_UP: "Suivi locatif"
 };
@@ -188,12 +188,12 @@ type HotelTaskKind =
 const HOTEL_TASK_LABELS: Record<HotelTaskKind, string> = {
   CHECK_IN: "Check-in",
   CHECK_OUT: "Check-out",
-  ROOM_PREPARATION: "Preparation chambre",
+  ROOM_PREPARATION: "Préparation chambre",
   HOUSEKEEPING: "Menage",
   MAINTENANCE: "Maintenance",
   RESTAURANT_SERVICE: "Service restauration",
   LAUNDRY: "Blanchisserie",
-  EVENT_SETUP: "Preparation evenement",
+  EVENT_SETUP: "Préparation événement",
   GUEST_FOLLOW_UP: "Suivi client",
   SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
   NIGHT_AUDIT: "Audit nuit",
@@ -215,10 +215,10 @@ type WaterTaskKind =
   | "FOLLOW_UP";
 const WATER_TASK_LABELS: Record<WaterTaskKind, string> = {
   PRODUCTION_READING: "Releve production",
-  QUALITY_CONTROL: "Controle qualite",
+  QUALITY_CONTROL: "Contrôle qualité",
   PUMP_MAINTENANCE: "Maintenance pompe",
-  NETWORK_INSPECTION: "Inspection reseau",
-  LEAK_REPAIR: "Reparation fuite",
+  NETWORK_INSPECTION: "Inspection réseau",
+  LEAK_REPAIR: "Réparation fuite",
   METER_READING: "Releve compteur",
   CONNECTION_WORK: "Branchement",
   CHEMICAL_DOSING: "Dosage traitement",
@@ -251,7 +251,7 @@ const AGENCY_TASK_LABELS: Record<AgencyTaskKind, string> = {
   DOCUMENT_COLLECTION: "Collecte documents",
   NOTARY_FOLLOW_UP: "Suivi notaire",
   CONTRACT_SIGNING: "Signature contrat",
-  OWNER_REPORTING: "Reporting proprietaire",
+  OWNER_REPORTING: "Reporting propriétaire",
   COMMISSION_COLLECTION: "Recouvrement commission",
   FOLLOW_UP: "Suivi dossier"
 };
@@ -266,10 +266,10 @@ type FishFarmingTaskKind =
   | "FOLLOW_UP";
 const FISH_FARMING_TASK_LABELS: Record<FishFarmingTaskKind, string> = {
   FEEDING: "Nourrissage",
-  WATER_CONTROL: "Controle eau",
+  WATER_CONTROL: "Contrôle eau",
   TREATMENT: "Traitement sanitaire",
   SORTING: "Tri / calibrage",
-  HARVEST: "Recolte",
+  HARVEST: "Récolte",
   STOCKING: "Mise en charge",
   FOLLOW_UP: "Suivi bassin"
 };
@@ -285,13 +285,13 @@ type LivestockTaskKind =
   | "FOLLOW_UP";
 const LIVESTOCK_TASK_LABELS: Record<LivestockTaskKind, string> = {
   FEEDING: "Nourrissage",
-  HEALTH_CHECK: "Controle sanitaire",
+  HEALTH_CHECK: "Contrôle sanitaire",
   VACCINATION: "Vaccination",
   TREATMENT: "Traitement",
   CLEANING: "Nettoyage enclos",
   BREEDING: "Reproduction",
-  SALE_PREP: "Preparation vente",
-  FOLLOW_UP: "Suivi elevage"
+  SALE_PREP: "Préparation vente",
+  FOLLOW_UP: "Suivi élevage"
 };
 
 function toErrorMessage(error: unknown): string {
@@ -1167,7 +1167,7 @@ export function OperationsTasksPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         updateOperationsTaskStatusRequest(accessToken, taskId, status)
       );
-      setSuccessMessage("Statut mis a jour.");
+      setSuccessMessage("Statut mis à jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -1230,7 +1230,7 @@ export function OperationsTasksPage(): JSX.Element {
           <input
             type="search"
             className="quick-search-input"
-            placeholder="Recherche rapide: tache, responsable, createur..."
+            placeholder="Recherche rapide: tâche, responsable, createur..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -1535,7 +1535,7 @@ export function OperationsTasksPage(): JSX.Element {
                         title={field.helpText}
                         required={field.required}
                       >
-                        <option value="">Choisir le type d'action hoteliere</option>
+                        <option value="">Choisir le type d'action hôtelière</option>
                         <option value="CHECK_IN">{HOTEL_TASK_LABELS.CHECK_IN}</option>
                         <option value="CHECK_OUT">{HOTEL_TASK_LABELS.CHECK_OUT}</option>
                         <option value="ROOM_PREPARATION">{HOTEL_TASK_LABELS.ROOM_PREPARATION}</option>
@@ -1753,7 +1753,7 @@ export function OperationsTasksPage(): JSX.Element {
           <div className="operations-bulk-bar-header">
             <h3>Assignation en lot</h3>
             <p className="hint">
-              {selectedTaskIds.length} selectionnee(s) sur {displayTasks.length} visible(s)
+              {selectedTaskIds.length} sélectionnée(s) sur {displayTasks.length} visible(s)
               {selectedTotalCount !== selectedTaskIds.length
                 ? ` (${selectedTotalCount} au total)`
                 : ""}
@@ -1808,7 +1808,7 @@ export function OperationsTasksPage(): JSX.Element {
 
       <section className="panel">
         <div className="operations-list-header">
-          <h3>Taches</h3>
+          <h3>Tâches</h3>
           {false ? (
             <label className="inline-checkbox">
               <input

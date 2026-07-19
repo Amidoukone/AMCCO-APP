@@ -87,21 +87,21 @@ const HARDWARE_REPORT_BRANDING = {
 const AGRICULTURE_OPERATION_LABELS: Record<string, string> = {
   INPUT_PURCHASE: "Achat intrants",
   FIELD_EXPENSE: "Travaux champ",
-  HARVEST_SALE: "Vente recolte",
+  HARVEST_SALE: "Vente récolte",
   SUPPORT_INCOME: "Appui / subvention"
 };
 const AGRICULTURE_TASK_LABELS: Record<string, string> = {
-  PREPARATION: "Preparation",
+  PREPARATION: "Préparation",
   SOWING: "Semis",
   MAINTENANCE: "Entretien",
   TREATMENT: "Traitement",
-  HARVEST: "Recolte",
+  HARVEST: "Récolte",
   STORAGE: "Stockage",
   FOLLOW_UP: "Suivi terrain"
 };
 const AGRICULTURE_REPORT_BRANDING = {
   title: "ACTIVITE AGRICOLE",
-  subtitle: "Suivi de campagne, parcelles, cultures et operations terrain",
+  subtitle: "Suivi de campagne, parcelles, cultures et opérations terrain",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO"
 };
@@ -110,23 +110,23 @@ const GENERAL_STORE_OPERATION_LABELS: Record<string, string> = {
   STOCK_PURCHASE: "Achat stock",
   SUPPLIER_PAYMENT: "Paiement fournisseur",
   CUSTOMER_RETURN: "Retour client",
-  DISCOUNT_ADJUSTMENT: "Remise / ecart",
+  DISCOUNT_ADJUSTMENT: "Remise / écart",
   INVENTORY_ADJUSTMENT: "Ajustement inventaire",
   INTERNAL_TRANSFER: "Transfert interne",
   STORE_EXPENSE: "Charge magasin"
 };
 const GENERAL_STORE_TASK_LABELS: Record<string, string> = {
   OPENING_CASH: "Ouverture caisse",
-  CLOSING_CASH: "Cloture caisse",
-  STOCK_CONTROL: "Controle stock",
+  CLOSING_CASH: "Clôture caisse",
+  STOCK_CONTROL: "Contrôle stock",
   INVENTORY: "Inventaire",
-  REPLENISHMENT: "Reassort rayon",
+  REPLENISHMENT: "Réassort rayon",
   MERCHANDISING: "Implantation rayon",
-  PRICE_UPDATE: "Mise a jour prix",
+  PRICE_UPDATE: "Mise à jour prix",
   SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
   CUSTOMER_RETURN: "Retour client",
   CLEANING: "Nettoyage rayon",
-  SECURITY_CHECK: "Controle securite",
+  SECURITY_CHECK: "Contrôle sécurité",
   FOLLOW_UP: "Suivi magasin"
 };
 const GENERAL_STORE_REPORT_BRANDING = {
@@ -141,28 +141,28 @@ const FOOD_OPERATION_LABELS: Record<string, string> = {
   PRODUCT_SALE: "Vente produit",
   PRODUCT_PURCHASE: "Achat stock",
   SUPPLIER_PAYMENT: "Paiement fournisseur",
-  STOCK_LOSS: "Perte / peremption",
-  COLD_CHAIN_EXPENSE: "Chaine du froid",
+  STOCK_LOSS: "Perte / péremption",
+  COLD_CHAIN_EXPENSE: "Chaîne du froid",
   PACKAGING_EXPENSE: "Emballage",
   CUSTOMER_REFUND: "Remboursement client"
 };
 const FOOD_TASK_LABELS: Record<string, string> = {
-  RECEPTION: "Reception stock",
-  STOCK_CONTROL: "Controle stock",
-  EXPIRY_CHECK: "Controle DLC",
-  COLD_CHAIN_CHECK: "Controle froid",
+  RECEPTION: "Réception stock",
+  STOCK_CONTROL: "Contrôle stock",
+  EXPIRY_CHECK: "Contrôle DLC",
+  COLD_CHAIN_CHECK: "Contrôle froid",
   SHELF_ROTATION: "Rotation rayon",
   SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
   PRODUCT_WITHDRAWAL: "Retrait produit",
   CLEANING: "Nettoyage",
   INVENTORY: "Inventaire",
-  QUALITY_CONTROL: "Controle qualite",
+  QUALITY_CONTROL: "Contrôle qualité",
   DELIVERY: "Livraison",
   FOLLOW_UP: "Suivi alimentaire"
 };
 const FOOD_REPORT_BRANDING = {
   title: "ALIMENTATION",
-  subtitle: "Suivi des achats, ventes, lots, DLC, pertes, chaine du froid et controles",
+  subtitle: "Suivi des achats, ventes, lots, DLC, pertes, chaîne du froid et contrôles",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -175,7 +175,7 @@ const RENTAL_OPERATION_LABELS: Record<string, string> = {
   SERVICE_CHARGE_INCOME: "Charges recuperees",
   MAINTENANCE_EXPENSE: "Maintenance",
   PROPERTY_EXPENSE: "Charge bien",
-  OWNER_PAYOUT: "Reversement proprietaire"
+  OWNER_PAYOUT: "Reversement propriétaire"
 };
 const RENTAL_TASK_LABELS: Record<string, string> = {
   RENT_COLLECTION: "Recouvrement loyer",
@@ -187,7 +187,7 @@ const RENTAL_TASK_LABELS: Record<string, string> = {
   MAINTENANCE: "Maintenance",
   INSPECTION: "Inspection",
   DOCUMENTS: "Documents",
-  OWNER_REPORT: "Reporting proprietaire",
+  OWNER_REPORT: "Reporting propriétaire",
   LITIGATION: "Litige",
   FOLLOW_UP: "Suivi locatif"
 };
@@ -201,25 +201,25 @@ const RENTAL_REPORT_BRANDING = {
 };
 const HOTEL_OPERATION_LABELS: Record<string, string> = {
   ROOM_PAYMENT: "Paiement chambre",
-  BOOKING_DEPOSIT: "Acompte reservation",
+  BOOKING_DEPOSIT: "Acompte réservation",
   RESTAURANT_SALE: "Restauration",
   EVENT_SERVICE: "Evenement / salle",
   LAUNDRY_SERVICE: "Blanchisserie",
   ROOM_MAINTENANCE: "Maintenance chambre",
   SUPPLIER_PAYMENT: "Paiement fournisseur",
   COMMISSION_FEE: "Commission",
-  TAX_PAYMENT: "Taxe sejour",
+  TAX_PAYMENT: "Taxe séjour",
   GUEST_REFUND: "Remboursement client"
 };
 const HOTEL_TASK_LABELS: Record<string, string> = {
   CHECK_IN: "Check-in",
   CHECK_OUT: "Check-out",
-  ROOM_PREPARATION: "Preparation chambre",
+  ROOM_PREPARATION: "Préparation chambre",
   HOUSEKEEPING: "Menage",
   MAINTENANCE: "Maintenance",
   RESTAURANT_SERVICE: "Service restauration",
   LAUNDRY: "Blanchisserie",
-  EVENT_SETUP: "Preparation evenement",
+  EVENT_SETUP: "Préparation événement",
   GUEST_FOLLOW_UP: "Suivi client",
   SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
   NIGHT_AUDIT: "Audit nuit",
@@ -227,7 +227,7 @@ const HOTEL_TASK_LABELS: Record<string, string> = {
 };
 const HOTEL_REPORT_BRANDING = {
   title: "HOTELLERIE / AUBERGE",
-  subtitle: "Suivi des reservations, chambres, nuitees, restauration, services, charges et maintenance",
+  subtitle: "Suivi des réservations, chambres, nuitées, restauration, services, charges et maintenance",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -239,18 +239,18 @@ const WATER_OPERATION_LABELS: Record<string, string> = {
   CONNECTION_FEE: "Frais branchement",
   SUBSIDY_INCOME: "Subvention / appui",
   CHEMICAL_PURCHASE: "Produit traitement",
-  ENERGY_PAYMENT: "Energie",
+  ENERGY_PAYMENT: "Énergie",
   MAINTENANCE_EXPENSE: "Maintenance",
-  QUALITY_TEST_EXPENSE: "Analyse qualite",
-  NETWORK_REPAIR: "Reparation reseau",
+  QUALITY_TEST_EXPENSE: "Analyse qualité",
+  NETWORK_REPAIR: "Réparation réseau",
   SUPPLIER_PAYMENT: "Paiement fournisseur"
 };
 const WATER_TASK_LABELS: Record<string, string> = {
-  PRODUCTION_READING: "Releve production",
-  QUALITY_CONTROL: "Controle qualite",
+  PRODUCTION_READING: "Relevé production",
+  QUALITY_CONTROL: "Contrôle qualité",
   PUMP_MAINTENANCE: "Maintenance pompe",
-  NETWORK_INSPECTION: "Inspection reseau",
-  LEAK_REPAIR: "Reparation fuite",
+  NETWORK_INSPECTION: "Inspection réseau",
+  LEAK_REPAIR: "Réparation fuite",
   METER_READING: "Releve compteur",
   CONNECTION_WORK: "Branchement",
   CHEMICAL_DOSING: "Dosage traitement",
@@ -261,7 +261,7 @@ const WATER_TASK_LABELS: Record<string, string> = {
 };
 const WATER_REPORT_BRANDING = {
   title: "PRODUCTION D'EAU POTABLE",
-  subtitle: "Suivi des stations, volumes, facturation, qualite, maintenance et continuite de service",
+  subtitle: "Suivi des stations, volumes, facturation, qualité, maintenance et continuité de service",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -273,8 +273,8 @@ const AGENCY_OPERATION_LABELS: Record<string, string> = {
   MANDATE_FEE: "Frais mandat",
   VISIT_FEE: "Frais visite",
   FILE_FEE: "Frais dossier",
-  ADVERTISING_EXPENSE: "Publicite",
-  FIELD_VISIT_EXPENSE: "Deplacement visite",
+  ADVERTISING_EXPENSE: "Publicité",
+  FIELD_VISIT_EXPENSE: "Déplacement visite",
   BROKER_PAYOUT: "Reversement courtier",
   DOCUMENT_EXPENSE: "Frais document",
   CUSTOMER_REFUND: "Remboursement client",
@@ -290,7 +290,7 @@ const AGENCY_TASK_LABELS: Record<string, string> = {
   DOCUMENT_COLLECTION: "Collecte documents",
   NOTARY_FOLLOW_UP: "Suivi notaire",
   CONTRACT_SIGNING: "Signature contrat",
-  OWNER_REPORTING: "Reporting proprietaire",
+  OWNER_REPORTING: "Reporting propriétaire",
   COMMISSION_COLLECTION: "Recouvrement commission",
   FOLLOW_UP: "Suivi dossier"
 };
@@ -304,14 +304,14 @@ const AGENCY_REPORT_BRANDING = {
 };
 const BTP_OPERATION_LABELS: Record<string, string> = {
   CLIENT_PAYMENT: "Encaissement client",
-  MATERIAL_PURCHASE: "Achat materiaux",
+  MATERIAL_PURCHASE: "Achat matériaux",
   LABOR_PAYMENT: "Main-d'oeuvre",
   EQUIPMENT_RENTAL: "Location engin",
   SUBCONTRACTING: "Sous-traitance",
   SITE_EXPENSE: "Charge chantier"
 };
 const BTP_TASK_LABELS: Record<string, string> = {
-  SITE_PREPARATION: "Preparation chantier",
+  SITE_PREPARATION: "Préparation chantier",
   EARTHWORKS: "Terrassement",
   FOUNDATION: "Fondation",
   STRUCTURAL_WORK: "Structure",
@@ -319,14 +319,14 @@ const BTP_TASK_LABELS: Record<string, string> = {
   MEP: "Electricite / plomberie",
   FINISHING: "Finition",
   PROCUREMENT: "Approvisionnement",
-  QUALITY_CONTROL: "Controle qualite",
-  RESERVE: "Reserve / reprise",
-  HANDOVER: "Reception",
+  QUALITY_CONTROL: "Contrôle qualité",
+  RESERVE: "Réserve / reprise",
+  HANDOVER: "Réception",
   FOLLOW_UP: "Suivi chantier"
 };
 const BTP_REPORT_BRANDING = {
   title: "BTP",
-  subtitle: "Suivi de chantiers, lots, couts, avancement et reserves",
+  subtitle: "Suivi de chantiers, lots, coûts, avancement et réserves",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -341,16 +341,16 @@ const FISH_FARMING_OPERATION_LABELS: Record<string, string> = {
 };
 const FISH_FARMING_TASK_LABELS: Record<string, string> = {
   FEEDING: "Nourrissage",
-  WATER_CONTROL: "Controle eau",
+  WATER_CONTROL: "Contrôle eau",
   TREATMENT: "Traitement sanitaire",
   SORTING: "Tri / calibrage",
-  HARVEST: "Recolte",
+  HARVEST: "Récolte",
   STOCKING: "Mise en charge",
   FOLLOW_UP: "Suivi bassin"
 };
 const FISH_FARMING_REPORT_BRANDING = {
   title: "PISCICULTURE",
-  subtitle: "Suivi des bassins, cycles d'elevage, aliments, ventes et alertes sanitaires",
+  subtitle: "Suivi des bassins, cycles d'élevage, aliments, ventes et alertes sanitaires",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO"
 };
@@ -358,24 +358,24 @@ const LIVESTOCK_OPERATION_LABELS: Record<string, string> = {
   ANIMAL_PURCHASE: "Achat animaux",
   FEED_PURCHASE: "Achat aliment",
   VET_CARE: "Soins veterinaires",
-  FARM_EXPENSE: "Charge elevage",
+  FARM_EXPENSE: "Charge élevage",
   ANIMAL_SALE: "Vente animaux",
   PRODUCT_SALE: "Vente produits",
   SUPPORT_INCOME: "Appui / subvention"
 };
 const LIVESTOCK_TASK_LABELS: Record<string, string> = {
   FEEDING: "Nourrissage",
-  HEALTH_CHECK: "Controle sanitaire",
+  HEALTH_CHECK: "Contrôle sanitaire",
   VACCINATION: "Vaccination",
   TREATMENT: "Traitement",
   CLEANING: "Nettoyage enclos",
   BREEDING: "Reproduction",
-  SALE_PREP: "Preparation vente",
-  FOLLOW_UP: "Suivi elevage"
+  SALE_PREP: "Préparation vente",
+  FOLLOW_UP: "Suivi élevage"
 };
 const LIVESTOCK_REPORT_BRANDING = {
   title: "ELEVAGE",
-  subtitle: "Suivi des troupeaux, lots, especes, alimentation, soins, ventes et mortalite",
+  subtitle: "Suivi des troupeaux, lots, espèces, alimentation, soins, ventes et mortalité",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO"
 };
@@ -396,7 +396,7 @@ function ensureSectorReportFilter(
   filters: ReportPeriodFilter
 ): asserts filters is ReportPeriodFilter & { activityCode: BusinessActivityCode } {
   if (!filters.activityCode) {
-    throw new HttpError(400, "Selectionnez un secteur pour consulter le rapport.");
+    throw new HttpError(400, "Sélectionnez un secteur pour consulter le rapport.");
   }
 }
 
@@ -417,7 +417,7 @@ function buildCsv(headers: string[], rows: Array<Array<string | number | null | 
 
 function toDisplayPeriodLabel(filters: { dateFrom?: string; dateTo?: string }): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   const fromLabel = filters.dateFrom
@@ -432,7 +432,7 @@ function toDisplayPeriodLabel(filters: { dateFrom?: string; dateTo?: string }): 
 
 function toDisplayActivityLabel(activityCode?: BusinessActivityCode): string {
   if (!activityCode) {
-    return "Toutes activites";
+    return "Toutes activités";
   }
   return BUSINESS_ACTIVITY_LABELS[activityCode];
 }
@@ -698,7 +698,7 @@ function toDisplayTaskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLO
     return "En cours";
   }
   if (status === "DONE") {
-    return "Terminee";
+    return "Terminée";
   }
   return "Bloquee";
 }
@@ -765,7 +765,7 @@ function drawPdfBrandingFrame(
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(9)
-    .text(`Periode: ${periodLabel}`, pageWidth - margin - 190, 28, {
+    .text(`Période: ${periodLabel}`, pageWidth - margin - 190, 28, {
       width: 190,
       align: "right"
     });
@@ -871,7 +871,7 @@ const HARDWARE_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "QUANTITE", width: 52, align: "right" },
   { label: "VENTE/JOUR", width: 75, align: "right" },
   { label: "VERSEMENT", width: 75, align: "right" },
-  { label: "COUT ACHAT", width: 70, align: "right" },
+  { label: "COÛT ACHAT", width: 70, align: "right" },
   { label: "BENEFICE", width: 70, align: "right" }
 ];
 
@@ -986,7 +986,7 @@ function drawHardwareContinuationHeader(doc: PDFKit.PDFDocument, report: Hardwar
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(8)
-    .text(`Periode: ${report.periodLabel}`, margin + 44, 43, {
+    .text(`Période: ${report.periodLabel}`, margin + 44, 43, {
       width: pageWidth - margin * 2 - 88
     });
   doc
@@ -1016,7 +1016,7 @@ function drawHardwareMetadataStrip(
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(8)
-    .text("Periode", margin + 10, y + 8, { width: 140 });
+    .text("Période", margin + 10, y + 8, { width: 140 });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
@@ -1058,10 +1058,10 @@ function drawHardwareMetricCards(doc: PDFKit.PDFDocument, report: HardwareMonthl
   const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
   const y = doc.y;
   const metrics = [
-    { label: "Quantite totale", value: formatPdfNumber(report.totals.quantity, 2) },
+    { label: "Quantité totale", value: formatPdfNumber(report.totals.quantity, 2) },
     { label: "Vente totale", value: formatPdfMoney(report.totals.salesAmount) },
     { label: "Versement", value: formatPdfMoney(report.totals.paymentAmount) },
-    { label: "Benefice brut", value: formatPdfMoney(report.totals.grossProfit) }
+    { label: "Bénéfice brut", value: formatPdfMoney(report.totals.grossProfit) }
   ];
 
   metrics.forEach((metric, index) => {
@@ -1186,7 +1186,7 @@ function drawHardwareEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(8.5)
     .text(
-      "Le rapport reprend les ventes XOF soumises ou approuvees avec designation article. Verifiez la periode, le statut des transactions et les champs quantite/prix si le tableau doit etre alimente.",
+      "Le rapport reprend les ventes XOF soumises ou approuvées avec désignation article. Vérifiez la période, le statut des transactions et les champs quantité/prix si le tableau doit être alimenté.",
       margin + 14,
       y + 34,
       {
@@ -1291,7 +1291,7 @@ function renderHardwareReportsPdf(
   drawHardwareMonthlyTable(doc, report);
 
   const note =
-    "Lecture: les montants sont consolides en F CFA. Le benefice brut correspond a la vente moins le cout d'achat renseigne sur les transactions article.";
+    "Lecture: les montants sont consolidés en F CFA. Le bénéfice brut correspond à la vente moins le coût d'achat renseigné sur les transactions article.";
   const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
   const noteHeight = doc.heightOfString(note, {
     width: noteWidth
@@ -1314,7 +1314,7 @@ const AGRICULTURE_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "CULTURE", width: 58, align: "left" },
   { label: "SURF.", width: 45, align: "right" },
   { label: "RECETTES", width: 60, align: "right" },
-  { label: "DEPENSES", width: 60, align: "right" },
+  { label: "DÉPENSES", width: 60, align: "right" },
   { label: "NET", width: 60, align: "right" },
   { label: "EXEC. %", width: 40, align: "right" }
 ];
@@ -1446,7 +1446,7 @@ function drawAgricultureMetadataStrip(
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(8.8)
-    .text("Periode", margin + 10, y + 8, { width: 155 });
+    .text("Période", margin + 10, y + 8, { width: 155 });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
@@ -1461,7 +1461,7 @@ function drawAgricultureMetadataStrip(
     .fillColor("#111827")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Activite agricole", margin + 205, y + 21, { width: 140 });
+    .text("Activité agricole", margin + 205, y + 21, { width: 140 });
   doc
     .fillColor("#486581")
     .font("Helvetica")
@@ -1493,7 +1493,7 @@ function drawAgricultureMetricCards(doc: PDFKit.PDFDocument, report: Agriculture
       value: `${formatPdfNumber(report.totals.parcelsCount)} | ${formatPdfNumber(report.totals.surfaceArea, 2)} ha`
     },
     { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
-    { label: "Depenses", value: formatPdfMoney(report.totals.cashOutAmount) },
+    { label: "Dépenses", value: formatPdfMoney(report.totals.cashOutAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
   ];
 
@@ -1523,7 +1523,7 @@ function drawAgricultureMetricCards(doc: PDFKit.PDFDocument, report: Agriculture
     .font("Helvetica")
     .fontSize(8.8)
     .text(
-      `Execution terrain: ${formatPdfNumber(report.totals.executionRate, 1)}% | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+      `Exécution terrain: ${formatPdfNumber(report.totals.executionRate, 1)}% | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
       margin,
       doc.y - 8,
       {
@@ -1618,7 +1618,7 @@ function drawAgricultureEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#14532d")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text("Aucune operation agricole reportable", margin + 14, y + 16, {
+    .text("Aucune opération agricole reportable", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -1626,7 +1626,7 @@ function drawAgricultureEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvees et les taches agricoles de la periode. Renseignez campagne, parcelle et type de champ pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches agricoles de la période. Renseignez campagne, parcelle et type de champ pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -1651,7 +1651,7 @@ function drawAgricultureOperationsTable(doc: PDFKit.PDFDocument, report: Agricul
     .fillColor("#14532d")
     .font("Helvetica-Bold")
     .fontSize(10.5)
-    .text("Synthese par campagne, parcelle et culture", PDF_PAGE_MARGIN, doc.y, {
+    .text("Synthèse par campagne, parcelle et culture", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -1688,7 +1688,7 @@ function drawAgricultureBreakdown(doc: PDFKit.PDFDocument, report: AgricultureOp
     .fillColor("#14532d")
     .font("Helvetica-Bold")
     .fontSize(12)
-    .text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    .text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -1698,7 +1698,7 @@ function drawAgricultureBreakdown(doc: PDFKit.PDFDocument, report: AgricultureOp
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -1846,7 +1846,7 @@ const GENERAL_STORE_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "ACH", width: 32, align: "right" },
   { label: "RET", width: 30, align: "right" },
   { label: "CA", width: 49, align: "right" },
-  { label: "COUT", width: 49, align: "right" },
+  { label: "COÛT", width: 49, align: "right" },
   { label: "NET", width: 49, align: "right" },
   { label: "MARGE", width: 39, align: "right" },
   { label: "BLQ", width: 22, align: "right" }
@@ -1913,7 +1913,7 @@ function drawGeneralStoreMetadataStrip(
 
   doc.roundedRect(margin, y, width, 42, 4).fill("#eef2ff");
   doc.rect(margin, y, width, 42).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Magasins", margin + 205, y + 21, { width: 140 });
@@ -1950,7 +1950,7 @@ function drawGeneralStoreMetricCards(doc: PDFKit.PDFDocument, report: GeneralSto
   });
   doc.y = y + 60;
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
-    `Quantites: ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | achats ${formatPdfNumber(report.totals.purchaseQuantity, 2)} | retours ${formatPdfNumber(report.totals.returnQuantity, 2)} | remises ${formatPdfMoney(report.totals.discountAmount)} | marge ${formatPdfMoney(report.totals.grossMargin)} (${formatPdfNumber(report.totals.marginRate, 1)}%).`,
+    `Quantités: ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | achats ${formatPdfNumber(report.totals.purchaseQuantity, 2)} | retours ${formatPdfNumber(report.totals.returnQuantity, 2)} | remises ${formatPdfMoney(report.totals.discountAmount)} | marge ${formatPdfMoney(report.totals.grossMargin)} (${formatPdfNumber(report.totals.marginRate, 1)}%).`,
     margin,
     doc.y - 8,
     { width: pageWidth - margin * 2, align: "center" }
@@ -2044,11 +2044,11 @@ function drawGeneralStoreEmptyState(doc: PDFKit.PDFDocument): void {
 
   doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#eef2ff");
   doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(11).text("Aucune operation magasin reportable", margin + 14, y + 16, {
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(11).text("Aucune opération magasin reportable", margin + 14, y + 16, {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#3730a3").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Magasins de la periode. Renseignez rayon, famille, article, reference, quantite et caisse pour alimenter le suivi.",
+    "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Magasins de la période. Renseignez rayon, famille, article, référence, quantité et caisse pour alimenter le suivi.",
     margin + 14,
     y + 34,
     { width: pageWidth - margin * 2 - 28 }
@@ -2067,7 +2067,7 @@ function drawGeneralStoreOperationsTable(doc: PDFKit.PDFDocument, report: Genera
     doc.addPage();
     drawGeneralStoreReportHeader(doc, report);
   }
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(10.5).text("Synthese par rayon, famille et article", PDF_PAGE_MARGIN, doc.y, {
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(10.5).text("Synthèse par rayon, famille et article", PDF_PAGE_MARGIN, doc.y, {
     width: doc.page.width - PDF_PAGE_MARGIN * 2
   });
   doc.moveDown(0.4);
@@ -2100,7 +2100,7 @@ function drawGeneralStoreBreakdown(doc: PDFKit.PDFDocument, report: GeneralStore
     drawGeneralStoreReportHeader(doc, report);
   }
 
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
     width: doc.page.width - PDF_PAGE_MARGIN * 2
   });
   doc.moveDown(0.4);
@@ -2110,7 +2110,7 @@ function drawGeneralStoreBreakdown(doc: PDFKit.PDFDocument, report: GeneralStore
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -2242,7 +2242,7 @@ const FOOD_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "VENTE", width: 36, align: "right" },
   { label: "PERTE", width: 36, align: "right" },
   { label: "CA", width: 48, align: "right" },
-  { label: "COUT", width: 48, align: "right" },
+  { label: "COÛT", width: 48, align: "right" },
   { label: "NET", width: 48, align: "right" },
   { label: "MARGE", width: 41, align: "right" },
   { label: "BLQ", width: 25, align: "right" }
@@ -2308,7 +2308,7 @@ function drawFoodMetadataStrip(
 
   doc.roundedRect(margin, y, width, 42, 4).fill("#f0fdf4");
   doc.rect(margin, y, width, 42).strokeColor("#bbf7d0").lineWidth(0.8).stroke();
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Alimentation", margin + 205, y + 21, { width: 140 });
@@ -2349,7 +2349,7 @@ function drawFoodMetricCards(doc: PDFKit.PDFDocument, report: FoodOperationsRepo
   });
   doc.y = y + 60;
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
-    `Quantites: achats ${formatPdfNumber(report.totals.purchaseQuantity, 2)} | ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | pertes ${formatPdfNumber(report.totals.lossQuantity, 2)} | marge ${formatPdfMoney(report.totals.grossMargin)} (${formatPdfNumber(report.totals.marginRate, 1)}%) | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+    `Quantités: achats ${formatPdfNumber(report.totals.purchaseQuantity, 2)} | ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | pertes ${formatPdfNumber(report.totals.lossQuantity, 2)} | marge ${formatPdfMoney(report.totals.grossMargin)} (${formatPdfNumber(report.totals.marginRate, 1)}%) | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
     margin,
     doc.y - 8,
     {
@@ -2446,11 +2446,11 @@ function drawFoodEmptyState(doc: PDFKit.PDFDocument): void {
 
   doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#f0fdf4");
   doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#bbf7d0").lineWidth(0.8).stroke();
-  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(11).text("Aucune operation alimentaire reportable", margin + 14, y + 16, {
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(11).text("Aucune opération alimentaire reportable", margin + 14, y + 16, {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#166534").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Alimentation de la periode. Renseignez famille, produit, lot, quantite et zone pour alimenter le suivi.",
+    "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Alimentation de la période. Renseignez famille, produit, lot, quantité et zone pour alimenter le suivi.",
     margin + 14,
     y + 34,
     {
@@ -2471,7 +2471,7 @@ function drawFoodOperationsTable(doc: PDFKit.PDFDocument, report: FoodOperations
     doc.addPage();
     drawFoodReportHeader(doc, report);
   }
-  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(10.5).text("Synthese par famille, produit, lot et zone", PDF_PAGE_MARGIN, doc.y, {
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(10.5).text("Synthèse par famille, produit, lot et zone", PDF_PAGE_MARGIN, doc.y, {
     width: doc.page.width - PDF_PAGE_MARGIN * 2
   });
   doc.moveDown(0.4);
@@ -2504,7 +2504,7 @@ function drawFoodBreakdown(doc: PDFKit.PDFDocument, report: FoodOperationsReport
     drawFoodReportHeader(doc, report);
   }
 
-  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+  doc.fillColor("#14532d").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
     width: doc.page.width - PDF_PAGE_MARGIN * 2
   });
   doc.moveDown(0.4);
@@ -2514,7 +2514,7 @@ function drawFoodBreakdown(doc: PDFKit.PDFDocument, report: FoodOperationsReport
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -2749,10 +2749,10 @@ function drawRentalMetadataStrip(
 
   doc.roundedRect(margin, y, width, 42, 4).fill("#ecfeff");
   doc.rect(margin, y, width, 42).strokeColor("#99f6e4").lineWidth(0.8).stroke();
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Location immobiliere", margin + 205, y + 21, { width: 170 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Location immobilière", margin + 205, y + 21, { width: 170 });
   doc
     .fillColor("#486581")
     .font("Helvetica")
@@ -2784,7 +2784,7 @@ function drawRentalMetricCards(doc: PDFKit.PDFDocument, report: RentalOperations
       value: `${formatPdfNumber(report.totals.propertiesCount)} | ${formatPdfNumber(report.totals.unitsCount)}`
     },
     { label: "Loyers", value: formatPdfMoney(report.totals.rentAmount) },
-    { label: "Depenses", value: formatPdfMoney(report.totals.cashOutAmount) },
+    { label: "Dépenses", value: formatPdfMoney(report.totals.cashOutAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
   ];
 
@@ -2805,7 +2805,7 @@ function drawRentalMetricCards(doc: PDFKit.PDFDocument, report: RentalOperations
     .font("Helvetica")
     .fontSize(8.8)
     .text(
-      `Locataires: ${formatPdfNumber(report.totals.tenantsCount)} | cautions ${formatPdfMoney(report.totals.depositAmount)} | charges ${formatPdfMoney(report.totals.serviceChargeAmount)} | maintenance ${formatPdfMoney(report.totals.maintenanceAmount)} | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+      `Locataires: ${formatPdfNumber(report.totals.tenantsCount)} | cautions ${formatPdfMoney(report.totals.depositAmount)} | charges ${formatPdfMoney(report.totals.serviceChargeAmount)} | maintenance ${formatPdfMoney(report.totals.maintenanceAmount)} | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
       margin,
       doc.y - 8,
       {
@@ -2905,7 +2905,7 @@ function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text("Aucune operation locative reportable", margin + 14, y + 16, {
+    .text("Aucune opération locative reportable", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -2913,7 +2913,7 @@ function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Location de la periode. Renseignez bien, lot, locataire et bail pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Location de la période. Renseignez bien, lot, locataire et bail pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -2938,7 +2938,7 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(10.5)
-    .text("Synthese par bien, lot et locataire", PDF_PAGE_MARGIN, doc.y, {
+    .text("Synthèse par bien, lot et locataire", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -2975,7 +2975,7 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(12)
-    .text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    .text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -2985,7 +2985,7 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -3061,7 +3061,7 @@ function drawRentalPdfFooter(
     .fillColor("#627d98")
     .font("Helvetica")
     .fontSize(8.5)
-    .text(`AMCCO - Rapport location immobiliere | ${periodLabel}`, margin, pageHeight - 32, {
+    .text(`AMCCO - Rapport location immobilière | ${periodLabel}`, margin, pageHeight - 32, {
       width: 330
     });
   doc
@@ -3200,10 +3200,10 @@ function drawHotelMetadataStrip(
 
   doc.roundedRect(margin, y, width, 42, 4).fill("#f0f9ff");
   doc.rect(margin, y, width, 42).strokeColor("#bae6fd").lineWidth(0.8).stroke();
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Periode", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Hotellerie / Auberge", margin + 205, y + 21, { width: 165 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Hôtellerie / Auberge", margin + 205, y + 21, { width: 165 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
     width: 140,
     align: "right"
@@ -3222,7 +3222,7 @@ function drawHotelMetricCards(doc: PDFKit.PDFDocument, report: HotelOperationsRe
   const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
   const y = doc.y;
   const metrics = [
-    { label: "Reservations / chambres", value: `${formatPdfNumber(report.totals.bookingsCount)} | ${formatPdfNumber(report.totals.roomsCount)}` },
+    { label: "Réservations / chambres", value: `${formatPdfNumber(report.totals.bookingsCount)} | ${formatPdfNumber(report.totals.roomsCount)}` },
     { label: "Nuitees", value: formatPdfNumber(report.totals.nightsCount, 1) },
     { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
@@ -3330,11 +3330,11 @@ function drawHotelEmptyState(doc: PDFKit.PDFDocument): void {
 
   doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#f0f9ff");
   doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#bae6fd").lineWidth(0.8).stroke();
-  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(11).text("Aucune operation hoteliere reportable", margin + 14, y + 16, {
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(11).text("Aucune opération hôtelière reportable", margin + 14, y + 16, {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#075985").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les transactions XOF soumises ou approuvees et les taches Hotellerie de la periode. Renseignez reservation, chambre, service, nuitees et client pour alimenter le suivi.",
+    "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Hôtellerie de la période. Renseignez réservation, chambre, service, nuitées et client pour alimenter le suivi.",
     margin + 14,
     y + 34,
     { width: pageWidth - margin * 2 - 28 }
@@ -3353,7 +3353,7 @@ function drawHotelOperationsTable(doc: PDFKit.PDFDocument, report: HotelOperatio
     doc.addPage();
     drawHotelReportHeader(doc, report);
   }
-  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(10.5).text("Synthese par service, chambre et reservation", PDF_PAGE_MARGIN, doc.y, {
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(10.5).text("Synthèse par service, chambre et réservation", PDF_PAGE_MARGIN, doc.y, {
     width: doc.page.width - PDF_PAGE_MARGIN * 2
   });
   doc.moveDown(0.4);
@@ -3386,7 +3386,7 @@ function drawHotelBreakdown(doc: PDFKit.PDFDocument, report: HotelOperationsRepo
     drawHotelReportHeader(doc, report);
   }
 
-  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+  doc.fillColor("#0c4a6e").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
     width: doc.page.width - PDF_PAGE_MARGIN * 2
   });
   doc.moveDown(0.4);
@@ -3396,7 +3396,7 @@ function drawHotelBreakdown(doc: PDFKit.PDFDocument, report: HotelOperationsRepo
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -3463,7 +3463,7 @@ function drawHotelPdfFooter(
 
   doc.save();
   doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#bae6fd").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport hotellerie | ${periodLabel}`, margin, pageHeight - 32, {
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport hôtellerie | ${periodLabel}`, margin, pageHeight - 32, {
     width: 330
   });
   doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
@@ -3529,7 +3529,7 @@ const WATER_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "PROD. M3", width: 45, align: "right" },
   { label: "FACT. M3", width: 45, align: "right" },
   { label: "RECETTES", width: 61, align: "right" },
-  { label: "DEPENSES", width: 61, align: "right" },
+  { label: "DÉPENSES", width: 61, align: "right" },
   { label: "NET", width: 61, align: "right" },
   { label: "PERTES", width: 38, align: "right" },
   { label: "EXEC.", width: 38, align: "right" }
@@ -3576,7 +3576,7 @@ function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsR
     .fillColor("#1e3a8a")
     .font("Helvetica-Bold")
     .fontSize(8.6)
-    .text(`Periode: ${report.periodLabel}`, margin + 12, 91, {
+    .text(`Période: ${report.periodLabel}`, margin + 12, 91, {
       width: doc.page.width - margin * 2 - 24
     });
   doc.y = 138;
@@ -3613,7 +3613,7 @@ function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsRe
     .font("Helvetica")
     .fontSize(8.2)
     .text(
-      `Production ${formatPdfNumber(report.totals.producedVolumeM3, 1)} m3 | pertes apparentes ${formatPdfNumber(report.totals.lossRate, 1)}% | qualite ${formatPdfMoney(report.totals.qualityCost)} | maintenance ${formatPdfMoney(report.totals.maintenanceCost)} | reparations ${formatPdfMoney(report.totals.repairCost)} | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+      `Production ${formatPdfNumber(report.totals.producedVolumeM3, 1)} m3 | pertes apparentes ${formatPdfNumber(report.totals.lossRate, 1)}% | qualité ${formatPdfMoney(report.totals.qualityCost)} | maintenance ${formatPdfMoney(report.totals.maintenanceCost)} | réparations ${formatPdfMoney(report.totals.repairCost)} | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
       margin,
       doc.y,
       { width: doc.page.width - margin * 2 }
@@ -3702,12 +3702,12 @@ function drawWaterOperationsTable(doc: PDFKit.PDFDocument, report: WaterOperatio
       .fillColor("#1e3a8a")
       .font("Helvetica-Bold")
       .fontSize(11)
-      .text("Aucune operation eau potable reportable", PDF_PAGE_MARGIN + 14, doc.y + 16);
+      .text("Aucune opération eau potable reportable", PDF_PAGE_MARGIN + 14, doc.y + 16);
     doc.y += 84;
     return;
   }
 
-  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Synthese par site, zone et ligne exploitation", PDF_PAGE_MARGIN, doc.y);
+  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Synthèse par site, zone et ligne exploitation", PDF_PAGE_MARGIN, doc.y);
   doc.moveDown(0.4);
   let y = drawWaterTableHeader(doc, doc.y);
   for (const row of report.rows) {
@@ -3730,14 +3730,14 @@ function drawWaterBreakdown(doc: PDFKit.PDFDocument, report: WaterOperationsRepo
     doc.addPage();
     drawWaterReportHeader(doc, report);
   }
-  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y);
+  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y);
   doc.moveDown(0.4);
   const columns: PdfTableColumn[] = [
     { label: "OPERATION", width: 168, align: "left" },
     { label: "TRANS.", width: 52, align: "right" },
     { label: "TACHES", width: 52, align: "right" },
     { label: "RECETTES", width: 76, align: "right" },
-    { label: "DEPENSES", width: 76, align: "right" },
+    { label: "DÉPENSES", width: 76, align: "right" },
     { label: "NET", width: 76, align: "right" }
   ];
   let y = doc.y;
@@ -3839,10 +3839,10 @@ const AGENCY_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "BIEN", width: 58, align: "left" },
   { label: "TYPE", width: 44, align: "left" },
   { label: "CLIENT", width: 55, align: "left" },
-  { label: "ETAPE", width: 49, align: "left" },
+  { label: "ÉTAPE", width: 49, align: "left" },
   { label: "AFFAIRE", width: 62, align: "right" },
   { label: "RECETTES", width: 58, align: "right" },
-  { label: "DEPENSES", width: 58, align: "right" },
+  { label: "DÉPENSES", width: 58, align: "right" },
   { label: "NET", width: 48, align: "right" },
   { label: "EXEC.", width: 34, align: "right" }
 ];
@@ -3869,7 +3869,7 @@ function drawAgencyReportHeader(doc: PDFKit.PDFDocument, report: AgencyOperation
     align: "right"
   });
   doc.roundedRect(margin, 84, doc.page.width - margin * 2, 24, 4).fill("#e5e7eb");
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8.6).text(`Periode: ${report.periodLabel}`, margin + 12, 91, {
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8.6).text(`Période: ${report.periodLabel}`, margin + 12, 91, {
     width: doc.page.width - margin * 2 - 24
   });
   doc.y = 138;
@@ -3899,7 +3899,7 @@ function drawAgencyMetricCards(doc: PDFKit.PDFDocument, report: AgencyOperations
   });
   doc.y = y + 70;
   doc.fillColor("#374151").font("Helvetica").fontSize(8.2).text(
-    `Clients ${formatPdfNumber(report.totals.clientsCount)} | taux commission ${formatPdfNumber(report.totals.commissionRate, 1)}% | frais commerciaux ${formatPdfMoney(report.totals.cashOutAmount)} | execution ${formatPdfNumber(report.totals.executionRate, 1)}% | blocages ${formatPdfNumber(report.totals.blockedTasksCount)}.`,
+    `Clients ${formatPdfNumber(report.totals.clientsCount)} | taux commission ${formatPdfNumber(report.totals.commissionRate, 1)}% | frais commerciaux ${formatPdfMoney(report.totals.cashOutAmount)} | exécution ${formatPdfNumber(report.totals.executionRate, 1)}% | blocages ${formatPdfNumber(report.totals.blockedTasksCount)}.`,
     margin,
     doc.y,
     { width: doc.page.width - margin * 2 }
@@ -3984,12 +3984,12 @@ function drawAgencyTotalsRow(doc: PDFKit.PDFDocument, report: AgencyOperationsRe
 function drawAgencyOperationsTable(doc: PDFKit.PDFDocument, report: AgencyOperationsReport): void {
   if (report.rows.length === 0) {
     doc.roundedRect(PDF_PAGE_MARGIN, doc.y, doc.page.width - PDF_PAGE_MARGIN * 2, 64, 4).fill("#f3f4f6");
-    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11).text("Aucune operation agence immobiliere reportable", PDF_PAGE_MARGIN + 14, doc.y + 16);
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11).text("Aucune opération agence immobilière reportable", PDF_PAGE_MARGIN + 14, doc.y + 16);
     doc.y += 84;
     return;
   }
 
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10.5).text("Synthese par mandat, bien, client et etape", PDF_PAGE_MARGIN, doc.y);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10.5).text("Synthèse par mandat, bien, client et étape", PDF_PAGE_MARGIN, doc.y);
   doc.moveDown(0.4);
   let y = drawAgencyTableHeader(doc, doc.y);
   for (const row of report.rows) {
@@ -4012,17 +4012,17 @@ function drawAgencyBreakdown(doc: PDFKit.PDFDocument, report: AgencyOperationsRe
     doc.addPage();
     drawAgencyReportHeader(doc, report);
   }
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10.5).text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10.5).text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y);
   doc.moveDown(0.4);
   writePdfList(
     doc,
     limitPdfRows(
       report.operationRows.map((row) =>
-        `${row.operationLabel}: ${row.transactionsCount} transaction(s), ${row.tasksCount} tache(s), net ${row.netAmount} XOF`
+        `${row.operationLabel}: ${row.transactionsCount} transaction(s), ${row.tasksCount} tâche(s), net ${row.netAmount} XOF`
       ),
       18
     ),
-    "Aucune operation agence."
+    "Aucune opération agence."
   );
 }
 
@@ -4082,7 +4082,7 @@ const BTP_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "MO J/H", width: 36, align: "right" },
   { label: "ENG.H", width: 34, align: "right" },
   { label: "RECETTES", width: 56, align: "right" },
-  { label: "DEPENSES", width: 56, align: "right" },
+  { label: "DÉPENSES", width: 56, align: "right" },
   { label: "NET", width: 54, align: "right" },
   { label: "EXEC.%", width: 34, align: "right" }
 ];
@@ -4200,7 +4200,7 @@ function drawBtpMetadataStrip(
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(8.8)
-    .text("Periode", margin + 10, y + 8, { width: 155 });
+    .text("Période", margin + 10, y + 8, { width: 155 });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
@@ -4247,7 +4247,7 @@ function drawBtpMetricCards(doc: PDFKit.PDFDocument, report: BtpOperationsReport
       value: `${formatPdfNumber(report.totals.projectsCount)} | ${formatPdfNumber(report.totals.workPackagesCount)}`
     },
     { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
-    { label: "Depenses", value: formatPdfMoney(report.totals.cashOutAmount) },
+    { label: "Dépenses", value: formatPdfMoney(report.totals.cashOutAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
   ];
 
@@ -4277,7 +4277,7 @@ function drawBtpMetricCards(doc: PDFKit.PDFDocument, report: BtpOperationsReport
     .font("Helvetica")
     .fontSize(8.8)
     .text(
-      `Avancement moyen: ${formatPdfNumber(report.totals.progressPercent, 1)}% | materiaux ${formatPdfNumber(report.totals.materialQuantity, 2)} | main-d'oeuvre ${formatPdfNumber(report.totals.laborDays, 2)} j/h | engins ${formatPdfNumber(report.totals.equipmentHours, 2)} h | taches ${formatPdfNumber(report.totals.doneTasksCount)} terminees, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquees.`,
+      `Avancement moyen: ${formatPdfNumber(report.totals.progressPercent, 1)}% | matériaux ${formatPdfNumber(report.totals.materialQuantity, 2)} | main-d'oeuvre ${formatPdfNumber(report.totals.laborDays, 2)} j/h | engins ${formatPdfNumber(report.totals.equipmentHours, 2)} h | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
       margin,
       doc.y - 8,
       {
@@ -4378,7 +4378,7 @@ function drawBtpEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#78350f")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text("Aucune operation BTP reportable", margin + 14, y + 16, {
+    .text("Aucune opération BTP reportable", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -4386,7 +4386,7 @@ function drawBtpEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvees et les taches BTP de la periode. Renseignez chantier, lot, client et avancement pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches BTP de la période. Renseignez chantier, lot, client et avancement pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -4411,7 +4411,7 @@ function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsRe
     .fillColor("#78350f")
     .font("Helvetica-Bold")
     .fontSize(10.5)
-    .text("Synthese par chantier, lot et client", PDF_PAGE_MARGIN, doc.y, {
+    .text("Synthèse par chantier, lot et client", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -4448,7 +4448,7 @@ function drawBtpBreakdown(doc: PDFKit.PDFDocument, report: BtpOperationsReport):
     .fillColor("#78350f")
     .font("Helvetica-Bold")
     .fontSize(12)
-    .text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    .text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -4458,7 +4458,7 @@ function drawBtpBreakdown(doc: PDFKit.PDFDocument, report: BtpOperationsReport):
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -4597,7 +4597,7 @@ const FISH_FARMING_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "VENTES", width: 42, align: "right" },
   { label: "MORT.", width: 36, align: "right" },
   { label: "RECETTES", width: 57, align: "right" },
-  { label: "DEPENSES", width: 57, align: "right" },
+  { label: "DÉPENSES", width: 57, align: "right" },
   { label: "NET", width: 51, align: "right" },
   { label: "EXEC. %", width: 42, align: "right" }
 ];
@@ -4712,7 +4712,7 @@ function drawFishFarmingMetadataStrip(
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(8.8)
-    .text("Periode", margin + 10, y + 8, { width: 155 });
+    .text("Période", margin + 10, y + 8, { width: 155 });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
@@ -4759,7 +4759,7 @@ function drawFishFarmingMetricCards(doc: PDFKit.PDFDocument, report: FishFarming
       value: `${formatPdfNumber(report.totals.pondsCount)} | ${formatPdfNumber(report.totals.cyclesCount)}`
     },
     { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
-    { label: "Depenses", value: formatPdfMoney(report.totals.cashOutAmount) },
+    { label: "Dépenses", value: formatPdfMoney(report.totals.cashOutAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
   ];
 
@@ -4789,7 +4789,7 @@ function drawFishFarmingMetricCards(doc: PDFKit.PDFDocument, report: FishFarming
     .font("Helvetica")
     .fontSize(8.8)
     .text(
-      `Production: alevins ${formatPdfNumber(report.totals.fingerlingsQuantity, 2)} | aliment ${formatPdfNumber(report.totals.feedQuantity, 2)} | ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | mortalite ${formatPdfNumber(report.totals.mortalityCount, 2)} | execution ${formatPdfNumber(report.totals.executionRate, 1)}%.`,
+      `Production: alevins ${formatPdfNumber(report.totals.fingerlingsQuantity, 2)} | aliment ${formatPdfNumber(report.totals.feedQuantity, 2)} | ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | mortalité ${formatPdfNumber(report.totals.mortalityCount, 2)} | exécution ${formatPdfNumber(report.totals.executionRate, 1)}%.`,
       margin,
       doc.y - 8,
       {
@@ -4893,7 +4893,7 @@ function drawFishFarmingEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#075985")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text("Aucune operation piscicole reportable", margin + 14, y + 16, {
+    .text("Aucune opération piscicole reportable", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -4901,7 +4901,7 @@ function drawFishFarmingEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvees et les taches piscicoles de la periode. Renseignez bassin, cycle et espece pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches piscicoles de la période. Renseignez bassin, cycle et espèce pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -4926,7 +4926,7 @@ function drawFishFarmingOperationsTable(doc: PDFKit.PDFDocument, report: FishFar
     .fillColor("#075985")
     .font("Helvetica-Bold")
     .fontSize(10.5)
-    .text("Synthese par bassin, cycle et espece", PDF_PAGE_MARGIN, doc.y, {
+    .text("Synthèse par bassin, cycle et espèce", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -4963,7 +4963,7 @@ function drawFishFarmingBreakdown(doc: PDFKit.PDFDocument, report: FishFarmingOp
     .fillColor("#075985")
     .font("Helvetica-Bold")
     .fontSize(12)
-    .text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    .text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -4973,7 +4973,7 @@ function drawFishFarmingBreakdown(doc: PDFKit.PDFDocument, report: FishFarmingOp
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -5114,7 +5114,7 @@ const LIVESTOCK_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "PRODUIT", width: 39, align: "right" },
   { label: "MORT.", width: 34, align: "right" },
   { label: "RECETTES", width: 56, align: "right" },
-  { label: "DEPENSES", width: 56, align: "right" },
+  { label: "DÉPENSES", width: 56, align: "right" },
   { label: "NET", width: 44, align: "right" },
   { label: "EXEC. %", width: 36, align: "right" }
 ];
@@ -5219,7 +5219,7 @@ function drawLivestockMetadataStrip(
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(8.8)
-    .text("Periode", margin + 10, y + 8, { width: 155 });
+    .text("Période", margin + 10, y + 8, { width: 155 });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
@@ -5234,7 +5234,7 @@ function drawLivestockMetadataStrip(
     .fillColor("#111827")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Elevage", margin + 205, y + 21, { width: 140 });
+    .text("Élevage", margin + 205, y + 21, { width: 140 });
   doc
     .fillColor("#486581")
     .font("Helvetica")
@@ -5266,7 +5266,7 @@ function drawLivestockMetricCards(doc: PDFKit.PDFDocument, report: LivestockOper
       value: `${formatPdfNumber(report.totals.herdsCount)} | ${formatPdfNumber(report.totals.batchesCount)}`
     },
     { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
-    { label: "Depenses", value: formatPdfMoney(report.totals.cashOutAmount) },
+    { label: "Dépenses", value: formatPdfMoney(report.totals.cashOutAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
   ];
 
@@ -5296,7 +5296,7 @@ function drawLivestockMetricCards(doc: PDFKit.PDFDocument, report: LivestockOper
     .font("Helvetica")
     .fontSize(8.8)
     .text(
-      `Cheptel: achats ${formatPdfNumber(report.totals.animalPurchaseCount, 2)} | aliment ${formatPdfNumber(report.totals.feedQuantity, 2)} | ventes ${formatPdfNumber(report.totals.soldAnimalCount, 2)} | produits ${formatPdfNumber(report.totals.productQuantity, 2)} | mortalite ${formatPdfNumber(report.totals.mortalityCount, 2)} | execution ${formatPdfNumber(report.totals.executionRate, 1)}%.`,
+      `Cheptel: achats ${formatPdfNumber(report.totals.animalPurchaseCount, 2)} | aliment ${formatPdfNumber(report.totals.feedQuantity, 2)} | ventes ${formatPdfNumber(report.totals.soldAnimalCount, 2)} | produits ${formatPdfNumber(report.totals.productQuantity, 2)} | mortalité ${formatPdfNumber(report.totals.mortalityCount, 2)} | exécution ${formatPdfNumber(report.totals.executionRate, 1)}%.`,
       margin,
       doc.y - 8,
       {
@@ -5402,7 +5402,7 @@ function drawLivestockEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#3f6212")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text("Aucune operation d'elevage reportable", margin + 14, y + 16, {
+    .text("Aucune opération d'élevage reportable", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -5410,7 +5410,7 @@ function drawLivestockEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvees et les taches d'elevage de la periode. Renseignez troupeau, lot et espece pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches d'élevage de la période. Renseignez troupeau, lot et espèce pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -5435,7 +5435,7 @@ function drawLivestockOperationsTable(doc: PDFKit.PDFDocument, report: Livestock
     .fillColor("#3f6212")
     .font("Helvetica-Bold")
     .fontSize(10.5)
-    .text("Synthese par troupeau, lot et espece", PDF_PAGE_MARGIN, doc.y, {
+    .text("Synthèse par troupeau, lot et espèce", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -5472,7 +5472,7 @@ function drawLivestockBreakdown(doc: PDFKit.PDFDocument, report: LivestockOperat
     .fillColor("#3f6212")
     .font("Helvetica-Bold")
     .fontSize(12)
-    .text("Ventilation par type d'operation", PDF_PAGE_MARGIN, doc.y, {
+    .text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -5482,7 +5482,7 @@ function drawLivestockBreakdown(doc: PDFKit.PDFDocument, report: LivestockOperat
     { label: "TRANS.", width: 50, align: "right" },
     { label: "TACHES", width: 50, align: "right" },
     { label: "RECETTES", width: 80, align: "right" },
-    { label: "DEPENSES", width: 80, align: "right" },
+    { label: "DÉPENSES", width: 80, align: "right" },
     { label: "NET", width: 85, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
@@ -5558,7 +5558,7 @@ function drawLivestockPdfFooter(
     .fillColor("#627d98")
     .font("Helvetica")
     .fontSize(8.5)
-    .text(`AMCCO - Rapport elevage | ${periodLabel}`, margin, pageHeight - 32, {
+    .text(`AMCCO - Rapport élevage | ${periodLabel}`, margin, pageHeight - 32, {
       width: 320
     });
   doc
@@ -5598,7 +5598,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     {
       category: "Meta",
       item: "period",
-      label: "Periode",
+      label: "Période",
       value: toDisplayPeriodLabel({
         dateFrom: overview.filters.dateFrom ?? undefined,
         dateTo: overview.filters.dateTo ?? undefined
@@ -5608,7 +5608,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     {
       category: "Meta",
       item: "activity",
-      label: "Activite",
+      label: "Activité",
       value: toDisplayActivityLabel(overview.filters.activityCode ?? undefined),
       extra: ""
     },
@@ -5664,7 +5664,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: item.type,
       label: `${item.type} ${item.currency}`,
       value: item.count,
-      extra: `total ${item.totalAmount} ${item.currency} | approuve ${item.approvedAmount} ${item.currency}`
+      extra: `total ${item.totalAmount} ${item.currency} | approuvé ${item.approvedAmount} ${item.currency}`
     });
   }
 
@@ -5674,7 +5674,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: item.activityCode,
       label: BUSINESS_ACTIVITY_LABELS[item.activityCode],
       value: item.count,
-      extra: `total ${item.totalAmount} XOF/DEV | approuve ${item.approvedAmount} XOF/DEV`
+      extra: `total ${item.totalAmount} XOF/DEV | approuvé ${item.approvedAmount} XOF/DEV`
     });
   }
 
@@ -5688,9 +5688,9 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
   rows.push({
     category: "FinanceAccounts",
     item: "scope-distribution",
-    label: "Portee des comptes",
+    label: "Portée des comptes",
     value: overview.financeAccountsSummary.globalCount,
-    extra: `globaux ${overview.financeAccountsSummary.globalCount} | dedies ${overview.financeAccountsSummary.dedicatedCount} | restreints ${overview.financeAccountsSummary.restrictedCount}`
+    extra: `globaux ${overview.financeAccountsSummary.globalCount} | dédiés ${overview.financeAccountsSummary.dedicatedCount} | restreints ${overview.financeAccountsSummary.restrictedCount}`
   });
 
   for (const item of overview.financeAccounts) {
@@ -5709,7 +5709,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: `${item.scope}-${item.activityCode}-${item.dimensionKey}-${item.itemKey}`,
       label: `${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.dimensionLabel} | ${item.itemLabel}`,
       value: item.netProfit,
-      extra: `entrees ${item.approvedCashIn} XOF | sorties ${item.approvedCashOut} XOF | marge ${item.marginRate}% | rentabilite couts ${item.returnOnCostRate}% | execution ${item.executionRate}% | ouvertes ${item.openTasksCount} | bloquees ${item.blockedTasksCount} | retards ${item.overdueTasksCount}`
+      extra: `entrées ${item.approvedCashIn} XOF | sorties ${item.approvedCashOut} XOF | marge ${item.marginRate}% | rentabilité coûts ${item.returnOnCostRate}% | exécution ${item.executionRate}% | ouvertes ${item.openTasksCount} | bloquées ${item.blockedTasksCount} | retards ${item.overdueTasksCount}`
     });
   }
 
@@ -5719,7 +5719,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Quincaillerie ${overview.hardwareMonthlyReport.periodLabel}`,
       value: overview.hardwareMonthlyReport.totals.salesAmount,
-      extra: `quantite ${overview.hardwareMonthlyReport.totals.quantity} | versement ${overview.hardwareMonthlyReport.totals.paymentAmount} XOF | cout ${overview.hardwareMonthlyReport.totals.purchaseAmount} XOF | benefice ${overview.hardwareMonthlyReport.totals.grossProfit} XOF | marge ${overview.hardwareMonthlyReport.totals.marginRate}%`
+      extra: `quantité ${overview.hardwareMonthlyReport.totals.quantity} | versement ${overview.hardwareMonthlyReport.totals.paymentAmount} XOF | coût ${overview.hardwareMonthlyReport.totals.purchaseAmount} XOF | bénéfice ${overview.hardwareMonthlyReport.totals.grossProfit} XOF | marge ${overview.hardwareMonthlyReport.totals.marginRate}%`
     });
   }
 
@@ -5729,7 +5729,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Agriculture ${overview.agricultureOperationsReport.periodLabel}`,
       value: overview.agricultureOperationsReport.totals.netAmount,
-      extra: `parcelles ${overview.agricultureOperationsReport.totals.parcelsCount} | surface ${overview.agricultureOperationsReport.totals.surfaceArea} | recettes ${overview.agricultureOperationsReport.totals.cashInAmount} XOF | depenses ${overview.agricultureOperationsReport.totals.cashOutAmount} XOF | execution ${overview.agricultureOperationsReport.totals.executionRate}%`
+      extra: `parcelles ${overview.agricultureOperationsReport.totals.parcelsCount} | surface ${overview.agricultureOperationsReport.totals.surfaceArea} | recettes ${overview.agricultureOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.agricultureOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.agricultureOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5739,7 +5739,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Magasins ${overview.generalStoreOperationsReport.periodLabel}`,
       value: overview.generalStoreOperationsReport.totals.netAmount,
-      extra: `rayons ${overview.generalStoreOperationsReport.totals.departmentsCount} | familles ${overview.generalStoreOperationsReport.totals.productFamiliesCount} | articles ${overview.generalStoreOperationsReport.totals.itemsCount} | ventes ${overview.generalStoreOperationsReport.totals.salesAmount} XOF | achats ${overview.generalStoreOperationsReport.totals.purchaseAmount} XOF | retours ${overview.generalStoreOperationsReport.totals.returnAmount} XOF | remises ${overview.generalStoreOperationsReport.totals.discountAmount} XOF | marge ${overview.generalStoreOperationsReport.totals.marginRate}% | execution ${overview.generalStoreOperationsReport.totals.executionRate}%`
+      extra: `rayons ${overview.generalStoreOperationsReport.totals.departmentsCount} | familles ${overview.generalStoreOperationsReport.totals.productFamiliesCount} | articles ${overview.generalStoreOperationsReport.totals.itemsCount} | ventes ${overview.generalStoreOperationsReport.totals.salesAmount} XOF | achats ${overview.generalStoreOperationsReport.totals.purchaseAmount} XOF | retours ${overview.generalStoreOperationsReport.totals.returnAmount} XOF | remises ${overview.generalStoreOperationsReport.totals.discountAmount} XOF | marge ${overview.generalStoreOperationsReport.totals.marginRate}% | exécution ${overview.generalStoreOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5749,7 +5749,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Alimentation ${overview.foodOperationsReport.periodLabel}`,
       value: overview.foodOperationsReport.totals.netAmount,
-      extra: `familles ${overview.foodOperationsReport.totals.productFamiliesCount} | produits ${overview.foodOperationsReport.totals.productsCount} | lots ${overview.foodOperationsReport.totals.batchesCount} | ventes ${overview.foodOperationsReport.totals.salesAmount} XOF | achats ${overview.foodOperationsReport.totals.purchaseAmount} XOF | pertes ${overview.foodOperationsReport.totals.lossAmount} XOF | marge ${overview.foodOperationsReport.totals.marginRate}% | execution ${overview.foodOperationsReport.totals.executionRate}%`
+      extra: `familles ${overview.foodOperationsReport.totals.productFamiliesCount} | produits ${overview.foodOperationsReport.totals.productsCount} | lots ${overview.foodOperationsReport.totals.batchesCount} | ventes ${overview.foodOperationsReport.totals.salesAmount} XOF | achats ${overview.foodOperationsReport.totals.purchaseAmount} XOF | pertes ${overview.foodOperationsReport.totals.lossAmount} XOF | marge ${overview.foodOperationsReport.totals.marginRate}% | exécution ${overview.foodOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5759,7 +5759,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Location ${overview.rentalOperationsReport.periodLabel}`,
       value: overview.rentalOperationsReport.totals.netAmount,
-      extra: `biens ${overview.rentalOperationsReport.totals.propertiesCount} | lots ${overview.rentalOperationsReport.totals.unitsCount} | locataires ${overview.rentalOperationsReport.totals.tenantsCount} | loyers ${overview.rentalOperationsReport.totals.rentAmount} XOF | cautions ${overview.rentalOperationsReport.totals.depositAmount} XOF | charges ${overview.rentalOperationsReport.totals.serviceChargeAmount} XOF | maintenance ${overview.rentalOperationsReport.totals.maintenanceAmount} XOF | recettes ${overview.rentalOperationsReport.totals.cashInAmount} XOF | depenses ${overview.rentalOperationsReport.totals.cashOutAmount} XOF | execution ${overview.rentalOperationsReport.totals.executionRate}%`
+      extra: `biens ${overview.rentalOperationsReport.totals.propertiesCount} | lots ${overview.rentalOperationsReport.totals.unitsCount} | locataires ${overview.rentalOperationsReport.totals.tenantsCount} | loyers ${overview.rentalOperationsReport.totals.rentAmount} XOF | cautions ${overview.rentalOperationsReport.totals.depositAmount} XOF | charges ${overview.rentalOperationsReport.totals.serviceChargeAmount} XOF | maintenance ${overview.rentalOperationsReport.totals.maintenanceAmount} XOF | recettes ${overview.rentalOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.rentalOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.rentalOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5767,9 +5767,9 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     rows.push({
       category: "HotelOperationsReport",
       item: "totals",
-      label: `Hotellerie ${overview.hotelOperationsReport.periodLabel}`,
+      label: `Hôtellerie ${overview.hotelOperationsReport.periodLabel}`,
       value: overview.hotelOperationsReport.totals.netAmount,
-      extra: `reservations ${overview.hotelOperationsReport.totals.bookingsCount} | chambres ${overview.hotelOperationsReport.totals.roomsCount} | nuitees ${overview.hotelOperationsReport.totals.nightsCount} | hebergement ${overview.hotelOperationsReport.totals.roomRevenue} XOF | restauration ${overview.hotelOperationsReport.totals.restaurantAmount} XOF | services ${overview.hotelOperationsReport.totals.serviceAmount} XOF | charges ${overview.hotelOperationsReport.totals.cashOutAmount} XOF | tarif moyen ${overview.hotelOperationsReport.totals.averageRoomRate} XOF | execution ${overview.hotelOperationsReport.totals.executionRate}%`
+      extra: `réservations ${overview.hotelOperationsReport.totals.bookingsCount} | chambres ${overview.hotelOperationsReport.totals.roomsCount} | nuitées ${overview.hotelOperationsReport.totals.nightsCount} | hebergement ${overview.hotelOperationsReport.totals.roomRevenue} XOF | restauration ${overview.hotelOperationsReport.totals.restaurantAmount} XOF | services ${overview.hotelOperationsReport.totals.serviceAmount} XOF | charges ${overview.hotelOperationsReport.totals.cashOutAmount} XOF | tarif moyen ${overview.hotelOperationsReport.totals.averageRoomRate} XOF | exécution ${overview.hotelOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5779,7 +5779,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Eau potable ${overview.waterOperationsReport.periodLabel}`,
       value: overview.waterOperationsReport.totals.netAmount,
-      extra: `sites ${overview.waterOperationsReport.totals.facilitiesCount} | zones ${overview.waterOperationsReport.totals.zonesCount} | produit ${overview.waterOperationsReport.totals.producedVolumeM3} m3 | facture ${overview.waterOperationsReport.totals.billedVolumeM3} m3 | recettes ${overview.waterOperationsReport.totals.cashInAmount} XOF | charges ${overview.waterOperationsReport.totals.cashOutAmount} XOF | pertes ${overview.waterOperationsReport.totals.lossRate}% | execution ${overview.waterOperationsReport.totals.executionRate}%`
+      extra: `sites ${overview.waterOperationsReport.totals.facilitiesCount} | zones ${overview.waterOperationsReport.totals.zonesCount} | produit ${overview.waterOperationsReport.totals.producedVolumeM3} m3 | facture ${overview.waterOperationsReport.totals.billedVolumeM3} m3 | recettes ${overview.waterOperationsReport.totals.cashInAmount} XOF | charges ${overview.waterOperationsReport.totals.cashOutAmount} XOF | pertes ${overview.waterOperationsReport.totals.lossRate}% | exécution ${overview.waterOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5787,9 +5787,9 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     rows.push({
       category: "AgencyOperationsReport",
       item: "totals",
-      label: `Agence immobiliere ${overview.agencyOperationsReport.periodLabel}`,
+      label: `Agence immobilière ${overview.agencyOperationsReport.periodLabel}`,
       value: overview.agencyOperationsReport.totals.netAmount,
-      extra: `mandats ${overview.agencyOperationsReport.totals.mandatesCount} | biens ${overview.agencyOperationsReport.totals.propertiesCount} | clients ${overview.agencyOperationsReport.totals.clientsCount} | affaires ${overview.agencyOperationsReport.totals.dealAmount} XOF | commissions vente ${overview.agencyOperationsReport.totals.saleCommissionAmount} XOF | commissions location ${overview.agencyOperationsReport.totals.rentalCommissionAmount} XOF | charges ${overview.agencyOperationsReport.totals.cashOutAmount} XOF | taux commission ${overview.agencyOperationsReport.totals.commissionRate}% | execution ${overview.agencyOperationsReport.totals.executionRate}%`
+      extra: `mandats ${overview.agencyOperationsReport.totals.mandatesCount} | biens ${overview.agencyOperationsReport.totals.propertiesCount} | clients ${overview.agencyOperationsReport.totals.clientsCount} | affaires ${overview.agencyOperationsReport.totals.dealAmount} XOF | commissions vente ${overview.agencyOperationsReport.totals.saleCommissionAmount} XOF | commissions location ${overview.agencyOperationsReport.totals.rentalCommissionAmount} XOF | charges ${overview.agencyOperationsReport.totals.cashOutAmount} XOF | taux commission ${overview.agencyOperationsReport.totals.commissionRate}% | exécution ${overview.agencyOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5799,7 +5799,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `BTP ${overview.btpOperationsReport.periodLabel}`,
       value: overview.btpOperationsReport.totals.netAmount,
-      extra: `chantiers ${overview.btpOperationsReport.totals.projectsCount} | lots ${overview.btpOperationsReport.totals.workPackagesCount} | avancement ${overview.btpOperationsReport.totals.progressPercent}% | main-d'oeuvre ${overview.btpOperationsReport.totals.laborDays} j/h | engins ${overview.btpOperationsReport.totals.equipmentHours} h | recettes ${overview.btpOperationsReport.totals.cashInAmount} XOF | depenses ${overview.btpOperationsReport.totals.cashOutAmount} XOF | execution ${overview.btpOperationsReport.totals.executionRate}%`
+      extra: `chantiers ${overview.btpOperationsReport.totals.projectsCount} | lots ${overview.btpOperationsReport.totals.workPackagesCount} | avancement ${overview.btpOperationsReport.totals.progressPercent}% | main-d'oeuvre ${overview.btpOperationsReport.totals.laborDays} j/h | engins ${overview.btpOperationsReport.totals.equipmentHours} h | recettes ${overview.btpOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.btpOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.btpOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5809,7 +5809,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Pisciculture ${overview.fishFarmingOperationsReport.periodLabel}`,
       value: overview.fishFarmingOperationsReport.totals.netAmount,
-      extra: `bassins ${overview.fishFarmingOperationsReport.totals.pondsCount} | cycles ${overview.fishFarmingOperationsReport.totals.cyclesCount} | alevins ${overview.fishFarmingOperationsReport.totals.fingerlingsQuantity} | aliment ${overview.fishFarmingOperationsReport.totals.feedQuantity} | ventes ${overview.fishFarmingOperationsReport.totals.soldQuantity} | mortalite ${overview.fishFarmingOperationsReport.totals.mortalityCount} | recettes ${overview.fishFarmingOperationsReport.totals.cashInAmount} XOF | depenses ${overview.fishFarmingOperationsReport.totals.cashOutAmount} XOF | execution ${overview.fishFarmingOperationsReport.totals.executionRate}%`
+      extra: `bassins ${overview.fishFarmingOperationsReport.totals.pondsCount} | cycles ${overview.fishFarmingOperationsReport.totals.cyclesCount} | alevins ${overview.fishFarmingOperationsReport.totals.fingerlingsQuantity} | aliment ${overview.fishFarmingOperationsReport.totals.feedQuantity} | ventes ${overview.fishFarmingOperationsReport.totals.soldQuantity} | mortalité ${overview.fishFarmingOperationsReport.totals.mortalityCount} | recettes ${overview.fishFarmingOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.fishFarmingOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.fishFarmingOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5817,9 +5817,9 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     rows.push({
       category: "LivestockOperationsReport",
       item: "totals",
-      label: `Elevage ${overview.livestockOperationsReport.periodLabel}`,
+      label: `Élevage ${overview.livestockOperationsReport.periodLabel}`,
       value: overview.livestockOperationsReport.totals.netAmount,
-      extra: `troupeaux ${overview.livestockOperationsReport.totals.herdsCount} | lots ${overview.livestockOperationsReport.totals.batchesCount} | achats ${overview.livestockOperationsReport.totals.animalPurchaseCount} | aliment ${overview.livestockOperationsReport.totals.feedQuantity} | ventes ${overview.livestockOperationsReport.totals.soldAnimalCount} | produits ${overview.livestockOperationsReport.totals.productQuantity} | mortalite ${overview.livestockOperationsReport.totals.mortalityCount} | recettes ${overview.livestockOperationsReport.totals.cashInAmount} XOF | depenses ${overview.livestockOperationsReport.totals.cashOutAmount} XOF | execution ${overview.livestockOperationsReport.totals.executionRate}%`
+      extra: `troupeaux ${overview.livestockOperationsReport.totals.herdsCount} | lots ${overview.livestockOperationsReport.totals.batchesCount} | achats ${overview.livestockOperationsReport.totals.animalPurchaseCount} | aliment ${overview.livestockOperationsReport.totals.feedQuantity} | ventes ${overview.livestockOperationsReport.totals.soldAnimalCount} | produits ${overview.livestockOperationsReport.totals.productQuantity} | mortalité ${overview.livestockOperationsReport.totals.mortalityCount} | recettes ${overview.livestockOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.livestockOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.livestockOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -5839,7 +5839,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: item.activityCode,
       label: BUSINESS_ACTIVITY_LABELS[item.activityCode],
       value: item.totalCount,
-      extra: `ouvertes ${item.openCount} | bloquees ${item.blockedCount} | terminees ${item.doneCount}`
+      extra: `ouvertes ${item.openCount} | bloquées ${item.blockedCount} | terminées ${item.doneCount}`
     });
   }
 
@@ -6300,7 +6300,7 @@ function normalizeReportFilters(input: ReportFiltersInput = {}): ReportPeriodFil
   }
 
   if (dateFrom && dateTo && dateFrom.getTime() > dateTo.getTime()) {
-    throw new HttpError(400, "dateFrom doit etre inferieure ou egale a dateTo.");
+    throw new HttpError(400, "dateFrom doit être inférieure ou égale à dateTo.");
   }
 
   if (input.activityCode && !isBusinessActivityCode(input.activityCode)) {
@@ -6499,7 +6499,7 @@ function toHardwarePeriodLabel(
   _rows: HardwareMonthlyBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -6722,10 +6722,10 @@ function getAgricultureReportBucket(
   metadata: Record<string, string>
 ): AgricultureReportBucket {
   const input = {
-    campaignRef: getAgricultureMetadataLabel(metadata, "campaignRef", "Campagne non renseignee"),
-    parcelRef: getAgricultureMetadataLabel(metadata, "parcelRef", "Parcelle non renseignee"),
-    fieldType: getAgricultureMetadataLabel(metadata, "fieldType", "Type non renseigne"),
-    cropType: getAgricultureMetadataLabel(metadata, "cropType", "Culture non renseignee")
+    campaignRef: getAgricultureMetadataLabel(metadata, "campaignRef", "Campagne non renseignée"),
+    parcelRef: getAgricultureMetadataLabel(metadata, "parcelRef", "Parcelle non renseignée"),
+    fieldType: getAgricultureMetadataLabel(metadata, "fieldType", "Type non renseigné"),
+    cropType: getAgricultureMetadataLabel(metadata, "cropType", "Culture non renseignée")
   };
   const key = getAgricultureBucketKey(input);
   const existing = buckets.get(key);
@@ -6789,7 +6789,7 @@ function toAgricultureOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${AGRICULTURE_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${AGRICULTURE_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -6799,7 +6799,7 @@ function toAgriculturePeriodLabel(
   _rows: AgricultureReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -7043,10 +7043,10 @@ function getGeneralStoreReportBucket(
   metadata: Record<string, string>
 ): GeneralStoreReportBucket {
   const input = {
-    department: getGeneralStoreMetadataLabel(metadata, "department", "Rayon non renseigne"),
-    productFamily: getGeneralStoreMetadataLabel(metadata, "productFamily", "Famille non renseignee"),
-    itemName: getGeneralStoreMetadataLabel(metadata, "itemName", "Article non renseigne"),
-    skuRef: getGeneralStoreMetadataLabel(metadata, "skuRef", "Reference non renseignee")
+    department: getGeneralStoreMetadataLabel(metadata, "department", "Rayon non renseigné"),
+    productFamily: getGeneralStoreMetadataLabel(metadata, "productFamily", "Famille non renseignée"),
+    itemName: getGeneralStoreMetadataLabel(metadata, "itemName", "Article non renseigné"),
+    skuRef: getGeneralStoreMetadataLabel(metadata, "skuRef", "Référence non renseignée")
   };
   const key = getGeneralStoreBucketKey(input);
   const existing = buckets.get(key);
@@ -7119,7 +7119,7 @@ function toGeneralStoreOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${GENERAL_STORE_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${GENERAL_STORE_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -7129,7 +7129,7 @@ function toGeneralStorePeriodLabel(
   _rows: GeneralStoreReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -7439,10 +7439,10 @@ function getFoodReportBucket(
   metadata: Record<string, string>
 ): FoodReportBucket {
   const input = {
-    productFamily: getFoodMetadataLabel(metadata, "productFamily", "Famille non renseignee"),
-    productName: getFoodMetadataLabel(metadata, "productName", "Produit non renseigne"),
-    batchRef: getFoodMetadataLabel(metadata, "batchRef", "Lot non renseigne"),
-    storageArea: getFoodMetadataLabel(metadata, "storageArea", "Zone non renseignee")
+    productFamily: getFoodMetadataLabel(metadata, "productFamily", "Famille non renseignée"),
+    productName: getFoodMetadataLabel(metadata, "productName", "Produit non renseigné"),
+    batchRef: getFoodMetadataLabel(metadata, "batchRef", "Lot non renseigné"),
+    storageArea: getFoodMetadataLabel(metadata, "storageArea", "Zone non renseignée")
   };
   const key = getFoodBucketKey(input);
   const existing = buckets.get(key);
@@ -7512,7 +7512,7 @@ function toFoodOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${FOOD_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${FOOD_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -7522,7 +7522,7 @@ function toFoodPeriodLabel(
   _rows: FoodReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -7829,11 +7829,11 @@ function getRentalReportBucket(
   metadata: Record<string, string>
 ): RentalReportBucket {
   const input = {
-    propertyRef: getRentalMetadataLabel(metadata, "propertyRef", "Bien non renseigne"),
-    unitRef: getRentalMetadataLabel(metadata, "unitRef", "Lot non renseigne"),
-    tenantRef: getRentalMetadataLabel(metadata, "tenantRef", "Locataire non renseigne"),
-    leaseRef: getRentalMetadataLabel(metadata, "leaseRef", "Bail non renseigne"),
-    propertyType: getRentalMetadataLabel(metadata, "propertyType", "Type non renseigne")
+    propertyRef: getRentalMetadataLabel(metadata, "propertyRef", "Bien non renseigné"),
+    unitRef: getRentalMetadataLabel(metadata, "unitRef", "Lot non renseigné"),
+    tenantRef: getRentalMetadataLabel(metadata, "tenantRef", "Locataire non renseigné"),
+    leaseRef: getRentalMetadataLabel(metadata, "leaseRef", "Bail non renseigné"),
+    propertyType: getRentalMetadataLabel(metadata, "propertyType", "Type non renseigné")
   };
   const key = getRentalBucketKey(input);
   const existing = buckets.get(key);
@@ -7902,7 +7902,7 @@ function toRentalOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${RENTAL_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${RENTAL_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -7912,7 +7912,7 @@ function toRentalPeriodLabel(
   _rows: RentalReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -8200,11 +8200,11 @@ function getHotelReportBucket(
   metadata: Record<string, string>
 ): HotelReportBucket {
   const input = {
-    serviceLine: getHotelMetadataLabel(metadata, "serviceLine", "Service non renseigne"),
-    roomRef: getHotelMetadataLabel(metadata, "roomRef", "Chambre non renseignee"),
-    roomType: getHotelMetadataLabel(metadata, "roomType", "Type non renseigne"),
-    bookingRef: getHotelMetadataLabel(metadata, "bookingRef", "Reservation non renseignee"),
-    guestRef: getHotelMetadataLabel(metadata, "guestRef", "Client non renseigne")
+    serviceLine: getHotelMetadataLabel(metadata, "serviceLine", "Service non renseigné"),
+    roomRef: getHotelMetadataLabel(metadata, "roomRef", "Chambre non renseignée"),
+    roomType: getHotelMetadataLabel(metadata, "roomType", "Type non renseigné"),
+    bookingRef: getHotelMetadataLabel(metadata, "bookingRef", "Reservation non renseignée"),
+    guestRef: getHotelMetadataLabel(metadata, "guestRef", "Client non renseigné")
   };
   const key = getHotelBucketKey(input);
   const existing = buckets.get(key);
@@ -8278,7 +8278,7 @@ function toHotelOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${HOTEL_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${HOTEL_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -8288,7 +8288,7 @@ function toHotelPeriodLabel(
   _rows: HotelReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -8600,8 +8600,8 @@ function getWaterMetadataLabel(
 
 function getWaterBucketKey(metadata: Record<string, string>): string {
   return [
-    getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigne"),
-    getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignee"),
+    getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigné"),
+    getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignée"),
     getWaterMetadataLabel(metadata, "productionLine", "Exploitation")
   ].join("::");
 }
@@ -8617,8 +8617,8 @@ function getWaterReportBucket(
   }
 
   const created: WaterReportBucket = {
-    facilityRef: getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigne"),
-    networkZone: getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignee"),
+    facilityRef: getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigné"),
+    networkZone: getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignée"),
     productionLine: getWaterMetadataLabel(metadata, "productionLine", "Exploitation"),
     producedVolumeValue: 0,
     billedVolumeValue: 0,
@@ -8685,14 +8685,14 @@ function toWaterOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${WATER_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${WATER_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
 
 function toWaterPeriodLabel(filters: ReportPeriodFilter): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -9013,11 +9013,11 @@ function getAgencyMetadataLabel(
 
 function getAgencyBucketKey(metadata: Record<string, string>): string {
   return [
-    getAgencyMetadataLabel(metadata, "mandateRef", "Mandat non renseigne"),
-    getAgencyMetadataLabel(metadata, "propertyRef", "Bien non renseigne"),
+    getAgencyMetadataLabel(metadata, "mandateRef", "Mandat non renseigné"),
+    getAgencyMetadataLabel(metadata, "propertyRef", "Bien non renseigné"),
     getAgencyMetadataLabel(metadata, "mandateType", "Mandat"),
-    getAgencyMetadataLabel(metadata, "clientRef", "Client non renseigne"),
-    getAgencyMetadataLabel(metadata, "dealStage", "Etape non renseignee")
+    getAgencyMetadataLabel(metadata, "clientRef", "Client non renseigné"),
+    getAgencyMetadataLabel(metadata, "dealStage", "Étape non renseignée")
   ].join("::");
 }
 
@@ -9032,13 +9032,13 @@ function getAgencyReportBucket(
   }
 
   const created: AgencyReportBucket = {
-    mandateRef: getAgencyMetadataLabel(metadata, "mandateRef", "Mandat non renseigne"),
-    propertyRef: getAgencyMetadataLabel(metadata, "propertyRef", "Bien non renseigne"),
+    mandateRef: getAgencyMetadataLabel(metadata, "mandateRef", "Mandat non renseigné"),
+    propertyRef: getAgencyMetadataLabel(metadata, "propertyRef", "Bien non renseigné"),
     mandateType: getAgencyMetadataLabel(metadata, "mandateType", "Mandat"),
-    propertyType: getAgencyMetadataLabel(metadata, "propertyType", "Type non renseigne"),
-    locationZone: getAgencyMetadataLabel(metadata, "locationZone", "Zone non renseignee"),
-    clientRef: getAgencyMetadataLabel(metadata, "clientRef", getAgencyMetadataLabel(metadata, "prospectRef", "Client non renseigne")),
-    dealStage: getAgencyMetadataLabel(metadata, "dealStage", "Etape non renseignee"),
+    propertyType: getAgencyMetadataLabel(metadata, "propertyType", "Type non renseigné"),
+    locationZone: getAgencyMetadataLabel(metadata, "locationZone", "Zone non renseignée"),
+    clientRef: getAgencyMetadataLabel(metadata, "clientRef", getAgencyMetadataLabel(metadata, "prospectRef", "Client non renseigné")),
+    dealStage: getAgencyMetadataLabel(metadata, "dealStage", "Étape non renseignée"),
     dealAmountValue: 0,
     saleCommissionValue: 0,
     rentalCommissionValue: 0,
@@ -9104,14 +9104,14 @@ function toAgencyOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${AGENCY_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${AGENCY_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
 
 function toAgencyPeriodLabel(filters: ReportPeriodFilter): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
   if (!filters.dateFrom || !filters.dateTo) {
     return toDisplayPeriodLabel(filters);
@@ -9441,10 +9441,10 @@ function getBtpReportBucket(
   metadata: Record<string, string>
 ): BtpReportBucket {
   const input = {
-    projectRef: getBtpMetadataLabel(metadata, "projectRef", "Chantier non renseigne"),
-    workPackage: getBtpMetadataLabel(metadata, "workPackage", "Lot non renseigne"),
-    siteLocation: getBtpMetadataLabel(metadata, "siteLocation", "Localisation non renseignee"),
-    clientRef: getBtpMetadataLabel(metadata, "clientRef", "Client non renseigne")
+    projectRef: getBtpMetadataLabel(metadata, "projectRef", "Chantier non renseigné"),
+    workPackage: getBtpMetadataLabel(metadata, "workPackage", "Lot non renseigné"),
+    siteLocation: getBtpMetadataLabel(metadata, "siteLocation", "Localisation non renseignée"),
+    clientRef: getBtpMetadataLabel(metadata, "clientRef", "Client non renseigné")
   };
   const key = getBtpBucketKey(input);
   const existing = buckets.get(key);
@@ -9511,7 +9511,7 @@ function toBtpOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${BTP_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${BTP_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -9521,7 +9521,7 @@ function toBtpPeriodLabel(
   _rows: BtpReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -9787,9 +9787,9 @@ function getFishFarmingReportBucket(
   metadata: Record<string, string>
 ): FishFarmingReportBucket {
   const input = {
-    pondRef: getFishFarmingMetadataLabel(metadata, "pondRef", "Bassin non renseigne"),
-    cycleRef: getFishFarmingMetadataLabel(metadata, "cycleRef", "Cycle non renseigne"),
-    species: getFishFarmingMetadataLabel(metadata, "species", "Espece non renseignee")
+    pondRef: getFishFarmingMetadataLabel(metadata, "pondRef", "Bassin non renseigné"),
+    cycleRef: getFishFarmingMetadataLabel(metadata, "cycleRef", "Cycle non renseigné"),
+    species: getFishFarmingMetadataLabel(metadata, "species", "Espèce non renseignée")
   };
   const key = getFishFarmingBucketKey(input);
   const existing = buckets.get(key);
@@ -9856,7 +9856,7 @@ function toFishFarmingOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${FISH_FARMING_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${FISH_FARMING_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -9866,7 +9866,7 @@ function toFishFarmingPeriodLabel(
   _rows: FishFarmingReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -10121,9 +10121,9 @@ function getLivestockReportBucket(
   metadata: Record<string, string>
 ): LivestockReportBucket {
   const input = {
-    herdRef: getLivestockMetadataLabel(metadata, "herdRef", "Troupeau non renseigne"),
-    batchRef: getLivestockMetadataLabel(metadata, "batchRef", "Lot non renseigne"),
-    species: getLivestockMetadataLabel(metadata, "species", "Espece non renseignee")
+    herdRef: getLivestockMetadataLabel(metadata, "herdRef", "Troupeau non renseigné"),
+    batchRef: getLivestockMetadataLabel(metadata, "batchRef", "Lot non renseigné"),
+    species: getLivestockMetadataLabel(metadata, "species", "Espèce non renseignée")
   };
   const key = getLivestockBucketKey(input);
   const existing = buckets.get(key);
@@ -10191,7 +10191,7 @@ function toLivestockOperationLabel(operationKind: string): string {
   }
   if (operationKind.startsWith("TASK_")) {
     const taskKind = operationKind.slice("TASK_".length);
-    return `Tache: ${LIVESTOCK_TASK_LABELS[taskKind] ?? taskKind}`;
+    return `Tâche: ${LIVESTOCK_TASK_LABELS[taskKind] ?? taskKind}`;
   }
   return operationKind;
 }
@@ -10201,7 +10201,7 @@ function toLivestockPeriodLabel(
   _rows: LivestockReportBucket[]
 ): string {
   if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes periodes";
+    return "Toutes périodes";
   }
 
   if (!filters.dateFrom || !filters.dateTo) {
@@ -10421,7 +10421,7 @@ function normalizeOperationalItem(value: string | undefined): { itemKey: string;
   if (!trimmed) {
     return {
       itemKey: "UNCLASSIFIED",
-      itemLabel: "Non renseigne"
+      itemLabel: "Non renseigné"
     };
   }
   return {
@@ -10937,7 +10937,7 @@ export async function exportCompanyTransactionsExcel(
       columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
     },
     {
-      name: "Synthese",
+      name: "Synthèse",
       rows: buildOverviewSummaryRows(overview),
       columns: ["category", "item", "label", "value", "extra"]
     },
@@ -11149,7 +11149,7 @@ export async function exportCompanyTransactionsExcel(
       ]
     },
     {
-      name: "Hotellerie",
+      name: "Hôtellerie",
       rows: buildHotelOperationsReportRows(overview),
       columns: [
         "serviceLine",
@@ -11367,7 +11367,7 @@ export async function exportCompanyTransactionsExcel(
       ]
     },
     {
-      name: "Elevage",
+      name: "Élevage",
       rows: buildLivestockOperationsReportRows(overview),
       columns: [
         "herdRef",
@@ -11391,7 +11391,7 @@ export async function exportCompanyTransactionsExcel(
       ]
     },
     {
-      name: "ElevageOps",
+      name: "ÉlevageOps",
       rows: buildLivestockOperationsBreakdownRows(overview),
       columns: [
         "operationKind",
@@ -11470,7 +11470,7 @@ export async function exportCompanyTasksExcel(
       columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
     },
     {
-      name: "Synthese",
+      name: "Synthèse",
       rows: buildOverviewSummaryRows(overview),
       columns: ["category", "item", "label", "value", "extra"]
     },
@@ -11682,7 +11682,7 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
-      name: "Hotellerie",
+      name: "Hôtellerie",
       rows: buildHotelOperationsReportRows(overview),
       columns: [
         "serviceLine",
@@ -11804,7 +11804,7 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
-      name: "Elevage",
+      name: "Élevage",
       rows: buildLivestockOperationsReportRows(overview),
       columns: [
         "herdRef",
@@ -11828,7 +11828,7 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
-      name: "ElevageOps",
+      name: "ÉlevageOps",
       rows: buildLivestockOperationsBreakdownRows(overview),
       columns: [
         "operationKind",
@@ -11938,7 +11938,7 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
-      name: "Taches",
+      name: "Tâches",
       columns: [
         "taskId",
         "title",
@@ -12132,23 +12132,23 @@ export async function exportCompanyReportsPdf(
     doc.moveDown(0.5);
     doc.fillColor("#334e68").font("Helvetica").fontSize(10).text(`Entreprise: ${actor.companyId}`);
     doc.fontSize(10).text(`Genere le: ${new Date().toLocaleString("fr-FR")}`);
-    doc.fontSize(10).text(`Periode appliquee: ${periodLabel}`);
-    doc.fontSize(10).text(`Activite: ${toDisplayActivityLabel(filters.activityCode)}`);
+    doc.fontSize(10).text(`Période appliquée: ${periodLabel}`);
+    doc.fontSize(10).text(`Activité: ${toDisplayActivityLabel(filters.activityCode)}`);
     if (overview.activityProfile) {
       doc.fontSize(10).text(`Mode operatoire: ${overview.activityProfile.operationsModel}`);
     }
 
-    writePdfSectionTitle(doc, "Synthese consolidee");
+    writePdfSectionTitle(doc, "Synthèse consolidée");
     writePdfList(
       doc,
       [
-        `Transactions consolidees: ${overview.financeByStatus.reduce((sum, item) => sum + item.count, 0)}`,
-        `Taches consolidees: ${overview.taskByStatus.reduce((sum, item) => sum + item.count, 0)}`
+        `Transactions consolidées: ${overview.financeByStatus.reduce((sum, item) => sum + item.count, 0)}`,
+        `Tâches consolidées: ${overview.taskByStatus.reduce((sum, item) => sum + item.count, 0)}`
       ],
       "Aucune synthese disponible."
     );
 
-    writePdfSectionTitle(doc, "Rentabilite et execution XOF");
+    writePdfSectionTitle(doc, "Rentabilité et exécution XOF");
     writePdfList(
       doc,
       limitPdfRows(
@@ -12156,10 +12156,10 @@ export async function exportCompanyReportsPdf(
           .filter((item) => item.transactionsCount > 0 || item.totalTasksCount > 0)
           .map(
             (item) =>
-              `${item.scope === "ACTIVITY" ? "Secteur" : "Sous-section"} | ${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.dimensionLabel}: ${item.itemLabel} | net ${item.netProfit} XOF | marge ${item.marginRate}% | execution ${item.executionRate}% | bloquees ${item.blockedTasksCount} | retards ${item.overdueTasksCount}`
+              `${item.scope === "ACTIVITY" ? "Secteur" : "Sous-section"} | ${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.dimensionLabel}: ${item.itemLabel} | net ${item.netProfit} XOF | marge ${item.marginRate}% | exécution ${item.executionRate}% | bloquées ${item.blockedTasksCount} | retards ${item.overdueTasksCount}`
           )
       ),
-      "Aucune donnee de pilotage operationnel sur cette periode."
+      "Aucune donnee de pilotage opérationnel sur cette période."
     );
 
     if (overview.hardwareMonthlyReport) {
@@ -12170,11 +12170,11 @@ export async function exportCompanyReportsPdf(
         limitPdfRows([
           ...hardwareReport.rows.map(
             (item) =>
-              `${item.date} | ${item.designation} | quantite ${item.quantity} | vente ${item.salesAmount} XOF | versement ${item.paymentAmount} XOF | cout ${item.purchaseAmount} XOF | benefice ${item.grossProfit} XOF`
+              `${item.date} | ${item.designation} | quantité ${item.quantity} | vente ${item.salesAmount} XOF | versement ${item.paymentAmount} XOF | coût ${item.purchaseAmount} XOF | bénéfice ${item.grossProfit} XOF`
           ),
-          `TOTAL | quantite ${hardwareReport.totals.quantity} | vente ${hardwareReport.totals.salesAmount} XOF | versement ${hardwareReport.totals.paymentAmount} XOF | cout ${hardwareReport.totals.purchaseAmount} XOF | benefice ${hardwareReport.totals.grossProfit} XOF`
+          `TOTAL | quantité ${hardwareReport.totals.quantity} | vente ${hardwareReport.totals.salesAmount} XOF | versement ${hardwareReport.totals.paymentAmount} XOF | coût ${hardwareReport.totals.purchaseAmount} XOF | bénéfice ${hardwareReport.totals.grossProfit} XOF`
         ]),
-        "Aucune vente quincaillerie soumise ou approuvee sur cette periode."
+        "Aucune vente quincaillerie soumise ou approuvée sur cette période."
       );
     }
 
@@ -12186,11 +12186,11 @@ export async function exportCompanyReportsPdf(
         limitPdfRows([
           ...btpReport.rows.map(
             (item) =>
-              `${item.projectRef} | ${item.workPackage} | ${item.siteLocation} | client ${item.clientRef} | avancement ${item.progressPercent}% | main-d'oeuvre ${item.laborDays} j/h | engins ${item.equipmentHours} h | recettes ${item.cashInAmount} XOF | depenses ${item.cashOutAmount} XOF | net ${item.netAmount} XOF | execution ${item.executionRate}% | blocages ${item.blockedTasksCount}`
+              `${item.projectRef} | ${item.workPackage} | ${item.siteLocation} | client ${item.clientRef} | avancement ${item.progressPercent}% | main-d'oeuvre ${item.laborDays} j/h | engins ${item.equipmentHours} h | recettes ${item.cashInAmount} XOF | dépenses ${item.cashOutAmount} XOF | net ${item.netAmount} XOF | exécution ${item.executionRate}% | blocages ${item.blockedTasksCount}`
           ),
-          `TOTAL | chantiers ${btpReport.totals.projectsCount} | lots ${btpReport.totals.workPackagesCount} | avancement ${btpReport.totals.progressPercent}% | main-d'oeuvre ${btpReport.totals.laborDays} j/h | engins ${btpReport.totals.equipmentHours} h | recettes ${btpReport.totals.cashInAmount} XOF | depenses ${btpReport.totals.cashOutAmount} XOF | net ${btpReport.totals.netAmount} XOF`
+          `TOTAL | chantiers ${btpReport.totals.projectsCount} | lots ${btpReport.totals.workPackagesCount} | avancement ${btpReport.totals.progressPercent}% | main-d'oeuvre ${btpReport.totals.laborDays} j/h | engins ${btpReport.totals.equipmentHours} h | recettes ${btpReport.totals.cashInAmount} XOF | dépenses ${btpReport.totals.cashOutAmount} XOF | net ${btpReport.totals.netAmount} XOF`
         ]),
-        "Aucune operation BTP sur cette periode."
+        "Aucune opération BTP sur cette période."
       );
     }
 
@@ -12202,27 +12202,27 @@ export async function exportCompanyReportsPdf(
         limitPdfRows([
           ...fishReport.rows.map(
             (item) =>
-              `${item.pondRef} | ${item.cycleRef} | ${item.species} | alevins ${item.fingerlingsQuantity} | aliment ${item.feedQuantity} | ventes ${item.soldQuantity} | mortalite ${item.mortalityCount} | net ${item.netAmount} XOF | execution ${item.executionRate}%`
+              `${item.pondRef} | ${item.cycleRef} | ${item.species} | alevins ${item.fingerlingsQuantity} | aliment ${item.feedQuantity} | ventes ${item.soldQuantity} | mortalité ${item.mortalityCount} | net ${item.netAmount} XOF | exécution ${item.executionRate}%`
           ),
-          `TOTAL | bassins ${fishReport.totals.pondsCount} | cycles ${fishReport.totals.cyclesCount} | alevins ${fishReport.totals.fingerlingsQuantity} | aliment ${fishReport.totals.feedQuantity} | ventes ${fishReport.totals.soldQuantity} | mortalite ${fishReport.totals.mortalityCount} | net ${fishReport.totals.netAmount} XOF`
+          `TOTAL | bassins ${fishReport.totals.pondsCount} | cycles ${fishReport.totals.cyclesCount} | alevins ${fishReport.totals.fingerlingsQuantity} | aliment ${fishReport.totals.feedQuantity} | ventes ${fishReport.totals.soldQuantity} | mortalité ${fishReport.totals.mortalityCount} | net ${fishReport.totals.netAmount} XOF`
         ]),
-        "Aucune operation piscicole sur cette periode."
+        "Aucune opération piscicole sur cette période."
       );
     }
 
     if (overview.livestockOperationsReport) {
       const livestockReport = overview.livestockOperationsReport;
-      writePdfSectionTitle(doc, `Rapport elevage - ${livestockReport.periodLabel}`);
+      writePdfSectionTitle(doc, `Rapport élevage - ${livestockReport.periodLabel}`);
       writePdfList(
         doc,
         limitPdfRows([
           ...livestockReport.rows.map(
             (item) =>
-              `${item.herdRef} | ${item.batchRef} | ${item.species} | achats ${item.animalPurchaseCount} | aliment ${item.feedQuantity} | ventes ${item.soldAnimalCount} | produits ${item.productQuantity} | mortalite ${item.mortalityCount} | net ${item.netAmount} XOF | execution ${item.executionRate}%`
+              `${item.herdRef} | ${item.batchRef} | ${item.species} | achats ${item.animalPurchaseCount} | aliment ${item.feedQuantity} | ventes ${item.soldAnimalCount} | produits ${item.productQuantity} | mortalité ${item.mortalityCount} | net ${item.netAmount} XOF | exécution ${item.executionRate}%`
           ),
-          `TOTAL | troupeaux ${livestockReport.totals.herdsCount} | lots ${livestockReport.totals.batchesCount} | achats ${livestockReport.totals.animalPurchaseCount} | aliment ${livestockReport.totals.feedQuantity} | ventes ${livestockReport.totals.soldAnimalCount} | produits ${livestockReport.totals.productQuantity} | mortalite ${livestockReport.totals.mortalityCount} | net ${livestockReport.totals.netAmount} XOF`
+          `TOTAL | troupeaux ${livestockReport.totals.herdsCount} | lots ${livestockReport.totals.batchesCount} | achats ${livestockReport.totals.animalPurchaseCount} | aliment ${livestockReport.totals.feedQuantity} | ventes ${livestockReport.totals.soldAnimalCount} | produits ${livestockReport.totals.productQuantity} | mortalité ${livestockReport.totals.mortalityCount} | net ${livestockReport.totals.netAmount} XOF`
         ]),
-        "Aucune operation d'elevage sur cette periode."
+        "Aucune opération d'élevage sur cette période."
       );
     }
 
@@ -12231,9 +12231,9 @@ export async function exportCompanyReportsPdf(
       doc,
       overview.financeByType.map(
         (item) =>
-          `${toDisplayTransactionTypeLabel(item.type)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | approuve ${item.approvedAmount} ${item.currency}`
+          `${toDisplayTransactionTypeLabel(item.type)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | approuvé ${item.approvedAmount} ${item.currency}`
       ),
-      "Aucune transaction consolidee sur cette periode."
+      "Aucune transaction consolidée sur cette période."
     );
 
     writePdfSectionTitle(doc, "Transactions par statut");
@@ -12243,7 +12243,7 @@ export async function exportCompanyReportsPdf(
         (item) =>
           `${toDisplayTransactionStatusLabel(item.status)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency}`
       ),
-      "Aucune transaction par statut sur cette periode."
+      "Aucune transaction par statut sur cette période."
     );
 
     writePdfSectionTitle(doc, "Gouvernance des comptes");
@@ -12258,13 +12258,13 @@ export async function exportCompanyReportsPdf(
       "Aucun compte financier disponible."
     );
 
-    writePdfSectionTitle(doc, "Taches par statut");
+    writePdfSectionTitle(doc, "Tâches par statut");
     writePdfList(
       doc,
       overview.taskByStatus.map(
-        (item) => `${toDisplayTaskStatusLabel(item.status)} | ${item.count} tache(s)`
+        (item) => `${toDisplayTaskStatusLabel(item.status)} | ${item.count} tâche(s)`
       ),
-      "Aucune tache consolidee sur cette periode."
+      "Aucune tâche consolidée sur cette période."
     );
 
   }, (doc, pageNumber, totalPages) => {

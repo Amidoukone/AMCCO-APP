@@ -68,7 +68,7 @@ describe("reporting.service", () => {
     vi.mocked(listReportOperationalTasks).mockResolvedValue([]);
   });
 
-  it("filters dashboard finance and operations by the selected activity", async () => {
+  it("filters dashboard finance and opérations by the selected activity", async () => {
     vi.mocked(getDashboardCompanySummary).mockResolvedValue({
       companyId: "company-1",
       companyName: "AMCCO",
@@ -225,7 +225,7 @@ describe("reporting.service", () => {
       {
         id: "account-3",
         companyId: actor.companyId,
-        name: "Caisse elevage",
+        name: "Caisse élevage",
         accountRef: "LIV-01",
         balance: "1800.00",
         scopeType: "DEDICATED",
@@ -409,7 +409,7 @@ describe("reporting.service", () => {
     });
   });
 
-  it("builds the agriculture operations report from campaign metadata", async () => {
+  it("builds the agriculture opérations report from campaign metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 2, totalAmount: "170000.00" }
     ]);
@@ -549,9 +549,9 @@ describe("reporting.service", () => {
     expect(result.agricultureOperationsReport?.operationRows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ operationLabel: "Achat intrants", cashOutAmount: "50000.00" }),
-        expect.objectContaining({ operationLabel: "Vente recolte", cashInAmount: "120000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Semis", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Recolte", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Vente récolte", cashInAmount: "120000.00" }),
+        expect.objectContaining({ operationLabel: "Tâche: Semis", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Récolte", tasksCount: 1 })
       ])
     );
     expect(result.agricultureOperationsReport?.totals).toMatchObject({
@@ -600,10 +600,10 @@ describe("reporting.service", () => {
       activityCode: "AGRICULTURE"
     });
 
-    expect(unfilteredResult.agricultureOperationsReport?.periodLabel).toBe("Toutes periodes");
+    expect(unfilteredResult.agricultureOperationsReport?.periodLabel).toBe("Toutes périodes");
   });
 
-  it("builds the general store operations report from department and item metadata", async () => {
+  it("builds the général store opérations report from department and item metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 4, totalAmount: "365000.00" },
       { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "15000.00" }
@@ -825,8 +825,8 @@ describe("reporting.service", () => {
         expect.objectContaining({ operationLabel: "Retour client", cashOutAmount: "25000.00" }),
         expect.objectContaining({ operationLabel: "Ajustement inventaire", cashOutAmount: "5000.00" }),
         expect.objectContaining({ operationLabel: "Charge magasin", cashOutAmount: "15000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Controle stock", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Reassort rayon", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Tâche: Contrôle stock", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Réassort rayon", tasksCount: 1 })
       ])
     );
     expect(result.generalStoreOperationsReport?.totals).toMatchObject({
@@ -862,7 +862,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the food operations report from product and batch metadata", async () => {
+  it("builds the food opérations report from product and batch metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "260000.00" },
       { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "15000.00" }
@@ -918,7 +918,7 @@ describe("reporting.service", () => {
           productName: "Jus mangue",
           batchRef: "LOT-JM-01",
           expiryDate: "2027-03-31",
-          storageArea: "Reserve",
+          storageArea: "Réserve",
           quantity: "100",
           unit: "carton",
           purchaseUnitPrice: "1000",
@@ -939,7 +939,7 @@ describe("reporting.service", () => {
           productName: "Jus mangue",
           batchRef: "LOT-JM-01",
           expiryDate: "2027-03-31",
-          storageArea: "Reserve",
+          storageArea: "Réserve",
           quantity: "60",
           unit: "carton",
           saleUnitPrice: "2500",
@@ -960,7 +960,7 @@ describe("reporting.service", () => {
           productName: "Jus mangue",
           batchRef: "LOT-JM-01",
           expiryDate: "2027-03-31",
-          storageArea: "Reserve",
+          storageArea: "Réserve",
           lossQuantity: "10",
           unit: "carton",
           purchaseUnitPrice: "1000",
@@ -979,7 +979,7 @@ describe("reporting.service", () => {
           productFamily: "Boissons",
           productName: "Jus mangue",
           batchRef: "LOT-JM-01",
-          storageArea: "Reserve",
+          storageArea: "Réserve",
           temperatureRange: "4-8 C",
           supplierRef: "Technicien froid",
           invoiceRef: "FAC-FROID-01",
@@ -998,7 +998,7 @@ describe("reporting.service", () => {
           productName: "Jus mangue",
           batchRef: "LOT-JM-01",
           expiryDate: "2027-03-31",
-          storageArea: "Reserve"
+          storageArea: "Réserve"
         }
       },
       {
@@ -1011,8 +1011,8 @@ describe("reporting.service", () => {
           productName: "Jus mangue",
           batchRef: "LOT-JM-01",
           expiryDate: "2027-03-31",
-          storageArea: "Reserve",
-          issueRef: "Temperature instable"
+          storageArea: "Réserve",
+          issueRef: "Température instable"
         }
       }
     ]);
@@ -1029,7 +1029,7 @@ describe("reporting.service", () => {
         productFamily: "Boissons",
         productName: "Jus mangue",
         batchRef: "LOT-JM-01",
-        storageArea: "Reserve",
+        storageArea: "Réserve",
         purchaseQuantity: 100,
         soldQuantity: 60,
         lossQuantity: 10,
@@ -1055,10 +1055,10 @@ describe("reporting.service", () => {
       expect.arrayContaining([
         expect.objectContaining({ operationLabel: "Achat stock", cashOutAmount: "100000.00" }),
         expect.objectContaining({ operationLabel: "Vente produit", cashInAmount: "150000.00" }),
-        expect.objectContaining({ operationLabel: "Perte / peremption", cashOutAmount: "10000.00" }),
-        expect.objectContaining({ operationLabel: "Chaine du froid", cashOutAmount: "15000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Controle DLC", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Controle froid", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Perte / péremption", cashOutAmount: "10000.00" }),
+        expect.objectContaining({ operationLabel: "Chaîne du froid", cashOutAmount: "15000.00" }),
+        expect.objectContaining({ operationLabel: "Tâche: Contrôle DLC", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Contrôle froid", tasksCount: 1 })
       ])
     );
     expect(result.foodOperationsReport?.totals).toMatchObject({
@@ -1096,7 +1096,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the BTP operations report from project and work-package metadata", async () => {
+  it("builds the BTP opérations report from project and work-package metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "660000.00" },
       { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "90000.00" }
@@ -1277,11 +1277,11 @@ describe("reporting.service", () => {
     expect(result.btpOperationsReport?.operationRows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ operationLabel: "Encaissement client", cashInAmount: "500000.00" }),
-        expect.objectContaining({ operationLabel: "Achat materiaux", cashOutAmount: "120000.00" }),
+        expect.objectContaining({ operationLabel: "Achat matériaux", cashOutAmount: "120000.00" }),
         expect.objectContaining({ operationLabel: "Main-d'oeuvre", cashOutAmount: "90000.00" }),
         expect.objectContaining({ operationLabel: "Location engin", cashOutAmount: "40000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Controle qualite", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Reserve / reprise", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Tâche: Contrôle qualité", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Réserve / reprise", tasksCount: 1 })
       ])
     );
     expect(result.btpOperationsReport?.totals).toMatchObject({
@@ -1313,7 +1313,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the rental operations report from property and tenant metadata", async () => {
+  it("builds the rental opérations report from property and tenant metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "375000.00" },
       { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "15000.00" }
@@ -1505,8 +1505,8 @@ describe("reporting.service", () => {
         expect.objectContaining({ operationLabel: "Caution", cashInAmount: "120000.00" }),
         expect.objectContaining({ operationLabel: "Maintenance", cashOutAmount: "35000.00" }),
         expect.objectContaining({ operationLabel: "Charge bien", cashOutAmount: "15000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Recouvrement loyer", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Maintenance", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Tâche: Recouvrement loyer", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Maintenance", tasksCount: 1 })
       ])
     );
     expect(result.rentalOperationsReport?.totals).toMatchObject({
@@ -1541,7 +1541,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the hotel operations report from booking and stay metadata", async () => {
+  it("builds the hotel opérations report from booking and stay metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 6, totalAmount: "295000.00" }
     ]);
@@ -1729,7 +1729,7 @@ describe("reporting.service", () => {
           roomRef: "Chambre 12",
           roomType: "Double",
           serviceLine: "Hebergement",
-          issueRef: "Climatisation a controler"
+          issueRef: "Climatisation à contrôler"
         }
       }
     ]);
@@ -1775,13 +1775,13 @@ describe("reporting.service", () => {
     expect(result.hotelOperationsReport?.operationRows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ operationLabel: "Paiement chambre", cashInAmount: "180000.00" }),
-        expect.objectContaining({ operationLabel: "Acompte reservation", cashInAmount: "50000.00" }),
+        expect.objectContaining({ operationLabel: "Acompte réservation", cashInAmount: "50000.00" }),
         expect.objectContaining({ operationLabel: "Restauration", cashInAmount: "30000.00" }),
         expect.objectContaining({ operationLabel: "Maintenance chambre", cashOutAmount: "20000.00" }),
         expect.objectContaining({ operationLabel: "Commission", cashOutAmount: "10000.00" }),
-        expect.objectContaining({ operationLabel: "Taxe sejour", cashOutAmount: "5000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Check-in", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Maintenance", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Taxe séjour", cashOutAmount: "5000.00" }),
+        expect.objectContaining({ operationLabel: "Tâche: Check-in", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Maintenance", tasksCount: 1 })
       ])
     );
     expect(result.hotelOperationsReport?.totals).toMatchObject({
@@ -1822,7 +1822,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the water operations report from facility and network metadata", async () => {
+  it("builds the water opérations report from facility and network metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 9, totalAmount: "360000.00" }
     ]);
@@ -1974,7 +1974,7 @@ describe("reporting.service", () => {
           energySource: "Electricite",
           energyQuantity: "500",
           unitPrice: "50",
-          supplierRef: "Energie Mali",
+          supplierRef: "Énergie Mali",
           invoiceRef: "FAC-EN-01"
         }
       },
@@ -2030,7 +2030,7 @@ describe("reporting.service", () => {
           productionLine: "Distribution",
           equipmentRef: "Conduite A4",
           issueRef: "Fuite conduite",
-          supplierRef: "Equipe reseau",
+          supplierRef: "Equipe réseau",
           invoiceRef: "FAC-REP-01",
           invoiceAmount: "20000"
         }
@@ -2060,7 +2060,7 @@ describe("reporting.service", () => {
           networkZone: "Zone A",
           productionLine: "Distribution",
           equipmentRef: "Conduite A4",
-          issueRef: "Piece de rechange manquante"
+          issueRef: "Pièce de rechange manquante"
         }
       }
     ]);
@@ -2109,12 +2109,12 @@ describe("reporting.service", () => {
         expect.objectContaining({ operationLabel: "Frais branchement", cashInAmount: "30000.00" }),
         expect.objectContaining({ operationLabel: "Subvention / appui", cashInAmount: "20000.00" }),
         expect.objectContaining({ operationLabel: "Produit traitement", cashOutAmount: "15000.00" }),
-        expect.objectContaining({ operationLabel: "Energie", cashOutAmount: "25000.00" }),
+        expect.objectContaining({ operationLabel: "Énergie", cashOutAmount: "25000.00" }),
         expect.objectContaining({ operationLabel: "Maintenance", cashOutAmount: "40000.00" }),
-        expect.objectContaining({ operationLabel: "Analyse qualite", cashOutAmount: "10000.00" }),
-        expect.objectContaining({ operationLabel: "Reparation reseau", cashOutAmount: "20000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Controle qualite", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Reparation fuite", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Analyse qualité", cashOutAmount: "10000.00" }),
+        expect.objectContaining({ operationLabel: "Réparation réseau", cashOutAmount: "20000.00" }),
+        expect.objectContaining({ operationLabel: "Tâche: Contrôle qualité", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Réparation fuite", tasksCount: 1 })
       ])
     );
     expect(result.waterOperationsReport?.totals).toMatchObject({
@@ -2155,7 +2155,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the real estate agency operations report from mandate and deal metadata", async () => {
+  it("builds the real estate agency opérations report from mandate and deal metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 10, totalAmount: "655000.00" }
     ]);
@@ -2203,7 +2203,7 @@ describe("reporting.service", () => {
       mandateType: "Vente / location",
       propertyType: "Villa",
       locationZone: "ACI",
-      ownerRef: "Proprietaire Traore",
+      ownerRef: "Propriétaire Traore",
       clientRef: "Client Diallo",
       prospectRef: "Lead-01",
       dealRef: "AFF-01",
@@ -2440,13 +2440,13 @@ describe("reporting.service", () => {
         expect.objectContaining({ operationLabel: "Frais mandat", cashInAmount: "50000.00" }),
         expect.objectContaining({ operationLabel: "Frais visite", cashInAmount: "20000.00" }),
         expect.objectContaining({ operationLabel: "Frais dossier", cashInAmount: "25000.00" }),
-        expect.objectContaining({ operationLabel: "Publicite", cashOutAmount: "30000.00" }),
-        expect.objectContaining({ operationLabel: "Deplacement visite", cashOutAmount: "10000.00" }),
+        expect.objectContaining({ operationLabel: "Publicité", cashOutAmount: "30000.00" }),
+        expect.objectContaining({ operationLabel: "Déplacement visite", cashOutAmount: "10000.00" }),
         expect.objectContaining({ operationLabel: "Reversement courtier", cashOutAmount: "60000.00" }),
         expect.objectContaining({ operationLabel: "Frais document", cashOutAmount: "15000.00" }),
         expect.objectContaining({ operationLabel: "Remboursement client", cashOutAmount: "25000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Visite", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Collecte documents", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Tâche: Visite", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Collecte documents", tasksCount: 1 })
       ])
     );
     expect(result.agencyOperationsReport?.totals).toMatchObject({
@@ -2488,7 +2488,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the fish farming operations report from pond and cycle metadata", async () => {
+  it("builds the fish farming opérations report from pond and cycle metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "155000.00" }
     ]);
@@ -2645,8 +2645,8 @@ describe("reporting.service", () => {
         expect.objectContaining({ operationLabel: "Achat alevins", cashOutAmount: "30000.00" }),
         expect.objectContaining({ operationLabel: "Achat aliment", cashOutAmount: "45000.00" }),
         expect.objectContaining({ operationLabel: "Vente poisson", cashInAmount: "80000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Nourrissage", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Controle eau", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Tâche: Nourrissage", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Contrôle eau", tasksCount: 1 })
       ])
     );
     expect(result.fishFarmingOperationsReport?.totals).toMatchObject({
@@ -2678,7 +2678,7 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the livestock operations report from herd and batch metadata", async () => {
+  it("builds the livestock opérations report from herd and batch metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "550000.00" },
       { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "50000.00" }
@@ -2858,8 +2858,8 @@ describe("reporting.service", () => {
         expect.objectContaining({ operationLabel: "Achat aliment", cashOutAmount: "50000.00" }),
         expect.objectContaining({ operationLabel: "Vente animaux", cashInAmount: "220000.00" }),
         expect.objectContaining({ operationLabel: "Vente produits", cashInAmount: "30000.00" }),
-        expect.objectContaining({ operationLabel: "Tache: Vaccination", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tache: Controle sanitaire", tasksCount: 1 })
+        expect.objectContaining({ operationLabel: "Tâche: Vaccination", tasksCount: 1 }),
+        expect.objectContaining({ operationLabel: "Tâche: Contrôle sanitaire", tasksCount: 1 })
       ])
     );
     expect(result.livestockOperationsReport?.totals).toMatchObject({

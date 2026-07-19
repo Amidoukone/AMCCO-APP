@@ -58,12 +58,12 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "FISH_FARMING",
     label: "Pisciculture",
-    description: "Bassins, cycles d'elevage, alimentation, ventes et suivi sanitaire."
+    description: "Bassins, cycles d'élevage, alimentation, ventes et suivi sanitaire."
   },
   {
     code: "LIVESTOCK",
-    label: "Elevage",
-    description: "Boeufs, moutons, poulets et autres especes: lots, alimentation, soins et ventes."
+    label: "Élevage",
+    description: "Boeufs, moutons, poulets et autres espèces: lots, alimentation, soins et ventes."
   },
   {
     code: "TRANSPORT",
@@ -78,7 +78,7 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "HOTEL_LODGING",
     label: "Hôtellerie / Auberge",
-    description: "Chambres, reservations, sejours, charges et exploitation d'auberge."
+    description: "Chambres, réservations, séjours, charges et exploitation d'auberge."
   },
   {
     code: "SERVICES",

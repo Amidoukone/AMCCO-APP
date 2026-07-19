@@ -11,6 +11,7 @@ export function getDbPool(): Pool {
 
   pool = mysql.createPool({
     uri: env.DATABASE_URL,
+    charset: "utf8mb4",
     waitForConnections: true,
     connectionLimit: env.DB_POOL_LIMIT,
     queueLimit: 0
@@ -49,4 +50,3 @@ export async function closeDbPool(): Promise<void> {
     pool = null;
   }
 }
-

@@ -66,7 +66,7 @@ export async function authenticateAccessToken(
       next(error);
       return;
     }
-    next(new HttpError(401, "Jeton d'acces invalide ou expire."));
+    next(new HttpError(401, "Jeton d'accès invalide ou expire."));
   }
 }
 

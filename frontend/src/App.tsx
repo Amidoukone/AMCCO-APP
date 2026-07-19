@@ -1,152 +1,180 @@
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./components/AppLayout";
 import { AuthGuard } from "./components/AuthGuard";
 import { PublicOnlyRoute } from "./components/PublicOnlyRoute";
 import { RoleGuard } from "./components/RoleGuard";
 import { BusinessActivityProvider } from "./context/BusinessActivityContext";
-import { AdminUsersPage } from "./pages/AdminUsersPage";
-import { AdminActivitiesPage } from "./pages/AdminActivitiesPage";
-import { AdminCompaniesPage } from "./pages/AdminCompaniesPage";
-import { AlertsPage } from "./pages/AlertsPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { FinanceSalariesPage } from "./pages/FinanceSalariesPage";
-import { FinanceTransactionsPage } from "./pages/FinanceTransactionsPage";
-import { ForbiddenPage } from "./pages/ForbiddenPage";
-import { HomePage } from "./pages/HomePage";
-import { LoginPage } from "./pages/LoginPage";
-import { MyWorkPage } from "./pages/MyWorkPage";
-import { OperationsTasksPage } from "./pages/OperationsTasksPage";
-import { ReportsPage } from "./pages/ReportsPage";
-import { SecuritySettingsPage } from "./pages/SecuritySettingsPage";
-import { TaskDetailsPage } from "./pages/TaskDetailsPage";
+import type { FeatureKey } from "./config/permissions";
+
+const AdminUsersPage = lazy(() =>
+  import("./pages/AdminUsersPage").then(({ AdminUsersPage }) => ({ default: AdminUsersPage }))
+);
+const AdminActivitiesPage = lazy(() =>
+  import("./pages/AdminActivitiesPage").then(({ AdminActivitiesPage }) => ({
+    default: AdminActivitiesPage
+  }))
+);
+const AdminCompaniesPage = lazy(() =>
+  import("./pages/AdminCompaniesPage").then(({ AdminCompaniesPage }) => ({
+    default: AdminCompaniesPage
+  }))
+);
+const AlertsPage = lazy(() =>
+  import("./pages/AlertsPage").then(({ AlertsPage }) => ({ default: AlertsPage }))
+);
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage").then(({ DashboardPage }) => ({ default: DashboardPage }))
+);
+const FinanceSalariesPage = lazy(() =>
+  import("./pages/FinanceSalariesPage").then(({ FinanceSalariesPage }) => ({
+    default: FinanceSalariesPage
+  }))
+);
+const FinanceTransactionsPage = lazy(() =>
+  import("./pages/FinanceTransactionsPage").then(({ FinanceTransactionsPage }) => ({
+    default: FinanceTransactionsPage
+  }))
+);
+const ForbiddenPage = lazy(() =>
+  import("./pages/ForbiddenPage").then(({ ForbiddenPage }) => ({ default: ForbiddenPage }))
+);
+const HomePage = lazy(() =>
+  import("./pages/HomePage").then(({ HomePage }) => ({ default: HomePage }))
+);
+const LoginPage = lazy(() =>
+  import("./pages/LoginPage").then(({ LoginPage }) => ({ default: LoginPage }))
+);
+const MyWorkPage = lazy(() =>
+  import("./pages/MyWorkPage").then(({ MyWorkPage }) => ({ default: MyWorkPage }))
+);
+const OperationsTasksPage = lazy(() =>
+  import("./pages/OperationsTasksPage").then(({ OperationsTasksPage }) => ({
+    default: OperationsTasksPage
+  }))
+);
+const ReportsPage = lazy(() =>
+  import("./pages/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage }))
+);
+const SecuritySettingsPage = lazy(() =>
+  import("./pages/SecuritySettingsPage").then(({ SecuritySettingsPage }) => ({
+    default: SecuritySettingsPage
+  }))
+);
+const TaskDetailsPage = lazy(() =>
+  import("./pages/TaskDetailsPage").then(({ TaskDetailsPage }) => ({ default: TaskDetailsPage }))
+);
+
+function PageFallback(): JSX.Element {
+  return (
+    <div className="route-loading" role="status" aria-live="polite">
+      <span className="route-loading-indicator" aria-hidden="true" />
+      <span>Chargement de la page...</span>
+    </div>
+  );
+}
+
+function page(Page: ComponentType): JSX.Element {
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <Page />
+    </Suspense>
+  );
+}
+
+function publicOnlyPage(Page: ComponentType): JSX.Element {
+  return (
+    <PublicOnlyRoute>
+      {page(Page)}
+    </PublicOnlyRoute>
+  );
+}
+
+function guardedPage(feature: FeatureKey, Page: ComponentType): JSX.Element {
+  return (
+    <RoleGuard feature={feature}>
+      {page(Page)}
+    </RoleGuard>
+  );
+}
+
+function protectedLayout(children: ReactNode): JSX.Element {
+  return (
+    <AuthGuard>
+      <BusinessActivityProvider>{children}</BusinessActivityProvider>
+    </AuthGuard>
+  );
+}
 
 export function App(): JSX.Element {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route path="/" element={page(HomePage)} />
       <Route
         path="/login"
-        element={
-          <PublicOnlyRoute>
-            <LoginPage />
-          </PublicOnlyRoute>
-        }
+        element={publicOnlyPage(LoginPage)}
       />
 
       <Route
-        element={
-          <AuthGuard>
-            <BusinessActivityProvider>
-              <AppLayout />
-            </BusinessActivityProvider>
-          </AuthGuard>
-        }
+        element={protectedLayout(<AppLayout />)}
       >
         <Route
           path="/dashboard"
-          element={
-            <RoleGuard feature="dashboard">
-              <DashboardPage />
-            </RoleGuard>
-          }
+          element={guardedPage("dashboard", DashboardPage)}
         />
         <Route
           path="/alerts"
-          element={
-            <RoleGuard feature="alerts">
-              <AlertsPage />
-            </RoleGuard>
-          }
+          element={guardedPage("alerts", AlertsPage)}
         />
         <Route
           path="/my-work"
-          element={
-            <RoleGuard feature="myWork">
-              <MyWorkPage />
-            </RoleGuard>
-          }
+          element={guardedPage("myWork", MyWorkPage)}
         />
-        <Route path="/forbidden" element={<ForbiddenPage />} />
+        <Route path="/forbidden" element={page(ForbiddenPage)} />
 
         <Route
           path="/admin/companies"
-          element={
-            <RoleGuard feature="adminCompanies">
-              <AdminCompaniesPage />
-            </RoleGuard>
-          }
+          element={guardedPage("adminCompanies", AdminCompaniesPage)}
         />
 
         <Route
           path="/admin/users"
-          element={
-            <RoleGuard feature="adminUsers">
-              <AdminUsersPage />
-            </RoleGuard>
-          }
+          element={guardedPage("adminUsers", AdminUsersPage)}
         />
 
         <Route
           path="/admin/activities"
-          element={
-            <RoleGuard feature="adminActivities">
-              <AdminActivitiesPage />
-            </RoleGuard>
-          }
+          element={guardedPage("adminActivities", AdminActivitiesPage)}
         />
 
         <Route
           path="/finance/transactions"
-          element={
-            <RoleGuard feature="financeTransactions">
-              <FinanceTransactionsPage />
-            </RoleGuard>
-          }
+          element={guardedPage("financeTransactions", FinanceTransactionsPage)}
         />
 
         <Route
           path="/finance/salaries"
-          element={
-            <RoleGuard feature="financeSalaries">
-              <FinanceSalariesPage />
-            </RoleGuard>
-          }
+          element={guardedPage("financeSalaries", FinanceSalariesPage)}
         />
 
         <Route
           path="/operations/tasks"
-          element={
-            <RoleGuard feature="operationsTasks">
-              <OperationsTasksPage />
-            </RoleGuard>
-          }
+          element={guardedPage("operationsTasks", OperationsTasksPage)}
         />
 
         <Route
           path="/operations/tasks/:taskId"
-          element={
-            <RoleGuard feature="operationsTasks">
-              <TaskDetailsPage />
-            </RoleGuard>
-          }
+          element={guardedPage("operationsTasks", TaskDetailsPage)}
         />
 
         <Route
           path="/reports"
-          element={
-            <RoleGuard feature="reports">
-              <ReportsPage />
-            </RoleGuard>
-          }
+          element={guardedPage("reports", ReportsPage)}
         />
 
         <Route
           path="/settings/security"
-          element={
-            <RoleGuard feature="settingsSecurity">
-              <SecuritySettingsPage />
-            </RoleGuard>
-          }
+          element={guardedPage("settingsSecurity", SecuritySettingsPage)}
         />
       </Route>
 

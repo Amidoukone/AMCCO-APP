@@ -179,7 +179,7 @@ export function AdminUsersPage(): JSX.Element {
           })
         );
       }
-      setSuccessMessage("Profil utilisateur mis a jour.");
+      setSuccessMessage("Profil utilisateur mis à jour.");
       await loadUsers();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -333,7 +333,7 @@ export function AdminUsersPage(): JSX.Element {
           <input
             type="search"
             className="quick-search-input"
-            placeholder="Recherche rapide: nom, email, role..."
+            placeholder="Recherche rapide: nom, email, rôle..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -361,7 +361,7 @@ export function AdminUsersPage(): JSX.Element {
         </div>
         {!isLoading && items.length === 0 ? <p>Aucun utilisateur.</p> : null}
         {!isLoading && items.length > 0 && displayItems.length === 0 ? (
-          <p>Aucun utilisateur ne correspond a la recherche.</p>
+          <p>Aucun utilisateur ne correspond à la recherche.</p>
         ) : null}
 
         {!isLoading && displayItems.length > 0 ? (
@@ -371,7 +371,7 @@ export function AdminUsersPage(): JSX.Element {
                 <tr>
                   <th>Nom</th>
                   <th>Email</th>
-                  <th>Role</th>
+                  <th>Rôle</th>
                   <th>Actif</th>
                   <th>Actions</th>
                 </tr>

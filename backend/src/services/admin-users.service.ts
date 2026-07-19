@@ -52,7 +52,7 @@ export async function createCompanyUser(
   if (existingUser) {
     const existingMembership = await findMembershipByCompanyAndUser(actor.companyId, existingUser.userId);
     if (existingMembership) {
-      throw new HttpError(409, "Cet utilisateur est deja rattache a cette entreprise.");
+      throw new HttpError(409, "Cet utilisateur est déjà rattaché à cette entreprise.");
     }
   }
 
@@ -68,7 +68,7 @@ export async function createCompanyUser(
       });
     } catch (error) {
       if (mysqlErrorCode(error) === "ER_DUP_ENTRY") {
-        throw new HttpError(409, "Cet email existe deja.");
+        throw new HttpError(409, "Cet email existe déjà.");
       }
       throw error;
     }
@@ -92,7 +92,7 @@ export async function createCompanyUser(
         });
       } catch (error) {
         if (mysqlErrorCode(error) === "ER_DUP_ENTRY") {
-          throw new HttpError(409, "Le rattachement utilisateur existe deja pour cette entreprise.");
+          throw new HttpError(409, "Le rattachement utilisateur existe déjà pour cette entreprise.");
         }
         throw error;
       }
@@ -109,7 +109,7 @@ export async function createCompanyUser(
 
   const membership = await findMembershipByCompanyAndUser(actor.companyId, userId);
   if (!membership) {
-    throw new HttpError(500, "Impossible de creer le rattachement utilisateur.");
+    throw new HttpError(500, "Impossible de créer le rattachement utilisateur.");
   }
 
   await createAuditLogRecord({
@@ -143,7 +143,7 @@ export async function updateCompanyUser(
   }
 
   if (typeof input.fullName !== "string" && typeof input.isActive !== "boolean") {
-    throw new HttpError(400, "Aucun champ de profil a mettre a jour.");
+    throw new HttpError(400, "Aucun champ de profil à mettre à jour.");
   }
 
   await updateUserProfile({
@@ -154,7 +154,7 @@ export async function updateCompanyUser(
 
   const updatedMembership = await findMembershipByCompanyAndUser(actor.companyId, input.userId);
   if (!updatedMembership) {
-    throw new HttpError(500, "Impossible de recharger le profil utilisateur mis a jour.");
+    throw new HttpError(500, "Impossible de recharger le profil utilisateur mis à jour.");
   }
 
   await createAuditLogRecord({
@@ -186,13 +186,13 @@ export async function changeCompanyUserRole(
   }
 
   if (membership.userId === actor.actorId && input.role !== membership.role) {
-    throw new HttpError(400, "Vous ne pouvez pas modifier votre propre role.");
+    throw new HttpError(400, "Vous ne pouvez pas modifier votre propre rôle.");
   }
 
   if (membership.role === "OWNER" && input.role !== "OWNER") {
     const ownerCount = await countOwnersInCompany(actor.companyId);
     if (ownerCount <= 1) {
-      throw new HttpError(400, "Impossible de retirer le dernier proprietaire de l'entreprise.");
+      throw new HttpError(400, "Impossible de retirer le dernier propriétaire de l'entreprise.");
     }
   }
 
@@ -204,7 +204,7 @@ export async function changeCompanyUserRole(
 
   const updatedMembership = await findMembershipByCompanyAndUser(actor.companyId, input.userId);
   if (!updatedMembership) {
-    throw new HttpError(500, "Impossible de recharger le role mis a jour.");
+    throw new HttpError(500, "Impossible de recharger le rôle mis à jour.");
   }
 
   await createAuditLogRecord({
@@ -236,7 +236,7 @@ export async function deleteCompanyUser(actor: ActorContext, userId: string): Pr
   if (membership.role === "OWNER") {
     const ownerCount = await countOwnersInCompany(actor.companyId);
     if (ownerCount <= 1) {
-      throw new HttpError(400, "Impossible de retirer le dernier proprietaire de l'entreprise.");
+      throw new HttpError(400, "Impossible de retirer le dernier propriétaire de l'entreprise.");
     }
   }
 

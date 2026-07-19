@@ -92,7 +92,7 @@ function timelineActionLabel(action: string): string {
     return "Commentaire ajoute";
   }
   if (action === "TASK_ATTACHMENT_ADDED") {
-    return "Piece jointe ajoutee";
+    return "Pièce jointe ajoutee";
   }
   return action;
 }
@@ -126,7 +126,7 @@ function timelineDetail(event: OperationTaskTimelineEvent): string {
     return "Tâche créée.";
   }
   if (event.action === "TASK_ATTACHMENT_ADDED") {
-    return "Piece jointe ajoutee.";
+    return "Pièce jointe ajoutee.";
   }
   return "";
 }
@@ -325,7 +325,7 @@ export function TaskDetailsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => updateOperationsTaskStatusRequest(accessToken, taskId, status));
-      setSuccessMessage("Statut mis a jour.");
+      setSuccessMessage("Statut mis à jour.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -418,7 +418,7 @@ export function TaskDetailsPage(): JSX.Element {
       return;
     }
     if (!attachmentFile) {
-      setErrorMessage("Selectionne un fichier a joindre.");
+      setErrorMessage("Sélectionne un fichier à joindre.");
       return;
     }
 
@@ -429,7 +429,7 @@ export function TaskDetailsPage(): JSX.Element {
       const items = await uploadTaskAttachment(taskId, attachmentFile);
       setAttachmentFile(null);
       setAttachments(items);
-      setSuccessMessage("Piece jointe ajoutee.");
+      setSuccessMessage("Pièce jointe ajoutee.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -717,7 +717,7 @@ export function TaskDetailsPage(): JSX.Element {
 
       {!isLoading && task ? (
         <section className={canManageTasks ? "panel" : "panel task-detail-lite-panel"}>
-          <h3>{canManageTasks ? "Timeline operationnelle" : "Historique"}</h3>
+          <h3>{canManageTasks ? "Timeline opérationnelle" : "Historique"}</h3>
           {timelineEntries.length === 0 ? <p>Aucun événement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
             <>

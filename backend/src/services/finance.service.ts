@@ -128,7 +128,7 @@ function canViewAllSalaries(role: RoleCode): boolean {
 
 function ensureSalaryManagementAccess(role: RoleCode): void {
   if (!canManageSalary(role)) {
-    throw new HttpError(403, "Permissions insuffisantes pour gerer les salaires.");
+    throw new HttpError(403, "Permissions insuffisantes pour gérer les salaires.");
   }
 }
 
@@ -167,7 +167,7 @@ function assertAccountCreationGovernance(
   if (scopeType === "GLOBAL" && role === "ACCOUNTANT") {
     throw new HttpError(
       403,
-      "Seuls le proprietaire ou l'admin systeme peuvent creer ce type de compte financier."
+      "Seuls le propriétaire ou l'admin système peuvent créer ce type de compte financier."
     );
   }
 }
@@ -224,7 +224,7 @@ function assertAccountSupportsActivity(
 
   throw new HttpError(
     400,
-    `Le compte financier ${account.name} n'est pas autorise pour le secteur ${toActivityLabel(activityCode) ?? activityCode}.`
+    `Le compte financier ${account.name} n'est pas autorisé pour le secteur ${toActivityLabel(activityCode) ?? activityCode}.`
   );
 }
 
@@ -468,7 +468,7 @@ function buildSalarySnapshotFromInput(input: {
   const netCents = toMoneyCents(grossAmount) + toMoneyCents(bonusAmount) - toMoneyCents(deductionAmount);
 
   if (netCents <= 0) {
-    throw new HttpError(400, "Le salaire net doit etre superieur a zero.");
+    throw new HttpError(400, "Le salaire net doit être supérieur a zéro.");
   }
 
   return {
@@ -534,7 +534,7 @@ export async function createCompanyAccount(
   }
 ) {
   if (!canCreateAccount(actor.role)) {
-    throw new HttpError(403, "Permissions insuffisantes pour creer un compte financier.");
+    throw new HttpError(403, "Permissions insuffisantes pour créer un compte financier.");
   }
 
   const scopeType = input.scopeType ?? "GLOBAL";
@@ -547,7 +547,7 @@ export async function createCompanyAccount(
   });
 
   if (scopeType === "DEDICATED" && !primaryActivityCode) {
-    throw new HttpError(400, "Un compte dedie doit cibler un secteur.");
+    throw new HttpError(400, "Un compte dédié doit cibler un secteur.");
   }
 
   if (scopeType === "RESTRICTED" && allowedActivityCodes.length === 0) {
@@ -570,7 +570,7 @@ export async function createCompanyAccount(
 
   const created = await findFinancialAccountById(actor.companyId, accountId);
   if (!created) {
-    throw new HttpError(500, "Impossible de recharger le compte financier cree.");
+    throw new HttpError(500, "Impossible de recharger le compte financier créé.");
   }
 
   await createAuditLogRecord({
@@ -620,7 +620,7 @@ export async function updateCompanyAccount(
   if (existing.transactionsCount > 0) {
     throw new HttpError(
       400,
-      "Ce compte financier est deja utilise par des transactions et ne peut plus etre modifie."
+      "Ce compte financier est déjà utilisé par des transactions et ne peut plus être modifié."
     );
   }
 
@@ -636,7 +636,7 @@ export async function updateCompanyAccount(
   });
 
   if (scopeType === "DEDICATED" && !primaryActivityCode) {
-    throw new HttpError(400, "Un compte dedie doit cibler un secteur.");
+    throw new HttpError(400, "Un compte dédié doit cibler un secteur.");
   }
 
   if (scopeType === "RESTRICTED" && allowedActivityCodes.length === 0) {
@@ -657,7 +657,7 @@ export async function updateCompanyAccount(
 
   const updated = await findFinancialAccountById(actor.companyId, existing.id);
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger le compte financier modifie.");
+    throw new HttpError(500, "Impossible de recharger le compte financier modifié.");
   }
 
   await createAuditLogRecord({
@@ -741,7 +741,7 @@ export async function createCompanyTransaction(
       metadata
     });
   } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+    throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
   }
   const profile = getBusinessActivityProfile(input.activityCode);
 
@@ -793,7 +793,7 @@ export async function createCompanyTransaction(
 
   const created = await findFinancialTransactionById(actor.companyId, transactionId);
   if (!created) {
-    throw new HttpError(500, "Impossible de recharger la transaction creee.");
+    throw new HttpError(500, "Impossible de recharger la transaction créée.");
   }
   return created;
 }
@@ -820,7 +820,7 @@ export async function updateCompanyTransaction(
   }
 
   if (extractSalarySnapshot(existing.metadata)) {
-    throw new HttpError(400, "Les salaires doivent etre geres depuis la page salaires.");
+    throw new HttpError(400, "Les salaires doivent être gérés depuis la page salaires.");
   }
 
   const account = await findFinancialAccountById(actor.companyId, input.accountId);
@@ -841,7 +841,7 @@ export async function updateCompanyTransaction(
       metadata
     });
   } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+    throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
   }
 
   const profile = getBusinessActivityProfile(input.activityCode);
@@ -891,7 +891,7 @@ export async function updateCompanyTransaction(
 
   const updated = await findFinancialTransactionById(actor.companyId, existing.id);
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger la transaction modifiee.");
+    throw new HttpError(500, "Impossible de recharger la transaction modifiée.");
   }
 
   if (actor.role === "SYS_ADMIN") {
@@ -930,7 +930,7 @@ export async function listCompanySalaryTransactions(input: {
   payPeriod?: string;
 }) {
   if (!canViewAllSalaries(input.role) && input.status === "DRAFT") {
-    throw new HttpError(403, "Les brouillons de salaire sont reserves a la comptabilite.");
+    throw new HttpError(403, "Les brouillons de salaire sont réserves à la comptabilité.");
   }
 
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
@@ -1104,11 +1104,11 @@ export async function createCompanySalaryTransaction(
     throw new HttpError(404, "Collaborateur introuvable pour cette entreprise.");
   }
   if (!membership.isActive) {
-    throw new HttpError(400, "Le collaborateur selectionne est inactif.");
+    throw new HttpError(400, "Le collaborateur sélectionné est inactif.");
   }
 
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.payPeriod.trim())) {
-    throw new HttpError(400, "La periode de paie doit etre au format AAAA-MM.");
+    throw new HttpError(400, "La période de paie doit être au format AAAA-MM.");
   }
 
   const existing = await findSalaryTransactionByEmployeeAndPeriod({
@@ -1119,7 +1119,7 @@ export async function createCompanySalaryTransaction(
   if (existing) {
     throw new HttpError(
       409,
-      "Un salaire existe deja pour ce collaborateur sur cette periode."
+      "Un salaire existe déjà pour ce collaborateur sur cette période."
     );
   }
 
@@ -1169,7 +1169,7 @@ export async function createCompanySalaryTransaction(
 
   const created = await findFinancialTransactionById(actor.companyId, transactionId);
   if (!created) {
-    throw new HttpError(500, "Impossible de recharger le salaire cree.");
+    throw new HttpError(500, "Impossible de recharger le salaire créé.");
   }
 
   const salarySnapshot = extractSalarySnapshot(created.metadata);
@@ -1222,11 +1222,11 @@ export async function updateCompanySalaryTransaction(
     throw new HttpError(404, "Collaborateur introuvable pour cette entreprise.");
   }
   if (!membership.isActive) {
-    throw new HttpError(400, "Le collaborateur selectionne est inactif.");
+    throw new HttpError(400, "Le collaborateur sélectionné est inactif.");
   }
 
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.payPeriod.trim())) {
-    throw new HttpError(400, "La periode de paie doit etre au format AAAA-MM.");
+    throw new HttpError(400, "La période de paie doit être au format AAAA-MM.");
   }
 
   const duplicate = await findSalaryTransactionByEmployeeAndPeriod({
@@ -1237,7 +1237,7 @@ export async function updateCompanySalaryTransaction(
   if (duplicate && duplicate.id !== existing.id) {
     throw new HttpError(
       409,
-      "Un salaire existe deja pour ce collaborateur sur cette periode."
+      "Un salaire existe déjà pour ce collaborateur sur cette période."
     );
   }
 
@@ -1293,12 +1293,12 @@ export async function updateCompanySalaryTransaction(
 
   const updated = await findFinancialTransactionById(actor.companyId, existing.id);
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger le salaire modifie.");
+    throw new HttpError(500, "Impossible de recharger le salaire modifié.");
   }
 
   const updatedSnapshot = extractSalarySnapshot(updated.metadata);
   if (!updatedSnapshot) {
-    throw new HttpError(500, "Impossible de reconstruire les informations du salaire modifie.");
+    throw new HttpError(500, "Impossible de reconstruire les informations du salaire modifié.");
   }
 
   if (actor.role === "SYS_ADMIN") {
@@ -1496,7 +1496,7 @@ export async function deleteCompanyAccount(
   if (existing.transactionsCount > 0) {
     throw new HttpError(
       400,
-      "Ce compte financier est deja utilise par des transactions et ne peut pas etre supprime."
+      "Ce compte financier est déjà utilisé par des transactions et ne peut pas être supprimé."
     );
   }
 
@@ -1560,10 +1560,17 @@ export async function deleteCompanyTransaction(
   }
 
   if (extractSalarySnapshot(existing.metadata)) {
-    throw new HttpError(400, "Les salaires doivent etre geres depuis la page salaires.");
+    throw new HttpError(400, "Les salaires doivent être gérés depuis la page salaires.");
   }
 
   ensureTransactionManagementAccess(actor.role);
+
+  if (existing.status === "APPROVED" && !canDeleteApprovedTransaction(actor.role)) {
+    throw new HttpError(
+      403,
+      "Seul l'admin système peut supprimer une transaction déjà approuvée."
+    );
+  }
 
   const account = await findFinancialAccountById(actor.companyId, existing.accountId);
   await deleteFinancialTransaction({
@@ -1644,7 +1651,7 @@ export async function deleteCompanySalaryTransaction(
     if (!canDeleteApprovedTransaction(actor.role)) {
       throw new HttpError(
         403,
-        "Seul l'admin systeme peut supprimer un salaire deja approuve."
+        "Seul l'admin système peut supprimer un salaire déjà approuvé."
       );
     }
   } else {
@@ -1724,7 +1731,7 @@ export async function addProofToTransaction(
   }
 
   if (transaction.status === "REJECTED") {
-    throw new HttpError(400, "Ajout de preuve impossible apres validation finale.");
+    throw new HttpError(400, "Ajout de preuve impossible après validation finale.");
   }
 
   const fullTransaction = await findTransactionForProofs(actor.companyId, transaction.id);
@@ -1739,7 +1746,7 @@ export async function addProofToTransaction(
   });
   const account = await findFinancialAccountById(actor.companyId, fullTransaction.accountId);
   if (!account) {
-    throw new HttpError(500, "Impossible de recharger le compte financier apres ajout de preuve.");
+    throw new HttpError(500, "Impossible de recharger le compte financier après ajout de preuve.");
   }
 
   await createAuditLogRecord({
@@ -1803,7 +1810,7 @@ export async function submitCompanyTransaction(
   }
 
   if (transaction.status !== "DRAFT") {
-    throw new HttpError(400, "Seules les transactions en brouillon peuvent etre soumises.");
+    throw new HttpError(400, "Seules les transactions en brouillon peuvent être soumises.");
   }
 
   const fullTransaction = await findFinancialTransactionById(actor.companyId, transaction.id);
@@ -1826,7 +1833,7 @@ export async function submitCompanyTransaction(
 
   if (!salarySnapshot) {
     if (!transaction.activityCode) {
-      throw new HttpError(400, "La transaction doit etre rattachee a un secteur.");
+      throw new HttpError(400, "La transaction doit être rattachée à un secteur.");
     }
 
     try {
@@ -1837,7 +1844,7 @@ export async function submitCompanyTransaction(
         metadata: fullTransaction.metadata
       });
     } catch (error) {
-      throw new HttpError(400, error instanceof Error ? error.message : "Regle metier invalide.");
+      throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
     }
   }
 
@@ -1951,7 +1958,7 @@ export async function confirmCompanySalaryReceipt(
 ) {
   void actor;
   void input;
-  throw new HttpError(400, "La confirmation employe n'est plus requise pour les salaires.");
+  throw new HttpError(400, "La confirmation employé n'est plus requise pour les salaires.");
 }
 
 export async function reviewCompanyTransaction(
@@ -1971,7 +1978,7 @@ export async function reviewCompanyTransaction(
   }
 
   if (transaction.status !== "SUBMITTED") {
-    throw new HttpError(400, "Seules les transactions soumises peuvent etre validees.");
+    throw new HttpError(400, "Seules les transactions soumises peuvent être validées.");
   }
 
   const profile = transaction.activityCode
@@ -2092,7 +2099,7 @@ export async function getTransactionProofUploadAuth(
   }
 
   if (transaction.status === "REJECTED") {
-    throw new HttpError(400, "Ajout de preuve impossible apres validation finale.");
+    throw new HttpError(400, "Ajout de preuve impossible après validation finale.");
   }
 
   await findTransactionForProofs(actor.companyId, transaction.id);

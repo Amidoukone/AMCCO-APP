@@ -109,7 +109,7 @@ describe("membership-role-repair.service", () => {
     expect(suspects).toHaveLength(0);
   });
 
-  it("skips ambiguous users with different stronger roles across older companies", () => {
+  it("skips ambiguous users with différent stronger roles across older companies", () => {
     const memberships = [
       membership({
         membershipId: "m-owner",

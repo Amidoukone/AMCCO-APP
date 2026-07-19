@@ -170,7 +170,7 @@ export function findSuspectMembershipRoleDowngrades(input: {
       companyCreatedAt,
       referenceCompanies: olderStrongerMemberships.map((item) => item.companyCode).sort(),
       reason:
-        "Membership créé pendant la création de l'entreprise, sans changement de rôle explicite, alors que le même utilisateur avait déjà un rôle plus élevé stable dans une autre entreprise."
+        "Membership créé pendant la création de l'entreprise, sans changement de role explicite, alors que le même utilisateur avait déjà un role plus élevé stable dans une autre entreprise."
     });
   }
 

@@ -436,7 +436,7 @@ export function AlertsPage(): JSX.Element {
                     ) : null}
 
                     {(remainingLines.length > 0 || item.entityType || item.entityId) ? (
-                      <details className="alert-details">
+                      <details className="alert-détails">
                         <summary className="table-inline-summary">Voir le contexte</summary>
                         <div className="alert-meta">
                           {item.entityType || item.entityId ? (

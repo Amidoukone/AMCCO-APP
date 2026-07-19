@@ -28,12 +28,12 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "HARDWARE",
     label: "Quincaillerie",
-    description: "Vente de materiaux, outils et fournitures de quincaillerie."
+    description: "Vente de matériaux, outils et fournitures de quincaillerie."
   },
   {
     code: "GENERAL_STORE",
-    label: "Magasins (commerce general)",
-    description: "Activites de magasin multi-produits et commerce general."
+    label: "Magasins (commerce général)",
+    description: "Activités de magasin multi-produits et commerce général."
   },
   {
     code: "FOOD",
@@ -42,12 +42,12 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   },
   {
     code: "RENTAL",
-    label: "Location immobiliere",
-    description: "Gestion des biens mis en location et encaissements associes."
+    label: "Location immobilière",
+    description: "Gestion des biens mis en location et encaissements associés."
   },
   {
     code: "AGRICULTURE",
-    label: "Activites agricoles",
+    label: "Activités agricoles",
     description: "Production agricole, types de champs, intrants, exploitation et suivi terrain."
   },
   {
@@ -58,12 +58,12 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "FISH_FARMING",
     label: "Pisciculture",
-    description: "Bassins, cycles d'elevage, alimentation, ventes et suivi sanitaire."
+    description: "Bassins, cycles d'élevage, alimentation, ventes et suivi sanitaire."
   },
   {
     code: "LIVESTOCK",
-    label: "Elevage",
-    description: "Boeufs, moutons, poulets et autres especes avec suivi des lots, alimentation, soins et ventes."
+    label: "Élevage",
+    description: "Boeufs, moutons, poulets et autres espèces avec suivi des lots, alimentation, soins et ventes."
   },
   {
     code: "TRANSPORT",
@@ -77,8 +77,8 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   },
   {
     code: "HOTEL_LODGING",
-    label: "Hotellerie / Auberge",
-    description: "Chambres, reservations, sejours, charges et exploitation d'auberge."
+    label: "Hôtellerie / Auberge",
+    description: "Chambres, réservations, séjours, charges et exploitation d'auberge."
   },
   {
     code: "SERVICES",
@@ -87,8 +87,8 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   },
   {
     code: "MINING",
-    label: "Exploitation miniere",
-    description: "Operations et flux financiers lies a l'exploitation miniere."
+    label: "Exploitation minière",
+    description: "Opérations et flux financiers liés à l'exploitation minière."
   },
   {
     code: "WATER",
@@ -97,8 +97,8 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   },
   {
     code: "REAL_ESTATE_AGENCY",
-    label: "Agence immobiliere",
-    description: "Commercialisation, intermediation et suivi de mandats immobiliers."
+    label: "Agence immobilière",
+    description: "Commercialisation, intermédiation et suivi de mandats immobiliers."
   }
 ];
 

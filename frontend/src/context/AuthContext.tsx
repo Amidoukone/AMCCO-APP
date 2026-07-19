@@ -60,7 +60,7 @@ function resolveRoleFromMemberships(
     return "OWNER";
   }
 
-  throw new Error("Role utilisateur invalide pour la session active.");
+  throw new Error("Rôle utilisateur invalide pour la session active.");
 }
 
 function toLoginUser(me: Awaited<ReturnType<typeof meRequest>>): LoginUser {

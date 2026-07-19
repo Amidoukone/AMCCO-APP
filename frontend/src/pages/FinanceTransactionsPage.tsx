@@ -64,7 +64,7 @@ const STORE_OPERATION_LABELS: Record<StoreOperationKind, string> = {
   STOCK_PURCHASE: "Achat stock",
   SUPPLIER_PAYMENT: "Paiement fournisseur",
   CUSTOMER_RETURN: "Retour client",
-  DISCOUNT_ADJUSTMENT: "Remise / ecart",
+  DISCOUNT_ADJUSTMENT: "Remise / écart",
   INVENTORY_ADJUSTMENT: "Ajustement inventaire",
   INTERNAL_TRANSFER: "Transfert interne",
   STORE_EXPENSE: "Charge magasin"
@@ -254,8 +254,8 @@ const FOOD_OPERATION_LABELS: Record<FoodOperationKind, string> = {
   PRODUCT_SALE: "Vente produit",
   PRODUCT_PURCHASE: "Achat stock",
   SUPPLIER_PAYMENT: "Paiement fournisseur",
-  STOCK_LOSS: "Perte / peremption",
-  COLD_CHAIN_EXPENSE: "Chaine du froid",
+  STOCK_LOSS: "Perte / péremption",
+  COLD_CHAIN_EXPENSE: "Chaîne du froid",
   PACKAGING_EXPENSE: "Emballage",
   CUSTOMER_REFUND: "Remboursement client"
 };
@@ -368,7 +368,7 @@ const RENTAL_OPERATION_LABELS: Record<RentalOperationKind, string> = {
   SERVICE_CHARGE_INCOME: "Charges recuperees",
   MAINTENANCE_EXPENSE: "Maintenance",
   PROPERTY_EXPENSE: "Charge bien",
-  OWNER_PAYOUT: "Reversement proprietaire"
+  OWNER_PAYOUT: "Reversement propriétaire"
 };
 const RENTAL_NUMERIC_METADATA_FIELDS = new Set([
   "monthsCount",
@@ -478,14 +478,14 @@ type HotelOperationKind =
   | "GUEST_REFUND";
 const HOTEL_OPERATION_LABELS: Record<HotelOperationKind, string> = {
   ROOM_PAYMENT: "Paiement chambre",
-  BOOKING_DEPOSIT: "Acompte reservation",
+  BOOKING_DEPOSIT: "Acompte réservation",
   RESTAURANT_SALE: "Restauration",
   EVENT_SERVICE: "Evenement / salle",
   LAUNDRY_SERVICE: "Blanchisserie",
   ROOM_MAINTENANCE: "Maintenance chambre",
   SUPPLIER_PAYMENT: "Paiement fournisseur",
   COMMISSION_FEE: "Commission",
-  TAX_PAYMENT: "Taxe sejour",
+  TAX_PAYMENT: "Taxe séjour",
   GUEST_REFUND: "Remboursement client"
 };
 const HOTEL_NUMERIC_METADATA_FIELDS = new Set([
@@ -640,10 +640,10 @@ const WATER_OPERATION_LABELS: Record<WaterOperationKind, string> = {
   CONNECTION_FEE: "Frais branchement",
   SUBSIDY_INCOME: "Subvention / appui",
   CHEMICAL_PURCHASE: "Produit traitement",
-  ENERGY_PAYMENT: "Energie",
+  ENERGY_PAYMENT: "Énergie",
   MAINTENANCE_EXPENSE: "Maintenance",
-  QUALITY_TEST_EXPENSE: "Analyse qualite",
-  NETWORK_REPAIR: "Reparation reseau",
+  QUALITY_TEST_EXPENSE: "Analyse qualité",
+  NETWORK_REPAIR: "Réparation réseau",
   SUPPLIER_PAYMENT: "Paiement fournisseur"
 };
 const WATER_NUMERIC_METADATA_FIELDS = new Set([
@@ -800,8 +800,8 @@ const AGENCY_OPERATION_LABELS: Record<AgencyOperationKind, string> = {
   MANDATE_FEE: "Frais mandat",
   VISIT_FEE: "Frais visite",
   FILE_FEE: "Frais dossier",
-  ADVERTISING_EXPENSE: "Publicite",
-  FIELD_VISIT_EXPENSE: "Deplacement visite",
+  ADVERTISING_EXPENSE: "Publicité",
+  FIELD_VISIT_EXPENSE: "Déplacement visite",
   BROKER_PAYOUT: "Reversement courtier",
   DOCUMENT_EXPENSE: "Frais document",
   CUSTOMER_REFUND: "Remboursement client",
@@ -949,7 +949,7 @@ type AgricultureOperationKind = "INPUT_PURCHASE" | "FIELD_EXPENSE" | "HARVEST_SA
 const AGRICULTURE_OPERATION_LABELS: Record<AgricultureOperationKind, string> = {
   INPUT_PURCHASE: "Achat intrants",
   FIELD_EXPENSE: "Travaux champ",
-  HARVEST_SALE: "Vente recolte",
+  HARVEST_SALE: "Vente récolte",
   SUPPORT_INCOME: "Appui / subvention"
 };
 const AGRICULTURE_NUMERIC_METADATA_FIELDS = new Set([
@@ -1021,7 +1021,7 @@ type BtpOperationKind =
   | "SITE_EXPENSE";
 const BTP_OPERATION_LABELS: Record<BtpOperationKind, string> = {
   CLIENT_PAYMENT: "Encaissement client",
-  MATERIAL_PURCHASE: "Achat materiaux",
+  MATERIAL_PURCHASE: "Achat matériaux",
   LABOR_PAYMENT: "Main-d'oeuvre",
   EQUIPMENT_RENTAL: "Location engin",
   SUBCONTRACTING: "Sous-traitance",
@@ -1221,7 +1221,7 @@ const LIVESTOCK_OPERATION_LABELS: Record<LivestockOperationKind, string> = {
   ANIMAL_PURCHASE: "Achat animaux",
   FEED_PURCHASE: "Achat aliment",
   VET_CARE: "Soins / vaccin",
-  FARM_EXPENSE: "Charge elevage",
+  FARM_EXPENSE: "Charge élevage",
   ANIMAL_SALE: "Vente animaux",
   PRODUCT_SALE: "Vente produit",
   SUPPORT_INCOME: "Appui / subvention"
@@ -3032,196 +3032,196 @@ function deriveSectorAmount(
 
 function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
   return kind === "ITEM_EXIT"
-    ? "Vente: renseignez la quantite, le prix de vente et le versement."
+    ? "Vente: renseignez la quantité, le prix de vente et le versement."
     : kind === "ITEM_ENTRY"
-      ? "Acquisition: renseignez la quantite, le prix d'achat et le fournisseur."
+      ? "Acquisition: renseignez la quantité, le prix d'achat et le fournisseur."
       : "Transaction globale: renseignez seulement le montant et la description utile.";
 }
 
 function getStoreFormModeLabel(kind: StoreOperationKind): string {
   if (kind === "STORE_SALE") {
-    return "Vente caisse: rayon, article, reference, caisse, caissier, quantite, prix de vente, remise et ticket.";
+    return "Vente caisse: rayon, article, référence, caisse, caissier, quantité, prix de vente, remise et ticket.";
   }
   if (kind === "STOCK_PURCHASE") {
-    return "Achat stock: rayon, article, quantite, prix d'achat, fournisseur et facture.";
+    return "Achat stock: rayon, article, quantité, prix d'achat, fournisseur et facture.";
   }
   if (kind === "SUPPLIER_PAYMENT") {
-    return "Paiement fournisseur: fournisseur, facture, montant et reference de paiement.";
+    return "Paiement fournisseur: fournisseur, facture, montant et référence de paiement.";
   }
   if (kind === "CUSTOMER_RETURN") {
-    return "Retour client: article, ticket, quantite retour, montant et client concerne.";
+    return "Retour client: article, ticket, quantité retour, montant et client concerné.";
   }
   if (kind === "DISCOUNT_ADJUSTMENT") {
-    return "Remise / ecart: caisse, caissier, article ou ticket et montant de la remise.";
+    return "Remise / écart: caisse, caissier, article ou ticket et montant de la remise.";
   }
   if (kind === "INVENTORY_ADJUSTMENT") {
-    return "Ajustement inventaire: article, emplacement, ecart de quantite, cout unitaire et motif.";
+    return "Ajustement inventaire: article, emplacement, écart de quantité, coût unitaire et motif.";
   }
   if (kind === "INTERNAL_TRANSFER") {
-    return "Transfert interne: article, quantite, reference transfert, origine et destination.";
+    return "Transfert interne: article, quantité, référence transfert, origine et destination.";
   }
-  return "Charge magasin: nature de charge, fournisseur, facture, montant et reference de paiement.";
+  return "Charge magasin: nature de charge, fournisseur, facture, montant et référence de paiement.";
 }
 
 function getFoodFormModeLabel(kind: FoodOperationKind): string {
   if (kind === "PRODUCT_SALE") {
-    return "Vente produit: famille, produit, lot, DLC, quantite, prix de vente, client et reference paiement.";
+    return "Vente produit: famille, produit, lot, DLC, quantité, prix de vente, client et référence paiement.";
   }
   if (kind === "PRODUCT_PURCHASE") {
-    return "Achat stock: famille, produit, lot, DLC, quantite, prix d'achat, fournisseur et facture.";
+    return "Achat stock: famille, produit, lot, DLC, quantité, prix d'achat, fournisseur et facture.";
   }
   if (kind === "SUPPLIER_PAYMENT") {
-    return "Paiement fournisseur: fournisseur, facture, montant et reference de paiement.";
+    return "Paiement fournisseur: fournisseur, facture, montant et référence de paiement.";
   }
   if (kind === "STOCK_LOSS") {
-    return "Perte / peremption: lot, DLC, quantite perdue, cout unitaire et motif de retrait.";
+    return "Perte / péremption: lot, DLC, quantité perdue, coût unitaire et motif de retrait.";
   }
   if (kind === "COLD_CHAIN_EXPENSE") {
-    return "Chaine du froid: zone de stockage, temperature, prestataire, facture et montant.";
+    return "Chaîne du froid: zone de stockage, température, prestataire, facture et montant.";
   }
   if (kind === "PACKAGING_EXPENSE") {
     return "Emballage: famille, produit, fournisseur, facture et montant.";
   }
-  return "Remboursement client: produit, lot, quantite, prix de vente, client et reference paiement.";
+  return "Remboursement client: produit, lot, quantité, prix de vente, client et référence paiement.";
 }
 
 function getAgricultureFormModeLabel(kind: AgricultureOperationKind): string {
   if (kind === "INPUT_PURCHASE") {
-    return "Achat intrants: campagne, parcelle, type de champ, intrant, quantite et prix unitaire.";
+    return "Achat intrants: campagne, parcelle, type de champ, intrant, quantité et prix unitaire.";
   }
   if (kind === "FIELD_EXPENSE") {
     return "Travaux champ: campagne, parcelle, surface et nature des travaux agricoles.";
   }
   if (kind === "HARVEST_SALE") {
-    return "Vente recolte: culture, quantite vendue, prix unitaire et acheteur.";
+    return "Vente récolte: culture, quantité vendue, prix unitaire et acheteur.";
   }
   return "Appui / subvention: campagne, parcelle et source de financement.";
 }
 
 function getBtpFormModeLabel(kind: BtpOperationKind): string {
   if (kind === "CLIENT_PAYMENT") {
-    return "Encaissement client: chantier, marche/devis, client, situation de travaux et avancement.";
+    return "Encaissement client: chantier, marché/devis, client, situation de travaux et avancement.";
   }
   if (kind === "MATERIAL_PURCHASE") {
-    return "Achat materiaux: chantier, lot, materiau, quantite, prix unitaire et fournisseur.";
+    return "Achat matériaux: chantier, lot, matériau, quantité, prix unitaire et fournisseur.";
   }
   if (kind === "LABOR_PAYMENT") {
-    return "Main-d'oeuvre: chantier, lot, equipe, nombre d'ouvriers, jours travailles et taux journalier.";
+    return "Main-d'oeuvre: chantier, lot, équipe, nombre d'ouvriers, jours travailles et taux journalier.";
   }
   if (kind === "EQUIPMENT_RENTAL") {
     return "Location engin: chantier, engin, heures ou vacations, taux horaire et fournisseur.";
   }
   if (kind === "SUBCONTRACTING") {
-    return "Sous-traitance: chantier, lot, sous-traitant, quantite ou avancement, facture et retenue.";
+    return "Sous-traitance: chantier, lot, sous-traitant, quantité ou avancement, facture et retenue.";
   }
-  return "Charge chantier: depense generale, reserve, approvisionnement ou autre charge rattachee au chantier.";
+  return "Charge chantier: dépense générale, réserve, approvisionnement ou autre charge rattachée au chantier.";
 }
 
 function getRentalFormModeLabel(kind: RentalOperationKind): string {
   if (kind === "RENT_PAYMENT") {
-    return "Paiement loyer: bien, lot, locataire, bail, periode, nombre de mois, loyer mensuel et charges.";
+    return "Paiement loyer: bien, lot, locataire, bail, période, nombre de mois, loyer mensuel et charges.";
   }
   if (kind === "SECURITY_DEPOSIT") {
-    return "Caution: bien, lot, locataire, bail, montant caution et reference du paiement.";
+    return "Caution: bien, lot, locataire, bail, montant caution et référence du paiement.";
   }
   if (kind === "ADVANCE_PAYMENT") {
-    return "Avance loyer: periode couverte, nombre de mois, loyer mensuel et reference du paiement.";
+    return "Avance loyer: période couverte, nombre de mois, loyer mensuel et référence du paiement.";
   }
   if (kind === "SERVICE_CHARGE_INCOME") {
-    return "Charges recuperees: periode, nature de charge, montant des charges et reference du paiement.";
+    return "Charges recuperees: période, nature de charge, montant des charges et référence du paiement.";
   }
   if (kind === "MAINTENANCE_EXPENSE") {
-    return "Maintenance: type d'intervention, prestataire, facture et montant de la depense.";
+    return "Maintenance: type d'intervention, prestataire, facture et montant de la dépense.";
   }
   if (kind === "PROPERTY_EXPENSE") {
-    return "Charge bien: nature de charge, prestataire, facture et montant rattache au bien.";
+    return "Charge bien: nature de charge, prestataire, facture et montant rattaché au bien.";
   }
-  return "Reversement proprietaire: proprietaire, periode, montant reverse et reference du paiement.";
+  return "Reversement propriétaire: propriétaire, période, montant reverse et référence du paiement.";
 }
 
 function getHotelFormModeLabel(kind: HotelOperationKind): string {
   if (kind === "ROOM_PAYMENT") {
-    return "Paiement chambre: reservation, sejour, client, chambre, dates, nuitees et tarif par nuit.";
+    return "Paiement chambre: réservation, séjour, client, chambre, dates, nuitées et tarif par nuit.";
   }
   if (kind === "BOOKING_DEPOSIT") {
-    return "Acompte reservation: reservation, client, chambre, dates et montant de l'acompte.";
+    return "Acompte réservation: réservation, client, chambre, dates et montant de l'acompte.";
   }
   if (kind === "RESTAURANT_SALE") {
-    return "Restauration: reservation ou client, nombre de repas, prix unitaire et reference de paiement.";
+    return "Restauration: réservation ou client, nombre de repas, prix unitaire et référence de paiement.";
   }
   if (kind === "EVENT_SERVICE") {
-    return "Evenement / salle: evenement, quantite de service, prix unitaire et facture.";
+    return "Evenement / salle: evenement, quantité de service, prix unitaire et facture.";
   }
   if (kind === "LAUNDRY_SERVICE") {
-    return "Blanchisserie: quantite de service, prix unitaire, chambre ou sejour rattache.";
+    return "Blanchisserie: quantité de service, prix unitaire, chambre ou séjour rattaché.";
   }
   if (kind === "ROOM_MAINTENANCE") {
     return "Maintenance chambre: chambre, service, fournisseur, facture et montant de charge.";
   }
   if (kind === "SUPPLIER_PAYMENT") {
-    return "Paiement fournisseur: service, fournisseur, facture, montant et reference de paiement.";
+    return "Paiement fournisseur: service, fournisseur, facture, montant et référence de paiement.";
   }
   if (kind === "COMMISSION_FEE") {
-    return "Commission: reservation, agence ou plateforme, montant commission et paiement.";
+    return "Commission: réservation, agence ou plateforme, montant commission et paiement.";
   }
   if (kind === "TAX_PAYMENT") {
-    return "Taxe sejour: reservation, client, service, montant taxe et reference de paiement.";
+    return "Taxe séjour: réservation, client, service, montant taxe et référence de paiement.";
   }
-  return "Remboursement client: reservation, sejour, client, chambre, montant et reference de paiement.";
+  return "Remboursement client: réservation, séjour, client, chambre, montant et référence de paiement.";
 }
 
 function getWaterFormModeLabel(kind: WaterOperationKind): string {
   if (kind === "WATER_BILLING") {
-    return "Facture eau: site, zone, compteur, abonne, periode, index, volume m3, prix du m3 et paiement.";
+    return "Facture eau: site, zone, compteur, abonne, période, index, volume m3, prix du m3 et paiement.";
   }
   if (kind === "BULK_WATER_SALE") {
     return "Vente en gros: site, zone, client, volume m3, prix unitaire, facture et paiement.";
   }
   if (kind === "CONNECTION_FEE") {
-    return "Branchement: site, zone, abonne, dossier de raccordement, frais et reference paiement.";
+    return "Branchement: site, zone, abonne, dossier de raccordement, frais et référence paiement.";
   }
   if (kind === "SUBSIDY_INCOME") {
-    return "Subvention / appui: site, zone, source, montant et reference de paiement.";
+    return "Subvention / appui: site, zone, source, montant et référence de paiement.";
   }
   if (kind === "CHEMICAL_PURCHASE") {
-    return "Produit de traitement: site, produit, quantite, prix unitaire, fournisseur et facture.";
+    return "Produit de traitement: site, produit, quantité, prix unitaire, fournisseur et facture.";
   }
   if (kind === "ENERGY_PAYMENT") {
-    return "Energie: site, source energie, quantite, prix unitaire, fournisseur et facture.";
+    return "Énergie: site, source énergie, quantité, prix unitaire, fournisseur et facture.";
   }
   if (kind === "MAINTENANCE_EXPENSE") {
-    return "Maintenance: site, equipement, type de maintenance, prestataire, facture et montant.";
+    return "Maintenance: site, équipement, type de maintenance, prestataire, facture et montant.";
   }
   if (kind === "QUALITY_TEST_EXPENSE") {
-    return "Analyse qualite: site, reference analyse, resultat qualite, laboratoire et montant.";
+    return "Analyse qualité: site, référence analyse, résultat qualité, laboratoire et montant.";
   }
   if (kind === "NETWORK_REPAIR") {
-    return "Reparation reseau: zone, equipement ou conduite, incident, prestataire, facture et montant.";
+    return "Réparation réseau: zone, équipement ou conduite, incident, prestataire, facture et montant.";
   }
-  return "Paiement fournisseur: site, zone, fournisseur, facture, montant et reference paiement.";
+  return "Paiement fournisseur: site, zone, fournisseur, facture, montant et référence paiement.";
 }
 
 function getAgencyFormModeLabel(kind: AgencyOperationKind): string {
   if (kind === "SALE_COMMISSION") {
-    return "Commission vente: mandat, bien, vendeur, acquereur, prix de vente, taux et reference paiement.";
+    return "Commission vente: mandat, bien, vendeur, acquéreur, prix de vente, taux et référence paiement.";
   }
   if (kind === "RENTAL_COMMISSION") {
     return "Commission location: mandat, bien, bailleur, locataire, valeur du bail ou loyer, taux et paiement.";
   }
   if (kind === "MANDATE_FEE") {
-    return "Frais mandat: mandat, bien, proprietaire, document rattache, montant frais et paiement.";
+    return "Frais mandat: mandat, bien, propriétaire, document rattaché, montant frais et paiement.";
   }
   if (kind === "VISIT_FEE") {
-    return "Frais visite: mandat, bien, prospect, nombre de visites, prix unitaire et reference paiement.";
+    return "Frais visite: mandat, bien, prospect, nombre de visites, prix unitaire et référence paiement.";
   }
   if (kind === "FILE_FEE") {
     return "Frais dossier: mandat, client, document ou affaire, montant et paiement.";
   }
   if (kind === "ADVERTISING_EXPENSE") {
-    return "Publicite: mandat, bien, canal publicitaire, prestataire, facture et montant de depense.";
+    return "Publicité: mandat, bien, canal publicitaire, prestataire, facture et montant de dépense.";
   }
   if (kind === "FIELD_VISIT_EXPENSE") {
-    return "Deplacement visite: mandat, bien, nombre de sorties, cout unitaire, prestataire et facture.";
+    return "Déplacement visite: mandat, bien, nombre de sorties, coût unitaire, prestataire et facture.";
   }
   if (kind === "BROKER_PAYOUT") {
     return "Reversement courtier: mandat, affaire, courtier ou apporteur, montant reverse et paiement.";
@@ -3230,45 +3230,45 @@ function getAgencyFormModeLabel(kind: AgencyOperationKind): string {
     return "Frais document: mandat, bien, document administratif, prestataire, facture et montant.";
   }
   if (kind === "CUSTOMER_REFUND") {
-    return "Remboursement client: mandat, client, affaire, montant rembourse et reference paiement.";
+    return "Remboursement client: mandat, client, affaire, montant rembourse et référence paiement.";
   }
-  return "Charge agence: mandat ou bien rattache, fournisseur, facture, montant et paiement.";
+  return "Charge agence: mandat ou bien rattaché, fournisseur, facture, montant et paiement.";
 }
 
 function getFishFarmingFormModeLabel(kind: FishFarmingOperationKind): string {
   if (kind === "FINGERLING_PURCHASE") {
-    return "Achat alevins: bassin, cycle, lot, quantite et prix unitaire.";
+    return "Achat alevins: bassin, cycle, lot, quantité et prix unitaire.";
   }
   if (kind === "FEED_PURCHASE") {
-    return "Achat aliment: bassin, cycle, aliment, quantite, unite et fournisseur.";
+    return "Achat aliment: bassin, cycle, aliment, quantité, unité et fournisseur.";
   }
   if (kind === "POND_EXPENSE") {
-    return "Charge bassin: intervention, intrant, mortalite ou qualite d'eau si applicable.";
+    return "Charge bassin: intervention, intrant, mortalité ou qualité d'eau si applicable.";
   }
   if (kind === "FISH_SALE") {
-    return "Vente poisson: bassin, cycle, quantite vendue, prix unitaire et acheteur.";
+    return "Vente poisson: bassin, cycle, quantité vendue, prix unitaire et acheteur.";
   }
   return "Appui / subvention: bassin, cycle et source de financement.";
 }
 
 function getLivestockFormModeLabel(kind: LivestockOperationKind): string {
   if (kind === "ANIMAL_PURCHASE") {
-    return "Achat animaux: troupeau, lot, espece, nombre d'animaux et prix unitaire.";
+    return "Achat animaux: troupeau, lot, espèce, nombre d'animaux et prix unitaire.";
   }
   if (kind === "FEED_PURCHASE") {
-    return "Achat aliment: troupeau, lot, aliment, quantite, unite et fournisseur.";
+    return "Achat aliment: troupeau, lot, aliment, quantité, unité et fournisseur.";
   }
   if (kind === "VET_CARE") {
-    return "Soins / vaccin: troupeau, lot, soin, animaux concernes et etat sanitaire.";
+    return "Soins / vaccin: troupeau, lot, soin, animaux concernés et état sanitaire.";
   }
   if (kind === "FARM_EXPENSE") {
-    return "Charge elevage: alimentation, intrant, mortalite ou observation sanitaire si applicable.";
+    return "Charge élevage: alimentation, intrant, mortalité ou observation sanitaire si applicable.";
   }
   if (kind === "ANIMAL_SALE") {
     return "Vente animaux: troupeau, lot, nombre vendu, prix unitaire et acheteur.";
   }
   if (kind === "PRODUCT_SALE") {
-    return "Vente produit: produit d'elevage, quantite vendue, prix unitaire et acheteur.";
+    return "Vente produit: produit d'élevage, quantité vendue, prix unitaire et acheteur.";
   }
   return "Appui / subvention: troupeau, lot et source de financement.";
 }
@@ -4321,7 +4321,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   async function handleAddProof(transactionId: string): Promise<void> {
     const selectedFile = proofFiles[transactionId];
     if (!selectedFile) {
-      setErrorMessage("Selectionne un fichier de preuve.");
+      setErrorMessage("Sélectionne un fichier de preuve.");
       return;
     }
 
@@ -4378,7 +4378,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         });
       });
 
-      setSuccessMessage("Preuve ajoutee.");
+      setSuccessMessage("Preuve ajoutée.");
       setProofFiles((prev) => ({ ...prev, [transactionId]: null }));
       setProofsByTransaction((prev) => ({
         ...prev,
@@ -4704,7 +4704,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             {selectedActivityCode === "GENERAL_STORE" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation magasin</span>
+                  <span>Opération magasin</span>
                   <select
                     value={storeOperationKind}
                     onChange={(event) => {
@@ -4743,7 +4743,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette magasin" : "Depense magasin"}
+                    {transactionForm.type === "CASH_IN" ? "Recette magasin" : "Dépense magasin"}
                   </strong>
                 </div>
               </>
@@ -4822,7 +4822,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             ) : selectedActivityCode === "FOOD" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation alimentaire</span>
+                  <span>Opération alimentaire</span>
                   <select
                     value={foodOperationKind}
                     onChange={(event) => {
@@ -4860,14 +4860,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette alimentaire" : "Depense alimentaire"}
+                    {transactionForm.type === "CASH_IN" ? "Recette alimentaire" : "Dépense alimentaire"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "AGRICULTURE" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation agricole</span>
+                  <span>Opération agricole</span>
                   <select
                     value={agricultureOperationKind}
                     onChange={(event) => {
@@ -4902,14 +4902,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette agricole" : "Depense agricole"}
+                    {transactionForm.type === "CASH_IN" ? "Recette agricole" : "Dépense agricole"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "BTP" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation BTP</span>
+                  <span>Opération BTP</span>
                   <select
                     value={btpOperationKind}
                     onChange={(event) => {
@@ -4946,14 +4946,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette chantier" : "Depense chantier"}
+                    {transactionForm.type === "CASH_IN" ? "Recette chantier" : "Dépense chantier"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "RENTAL" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation locative</span>
+                  <span>Opération locative</span>
                   <select
                     value={rentalOperationKind}
                     onChange={(event) => {
@@ -4991,14 +4991,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette locative" : "Depense locative"}
+                    {transactionForm.type === "CASH_IN" ? "Recette locative" : "Dépense locative"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "HOTEL_LODGING" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation hoteliere</span>
+                  <span>Opération hôtelière</span>
                   <select
                     value={hotelOperationKind}
                     onChange={(event) => {
@@ -5039,14 +5039,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette hoteliere" : "Depense hoteliere"}
+                    {transactionForm.type === "CASH_IN" ? "Recette hôtelière" : "Dépense hôtelière"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "WATER" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation eau potable</span>
+                  <span>Opération eau potable</span>
                   <select
                     value={waterOperationKind}
                     onChange={(event) => {
@@ -5087,14 +5087,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette eau" : "Depense exploitation eau"}
+                    {transactionForm.type === "CASH_IN" ? "Recette eau" : "Dépense exploitation eau"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation agence immobiliere</span>
+                  <span>Opération agence immobilière</span>
                   <select
                     value={agencyOperationKind}
                     onChange={(event) => {
@@ -5136,14 +5136,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette agence" : "Depense agence"}
+                    {transactionForm.type === "CASH_IN" ? "Recette agence" : "Dépense agence"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "FISH_FARMING" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation piscicole</span>
+                  <span>Opération piscicole</span>
                   <select
                     value={fishFarmingOperationKind}
                     onChange={(event) => {
@@ -5179,14 +5179,14 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette piscicole" : "Depense piscicole"}
+                    {transactionForm.type === "CASH_IN" ? "Recette piscicole" : "Dépense piscicole"}
                   </strong>
                 </div>
               </>
             ) : selectedActivityCode === "LIVESTOCK" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Operation elevage</span>
+                  <span>Opération élevage</span>
                   <select
                     value={livestockOperationKind}
                     onChange={(event) => {
@@ -5224,7 +5224,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette elevage" : "Depense elevage"}
+                    {transactionForm.type === "CASH_IN" ? "Recette élevage" : "Dépense élevage"}
                   </strong>
                 </div>
               </>
@@ -5622,7 +5622,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                             </button>
                           ) : null}
                         </div>
-                        <details className="table-inline-details">
+                        <details className="table-inline-détails">
                           <summary className="table-inline-summary">Voir plus</summary>
                           <div className="table-inline-content">
                             <p className="hint">
@@ -6019,7 +6019,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       <ConfirmDialog
         open={transactionPendingDelete !== null}
         title="Confirmer la suppression de la transaction"
-        description="Cette action supprime la transaction sélectionnée de la vue financière."
+        description="Cette action supprimé la transaction sélectionnée de la vue financière."
         objectLabel="Transaction concernée"
         objectName={transactionPendingDelete?.description?.trim() || transactionPendingDelete?.id || ""}
         impactText={

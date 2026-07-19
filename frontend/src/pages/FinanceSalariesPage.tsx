@@ -1317,7 +1317,7 @@ export function FinanceSalariesPage(): JSX.Element {
                             </>
                           ) : null}
                         </div>
-                        <details className="table-inline-details">
+                        <details className="table-inline-détails">
                           <summary className="table-inline-summary">Voir plus</summary>
                           <div className="table-inline-content">
                             <p className="hint">
@@ -1621,7 +1621,7 @@ export function FinanceSalariesPage(): JSX.Element {
       <ConfirmDialog
         open={salaryPendingDelete !== null}
         title="Confirmer la suppression du salaire"
-        description="Cette action supprime l'élément de paie sélectionné de la liste salariale."
+        description="Cette action supprimé l'élément de paie sélectionné de la liste salariale."
         objectLabel="Salaire concerné"
         objectName={
           salaryPendingDelete

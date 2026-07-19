@@ -24,7 +24,7 @@ export function formatAccountGovernanceDetails(input: {
   const lines = [formatAccountScopeLabel(input)];
 
   if (input.accountRef) {
-    lines.push(`Reference: ${input.accountRef}`);
+    lines.push(`Référence: ${input.accountRef}`);
   }
 
   if (input.activityCode) {

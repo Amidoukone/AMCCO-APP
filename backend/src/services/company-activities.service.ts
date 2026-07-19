@@ -26,7 +26,7 @@ type LegacyReclassificationScope = "TRANSACTIONS" | "TASKS" | "BOTH";
 
 function ensureAdminActivityAccess(role: RoleCode): void {
   if (role !== "OWNER" && role !== "SYS_ADMIN") {
-    throw new HttpError(403, "Permissions insuffisantes pour administrer les activites.");
+    throw new HttpError(403, "Permissions insuffisantes pour administrer les activités.");
   }
 }
 
@@ -64,7 +64,7 @@ export async function ensureCompanyActivityEnabledOrThrow(
   if (!isEnabled) {
     throw new HttpError(
       400,
-      "Cette activite est desactivee pour cette entreprise. Contactez un administrateur."
+      "Cette activité est désactivée pour cette entreprise. Contactez un administrateur."
     );
   }
 }
@@ -83,11 +83,11 @@ export async function updateCompanyActivityState(
   const current = currentItems.find((item) => item.code === input.activityCode);
 
   if (!current) {
-    throw new HttpError(404, "Activite introuvable.");
+    throw new HttpError(404, "Activité introuvable.");
   }
 
   if (current.isEnabled && !input.isEnabled && enabledCount <= 1) {
-    throw new HttpError(400, "Au moins une activite doit rester active pour l'entreprise.");
+    throw new HttpError(400, "Au moins une activité doit rester active pour l'entreprise.");
   }
 
   await upsertCompanyActivity({
@@ -112,7 +112,7 @@ export async function updateCompanyActivityState(
   const updatedItems = await listCompanyActivities(actor.companyId);
   const item = updatedItems.find((row) => row.code === input.activityCode);
   if (!item) {
-    throw new HttpError(500, "Impossible de recharger l'activite mise a jour.");
+    throw new HttpError(500, "Impossible de recharger l'activité mise à jour.");
   }
 
   return item;

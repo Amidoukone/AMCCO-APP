@@ -30,7 +30,7 @@ const updateUserSchema = z
     isActive: z.boolean().optional()
   })
   .refine((value) => typeof value.fullName === "string" || typeof value.isActive === "boolean", {
-    message: "Au moins un champ doit etre fourni."
+    message: "Au moins un champ doit être fourni."
   });
 
 const changeRoleSchema = z.object({

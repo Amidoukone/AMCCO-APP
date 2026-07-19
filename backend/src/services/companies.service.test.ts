@@ -187,6 +187,76 @@ describe("companies.service", () => {
     expect(result.company.code).toBe("MALI-SERVICES");
   });
 
+  it("repairs mojibake text before creating the company", async () => {
+    vi.mocked(findCompanyByCode).mockResolvedValue(null);
+    vi.mocked(listCompanyUsers).mockResolvedValue([]);
+    vi.mocked(listCompaniesForUser).mockResolvedValue([
+      {
+        company: {
+          id: "generated-company-id",
+          name: "Société Côte",
+          code: "SOCIETE-COTE",
+          legalName: null,
+          registrationNumber: null,
+          taxId: null,
+          email: null,
+          phone: null,
+          website: null,
+          addressLine1: null,
+          addressLine2: null,
+          city: "Ségou",
+          stateRegion: null,
+          postalCode: null,
+          country: "Côte d'Ivoire",
+          businessSector: "Hôtellerie",
+          contactFullName: "Amadou Koné",
+          contactJobTitle: null,
+          isActive: true,
+          createdAt: "2026-04-22T00:00:00.000Z",
+          updatedAt: "2026-04-22T00:00:00.000Z"
+        },
+        role: "OWNER"
+      }
+    ]);
+
+    vi.mocked(randomUUID)
+      .mockReturnValueOnce("generated-company-id")
+      .mockReturnValueOnce("audit-encoding-1");
+
+    await createCompanyForActor(
+      {
+        userId: "owner-1",
+        companyId: "company-source",
+        role: "OWNER",
+        email: "owner1@example.com"
+      },
+      {
+        name: "Soci\u00c3\u00a9t\u00c3\u00a9 C\u00c3\u00b4te",
+        code: "societe-cote",
+        city: "S\u00c3\u00a9gou",
+        country: "C\u00c3\u00b4te d'Ivoire",
+        businessSector: "H\u00c3\u00b4tellerie",
+        contactFullName: "Amadou Kon\u00c3\u00a9"
+      }
+    );
+
+    expect(createCompany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Société Côte",
+        code: "SOCIETE-COTE",
+        city: "Ségou",
+        country: "Côte d'Ivoire",
+        businessSector: "Hôtellerie",
+        contactFullName: "Amadou Koné"
+      })
+    );
+    expect(createAuditLogRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadataJson: expect.stringContaining("Côte d'Ivoire")
+      })
+    );
+  });
+
   it("updates a company and alerts owners when a sys admin performs the change", async () => {
     vi.mocked(findUserCompanyMembership)
       .mockResolvedValueOnce({
