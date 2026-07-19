@@ -10,6 +10,29 @@ const emptyStringToUndefined = (value: unknown) => {
   return value;
 };
 
+const escapedNewlinesToNewlines = (value: unknown) => {
+  const normalized = emptyStringToUndefined(value);
+  if (typeof normalized === "string") {
+    return normalized.replace(/\\n/g, "\n");
+  }
+  return normalized;
+};
+
+const booleanLike = (value: unknown) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return value;
+};
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
@@ -21,6 +44,9 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
   DATABASE_URL: z.string().startsWith("mysql://"),
   DB_POOL_LIMIT: z.coerce.number().int().min(1).max(100).default(10),
+  DB_SSL: z.preprocess(booleanLike, z.boolean()).default(false),
+  DB_SSL_REJECT_UNAUTHORIZED: z.preprocess(booleanLike, z.boolean()).default(true),
+  DB_SSL_CA: z.preprocess(escapedNewlinesToNewlines, z.string().optional()),
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(60000).default(900000),
   AUTH_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(10),
   IMAGEKIT_PUBLIC_KEY: z.preprocess(emptyStringToUndefined, z.string().optional()),

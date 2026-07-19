@@ -8,7 +8,7 @@ Application web centralisee, multi-entreprises, avec controle financier strict e
 
 - Frontend React TypeScript (PWA-ready)
 - Backend Express TypeScript
-- Base MySQL (local en dev, PlanetScale en production) avec acces natif `mysql2`
+- Base MySQL (local en dev, DigitalOcean Managed MySQL en production) avec acces natif `mysql2`
 - Stockage fichiers/ImageKit pour preuves et documents
 
 ## 3. Couches backend

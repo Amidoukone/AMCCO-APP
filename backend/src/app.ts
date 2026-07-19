@@ -19,6 +19,10 @@ import { meRouter } from "./routes/me.route.js";
 import { reportingRouter } from "./routes/reporting.route.js";
 import { tasksRouter } from "./routes/tasks.route.js";
 
+const corsOrigins = env.CORS_ORIGIN.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 export const app = express();
 
 app.use(requestIdMiddleware);
@@ -32,7 +36,7 @@ app.use(
 app.use(helmet());
 app.use(
   cors({
-    origin: env.CORS_ORIGIN
+    origin: corsOrigins.length > 1 ? corsOrigins : corsOrigins[0]
   })
 );
 app.use(express.json({ limit: "2mb" }));

@@ -16,6 +16,11 @@ Ce repo contient une base professionnelle pour construire:
 - `frontend/`: interface web PWA-ready
 - `docs/`: architecture, roadmap, domaine metier, decisions techniques
 
+## Mise en production
+
+La procedure Render + Netlify + DigitalOcean Managed MySQL + ImageKit +
+Squarespace est detaillee dans `docs/18_production_deployment_runbook.md`.
+
 ## Prerequis
 
 - Node.js 20+

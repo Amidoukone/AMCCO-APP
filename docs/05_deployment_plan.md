@@ -10,7 +10,7 @@
 
 - frontend: Netlify
 - backend: Render
-- db: PlanetScale
+- db: DigitalOcean Managed MySQL
 - stockage fichiers: ImageKit
 
 ## Variables critiques
@@ -19,6 +19,7 @@
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
 - `CORS_ORIGIN`
+- `DB_SSL`, `DB_SSL_CA`, `DB_SSL_REJECT_UNAUTHORIZED`
 - `IMAGEKIT_*` (a ajouter avec le module documents)
 
 ## Strategie release
@@ -31,7 +32,6 @@
 ## Prepa domaines (quand decide)
 
 - frontend: configuration DNS du domaine public dans Netlify
-- backend: sous-domaine API avec HTTPS force
+- backend: sous-domaine API avec HTTPS force (`api.groupenioumaladiady.com`)
 - mise a jour `CORS_ORIGIN` et URL API frontend
 - activation politique HSTS cote API
-

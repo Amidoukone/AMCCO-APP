@@ -2,6 +2,10 @@
   "name": "amcco-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <23",
+    "npm": ">=10"
+  },
   "workspaces": [
     "backend",
     "frontend"
@@ -14,4 +18,3 @@
     "typecheck": "npm run typecheck --workspaces"
   }
 }
-

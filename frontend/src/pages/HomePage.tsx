@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import amccoLogoUrl from "../../images/LOGO AMCCO.jpg.jpeg";
 import agricultureHeroUrl from "../../images/all-images-tractor-plowing-field-sunset11.jpg";
 import agricultureSectorUrl from "../../images/National-Mission-for-Sustainable-Agriculture.jpg";
 import livestockSectorUrl from "../../images/images (7).jpg";
 import fishSectorUrl from "../../images/0409-22407-pisciculture-le-cameroun-vise-une-augmentation-de-sa-production-de-10-000-tonnes-d-ici-2027_L.jpg";
 import transportSectorUrl from "../../images/--Shacman-F3000-6x4-Dump-Truck--5---163422-092525.jpg";
 
+const amccoLogoUrl = "/logo-amcco-web.jpg";
 const CONTACT_PHONE = "79072440";
 const CONTACT_PHONE_DISPLAY = "79 07 24 40";
 

@@ -11,6 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:init": "node dist/scripts/init-schema.js",
+    "db:init:dev": "tsx src/scripts/init-schema.ts",
     "seed:dev-user": "tsx src/scripts/seed-dev-user.ts",
     "roles:repair:dry-run": "tsx src/scripts/repair-membership-roles.ts",
     "roles:repair:apply": "tsx src/scripts/repair-membership-roles.ts --apply"

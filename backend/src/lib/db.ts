@@ -1,4 +1,4 @@
-import mysql, { type Pool, type RowDataPacket } from "mysql2/promise";
+import mysql, { type Pool, type PoolOptions, type RowDataPacket } from "mysql2/promise";
 import { env } from "../config/env.js";
 import { logger } from "./logger.js";
 
@@ -9,13 +9,22 @@ export function getDbPool(): Pool {
     return pool;
   }
 
-  pool = mysql.createPool({
+  const poolOptions: PoolOptions = {
     uri: env.DATABASE_URL,
     charset: "utf8mb4",
     waitForConnections: true,
     connectionLimit: env.DB_POOL_LIMIT,
     queueLimit: 0
-  });
+  };
+
+  if (env.DB_SSL) {
+    poolOptions.ssl = {
+      rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED,
+      ...(env.DB_SSL_CA ? { ca: env.DB_SSL_CA } : {})
+    };
+  }
+
+  pool = mysql.createPool(poolOptions);
 
   return pool;
 }

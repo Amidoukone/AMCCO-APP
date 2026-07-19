@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: amcco-backend
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: "npm ci --include=dev && npm --workspace backend run build && npm prune --omit=dev"
+    preDeployCommand: "npm --workspace backend run db:init"
+    startCommand: "npm --workspace backend run start"
+    healthCheckPath: /api/v1/health
+    maxShutdownDelaySeconds: 30
+    buildFilter:
+      paths:
+        - backend/**
+        - package.json
+        - package-lock.json
+        - render.yaml
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: /api/v1
+      - key: CORS_ORIGIN
+        value: "https://groupenioumaladiady.com,https://www.groupenioumaladiady.com"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_POOL_LIMIT
+        value: "10"
+      - key: DB_SSL
+        value: "true"
+      - key: DB_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: DB_SSL_CA
+        sync: false
+      - key: AUTH_RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: AUTH_RATE_LIMIT_MAX_ATTEMPTS
+        value: "10"
+      - key: IMAGEKIT_PUBLIC_KEY
+        sync: false
+      - key: IMAGEKIT_PRIVATE_KEY
+        sync: false
+      - key: IMAGEKIT_URL_ENDPOINT
+        sync: false
