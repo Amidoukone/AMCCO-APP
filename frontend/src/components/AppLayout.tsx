@@ -145,6 +145,7 @@ export function AppLayout(): JSX.Element {
 
   function handleActivityChange(nextValue: string): void {
     setSelectedActivityCode(isBusinessActivityCode(nextValue) ? nextValue : null);
+    setIsMobileMenuOpen(false);
   }
 
   async function handleCompanyChange(nextCompanyId: string): Promise<void> {
@@ -156,6 +157,7 @@ export function AppLayout(): JSX.Element {
     setIsSwitchingCompany(true);
     try {
       await switchCompany(nextCompanyId);
+      setIsMobileMenuOpen(false);
     } catch (error) {
       setCompanySwitchError(
         error instanceof ApiError
@@ -240,6 +242,9 @@ export function AppLayout(): JSX.Element {
             </div>
           ))}
           </nav>
+          <Link to="/" className="sidebar-public-link">
+            Site vitrine
+          </Link>
         </div>
       </aside>
 
@@ -333,6 +338,138 @@ export function AppLayout(): JSX.Element {
               >
                 X
               </button>
+            </div>
+            <div className="mobile-smart-menu">
+              <div className="mobile-menu-utility-grid" aria-label="Acces rapides">
+                <Link
+                  to="/"
+                  className="mobile-utility-link"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <span>Vitrine</span>
+                  <strong>Retour au site</strong>
+                </Link>
+                {canManageCompanies ? (
+                  <Link
+                    to="/admin/companies"
+                    className="mobile-utility-link"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span>Admin</span>
+                    <strong>{isBootstrapMode ? "Entreprise" : "Entreprises"}</strong>
+                  </Link>
+                ) : null}
+              </div>
+
+              <details className="mobile-menu-section" open>
+                <summary>
+                  <span>Navigation</span>
+                  <strong>{activeNavigationItem?.label ?? "Tableau de bord"}</strong>
+                </summary>
+                <nav className="mobile-drawer-nav mobile-smart-nav" aria-label="Navigation mobile">
+                  {Object.entries(navigationSections).map(([section, items]) => (
+                    <div key={section} className="mobile-drawer-section">
+                      <p className="sidebar-section-label">{section}</p>
+                      <div className="mobile-drawer-list">
+                        {items.map((item) => (
+                          <NavLink
+                            key={item.key}
+                            to={item.to}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={({ isActive }) =>
+                              isActive ? "mobile-drawer-link active" : "mobile-drawer-link"
+                            }
+                          >
+                            <span>{item.label}</span>
+                            {item.key === "alerts" && unreadAlertsCount > 0 ? (
+                              <strong>{unreadAlertsCount}</strong>
+                            ) : null}
+                          </NavLink>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </nav>
+              </details>
+
+              {!isBootstrapMode ? (
+                <details className="mobile-menu-section">
+                  <summary>
+                    <span>Secteur</span>
+                    <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
+                  </summary>
+                  {enabledActivities.length === 0 ? (
+                    <p className="hint">Aucun secteur actif pour cette entreprise.</p>
+                  ) : (
+                    <div className="mobile-choice-list" role="group" aria-label="Choisir un secteur">
+                      {enabledActivities.map((activity) => {
+                        const isSelected = selectedActivityCode === activity.code;
+                        return (
+                          <button
+                            key={activity.code}
+                            type="button"
+                            className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
+                            onClick={() => handleActivityChange(activity.code)}
+                            disabled={isLoadingActivities}
+                            aria-pressed={isSelected}
+                          >
+                            <strong>{activity.label}</strong>
+                            <span>{isSelected ? "Secteur actif" : "Choisir ce secteur"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </details>
+              ) : (
+                <div className="mobile-context-card">
+                  <span>Initialisation</span>
+                  <strong>Aucune entreprise active</strong>
+                </div>
+              )}
+
+              {activeCompany ? (
+                <details className="mobile-menu-section">
+                  <summary>
+                    <span>Entreprise</span>
+                    <strong>{activeCompany.name}</strong>
+                  </summary>
+                  <div className="mobile-choice-list" role="group" aria-label="Choisir une entreprise">
+                    {memberships.map((membership) => {
+                      const isSelected = membership.companyId === activeCompany.id;
+                      return (
+                        <button
+                          key={membership.companyId}
+                          type="button"
+                          className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
+                          onClick={() => void handleCompanyChange(membership.companyId)}
+                          disabled={isSwitchingCompany || isSelected}
+                          aria-pressed={isSelected}
+                        >
+                          <strong>{membership.companyName}</strong>
+                          <span>{isSelected ? "Entreprise active" : "Basculer"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </details>
+              ) : null}
+
+              {!isBootstrapMode ? (
+                <details className="mobile-menu-section">
+                  <summary>
+                    <span>Recherche</span>
+                    <strong>Pages et modules</strong>
+                  </summary>
+                  <GlobalSearch
+                    className="mobile-drawer-search"
+                    inputId="mobile-global-search-input-smart"
+                    navigation={visibleNavigation}
+                    role={user.role}
+                    selectedActivityCode={selectedActivityCode}
+                  />
+                </details>
+              ) : null}
             </div>
             {!isBootstrapMode ? (
               <GlobalSearch
