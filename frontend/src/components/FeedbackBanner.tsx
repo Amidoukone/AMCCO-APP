@@ -23,11 +23,15 @@ export function FeedbackBanner({
         </p>
       ) : null}
       {successMessage ? (
-        <p className="feedback-banner feedback-banner-success">
+        <p className="feedback-banner feedback-banner-success" role="status">
           {successMessage}
         </p>
       ) : null}
-      {isLoading ? <p className="feedback-banner feedback-banner-loading">{loadingLabel}</p> : null}
+      {isLoading ? (
+        <p className="feedback-banner feedback-banner-loading" role="status">
+          {loadingLabel}
+        </p>
+      ) : null}
     </div>
   );
 }

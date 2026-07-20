@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import agricultureHeroUrl from "../../images/all-images-tractor-plowing-field-sunset11.jpg";
@@ -62,8 +63,29 @@ const serviceLines = [
 
 export function HomePage(): JSX.Element {
   const { isAuthenticated } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const platformPath = isAuthenticated ? "/dashboard" : "/login";
   const platformLabel = isAuthenticated ? "Ouvrir la plateforme" : "Se connecter";
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
+
+  const closeMenu = (): void => setIsMenuOpen(false);
 
   return (
     <main className="home-page">
@@ -75,6 +97,16 @@ export function HomePage(): JSX.Element {
             <small>Courtage, conseil et orientation</small>
           </span>
         </Link>
+        <button
+          type="button"
+          className="home-menu-toggle"
+          aria-label={isMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-expanded={isMenuOpen}
+          aria-controls="home-mobile-menu"
+          onClick={() => setIsMenuOpen((isOpen) => !isOpen)}
+        >
+          <span aria-hidden="true" />
+        </button>
         <nav className="home-nav-links" aria-label="Navigation vitrine">
           <a href="#secteurs">Secteurs</a>
           <a href="#services">Services</a>
@@ -84,6 +116,57 @@ export function HomePage(): JSX.Element {
           </Link>
         </nav>
       </header>
+      <div
+        className={isMenuOpen ? "home-menu-backdrop is-open" : "home-menu-backdrop"}
+        onClick={closeMenu}
+        aria-hidden="true"
+      />
+      <aside
+        id="home-mobile-menu"
+        className={isMenuOpen ? "home-mobile-menu is-open" : "home-mobile-menu"}
+        aria-label="Menu du site"
+        aria-hidden={!isMenuOpen}
+      >
+        <div className="home-mobile-menu-header">
+          <Link className="home-brand" to="/" aria-label="Accueil AMCCO" onClick={closeMenu}>
+            <img src={amccoLogoUrl} alt="Logo AMCCO MBAG" />
+            <span>
+              <strong>AMCCO MBAG</strong>
+              <small>Courtage, conseil et orientation</small>
+            </span>
+          </Link>
+          <button
+            type="button"
+            className="home-menu-close"
+            onClick={closeMenu}
+            aria-label="Fermer le menu"
+          >
+            X
+          </button>
+        </div>
+        <nav className="home-mobile-nav" aria-label="Navigation mobile vitrine">
+          <a href="#secteurs" onClick={closeMenu}>
+            <span>Secteurs</span>
+            <strong>Domaines prioritaires</strong>
+          </a>
+          <a href="#services" onClick={closeMenu}>
+            <span>Services</span>
+            <strong>Courtage, conseil et pilotage</strong>
+          </a>
+          <a href="#contact" onClick={closeMenu}>
+            <span>Contact</span>
+            <strong>{CONTACT_PHONE_DISPLAY}</strong>
+          </a>
+        </nav>
+        <div className="home-mobile-menu-actions">
+          <Link className="home-mobile-primary" to={platformPath} onClick={closeMenu}>
+            {platformLabel}
+          </Link>
+          <a className="home-mobile-secondary" href={`tel:${CONTACT_PHONE}`} onClick={closeMenu}>
+            Appeler {CONTACT_PHONE_DISPLAY}
+          </a>
+        </div>
+      </aside>
 
       <section className="home-hero" aria-labelledby="home-title">
         <div className="home-hero-copy">
@@ -111,12 +194,6 @@ export function HomePage(): JSX.Element {
               <img src={amccoLogoUrl} alt="AMCCO MBAG" />
               <span>Présence multisectorielle</span>
             </div>
-          </div>
-          <div className="home-hero-metrics" aria-label="Domaines prioritaires">
-            <span>Agriculture</span>
-            <span>Élevage</span>
-            <span>Pisciculture</span>
-            <span>Transport</span>
           </div>
         </div>
       </section>

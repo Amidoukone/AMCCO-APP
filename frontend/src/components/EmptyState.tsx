@@ -12,7 +12,7 @@ export function EmptyState({
   onAction
 }: EmptyStateProps): JSX.Element {
   return (
-    <div className="empty-state">
+    <section className="empty-state" aria-label={title}>
       <div className="empty-state-mark" aria-hidden="true" />
       <div>
         <h3>{title}</h3>
@@ -23,6 +23,6 @@ export function EmptyState({
           {actionLabel}
         </button>
       ) : null}
-    </div>
+    </section>
   );
 }

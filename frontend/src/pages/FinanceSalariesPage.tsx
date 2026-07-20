@@ -1149,7 +1149,7 @@ export function FinanceSalariesPage(): JSX.Element {
               </button>
             </div>
           </div>
-          <div className="table-wrap">
+          <div className="table-wrap mobile-card-table">
             <table className="admin-table salaries-table">
               <thead>
                 <tr>
@@ -1169,12 +1169,12 @@ export function FinanceSalariesPage(): JSX.Element {
                 ) : (
                   salarySummary.byStatus.map((item) => (
                     <tr key={item.status}>
-                      <td>{statusLabel(item.status)}</td>
-                      <td>{item.count}</td>
-                      <td>{item.grossAmount}</td>
-                      <td>{item.bonusAmount}</td>
-                      <td>{item.deductionAmount}</td>
-                      <td>{item.netAmount}</td>
+                      <td data-label="Statut">{statusLabel(item.status)}</td>
+                      <td data-label="Effectif">{item.count}</td>
+                      <td data-label="Brut">{item.grossAmount}</td>
+                      <td data-label="Primes">{item.bonusAmount}</td>
+                      <td data-label="Retenues">{item.deductionAmount}</td>
+                      <td data-label="Net">{item.netAmount}</td>
                     </tr>
                   ))
                 )}
@@ -1199,7 +1199,7 @@ export function FinanceSalariesPage(): JSX.Element {
         {!isLoading && displaySalaryItems.length > 0 ? (
           <>
           {renderVisibleSalariesPagination()}
-          <div className="table-wrap list-managed-table-wrap">
+          <div className="table-wrap list-managed-table-wrap mobile-card-table">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -1230,19 +1230,19 @@ export function FinanceSalariesPage(): JSX.Element {
 
                   return (
                     <tr key={item.id}>
-                      <td>{formatPayPeriod(item.payPeriod)}</td>
-                      <td>
+                      <td data-label="Période">{formatPayPeriod(item.payPeriod)}</td>
+                      <td data-label="Collaborateur">
                         <strong>{item.employeeFullName}</strong>
                         <div className="hint">
                           {ROLE_LABELS[item.employeeRole as keyof typeof ROLE_LABELS] ?? item.employeeRole}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Net">
                         {item.netAmount} {item.currency}
                       </td>
-                      <td>{statusLabel(item.status)}</td>
-                      <td>{salaryConfirmationLabel(item.status, item.salaryConfirmation.status)}</td>
-                      <td>
+                      <td data-label="Statut">{statusLabel(item.status)}</td>
+                      <td data-label="Réception">{salaryConfirmationLabel(item.status, item.salaryConfirmation.status)}</td>
+                      <td data-label="Actions">
                         <div className="actions-inline">
                           <button
                             type="button"
@@ -1317,7 +1317,7 @@ export function FinanceSalariesPage(): JSX.Element {
                             </>
                           ) : null}
                         </div>
-                        <details className="table-inline-détails">
+                        <details className="table-inline-details">
                           <summary className="table-inline-summary">Voir plus</summary>
                           <div className="table-inline-content">
                             <p className="hint">

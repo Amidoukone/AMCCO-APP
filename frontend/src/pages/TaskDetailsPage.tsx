@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useAuth } from "../context/AuthContext";
 import {
   addTaskAttachmentRequest,
@@ -507,10 +508,12 @@ export function TaskDetailsPage(): JSX.Element {
         ) : null}
       </header>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {successMessage ? <p className="success-box">{successMessage}</p> : null}
-
-      {isLoading ? <p>Chargement...</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        isLoading={isLoading}
+        loadingLabel="Chargement de la tâche..."
+      />
 
       {!isLoading && task && !isReadOnlyOwner ? (
         <section className="panel">

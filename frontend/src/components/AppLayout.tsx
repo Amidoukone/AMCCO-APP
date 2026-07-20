@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { GlobalSearch } from "./GlobalSearch";
@@ -9,6 +9,7 @@ import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getNavigationForRole, ROLE_LABELS } from "../config/permissions";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
+import { enhanceMobileTables } from "../lib/mobileTables";
 
 export function AppLayout(): JSX.Element {
   const { activeCompany, memberships, user, switchCompany } = useAuth();
@@ -24,6 +25,8 @@ export function AppLayout(): JSX.Element {
   const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
   const [companySwitchError, setCompanySwitchError] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const contentRef = useRef<HTMLElement | null>(null);
   const withAuthorizedToken = useAuthorizedRequest();
   const canManageCompanies = user?.role === "SYS_ADMIN";
   const isBootstrapMode = !activeCompany;
@@ -44,6 +47,13 @@ export function AppLayout(): JSX.Element {
       return groups;
     }, {});
   }, [visibleNavigation]);
+  const activeNavigationItem = useMemo(
+    () =>
+      visibleNavigation.find(
+        (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
+      ),
+    [location.pathname, visibleNavigation]
+  );
 
   useEffect(() => {
     if (isBootstrapMode) {
@@ -82,8 +92,59 @@ export function AppLayout(): JSX.Element {
     };
   }, [isBootstrapMode, location.pathname, withAuthorizedToken]);
 
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileMenuOpen]);
+
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root) {
+      return undefined;
+    }
+
+    let animationFrameId = 0;
+    const scheduleEnhancement = (): void => {
+      window.cancelAnimationFrame(animationFrameId);
+      animationFrameId = window.requestAnimationFrame(() => enhanceMobileTables(root));
+    };
+
+    scheduleEnhancement();
+    const observer = new MutationObserver(scheduleEnhancement);
+    observer.observe(root, {
+      childList: true,
+      subtree: true
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
+    };
+  }, [location.pathname]);
+
   if (!user) {
     return <main className="page center">Session invalide</main>;
+  }
+
+  function handleActivityChange(nextValue: string): void {
+    setSelectedActivityCode(isBusinessActivityCode(nextValue) ? nextValue : null);
   }
 
   async function handleCompanyChange(nextCompanyId: string): Promise<void> {
@@ -138,10 +199,7 @@ export function AppLayout(): JSX.Element {
             <select
               className="sidebar-sector-select"
               value={selectedActivityCode ?? ""}
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                setSelectedActivityCode(isBusinessActivityCode(nextValue) ? nextValue : null);
-              }}
+              onChange={(event) => handleActivityChange(event.target.value)}
               disabled={isLoadingActivities || enabledActivities.length === 0}
               aria-label="Sélectionner le secteur actif"
             >
@@ -187,6 +245,55 @@ export function AppLayout(): JSX.Element {
 
       <div className="app-main">
         <header className="app-header">
+          <div className="mobile-header-row">
+            <button
+              type="button"
+              className="mobile-menu-toggle"
+              aria-label={isMobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-app-menu"
+              onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+            >
+              <span aria-hidden="true" />
+            </button>
+            <div className="mobile-title-block">
+              <p className="header-mobile-kicker">AMCCO &amp; SND</p>
+              <p className="header-mobile-title">{activeNavigationItem?.label ?? "Pilotage"}</p>
+              <p className="mobile-context-summary">
+                {activeCompany?.name ?? "Initialisation"}{" / "}
+                {isBootstrapMode
+                  ? "Entreprise à créer"
+                  : selectedActivity?.label ?? "Aucun secteur actif"}
+              </p>
+            </div>
+            {unreadAlertsCount > 0 ? (
+              <Link to="/alerts" className="mobile-alert-shortcut" aria-label="Alertes non lues">
+                {unreadAlertsCount}
+              </Link>
+            ) : null}
+          </div>
+          <div className="mobile-context-chips" aria-label="Contexte actif">
+            <button
+              type="button"
+              className="mobile-context-chip"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <span>Secteur</span>
+              <strong>
+                {isBootstrapMode
+                  ? "Initialisation"
+                  : selectedActivity?.label ?? "Aucun secteur actif"}
+              </strong>
+            </button>
+            <button
+              type="button"
+              className="mobile-context-chip"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <span>Entreprise</span>
+              <strong>{activeCompany?.name ?? "Aucune entreprise"}</strong>
+            </button>
+          </div>
           <div className="header-identity-block">
             <p className="header-user">{user.fullName}</p>
             <p className="header-meta">
@@ -202,8 +309,135 @@ export function AppLayout(): JSX.Element {
             </div>
             {companySwitchError ? <p className="header-switch-error">{companySwitchError}</p> : null}
           </div>
+          <div
+            className={isMobileMenuOpen ? "mobile-menu-backdrop is-open" : "mobile-menu-backdrop"}
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            id="mobile-app-menu"
+            className={isMobileMenuOpen ? "mobile-context-panel is-open" : "mobile-context-panel"}
+            aria-label="Menu mobile"
+            aria-hidden={!isMobileMenuOpen}
+          >
+            <div className="mobile-app-menu-header">
+              <div>
+                <p className="header-mobile-kicker">AMCCO &amp; SND</p>
+                <strong>Menu</strong>
+              </div>
+              <button
+                type="button"
+                className="mobile-menu-close"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label="Fermer le menu"
+              >
+                X
+              </button>
+            </div>
+            {!isBootstrapMode ? (
+              <GlobalSearch
+                className="mobile-drawer-search"
+                inputId="mobile-global-search-input"
+                navigation={visibleNavigation}
+                role={user.role}
+                selectedActivityCode={selectedActivityCode}
+              />
+            ) : null}
+            {isBootstrapMode ? (
+              <div className="mobile-context-card">
+                <span>Initialisation</span>
+                <strong>Aucune entreprise active</strong>
+              </div>
+            ) : (
+              <section className="mobile-context-group" aria-label="Secteur actif">
+                <div className="mobile-context-group-header">
+                  <span>Secteur actif</span>
+                  <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
+                </div>
+                {enabledActivities.length === 0 ? (
+                  <p className="hint">Aucun secteur actif pour cette entreprise.</p>
+                ) : (
+                  <div className="mobile-choice-list" role="group" aria-label="Choisir un secteur">
+                    {enabledActivities.map((activity) => {
+                      const isSelected = selectedActivityCode === activity.code;
+                      return (
+                        <button
+                          key={activity.code}
+                          type="button"
+                          className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
+                          onClick={() => handleActivityChange(activity.code)}
+                          disabled={isLoadingActivities}
+                          aria-pressed={isSelected}
+                        >
+                          <strong>{activity.label}</strong>
+                          <span>{activity.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
+            {activeCompany ? (
+              <section className="mobile-context-group" aria-label="Entreprise active">
+                <div className="mobile-context-group-header">
+                  <span>Entreprise</span>
+                  <strong>{activeCompany.name}</strong>
+                </div>
+                <div className="mobile-choice-list" role="group" aria-label="Choisir une entreprise">
+                  {memberships.map((membership) => {
+                    const isSelected = membership.companyId === activeCompany.id;
+                    return (
+                      <button
+                        key={membership.companyId}
+                        type="button"
+                        className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
+                        onClick={() => void handleCompanyChange(membership.companyId)}
+                        disabled={isSwitchingCompany || isSelected}
+                        aria-pressed={isSelected}
+                      >
+                        <strong>{membership.companyName}</strong>
+                        <span>{isSelected ? "Entreprise active" : "Basculer vers cette entreprise"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+            {canManageCompanies ? (
+              <Link to="/admin/companies" className="secondary-btn mobile-context-link">
+                {isBootstrapMode ? "Créer une entreprise" : "Entreprises"}
+              </Link>
+            ) : null}
+            {companySwitchError ? <p className="header-switch-error">{companySwitchError}</p> : null}
+            <nav className="mobile-drawer-nav" aria-label="Navigation mobile">
+              {Object.entries(navigationSections).map(([section, items]) => (
+                <div key={section} className="mobile-drawer-section">
+                  <p className="sidebar-section-label">{section}</p>
+                  <div className="mobile-drawer-list">
+                    {items.map((item) => (
+                      <NavLink
+                        key={item.key}
+                        to={item.to}
+                        className={({ isActive }) =>
+                          isActive ? "mobile-drawer-link active" : "mobile-drawer-link"
+                        }
+                      >
+                        <span>{item.label}</span>
+                        {item.key === "alerts" && unreadAlertsCount > 0 ? (
+                          <strong>{unreadAlertsCount}</strong>
+                        ) : null}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </nav>
+          </div>
           {!isBootstrapMode ? (
             <GlobalSearch
+              className="desktop-header-search"
+              inputId="desktop-global-search-input"
               navigation={visibleNavigation}
               role={user.role}
               selectedActivityCode={selectedActivityCode}
@@ -234,7 +468,7 @@ export function AppLayout(): JSX.Element {
             ) : null}
           </div>
         </header>
-        <section className="app-content">
+        <section className="app-content" ref={contentRef}>
           {!isBootstrapMode ? (
             <div className="workspace-toolbar">
               <Breadcrumbs />

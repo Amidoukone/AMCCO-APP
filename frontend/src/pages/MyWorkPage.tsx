@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
+import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ApiError, getDashboardSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
@@ -79,8 +80,11 @@ export function MyWorkPage(): JSX.Element {
         </div>
       </header>
 
-      {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-      {isLoading ? <p className="feedback-banner feedback-banner-loading">Chargement des priorités...</p> : null}
+      <FeedbackBanner
+        errorMessage={errorMessage}
+        isLoading={isLoading}
+        loadingLabel="Chargement des priorités..."
+      />
 
       {summary ? (
         <>

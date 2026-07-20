@@ -13,6 +13,8 @@ type SearchItem = {
 };
 
 type GlobalSearchProps = {
+  className?: string;
+  inputId?: string;
   navigation: NavigationItem[];
   role: RoleCode;
   selectedActivityCode: string | null;
@@ -91,6 +93,8 @@ function buildSearchItems(
 }
 
 export function GlobalSearch({
+  className,
+  inputId = "global-search-input",
   navigation,
   role,
   selectedActivityCode
@@ -129,10 +133,10 @@ export function GlobalSearch({
   }
 
   return (
-    <div className="global-search">
-      <label htmlFor="global-search-input">Recherche</label>
+    <div className={className ? `global-search ${className}` : "global-search"}>
+      <label htmlFor={inputId}>Recherche</label>
       <input
-        id="global-search-input"
+        id={inputId}
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}

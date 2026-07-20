@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -29,6 +29,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps): JSX.Element | null {
   const titleId = useId();
   const descriptionId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -36,7 +37,10 @@ export function ConfirmDialog({
     }
 
     const previousOverflow = document.body.style.overflow;
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = "hidden";
+    window.setTimeout(() => cancelButtonRef.current?.focus(), 0);
 
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key === "Escape" && !isConfirming) {
@@ -47,6 +51,7 @@ export function ConfirmDialog({
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      previousActiveElement?.focus();
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isConfirming, onCancel, open]);
@@ -83,6 +88,7 @@ export function ConfirmDialog({
         <p className="confirm-dialog-impact">{impactText}</p>
         <div className="confirm-dialog-actions">
           <button
+            ref={cancelButtonRef}
             type="button"
             className="secondary-btn"
             onClick={onCancel}

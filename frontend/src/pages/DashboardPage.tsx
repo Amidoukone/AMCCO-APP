@@ -296,7 +296,7 @@ export function DashboardPage(): JSX.Element {
                 </p>
               </div>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap mobile-card-table">
               <table className="admin-table">
                 <thead>
                   <tr>
@@ -318,14 +318,14 @@ export function DashboardPage(): JSX.Element {
                   ) : (
                     operationalRows.map((row) => (
                       <tr key={`${row.scope}-${row.activityCode}-${row.dimensionKey}-${row.itemKey}`}>
-                        <td>{getOperationalRowLabel(row)}</td>
-                        <td>{formatAmount(row.approvedCashIn, row.currency)}</td>
-                        <td>{formatAmount(row.approvedCashOut, row.currency)}</td>
-                        <td>{formatAmount(row.netProfit, row.currency)}</td>
-                        <td>{formatRate(row.executionRate)}</td>
-                        <td>{row.openTasksCount}</td>
-                        <td>{row.blockedTasksCount}</td>
-                        <td>{row.overdueTasksCount}</td>
+                        <td data-label="Périmètre">{getOperationalRowLabel(row)}</td>
+                        <td data-label="Entrées">{formatAmount(row.approvedCashIn, row.currency)}</td>
+                        <td data-label="Sorties">{formatAmount(row.approvedCashOut, row.currency)}</td>
+                        <td data-label="Net">{formatAmount(row.netProfit, row.currency)}</td>
+                        <td data-label="Exécution">{formatRate(row.executionRate)}</td>
+                        <td data-label="Ouvertes">{row.openTasksCount}</td>
+                        <td data-label="Blocages">{row.blockedTasksCount}</td>
+                        <td data-label="Retards">{row.overdueTasksCount}</td>
                       </tr>
                     ))
                   )}

@@ -365,7 +365,7 @@ export function AdminUsersPage(): JSX.Element {
         ) : null}
 
         {!isLoading && displayItems.length > 0 ? (
-          <div className="table-wrap admin-users-table-wrap">
+          <div className="table-wrap admin-users-table-wrap mobile-card-table">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -382,7 +382,7 @@ export function AdminUsersPage(): JSX.Element {
                   const isBusy = busyUserId === item.userId;
                   return (
                     <tr key={item.userId}>
-                      <td>
+                      <td data-label="Nom">
                         <input
                           type="text"
                           value={draft?.fullName ?? item.fullName}
@@ -403,8 +403,8 @@ export function AdminUsersPage(): JSX.Element {
                           disabled={!canManageUser || isBusy}
                         />
                       </td>
-                      <td>{item.email}</td>
-                      <td className="admin-user-role-cell">
+                      <td data-label="Email">{item.email}</td>
+                      <td className="admin-user-role-cell" data-label="Rôle">
                         <span className="admin-user-role-badge">{ROLE_LABELS[draft?.role ?? item.role]}</span>
                         <select
                           value={draft?.role ?? item.role}
@@ -431,7 +431,7 @@ export function AdminUsersPage(): JSX.Element {
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td data-label="Actif">
                         <label className="inline-checkbox">
                           <input
                             type="checkbox"
@@ -455,7 +455,7 @@ export function AdminUsersPage(): JSX.Element {
                           <span>{(draft?.isActive ?? item.isActive) ? "Oui" : "Non"}</span>
                         </label>
                       </td>
-                      <td className="admin-user-actions-cell">
+                      <td className="admin-user-actions-cell" data-label="Actions">
                         <div className="actions-inline admin-user-actions-row">
                           <button
                             type="button"

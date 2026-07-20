@@ -5551,7 +5551,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         {!isLoading && displayTransactions.length > 0 ? (
           <>
           {renderVisibleTransactionsPagination()}
-          <div className="table-wrap finance-transactions-table-wrap">
+          <div className="table-wrap finance-transactions-table-wrap mobile-card-table">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -5573,8 +5573,8 @@ export function FinanceTransactionsPage(): JSX.Element {
 
                   return (
                     <tr key={tx.id}>
-                      <td>{new Date(tx.occurredAt).toLocaleString("fr-FR")}</td>
-                      <td>
+                      <td data-label="Date">{new Date(tx.occurredAt).toLocaleString("fr-FR")}</td>
+                      <td data-label="Compte">
                         <strong>{tx.accountName}</strong>
                         <div className="hint">
                           {tx.type === "CASH_IN" ? "Entrée" : "Sortie"} |{" "}
@@ -5583,16 +5583,16 @@ export function FinanceTransactionsPage(): JSX.Element {
                             : "Charge transversale entreprise"}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Montant">
                         {formatAmountForDisplay(tx.amount)} {tx.currency}
                       </td>
-                      <td>
+                      <td data-label="Justificatifs">
                         <div>
                           {tx.proofsCount} preuve{tx.proofsCount > 1 ? "s" : ""}
                         </div>
                         <p className="hint">{tx.requiresProof ? "Justificatif requis" : "Justificatif libre"}</p>
                       </td>
-                      <td>
+                      <td data-label="Actions">
                         <div className="actions-inline">
                           <button
                             type="button"
@@ -5622,7 +5622,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                             </button>
                           ) : null}
                         </div>
-                        <details className="table-inline-détails">
+                        <details className="table-inline-details">
                           <summary className="table-inline-summary">Voir plus</summary>
                           <div className="table-inline-content">
                             <p className="hint">
