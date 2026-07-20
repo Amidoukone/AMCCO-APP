@@ -40,7 +40,7 @@ describe("authRouter", () => {
       .post("/auth/login")
       .set("user-agent", "vitest")
       .send({
-        email: "USER@EXAMPLE.COM",
+        email: " USER @ EXAMPLE.COM ",
         password: "secret"
       });
 

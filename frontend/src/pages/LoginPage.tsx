@@ -5,6 +5,10 @@ import { useAuth } from "../context/AuthContext";
 
 const LOGIN_BACKEND_ERROR = "Connexion impossible. Vérifiez le backend.";
 
+function normalizeLoginEmail(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+}
+
 export function LoginPage(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
@@ -13,6 +17,7 @@ export function LoginPage(): JSX.Element {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -22,7 +27,7 @@ export function LoginPage(): JSX.Element {
     setIsSubmitting(true);
     try {
       await login({
-        email: email.trim().toLowerCase(),
+        email: normalizeLoginEmail(email),
         password
       });
       navigate(redirectTo, { replace: true });
@@ -57,27 +62,51 @@ export function LoginPage(): JSX.Element {
             <span>Email</span>
             <input
               id="email"
+              name="email"
               type="email"
+              inputMode="email"
               placeholder="nom@entreprise.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
               autoFocus
             />
           </label>
-          <label className="login-field" htmlFor="password">
-            <span>Mot de passe</span>
-            <input
-              id="password"
-              type="password"
-              placeholder="Votre mot de passe"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </label>
+          <div className="login-field">
+            <label className="login-field-label" htmlFor="password">
+              Mot de passe
+            </label>
+            <div className="login-password-control">
+              <input
+                id="password"
+                name="password"
+                type={isPasswordVisible ? "text" : "password"}
+                placeholder="Votre mot de passe"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="done"
+              />
+              <button
+                type="button"
+                className="login-password-toggle"
+                onClick={() => setIsPasswordVisible((isVisible) => !isVisible)}
+                aria-label={isPasswordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-pressed={isPasswordVisible}
+              >
+                {isPasswordVisible ? "Masquer" : "Afficher"}
+              </button>
+            </div>
+          </div>
           {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
           <button className="login-submit" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Connexion..." : "Se connecter"}

@@ -5,8 +5,12 @@ import { asyncHandler } from "../lib/async-handler.js";
 import { createRateLimitMiddleware } from "../middleware/rate-limit.middleware.js";
 import { login, logout, refresh, switchCompany } from "../services/auth.service.js";
 
+function normalizeLoginEmail(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+}
+
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().transform(normalizeLoginEmail).pipe(z.string().email()),
   password: z.string().min(1)
 });
 
@@ -44,7 +48,7 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const body = loginSchema.parse(req.body);
     const result = await login({
-      email: body.email.toLowerCase(),
+      email: body.email,
       password: body.password,
       meta: getRequestMeta(req)
     });

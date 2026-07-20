@@ -4637,13 +4637,15 @@ textarea:focus,
   gap: 8px;
 }
 
-.login-field span {
+.login-field span,
+.login-field-label {
   color: var(--theme-text-soft);
   font-size: 13px;
   font-weight: 800;
 }
 
-.login-field input {
+.login-field input,
+.login-password-control input {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -4661,15 +4663,50 @@ textarea:focus,
     background-color 0.16s ease;
 }
 
-.login-field input::placeholder {
+.login-password-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.login-password-control input {
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+}
+
+.login-form .login-password-toggle {
+  appearance: none;
+  min-width: 92px;
+  min-height: 54px;
+  border: 1px solid rgba(154, 164, 255, 0.3);
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  padding: 0 13px;
+  color: #070a1b;
+  background: linear-gradient(135deg, var(--theme-gold), var(--theme-gold-soft));
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.login-form .login-password-toggle:focus-visible {
+  outline: 3px solid rgba(255, 199, 44, 0.45);
+  outline-offset: 3px;
+}
+
+.login-field input::placeholder,
+.login-password-control input::placeholder {
   color: rgba(217, 222, 245, 0.42);
 }
 
-.login-field input:hover {
+.login-field input:hover,
+.login-password-control input:hover {
   border-color: rgba(255, 255, 255, 0.24);
 }
 
-.login-field input:focus {
+.login-field input:focus,
+.login-password-control input:focus {
   border-color: rgba(255, 199, 44, 0.72);
   box-shadow:
     0 0 0 3px rgba(255, 199, 44, 0.14),
