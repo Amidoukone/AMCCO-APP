@@ -313,9 +313,11 @@ export function AdminUsersPage(): JSX.Element {
               </option>
             ))}
           </select>
-          <button type="submit" disabled={isSubmittingCreate}>
-            {isSubmittingCreate ? "Enregistrement..." : "Ajouter l'utilisateur"}
-          </button>
+          <div className="mobile-sticky-form-actions">
+            <button type="submit" disabled={isSubmittingCreate}>
+              {isSubmittingCreate ? "Enregistrement..." : "Ajouter l'utilisateur"}
+            </button>
+          </div>
         </form>
       </section> : null}
 

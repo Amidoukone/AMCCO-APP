@@ -9,7 +9,6 @@ import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   buildDailyActionCards,
   buildQuickSummaryPills,
-  formatDateTime,
   type DashboardActionCard
 } from "../utils/dashboardDisplay";
 import type { DashboardSummary, ReportOperationalMetric } from "../types/reporting";
@@ -201,8 +200,6 @@ export function DashboardPage(): JSX.Element {
       {!isLoading && summary ? (
         <>
           <DashboardHero
-            title={selectedActivity?.label ?? "Tous les périmètres"}
-            updatedAt={formatDateTime(summary.generatedAt)}
             actionCards={dailyActionCards}
             quickSummaryPills={quickSummaryPills}
             onNavigate={(href) => {
@@ -285,7 +282,7 @@ export function DashboardPage(): JSX.Element {
             </section>
           ) : null}
 
-          <section className="panel">
+          <section className="panel dashboard-operational-panel">
             <div className="dashboard-panel-header">
               <div>
                 <p className="sidebar-section-label">Pilotage opérationnel</p>
@@ -296,7 +293,7 @@ export function DashboardPage(): JSX.Element {
                 </p>
               </div>
             </div>
-            <div className="table-wrap mobile-card-table">
+            <div className="table-wrap mobile-force-scroll-table mobile-scroll-table dashboard-operational-table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>

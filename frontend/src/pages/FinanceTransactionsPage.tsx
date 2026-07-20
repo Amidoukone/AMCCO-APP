@@ -4584,18 +4584,20 @@ export function FinanceTransactionsPage(): JSX.Element {
                 })}
               </div>
             ) : null}
-            <button type="submit">
-              {editingAccountId ? "Enregistrer les modifications" : "Créer le compte"}
-            </button>
-            {editingAccountId ? (
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={handleCancelEditAccount}
-              >
-                Annuler la modification
+            <div className="mobile-sticky-form-actions">
+              <button type="submit">
+                {editingAccountId ? "Enregistrer les modifications" : "Créer le compte"}
               </button>
-            ) : null}
+              {editingAccountId ? (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={handleCancelEditAccount}
+                >
+                  Annuler la modification
+                </button>
+              ) : null}
+            </div>
             </form>
           </details>
         </section>
@@ -5487,33 +5489,35 @@ export function FinanceTransactionsPage(): JSX.Element {
             </div>
           </details>
 
-          <button
-            type="submit"
-            disabled={
-              accounts.length === 0 ||
-              !selectedActivityCode ||
-              isLoadingActivities ||
-              isSavingTransaction
-            }
-          >
-            {isSavingTransaction
-              ? transactionProofFile
-                ? "Enregistrement et envoi de la preuve..."
-                : "Enregistrement..."
-              : editingTransactionId
-                ? "Enregistrer les modifications"
-                : "Enregistrer la transaction"}
-          </button>
-          {editingTransactionId ? (
+          <div className="mobile-sticky-form-actions">
             <button
-              type="button"
-              className="secondary-btn"
-              onClick={handleCancelEditTransaction}
-              disabled={isSavingTransaction}
+              type="submit"
+              disabled={
+                accounts.length === 0 ||
+                !selectedActivityCode ||
+                isLoadingActivities ||
+                isSavingTransaction
+              }
             >
-              Annuler la modification
+              {isSavingTransaction
+                ? transactionProofFile
+                  ? "Enregistrement et envoi de la preuve..."
+                  : "Enregistrement..."
+                : editingTransactionId
+                  ? "Enregistrer les modifications"
+                  : "Enregistrer la transaction"}
             </button>
-          ) : null}
+            {editingTransactionId ? (
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={handleCancelEditTransaction}
+                disabled={isSavingTransaction}
+              >
+                Annuler la modification
+              </button>
+            ) : null}
+          </div>
           </form>
         </details>
       </section>

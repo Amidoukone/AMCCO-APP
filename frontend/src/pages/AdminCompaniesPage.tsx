@@ -504,22 +504,24 @@ export function AdminCompaniesPage(): JSX.Element {
             <option value="Guinée">Guinée</option>
             <option value="Niger">Niger</option>
           </select>
-          <button
-            type="button"
-            onClick={() => void handleCreateCompany()}
-            disabled={isSubmitting || !form.name?.trim()}
-          >
-            {isSubmitting
-              ? "Enregistrement..."
-              : isEditingCompany
-                ? "Enregistrer les modifications"
-                : "Enregistrer l'entreprise"}
-          </button>
-          {isEditingCompany ? (
-            <button type="button" className="secondary-btn" onClick={handleCancelEditCompany}>
-              Annuler
+          <div className="mobile-sticky-form-actions">
+            <button
+              type="button"
+              onClick={() => void handleCreateCompany()}
+              disabled={isSubmitting || !form.name?.trim()}
+            >
+              {isSubmitting
+                ? "Enregistrement..."
+                : isEditingCompany
+                  ? "Enregistrer les modifications"
+                  : "Enregistrer l'entreprise"}
             </button>
-          ) : null}
+            {isEditingCompany ? (
+              <button type="button" className="secondary-btn" onClick={handleCancelEditCompany}>
+                Annuler
+              </button>
+            ) : null}
+          </div>
         </div>
       </section> : null}
 

@@ -6,10 +6,12 @@ import { QuickActions } from "./QuickActions";
 import { isBusinessActivityCode } from "../config/businessActivities";
 import { ApiError, getAlertsSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
-import { getNavigationForRole, ROLE_LABELS } from "../config/permissions";
+import { getNavigationForRole, ROLE_LABELS, type FeatureKey } from "../config/permissions";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { enhanceMobileTables } from "../lib/mobileTables";
+
+const amccoLogoUrl = "/logo-amcco-web.jpg";
 
 export function AppLayout(): JSX.Element {
   const { activeCompany, memberships, user, switchCompany } = useAuth();
@@ -54,6 +56,17 @@ export function AppLayout(): JSX.Element {
       ),
     [location.pathname, visibleNavigation]
   );
+  const mobilePrimaryNavigation = useMemo(() => {
+    const preferredKeys: FeatureKey[] =
+      user?.role === "OWNER"
+        ? ["dashboard", "financeTransactions", "operationsTasks", "alerts"]
+        : ["dashboard", "myWork", "financeTransactions", "alerts"];
+    const preferredItems = preferredKeys
+      .map((key) => visibleNavigation.find((item) => item.key === key))
+      .filter((item): item is typeof visibleNavigation[number] => item !== undefined);
+
+    return (preferredItems.length > 0 ? preferredItems : visibleNavigation).slice(0, 4);
+  }, [user?.role, visibleNavigation]);
 
   useEffect(() => {
     if (isBootstrapMode) {
@@ -262,20 +275,31 @@ export function AppLayout(): JSX.Element {
               <span aria-hidden="true" />
             </button>
             <div className="mobile-title-block">
-              <p className="header-mobile-kicker">AMCCO &amp; SND</p>
               <p className="header-mobile-title">{activeNavigationItem?.label ?? "Pilotage"}</p>
-              <p className="mobile-context-summary">
-                {activeCompany?.name ?? "Initialisation"}{" / "}
-                {isBootstrapMode
-                  ? "Entreprise à créer"
-                  : selectedActivity?.label ?? "Aucun secteur actif"}
-              </p>
+              <button
+                type="button"
+                className="mobile-context-summary"
+                onClick={() => setIsMobileMenuOpen(true)}
+                aria-label="Changer le contexte actif"
+              >
+                <span>{activeCompany?.name ?? "Initialisation"}</span>
+                <span>
+                  {isBootstrapMode
+                    ? "Entreprise à créer"
+                    : selectedActivity?.label ?? "Aucun secteur actif"}
+                </span>
+              </button>
             </div>
-            {unreadAlertsCount > 0 ? (
-              <Link to="/alerts" className="mobile-alert-shortcut" aria-label="Alertes non lues">
-                {unreadAlertsCount}
+            <div className="mobile-top-actions">
+              {unreadAlertsCount > 0 ? (
+                <Link to="/alerts" className="mobile-alert-shortcut" aria-label="Alertes non lues">
+                  {unreadAlertsCount}
+                </Link>
+              ) : null}
+              <Link to="/" className="topbar-logo-link mobile-topbar-logo" aria-label="Retour au site vitrine">
+                <img src={amccoLogoUrl} alt="Logo AMCCO MBAG" />
               </Link>
-            ) : null}
+            </div>
           </div>
           <div className="mobile-context-chips" aria-label="Contexte actif">
             <button
@@ -603,6 +627,9 @@ export function AppLayout(): JSX.Element {
                 {isBootstrapMode ? "Créer une entreprise" : "Gérer les entreprises"}
               </Link>
             ) : null}
+            <Link to="/" className="topbar-logo-link desktop-topbar-logo" aria-label="Retour au site vitrine">
+              <img src={amccoLogoUrl} alt="Logo AMCCO MBAG" />
+            </Link>
           </div>
         </header>
         <section className="app-content" ref={contentRef}>
@@ -618,6 +645,27 @@ export function AppLayout(): JSX.Element {
           ) : null}
           <Outlet />
         </section>
+        {mobilePrimaryNavigation.length > 0 ? (
+          <nav className="mobile-bottom-nav" aria-label="Navigation mobile principale">
+            {mobilePrimaryNavigation.map((item) => (
+              <NavLink
+                key={item.key}
+                to={item.to}
+                className={({ isActive }) =>
+                  isActive ? "mobile-bottom-nav-item active" : "mobile-bottom-nav-item"
+                }
+              >
+                <span className="mobile-bottom-nav-mark" aria-hidden="true">
+                  {item.label.slice(0, 2)}
+                </span>
+                <span className="mobile-bottom-nav-label">{item.label}</span>
+                {item.key === "alerts" && unreadAlertsCount > 0 ? (
+                  <strong className="mobile-bottom-nav-badge">{unreadAlertsCount}</strong>
+                ) : null}
+              </NavLink>
+            ))}
+          </nav>
+        ) : null}
       </div>
     </div>
   );

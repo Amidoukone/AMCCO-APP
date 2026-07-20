@@ -1724,26 +1724,28 @@ export function OperationsTasksPage(): JSX.Element {
                 </div>
               </fieldset>
             ) : null}
-            <button
-              type="submit"
-              disabled={!selectedActivityCode || isLoadingActivities || isSavingTaskForm}
-            >
-              {isSavingTaskForm
-                ? "Enregistrement..."
-                : editingTaskId
-                  ? "Enregistrer les modifications"
-                  : "Enregistrer la tâche"}
-            </button>
-            {editingTaskId ? (
+            <div className="mobile-sticky-form-actions">
               <button
-                type="button"
-                className="secondary-btn"
-                onClick={handleCancelEditTask}
-                disabled={isSavingTaskForm}
+                type="submit"
+                disabled={!selectedActivityCode || isLoadingActivities || isSavingTaskForm}
               >
-                Annuler
+                {isSavingTaskForm
+                  ? "Enregistrement..."
+                  : editingTaskId
+                    ? "Enregistrer les modifications"
+                    : "Enregistrer la tâche"}
               </button>
-            ) : null}
+              {editingTaskId ? (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={handleCancelEditTask}
+                  disabled={isSavingTaskForm}
+                >
+                  Annuler
+                </button>
+              ) : null}
+            </div>
           </form>
         </section>
       ) : null}

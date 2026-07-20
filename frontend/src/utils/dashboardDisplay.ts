@@ -18,7 +18,14 @@ export function formatDateTime(value: string | null): string {
   if (!value) {
     return "-";
   }
-  return new Date(value).toLocaleString("fr-FR");
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(date);
 }
 
 export function formatAmount(value: string, currency: string): string {

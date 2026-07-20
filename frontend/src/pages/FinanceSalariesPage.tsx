@@ -1101,21 +1101,23 @@ export function FinanceSalariesPage(): JSX.Element {
                 }))
               }
             />
-            <button
-              type="submit"
-              disabled={salaryAccounts.length === 0 || salaryMembers.length === 0}
-            >
-              {editingSalaryId ? "Enregistrer les modifications" : "Enregistrer le salaire"}
-            </button>
-            {editingSalaryId ? (
+            <div className="mobile-sticky-form-actions">
               <button
-                type="button"
-                className="secondary-btn"
-                onClick={handleCancelEditSalary}
+                type="submit"
+                disabled={salaryAccounts.length === 0 || salaryMembers.length === 0}
               >
-                Annuler la modification
+                {editingSalaryId ? "Enregistrer les modifications" : "Enregistrer le salaire"}
               </button>
-            ) : null}
+              {editingSalaryId ? (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={handleCancelEditSalary}
+                >
+                  Annuler la modification
+                </button>
+              ) : null}
+            </div>
           </form>
         </section>
       ) : null}

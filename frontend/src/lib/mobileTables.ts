@@ -46,6 +46,12 @@ export function enhanceMobileTables(root: HTMLElement): void {
       return;
     }
 
+    if (wrapper.classList.contains("mobile-force-scroll-table")) {
+      wrapper.classList.add("mobile-scroll-table");
+      wrapper.classList.remove("mobile-auto-card-table");
+      return;
+    }
+
     const shouldUseCards = headers.length <= MOBILE_CARD_COLUMN_LIMIT;
     const targetClass = shouldUseCards ? "mobile-auto-card-table" : "mobile-scroll-table";
     const staleClass = shouldUseCards ? "mobile-scroll-table" : "mobile-auto-card-table";
