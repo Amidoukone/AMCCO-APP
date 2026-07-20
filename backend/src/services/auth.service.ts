@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { HttpError } from "../errors/http-error.js";
 import { BOOTSTRAP_COMPANY_CODE, BOOTSTRAP_COMPANY_ID, isBootstrapCompanyId } from "../lib/bootstrap-auth.js";
 import { logger } from "../lib/logger.js";
@@ -26,10 +26,41 @@ import type { RoleCode } from "../types/role.js";
 export type ClientMeta = {
   ipAddress?: string | null;
   userAgent?: string | null;
+  loginInput?: {
+    emailLength: number | null;
+    passwordLength: number | null;
+    passwordHadOuterWhitespace: boolean | null;
+    passwordHadZeroWidthCharacters: boolean | null;
+    passwordHadNonAsciiCharacters: boolean | null;
+  };
 };
 
 function invalidCredentialsError(): HttpError {
   return new HttpError(401, "Identifiants invalides.");
+}
+
+function getEmailHash(email: string): string {
+  return createHash("sha256").update(email).digest("hex").slice(0, 16);
+}
+
+function logInvalidLogin(
+  reason: "user_not_found" | "bootstrap_user_not_found" | "password_mismatch" | "bootstrap_password_mismatch",
+  input: {
+    email: string;
+    meta?: ClientMeta;
+  }
+): void {
+  logger.warn(
+    {
+      event: "auth_login_failed",
+      reason,
+      emailHash: getEmailHash(input.email),
+      ipAddress: input.meta?.ipAddress ?? null,
+      userAgent: input.meta?.userAgent ?? null,
+      input: input.meta?.loginInput ?? null
+    },
+    "Login failed"
+  );
 }
 
 function getRolePriority(role: RoleCode): number {
@@ -118,16 +149,19 @@ export async function login(input: {
   if (!record) {
     const activeCompaniesCount = await countActiveCompanies();
     if (activeCompaniesCount > 0) {
+      logInvalidLogin("user_not_found", input);
       throw invalidCredentialsError();
     }
 
     const bootstrapUser = await findActiveUserByEmail(input.email);
     if (!bootstrapUser) {
+      logInvalidLogin("bootstrap_user_not_found", input);
       throw invalidCredentialsError();
     }
 
     const isPasswordValid = await verifyPassword(input.password, bootstrapUser.passwordHash);
     if (!isPasswordValid) {
+      logInvalidLogin("bootstrap_password_mismatch", input);
       throw invalidCredentialsError();
     }
 
@@ -186,6 +220,7 @@ export async function login(input: {
 
   const isPasswordValid = await verifyPassword(input.password, record.passwordHash);
   if (!isPasswordValid) {
+    logInvalidLogin("password_mismatch", input);
     throw invalidCredentialsError();
   }
 

@@ -9,6 +9,10 @@ function normalizeLoginEmail(value: string): string {
   return value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
 }
 
+function normalizeLoginPassword(value: string): string {
+  return value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
 export function LoginPage(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,7 +32,7 @@ export function LoginPage(): JSX.Element {
     try {
       await login({
         email: normalizeLoginEmail(email),
-        password
+        password: normalizeLoginPassword(password)
       });
       navigate(redirectTo, { replace: true });
     } catch (error) {
@@ -68,8 +72,9 @@ export function LoginPage(): JSX.Element {
               placeholder="nom@entreprise.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              onBlur={() => setEmail((currentEmail) => normalizeLoginEmail(currentEmail))}
               required
-              autoComplete="email"
+              autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}

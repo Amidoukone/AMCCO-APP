@@ -9,9 +9,35 @@ function normalizeLoginEmail(value: string): string {
   return value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
 }
 
+function normalizeLoginPassword(value: string): string {
+  return value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
+function getStringPayloadValue(body: unknown, key: "email" | "password"): string | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const value = (body as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function buildLoginInputDiagnostics(body: unknown) {
+  const email = getStringPayloadValue(body, "email");
+  const password = getStringPayloadValue(body, "password");
+
+  return {
+    emailLength: email === null ? null : Array.from(email).length,
+    passwordLength: password === null ? null : Array.from(password).length,
+    passwordHadOuterWhitespace: password === null ? null : password !== password.trim(),
+    passwordHadZeroWidthCharacters: password === null ? null : /[\u200B-\u200D\uFEFF]/.test(password),
+    passwordHadNonAsciiCharacters: password === null ? null : /[^\x20-\x7E]/.test(password)
+  };
+}
+
 const loginSchema = z.object({
   email: z.string().transform(normalizeLoginEmail).pipe(z.string().email()),
-  password: z.string().min(1)
+  password: z.string().transform(normalizeLoginPassword).pipe(z.string().min(1))
 });
 
 const refreshSchema = z.object({
@@ -50,7 +76,10 @@ authRouter.post(
     const result = await login({
       email: body.email,
       password: body.password,
-      meta: getRequestMeta(req)
+      meta: {
+        ...getRequestMeta(req),
+        loginInput: buildLoginInputDiagnostics(req.body)
+      }
     });
     res.status(200).json(result);
   })

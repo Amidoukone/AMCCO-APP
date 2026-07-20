@@ -41,7 +41,7 @@ describe("authRouter", () => {
       .set("user-agent", "vitest")
       .send({
         email: " USER @ EXAMPLE.COM ",
-        password: "secret"
+        password: "\u200Bsecret\uFEFF "
       });
 
     expect(response.status).toBe(200);
@@ -52,7 +52,13 @@ describe("authRouter", () => {
         password: "secret",
         meta: expect.objectContaining({
           userAgent: "vitest",
-          ipAddress: expect.any(String)
+          ipAddress: expect.any(String),
+          loginInput: expect.objectContaining({
+            emailLength: 20,
+            passwordLength: 9,
+            passwordHadOuterWhitespace: true,
+            passwordHadZeroWidthCharacters: true
+          })
         })
       })
     );
