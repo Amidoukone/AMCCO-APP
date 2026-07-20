@@ -2,6 +2,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import type { LoginClientDiagnostics } from "../types/auth";
 
 const LOGIN_BACKEND_ERROR = "Connexion impossible. Vérifiez le backend.";
 
@@ -11,6 +12,27 @@ function normalizeLoginEmail(value: string): string {
 
 function normalizeLoginPassword(value: string): string {
   return value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
+function getSubmittedValue(formData: FormData, name: string, fallback: string): string {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : fallback;
+}
+
+function buildLoginClientDiagnostics(
+  rawEmail: string,
+  normalizedEmail: string,
+  rawPassword: string,
+  normalizedPassword: string
+): LoginClientDiagnostics {
+  return {
+    submitSource: "form-data",
+    emailChangedByNormalization: rawEmail !== normalizedEmail,
+    passwordChangedByNormalization: rawPassword !== normalizedPassword,
+    passwordHadOuterWhitespace: rawPassword !== rawPassword.trim(),
+    passwordHadZeroWidthCharacters: /[\u200B-\u200D\uFEFF]/.test(rawPassword),
+    passwordHadNonAsciiCharacters: /[^\x20-\x7E]/.test(rawPassword)
+  };
 }
 
 export function LoginPage(): JSX.Element {
@@ -27,12 +49,26 @@ export function LoginPage(): JSX.Element {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const submittedEmail = getSubmittedValue(formData, "email", email);
+    const submittedPassword = getSubmittedValue(formData, "password", password);
+    const normalizedEmail = normalizeLoginEmail(submittedEmail);
+    const normalizedPassword = normalizeLoginPassword(submittedPassword);
+
+    setEmail(normalizedEmail);
+    setPassword(submittedPassword);
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
       await login({
-        email: normalizeLoginEmail(email),
-        password: normalizeLoginPassword(password)
+        email: normalizedEmail,
+        password: normalizedPassword,
+        clientDiagnostics: buildLoginClientDiagnostics(
+          submittedEmail,
+          normalizedEmail,
+          submittedPassword,
+          normalizedPassword
+        )
       });
       navigate(redirectTo, { replace: true });
     } catch (error) {
@@ -61,7 +97,7 @@ export function LoginPage(): JSX.Element {
           <h2 id="login-title">Connexion</h2>
         </div>
 
-        <form className="form login-form" onSubmit={handleSubmit}>
+        <form className="form login-form" onSubmit={handleSubmit} autoComplete="on">
           <label className="login-field" htmlFor="email">
             <span>Email</span>
             <input

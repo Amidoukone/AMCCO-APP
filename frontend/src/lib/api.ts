@@ -67,6 +67,7 @@ type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   accessToken?: string;
+  headers?: Record<string, string>;
 };
 
 export class ApiError extends Error {
@@ -96,6 +97,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method: options.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
+      ...(options.headers ?? {}),
       ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined
@@ -124,9 +126,27 @@ async function download(path: string, accessToken: string): Promise<Blob> {
 }
 
 export function loginRequest(input: LoginInput): Promise<LoginResponse> {
+  const { clientDiagnostics, ...body } = input;
+  const clientDiagnosticsHeader = clientDiagnostics
+    ? [
+        "v=3",
+        `source=${clientDiagnostics.submitSource}`,
+        `emailNormalized=${clientDiagnostics.emailChangedByNormalization ? "1" : "0"}`,
+        `passwordNormalized=${clientDiagnostics.passwordChangedByNormalization ? "1" : "0"}`,
+        `passwordOuterWhitespace=${clientDiagnostics.passwordHadOuterWhitespace ? "1" : "0"}`,
+        `passwordZeroWidth=${clientDiagnostics.passwordHadZeroWidthCharacters ? "1" : "0"}`,
+        `passwordNonAscii=${clientDiagnostics.passwordHadNonAsciiCharacters ? "1" : "0"}`
+      ].join(";")
+    : undefined;
+
   return request<LoginResponse>("/auth/login", {
     method: "POST",
-    body: input
+    body,
+    headers: clientDiagnosticsHeader
+      ? {
+          "X-AMCCO-Login-Diagnostics": clientDiagnosticsHeader
+        }
+      : undefined
   });
 }
 

@@ -4,6 +4,16 @@ import type { RoleCode } from "./role";
 export type LoginInput = {
   email: string;
   password: string;
+  clientDiagnostics?: LoginClientDiagnostics;
+};
+
+export type LoginClientDiagnostics = {
+  submitSource: "form-data";
+  emailChangedByNormalization: boolean;
+  passwordChangedByNormalization: boolean;
+  passwordHadOuterWhitespace: boolean;
+  passwordHadZeroWidthCharacters: boolean;
+  passwordHadNonAsciiCharacters: boolean;
 };
 
 export type ChangeOwnPasswordInput = {

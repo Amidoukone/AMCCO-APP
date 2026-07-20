@@ -55,9 +55,11 @@ const switchCompanySchema = z.object({
 
 function getRequestMeta(req: { ip?: string; get: (name: string) => string | undefined }) {
   const userAgentHeader = req.get("user-agent");
+  const clientLoginDiagnosticsHeader = req.get("x-amcco-login-diagnostics");
   return {
     ipAddress: req.ip ?? null,
-    userAgent: userAgentHeader ?? null
+    userAgent: userAgentHeader ?? null,
+    clientLoginDiagnostics: clientLoginDiagnosticsHeader ?? null
   };
 }
 

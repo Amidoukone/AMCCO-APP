@@ -82,7 +82,64 @@ Pour un lancement manuel sans build:
 npm --workspace backend run db:init:dev
 ```
 
-## 5. ImageKit
+## 5. Creation du premier admin systeme
+
+Le premier compte de production doit etre cree dans la base production, pas dans
+la base locale. Pour une production neuve, utiliser le script idempotent
+`bootstrap:system-admin` depuis le shell Render apres un deploy backend reussi,
+avec le garde-fou `--require-empty`.
+
+Le script:
+
+- cree le compte si l'email n'existe pas;
+- reactive le compte si l'utilisateur existe mais est inactif;
+- rattache le compte en `SYS_ADMIN` a toutes les entreprises actives existantes;
+- cree l'entreprise principale si aucune entreprise active n'existe encore;
+- active tous les secteurs catalogue sur l'entreprise initiale;
+- ne remplace pas le mot de passe d'un compte existant sans `--reset-password`;
+- journalise l'operation dans `audit_logs`;
+- ne supprime aucune donnee.
+
+Dans le shell Render, definir les variables sans exposer le mot de passe dans
+l'historique:
+
+```bash
+export INITIAL_SYS_ADMIN_EMAIL="admin@example.com"
+export INITIAL_SYS_ADMIN_FULL_NAME="Admin Systeme"
+export INITIAL_SYS_ADMIN_COMPANY_CODE="AMCCO"
+export INITIAL_SYS_ADMIN_COMPANY_NAME="AMCCO"
+read -rsp "Mot de passe temporaire admin: " INITIAL_SYS_ADMIN_PASSWORD; echo
+export INITIAL_SYS_ADMIN_PASSWORD
+```
+
+Dry-run sans ecriture pour confirmer que la base est bien vide:
+
+```bash
+npm --workspace backend run bootstrap:system-admin -- --require-empty
+```
+
+Application reelle:
+
+```bash
+npm --workspace backend run bootstrap:system-admin -- --apply --require-empty
+```
+
+Si le compte existe deja et que son mot de passe doit etre remplace:
+
+```bash
+npm --workspace backend run bootstrap:system-admin -- --apply --reset-password
+```
+
+Apres connexion, changer le mot de passe depuis `Compte > Securite`, puis creer
+les autres utilisateurs depuis `Administration > Utilisateurs`.
+
+Nettoyer ensuite la variable sensible de la session shell:
+
+```bash
+unset INITIAL_SYS_ADMIN_PASSWORD
+```
+
+## 6. ImageKit
 
 Dans ImageKit, recuperer:
 
@@ -96,7 +153,7 @@ Netlify ou dans le frontend.
 Le frontend demande des parametres d'upload au backend authentifie, puis envoie
 le fichier a `https://upload.imagekit.io/api/v1/files/upload`.
 
-## 6. Render backend
+## 7. Render backend
 
 1. Connecter le repo GitHub dans Render.
 2. Creer un Blueprint depuis `render.yaml`.
@@ -131,7 +188,7 @@ curl https://api.groupenioumaladiady.com/api/v1/health
 curl https://api.groupenioumaladiady.com/api/v1/ready
 ```
 
-## 7. Netlify frontend
+## 8. Netlify frontend
 
 1. Creer un site Netlify depuis le repo GitHub.
 2. Netlify doit lire `netlify.toml` a la racine:
@@ -160,7 +217,7 @@ CORS_ORIGIN=https://groupenioumaladiady.com,https://www.groupenioumaladiady.com,
 Retirer l'URL temporaire si elle n'est plus necessaire apres activation du
 domaine custom.
 
-## 8. Domaine Squarespace vers Netlify
+## 9. Domaine Squarespace vers Netlify
 
 Dans Netlify, ajouter:
 
@@ -180,7 +237,7 @@ site Squarespace si le domaine doit pointer vers Netlify.
 
 Propagation DNS: prevoir quelques minutes a 24-48h selon les caches DNS.
 
-## 9. Variables production
+## 10. Variables production
 
 Backend Render:
 
@@ -210,7 +267,7 @@ Frontend Netlify:
 VITE_API_BASE_URL=https://api.groupenioumaladiady.com/api/v1
 ```
 
-## 10. Verification post-deploiement
+## 11. Verification post-deploiement
 
 Backend:
 
@@ -231,7 +288,7 @@ Frontend:
 - ajout commentaire et piece jointe;
 - export CSV/XLSX/PDF.
 
-## 11. Workflow Git professionnel
+## 12. Workflow Git professionnel
 
 Developpement quotidien:
 
@@ -258,14 +315,14 @@ Release:
 5. Le push sur `main` declenche Netlify et Render.
 6. Executer la verification post-deploiement.
 
-## 12. Rollback
+## 13. Rollback
 
 - Netlify: restaurer le deploy precedent depuis l'interface Deploys.
 - Render: rollback vers le deploy precedent depuis Events/Deploys.
 - Base de donnees: utiliser les backups/PITR DigitalOcean. Ne jamais faire de
   rollback SQL manuel sans sauvegarde prealable.
 
-## 13. References officielles
+## 14. References officielles
 
 - Render Blueprint: https://render.com/docs/blueprint-spec
 - Render custom domains: https://render.com/docs/custom-domains

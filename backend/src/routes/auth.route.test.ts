@@ -39,6 +39,7 @@ describe("authRouter", () => {
     const response = await request(app)
       .post("/auth/login")
       .set("user-agent", "vitest")
+      .set("x-amcco-login-diagnostics", "v=3;source=form-data;passwordNormalized=1")
       .send({
         email: " USER @ EXAMPLE.COM ",
         password: "\u200Bsecret\uFEFF "
@@ -53,6 +54,7 @@ describe("authRouter", () => {
         meta: expect.objectContaining({
           userAgent: "vitest",
           ipAddress: expect.any(String),
+          clientLoginDiagnostics: "v=3;source=form-data;passwordNormalized=1",
           loginInput: expect.objectContaining({
             emailLength: 20,
             passwordLength: 9,

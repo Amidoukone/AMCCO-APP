@@ -26,6 +26,7 @@ import type { RoleCode } from "../types/role.js";
 export type ClientMeta = {
   ipAddress?: string | null;
   userAgent?: string | null;
+  clientLoginDiagnostics?: string | null;
   loginInput?: {
     emailLength: number | null;
     passwordLength: number | null;
@@ -57,6 +58,7 @@ function logInvalidLogin(
       emailHash: getEmailHash(input.email),
       ipAddress: input.meta?.ipAddress ?? null,
       userAgent: input.meta?.userAgent ?? null,
+      clientLoginDiagnostics: input.meta?.clientLoginDiagnostics ?? null,
       input: input.meta?.loginInput ?? null
     },
     "Login failed"
