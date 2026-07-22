@@ -521,7 +521,7 @@ export function ReportsPage(): JSX.Element {
         <p>Données du secteur choisi, calculées depuis les transactions, tâches et comptes.</p>
       </header>
 
-      <section className="panel">
+      <section className="panel reports-control-panel">
         <h3>Filtres du rapport</h3>
         <div className="reports-period-presets" role="group" aria-label="Type de période">
           {REPORT_PERIOD_MODE_OPTIONS.map((option) => (

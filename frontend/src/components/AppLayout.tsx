@@ -114,6 +114,9 @@ export function AppLayout(): JSX.Element {
       return;
     }
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         setIsMobileMenuOpen(false);
@@ -123,6 +126,7 @@ export function AppLayout(): JSX.Element {
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isMobileMenuOpen]);
@@ -346,7 +350,9 @@ export function AppLayout(): JSX.Element {
           <div
             id="mobile-app-menu"
             className={isMobileMenuOpen ? "mobile-context-panel is-open" : "mobile-context-panel"}
+            role="dialog"
             aria-label="Menu mobile"
+            aria-modal={isMobileMenuOpen}
             aria-hidden={!isMobileMenuOpen}
           >
             <div className="mobile-app-menu-header">

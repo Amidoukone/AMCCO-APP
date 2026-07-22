@@ -59,6 +59,16 @@ function entityTypeLabel(entityType: string | null): string {
   return normalized || "Système";
 }
 
+function severityLabel(severity: AlertItem["severity"]): string {
+  if (severity === "CRITICAL") {
+    return "Critique";
+  }
+  if (severity === "WARNING") {
+    return "Attention";
+  }
+  return "Info";
+}
+
 function buildAlertContextLines(item: AlertItem): string[] {
   const financeLines = getFinanceTraceLines(item.metadata);
   if (financeLines.length > 0) {
@@ -388,12 +398,16 @@ export function AlertsPage(): JSX.Element {
                 return (
                   <article
                     key={item.id}
-                    className={`alert-card ${isUnread ? "is-unread" : ""}`}
+                    className={`alert-card severity-${item.severity.toLowerCase()} ${
+                      isUnread ? "is-unread" : ""
+                    }`}
                   >
                     <div className="alert-card-top">
                       <div className="alert-card-heading">
                         <div className="alert-card-badges">
-                          <span className="alert-meta-pill">Alerte</span>
+                          <span className={`alert-meta-pill alert-severity-chip severity-${item.severity.toLowerCase()}`}>
+                            {severityLabel(item.severity)}
+                          </span>
                           <span className={`alert-meta-pill alert-read-chip ${isUnread ? "is-unread" : "is-read"}`}>
                             {isUnread ? "Non lue" : "Lue"}
                           </span>
@@ -436,7 +450,7 @@ export function AlertsPage(): JSX.Element {
                     ) : null}
 
                     {(remainingLines.length > 0 || item.entityType || item.entityId) ? (
-                      <details className="alert-détails">
+                      <details className="alert-details">
                         <summary className="table-inline-summary">Voir le contexte</summary>
                         <div className="alert-meta">
                           {item.entityType || item.entityId ? (

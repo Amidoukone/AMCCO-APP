@@ -1123,7 +1123,7 @@ export function FinanceSalariesPage(): JSX.Element {
       ) : null}
 
       {canManageSalaries && salarySummary ? (
-        <section className="panel">
+        <section className="panel finance-salary-summary-panel">
           <div className="dashboard-panel-header">
             <div>
               <h3>Synthèse</h3>
@@ -1151,7 +1151,7 @@ export function FinanceSalariesPage(): JSX.Element {
               </button>
             </div>
           </div>
-          <div className="table-wrap mobile-card-table">
+          <div className="table-wrap mobile-card-table finance-salary-summary-table-wrap">
             <table className="admin-table salaries-table">
               <thead>
                 <tr>
@@ -1192,7 +1192,7 @@ export function FinanceSalariesPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className="panel">
+      <section className="panel finance-salary-list-panel">
         <h3>Liste des salaires</h3>
         {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette période.</p> : null}
         {!isLoading && salaryItems.length > 0 && displaySalaryItems.length === 0 ? (
@@ -1201,7 +1201,7 @@ export function FinanceSalariesPage(): JSX.Element {
         {!isLoading && displaySalaryItems.length > 0 ? (
           <>
           {renderVisibleSalariesPagination()}
-          <div className="table-wrap list-managed-table-wrap mobile-card-table">
+          <div className="table-wrap list-managed-table-wrap mobile-card-table finance-salaries-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -1231,7 +1231,7 @@ export function FinanceSalariesPage(): JSX.Element {
                     !isReadOnlyOwner && (canManageSalaries || item.createdById === user?.id);
 
                   return (
-                    <tr key={item.id}>
+                    <tr key={item.id} className={`finance-salary-row status-${item.status.toLowerCase()}`}>
                       <td data-label="Période">{formatPayPeriod(item.payPeriod)}</td>
                       <td data-label="Collaborateur">
                         <strong>{item.employeeFullName}</strong>
@@ -1239,12 +1239,12 @@ export function FinanceSalariesPage(): JSX.Element {
                           {ROLE_LABELS[item.employeeRole as keyof typeof ROLE_LABELS] ?? item.employeeRole}
                         </div>
                       </td>
-                      <td data-label="Net">
+                      <td className="finance-salary-net-cell" data-label="Net">
                         {item.netAmount} {item.currency}
                       </td>
                       <td data-label="Statut">{statusLabel(item.status)}</td>
                       <td data-label="Réception">{salaryConfirmationLabel(item.status, item.salaryConfirmation.status)}</td>
-                      <td data-label="Actions">
+                      <td className="finance-salary-actions-cell" data-label="Actions">
                         <div className="actions-inline">
                           <button
                             type="button"

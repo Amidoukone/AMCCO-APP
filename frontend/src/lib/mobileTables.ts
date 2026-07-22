@@ -1,4 +1,5 @@
 const MOBILE_CARD_COLUMN_LIMIT = 8;
+const REPORTS_MOBILE_CARD_COLUMN_LIMIT = 10;
 
 function getTableHeaders(table: HTMLTableElement): string[] {
   return Array.from(table.querySelectorAll("thead th")).map((header) =>
@@ -27,12 +28,15 @@ function labelTableRows(table: HTMLTableElement, headers: string[]): void {
 
 export function enhanceMobileTables(root: HTMLElement): void {
   const wrappers = root.querySelectorAll<HTMLElement>(".table-wrap");
+  const isReportsPage = root.querySelector(".reports-control-panel") !== null;
 
   wrappers.forEach((wrapper) => {
     const table = wrapper.querySelector("table.admin-table");
     if (!(table instanceof HTMLTableElement)) {
       return;
     }
+
+    wrapper.classList.toggle("reports-table-wrap", isReportsPage);
 
     const headers = getTableHeaders(table).filter(Boolean);
     if (headers.length === 0) {
@@ -52,7 +56,8 @@ export function enhanceMobileTables(root: HTMLElement): void {
       return;
     }
 
-    const shouldUseCards = headers.length <= MOBILE_CARD_COLUMN_LIMIT;
+    const cardColumnLimit = isReportsPage ? REPORTS_MOBILE_CARD_COLUMN_LIMIT : MOBILE_CARD_COLUMN_LIMIT;
+    const shouldUseCards = headers.length <= cardColumnLimit;
     const targetClass = shouldUseCards ? "mobile-auto-card-table" : "mobile-scroll-table";
     const staleClass = shouldUseCards ? "mobile-scroll-table" : "mobile-auto-card-table";
 

@@ -293,7 +293,7 @@ export function DashboardPage(): JSX.Element {
                 </p>
               </div>
             </div>
-            <div className="table-wrap mobile-force-scroll-table mobile-scroll-table dashboard-operational-table-wrap">
+            <div className="table-wrap dashboard-operational-table-wrap">
               <table className="admin-table">
                 <thead>
                   <tr>

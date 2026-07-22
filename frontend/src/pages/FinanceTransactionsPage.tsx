@@ -5576,7 +5576,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                   const canDeleteTransaction = canManageTransactions;
 
                   return (
-                    <tr key={tx.id}>
+                    <tr
+                      key={tx.id}
+                      className={`finance-transaction-row ${
+                        tx.type === "CASH_IN" ? "is-cash-in" : "is-cash-out"
+                      }`}
+                    >
                       <td data-label="Date">{new Date(tx.occurredAt).toLocaleString("fr-FR")}</td>
                       <td data-label="Compte">
                         <strong>{tx.accountName}</strong>
@@ -5587,16 +5592,16 @@ export function FinanceTransactionsPage(): JSX.Element {
                             : "Charge transversale entreprise"}
                         </div>
                       </td>
-                      <td data-label="Montant">
+                      <td data-label="Montant" className="finance-transaction-amount-cell">
                         {formatAmountForDisplay(tx.amount)} {tx.currency}
                       </td>
-                      <td data-label="Justificatifs">
+                      <td data-label="Justificatifs" className="finance-transaction-proof-cell">
                         <div>
                           {tx.proofsCount} preuve{tx.proofsCount > 1 ? "s" : ""}
                         </div>
                         <p className="hint">{tx.requiresProof ? "Justificatif requis" : "Justificatif libre"}</p>
                       </td>
-                      <td data-label="Actions">
+                      <td data-label="Actions" className="finance-transaction-actions-cell">
                         <div className="actions-inline">
                           <button
                             type="button"

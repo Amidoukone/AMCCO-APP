@@ -10070,6 +10070,1422 @@ textarea {
   }
 }
 
+/* Mobile page endings: keep final content above the native bottom navigation. */
+@media (max-width: 820px) {
+  .app-content {
+    padding-bottom: calc(118px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(118px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 640px) {
+  .my-work-grid.dashboard-priority-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    overflow: visible;
+    padding-bottom: 0;
+    scroll-snap-type: none;
+  }
+
+  .my-work-grid .dashboard-priority-card {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    scroll-snap-align: none;
+  }
+
+  .my-work-grid .dashboard-priority-list {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .my-work-grid .dashboard-priority-item {
+    width: 100%;
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-items: stretch;
+  }
+
+  .my-work-grid .dashboard-priority-main,
+  .my-work-grid .dashboard-priority-side {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .my-work-grid .dashboard-priority-main strong,
+  .my-work-grid .dashboard-priority-main span,
+  .my-work-grid .dashboard-priority-side strong,
+  .my-work-grid .dashboard-priority-side span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .my-work-grid .dashboard-priority-list .dashboard-priority-item:nth-child(n + 3) {
+    display: grid;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-content {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Mobile task workflow: compact, readable cards for field usage. */
+@media (max-width: 640px) {
+  .operations-filter-form,
+  .operations-task-form {
+    margin-top: 8px;
+    gap: 9px;
+  }
+
+  .operations-list-header {
+    display: grid;
+    gap: 4px;
+  }
+
+  .operations-list-header .hint {
+    margin: 0;
+  }
+
+  .operations-task-list {
+    margin-top: 8px;
+    gap: 10px;
+  }
+
+  .operations-task-card {
+    width: 100%;
+    max-width: 100%;
+    gap: 10px;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .operations-task-top {
+    min-width: 0;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .operations-task-title {
+    font-size: 16px;
+    line-height: 1.28;
+  }
+
+  .operations-task-description {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .operations-task-meta {
+    gap: 7px;
+  }
+
+  .operations-task-meta p {
+    min-width: 0;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .operations-task-meta p strong {
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.25;
+    text-transform: uppercase;
+  }
+
+  .operations-actions {
+    gap: 9px;
+    padding-top: 10px;
+  }
+
+  .operations-actions-primary,
+  .operations-actions-secondary-content {
+    gap: 8px;
+  }
+
+  .operations-actions-secondary-content {
+    padding: 0 10px 10px;
+  }
+
+  .operations-actions-secondary summary {
+    min-height: 42px;
+    padding: 9px 10px;
+  }
+
+  .operations-assign-card,
+  .task-attachment-callout,
+  .operations-task-form-options-body {
+    padding: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .operations-actions-primary {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile finance workflow: readable transaction entry and review cards. */
+@media (max-width: 640px) {
+  .finance-page-panel {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .finance-page-panel h3 {
+    margin-bottom: 6px;
+  }
+
+  .finance-section-toggle {
+    gap: 12px;
+  }
+
+  .finance-section-summary {
+    padding: 0 0 8px;
+    gap: 4px;
+  }
+
+  .finance-transactions-filters .operations-filter-form,
+  .finance-transaction-form {
+    margin-top: 8px;
+    gap: 9px;
+  }
+
+  .finance-transaction-form-section {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .finance-transaction-form-quick,
+  .salary-amount-group {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .finance-proof-selected {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 6px;
+  }
+
+  .finance-proof-selected .secondary-btn {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table tbody {
+    gap: 10px;
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table tr.finance-transaction-row {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table tr.finance-transaction-row::before {
+    content: "";
+    height: 3px;
+    background: var(--theme-border);
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table tr.finance-transaction-row.is-cash-in::before {
+    background: linear-gradient(90deg, #47d6a5, rgba(71, 214, 165, 0.24));
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table tr.finance-transaction-row.is-cash-out::before {
+    background: linear-gradient(90deg, #ff6f87, rgba(255, 111, 135, 0.22));
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table td {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 9px 11px;
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table td[data-label]::before {
+    align-self: start;
+    font-size: 10.5px;
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table td[data-label="Compte"] {
+    padding-top: 12px;
+  }
+
+  .finance-transactions-table-wrap.mobile-card-table .admin-table td[data-label="Compte"] > strong {
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .finance-transaction-amount-cell {
+    color: var(--mobile-text);
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.15;
+  }
+
+  .finance-transaction-row.is-cash-in .finance-transaction-amount-cell {
+    color: #9df2d4;
+  }
+
+  .finance-transaction-row.is-cash-out .finance-transaction-amount-cell {
+    color: #ffbec9;
+  }
+
+  .finance-transaction-proof-cell > div {
+    color: var(--mobile-text);
+    font-weight: 800;
+  }
+
+  .finance-transaction-actions-cell .actions-inline {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .finance-transaction-actions-cell .actions-inline .secondary-btn,
+  .finance-transaction-actions-cell .actions-inline .danger-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .finance-transaction-actions-cell .table-inline-details {
+    margin-top: 8px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    overflow: hidden;
+  }
+
+  .finance-transaction-actions-cell .table-inline-summary {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    color: var(--mobile-text);
+  }
+
+  .finance-transaction-actions-cell .table-inline-content {
+    padding: 0 10px 10px;
+  }
+
+  .finance-transaction-actions-cell .proof-inline-form {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .finance-transaction-actions-cell .proof-list {
+    padding: 9px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+}
+
+@media (max-width: 420px) {
+  .finance-transactions-table-wrap.mobile-card-table .admin-table td {
+    padding: 8px 10px;
+  }
+}
+
+/* Mobile dense admin workflow: salaries, users and task details stay readable. */
+@media (max-width: 640px) {
+  .finance-salary-summary-panel,
+  .finance-salary-list-panel,
+  .salary-detail-panel,
+  .admin-users-create-panel,
+  .admin-users-panel,
+  .security-personal-panel,
+  .company-admin-card {
+    gap: 12px;
+  }
+
+  .salaries-filter-form,
+  .finance-salary-form,
+  .admin-users-create-form,
+  .admin-users-filters,
+  .security-password-form,
+  .company-admin-form {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .finance-salary-form .scope-field {
+    padding: 10px 12px;
+  }
+
+  .finance-salary-form .scope-field strong {
+    max-width: 100%;
+    color: var(--mobile-text);
+    font-size: 20px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .finance-salary-summary-panel .dashboard-panel-header,
+  .finance-salary-list-panel .dashboard-panel-header,
+  .admin-users-management-header,
+  .company-admin-header,
+  .company-admin-top {
+    display: grid;
+    gap: 5px;
+  }
+
+  .company-admin-header {
+    grid-template-columns: 1fr;
+  }
+
+  .company-active-badge {
+    width: 100%;
+    max-width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    overflow-wrap: anywhere;
+  }
+
+  .company-card-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow: visible;
+    padding-bottom: 0;
+    scroll-snap-type: none;
+  }
+
+  .company-card-grid > * {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    scroll-snap-align: none;
+  }
+
+  .company-admin-top {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .company-status-pill {
+    width: fit-content;
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .company-admin-details,
+  .admin-impact-block,
+  .admin-actions-block {
+    width: 100%;
+    display: grid;
+    gap: 7px;
+  }
+
+  .company-admin-details p,
+  .admin-impact-block .hint {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-actions-block > .actions-inline,
+  .admin-actions-block > .secondary-btn {
+    width: 100%;
+  }
+
+  .finance-salary-summary-table-wrap.mobile-card-table .admin-table tbody,
+  .finance-salaries-table-wrap.mobile-card-table .admin-table tbody,
+  .admin-users-table-wrap.mobile-card-table .admin-table tbody {
+    gap: 10px;
+  }
+
+  .finance-salary-summary-table-wrap.mobile-card-table .admin-table tr,
+  .finance-salaries-table-wrap.mobile-card-table .admin-table tr,
+  .admin-users-table-wrap.mobile-card-table .admin-table tr {
+    border-radius: 15px;
+    overflow: hidden;
+  }
+
+  .finance-salaries-table-wrap.mobile-card-table .admin-table tr.finance-salary-row::before {
+    content: "";
+    height: 3px;
+    background: linear-gradient(90deg, #8fb7ff, rgba(143, 183, 255, 0.18));
+  }
+
+  .finance-salaries-table-wrap.mobile-card-table .admin-table tr.finance-salary-row.status-approved::before {
+    background: linear-gradient(90deg, #47d6a5, rgba(71, 214, 165, 0.22));
+  }
+
+  .finance-salaries-table-wrap.mobile-card-table .admin-table tr.finance-salary-row.status-submitted::before {
+    background: linear-gradient(90deg, #ffc72c, rgba(255, 199, 44, 0.2));
+  }
+
+  .finance-salaries-table-wrap.mobile-card-table .admin-table tr.finance-salary-row.status-rejected::before {
+    background: linear-gradient(90deg, #ff6f87, rgba(255, 111, 135, 0.2));
+  }
+
+  .finance-salary-summary-table-wrap.mobile-card-table .admin-table td,
+  .finance-salaries-table-wrap.mobile-card-table .admin-table td,
+  .admin-users-table-wrap.mobile-card-table .admin-table td {
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  .finance-salary-summary-table-wrap.mobile-card-table .admin-table td[data-label]::before,
+  .finance-salaries-table-wrap.mobile-card-table .admin-table td[data-label]::before,
+  .admin-users-table-wrap.mobile-card-table .admin-table td[data-label]::before {
+    align-self: start;
+    font-size: 10.5px;
+  }
+
+  .finance-salaries-table-wrap.mobile-card-table .admin-table td[data-label="Collaborateur"] > strong,
+  .admin-users-table-wrap.mobile-card-table .admin-table td[data-label="Nom"] input {
+    color: var(--mobile-text);
+    font-weight: 850;
+  }
+
+  .finance-salary-net-cell {
+    color: #d8efe6;
+    font-size: 17px;
+    font-weight: 900;
+    line-height: 1.15;
+  }
+
+  .finance-salary-actions-cell .actions-inline,
+  .admin-user-actions-row,
+  .admin-user-password-row,
+  .salary-detail-panel .finance-transaction-detail-actions,
+  .salary-detail-panel .finance-transaction-detail-actions > .actions-inline {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .finance-salary-actions-cell .actions-inline .secondary-btn,
+  .finance-salary-actions-cell .actions-inline .danger-btn,
+  .admin-user-actions-row .secondary-btn,
+  .admin-user-actions-row .danger-btn,
+  .admin-user-password-row .secondary-btn,
+  .salary-detail-panel .finance-transaction-detail-actions .secondary-btn,
+  .salary-detail-panel .finance-transaction-detail-actions .danger-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .finance-salary-actions-cell .table-inline-details,
+  .admin-user-security-toggle {
+    margin-top: 8px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    overflow: hidden;
+  }
+
+  .finance-salary-actions-cell .table-inline-summary,
+  .admin-user-security-toggle summary {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    color: var(--mobile-text);
+  }
+
+  .finance-salary-actions-cell .table-inline-content,
+  .admin-user-password-row {
+    padding: 0 10px 10px;
+  }
+
+  .finance-salary-actions-cell .table-inline-content,
+  .finance-salary-actions-cell .proof-list,
+  .salary-detail-panel .proof-list,
+  .task-attachment-list {
+    min-width: 0;
+  }
+
+  .finance-salary-actions-cell .proof-inline-form,
+  .task-attachment-inline-form,
+  .task-comment-form {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .finance-salary-actions-cell .proof-inline-form button,
+  .task-attachment-inline-form button,
+  .task-comment-form button {
+    width: 100%;
+  }
+
+  .proof-list ul {
+    gap: 8px;
+  }
+
+  .proof-list li {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .proof-list a,
+  .proof-list span,
+  .proof-list small,
+  .task-timeline-meta,
+  .task-timeline-detail,
+  .task-timeline-comment-body {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .admin-users-table-wrap.mobile-card-table .admin-table td[data-label="Email"] {
+    color: var(--mobile-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .admin-user-role-cell {
+    align-items: stretch;
+    gap: 7px;
+  }
+
+  .admin-user-role-badge {
+    width: fit-content;
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .admin-users-table-wrap .inline-checkbox {
+    width: 100%;
+    min-height: 42px;
+    justify-content: flex-start;
+    padding: 8px 9px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .task-detail-actions,
+  .operations-assign-card {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .task-detail-header > .secondary-btn,
+  .salary-detail-panel .task-detail-header > .secondary-btn {
+    width: 100%;
+  }
+
+  .task-timeline {
+    gap: 10px;
+    padding-left: 0;
+  }
+
+  .task-timeline-item {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .finance-salary-summary-table-wrap.mobile-card-table .admin-table td,
+  .finance-salaries-table-wrap.mobile-card-table .admin-table td,
+  .admin-users-table-wrap.mobile-card-table .admin-table td {
+    padding: 8px 9px;
+  }
+
+  .finance-salary-form .scope-field strong {
+    font-size: 18px;
+  }
+}
+
+/* Mobile public/auth workflow: first screens and small admin cards stay polished. */
+@media (max-width: 640px) {
+  .login-page {
+    align-items: start;
+    padding: max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
+  }
+
+  .login-card {
+    width: min(100%, 420px);
+    padding: 20px;
+    gap: 18px;
+  }
+
+  .login-brand {
+    gap: 9px;
+  }
+
+  .login-brand h1 {
+    font-size: clamp(28px, 9vw, 34px);
+    line-height: 1.04;
+  }
+
+  .login-brand p,
+  .login-card-intro h2 {
+    letter-spacing: 0;
+  }
+
+  .login-field input,
+  .login-password-control input,
+  .login-form .login-password-toggle,
+  .login-form .login-submit {
+    min-height: 50px;
+  }
+
+  .login-card .error-box {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .home-page {
+    scroll-padding-top: 74px;
+  }
+
+  .home-hero,
+  .home-section,
+  .home-sector-preview,
+  .home-final-cta {
+    width: min(calc(100% - 24px), 520px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .home-section {
+    padding-block: 34px;
+  }
+
+  .home-section-heading {
+    margin-bottom: 16px;
+  }
+
+  .home-section-heading h2,
+  .home-final-cta h2 {
+    font-size: clamp(24px, 8vw, 34px);
+    line-height: 1.14;
+  }
+
+  .home-mobile-nav a strong,
+  .home-mobile-nav a span,
+  .home-sector-preview strong,
+  .home-sector-content h3,
+  .home-sector-content p,
+  .home-service-row strong,
+  .home-final-cta h2 {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .home-sector-card {
+    min-height: 0;
+  }
+
+  .home-sector-image,
+  .home-sector-image img {
+    min-height: 210px;
+  }
+
+  .home-sector-image {
+    aspect-ratio: 16 / 10;
+  }
+
+  .home-sector-image img {
+    height: 100%;
+  }
+
+  .home-sector-content {
+    padding: 16px;
+    gap: 10px;
+  }
+
+  .home-sector-tags {
+    gap: 6px;
+  }
+
+  .home-sector-tags span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .home-services-layout,
+  .home-service-list {
+    gap: 10px;
+  }
+
+  .home-services-copy {
+    padding-left: 12px;
+  }
+
+  .home-contact-card {
+    padding: 14px;
+  }
+
+  .home-final-cta {
+    display: grid;
+    gap: 14px;
+  }
+
+  .home-final-cta .home-primary-action {
+    width: 100%;
+  }
+
+  .security-session-actions,
+  .activity-admin-list,
+  .activity-admin-card,
+  .activity-admin-card .admin-impact-block,
+  .activity-admin-card .admin-actions-block {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .security-session-actions,
+  .activity-admin-card,
+  .activity-admin-card .admin-actions-block {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .activity-admin-card h4,
+  .activity-admin-card .hint {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .activity-admin-card .secondary-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .login-page {
+    padding-inline: 12px;
+  }
+
+  .login-card {
+    padding: 16px;
+  }
+
+  .login-password-control {
+    grid-template-columns: 1fr;
+  }
+
+  .login-password-control input {
+    border-right: 1px solid rgba(154, 164, 255, 0.3);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .login-form .login-password-toggle {
+    width: 100%;
+    border-left: 1px solid rgba(154, 164, 255, 0.3);
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+  }
+}
+
+/* Mobile global controls: stable search, quick actions and confirmation sheets. */
+@media (max-width: 640px) {
+  .workspace-toolbar {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  .global-search {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .global-search input {
+    padding-inline: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .global-search-results {
+    left: 10px;
+    right: 10px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    max-height: min(54dvh, 380px);
+    padding: 8px;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+
+  .global-search-results button {
+    min-width: 0;
+    width: 100%;
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  .global-search-results strong,
+  .global-search-results span,
+  .global-search-results p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .quick-actions {
+    width: 100%;
+    max-width: 100%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(132px, min(72vw, 220px));
+    justify-content: start;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 3px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .quick-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .quick-action,
+  .app-shell .quick-action {
+    min-width: 0;
+    width: 100%;
+    justify-content: center;
+    border-radius: 14px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    scroll-snap-align: start;
+  }
+
+  .breadcrumb-nav {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .breadcrumb-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .breadcrumb-item,
+  .breadcrumb-nav a,
+  .breadcrumb-item strong {
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .confirm-dialog-backdrop {
+    padding: 10px;
+  }
+
+  .confirm-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(84dvh, 620px);
+    padding: 16px;
+    border-radius: 18px 18px 14px 14px;
+  }
+
+  .confirm-dialog h3,
+  .confirm-dialog-description,
+  .confirm-dialog-object strong,
+  .confirm-dialog-impact {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .confirm-dialog-object {
+    padding: 11px;
+  }
+
+  .confirm-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .confirm-dialog-actions .secondary-btn,
+  .confirm-dialog-actions .danger-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .global-search-results {
+    left: 8px;
+    right: 8px;
+  }
+
+  .quick-actions {
+    grid-auto-columns: minmax(120px, 78vw);
+  }
+}
+
+/* Mobile shell navigation: keep the app menu and bottom nav predictable. */
+@media (max-width: 820px) {
+  .mobile-context-panel {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-smart-menu {
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-menu-section summary strong,
+  .mobile-smart-menu .mobile-drawer-link span,
+  .mobile-smart-menu .mobile-choice-item strong,
+  .mobile-smart-menu .mobile-choice-item span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .mobile-smart-menu .mobile-drawer-link {
+    align-items: start;
+  }
+
+  .mobile-smart-menu .mobile-drawer-link strong {
+    flex: 0 0 auto;
+  }
+
+  .mobile-bottom-nav {
+    width: min(520px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+    margin-inline: auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mobile-bottom-nav-label {
+    min-height: 22px;
+    display: -webkit-box;
+    overflow: hidden;
+    text-align: center;
+    white-space: normal;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .mobile-bottom-nav-badge {
+    max-width: 28px;
+    overflow: hidden;
+    padding-inline: 5px;
+  }
+}
+
+@media (max-width: 380px) {
+  .mobile-bottom-nav {
+    width: min(360px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+  }
+
+  .mobile-bottom-nav-mark {
+    width: 21px;
+    height: 19px;
+  }
+}
+
+/* Mobile alerts workflow: quick triage with clear severity and reachable actions. */
+@media (max-width: 640px) {
+  .alerts-header-actions > .actions-inline {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .alerts-header-actions > .actions-inline .secondary-btn,
+  .alerts-header-actions > .actions-inline .danger-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .alerts-summary-pill {
+    align-content: center;
+    min-height: 64px;
+  }
+
+  .alerts-summary-pill strong {
+    font-size: 22px;
+  }
+
+  .alerts-filter-form {
+    gap: 9px;
+  }
+
+  .alerts-filter-form .inline-checkbox {
+    width: 100%;
+    min-height: 46px;
+    justify-content: flex-start;
+    padding: 9px 10px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .alerts-filter-form button {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .alert-card {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    gap: 10px;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .alert-card-top {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-card-top > .inline-checkbox {
+    width: 100%;
+    min-height: 40px;
+    justify-content: flex-start;
+    padding: 8px 9px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .alert-card-badges,
+  .alert-meta-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .alert-message {
+    font-size: 14.5px;
+    line-height: 1.42;
+  }
+
+  .alert-context-preview {
+    margin: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .alert-details {
+    border: 1px solid var(--mobile-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    overflow: hidden;
+  }
+
+  .alert-details .table-inline-summary {
+    width: 100%;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    color: var(--mobile-text);
+  }
+
+  .alert-details .alert-meta {
+    grid-template-columns: 1fr;
+    padding: 0 10px 10px;
+  }
+
+  .alert-card > .actions-inline {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .alert-card > .actions-inline .secondary-btn,
+  .alert-card > .actions-inline .danger-btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .alert-card {
+    padding: 11px;
+  }
+}
+
+/* Mobile dashboard workflow: compact entry point without horizontal friction. */
+@media (max-width: 640px) {
+  .dashboard-overview-panel .dashboard-action-card {
+    min-width: 0;
+    justify-items: start;
+  }
+
+  .dashboard-overview-panel .dashboard-action-value {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard-operational-table-wrap.mobile-auto-card-table {
+    overflow: visible;
+  }
+
+  .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table tbody {
+    gap: 10px;
+  }
+
+  .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table {
+    min-width: 0;
+  }
+
+  .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table tr {
+    border-radius: 16px;
+  }
+
+  .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table td {
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table td[data-label]::before {
+    font-size: 10.5px;
+  }
+
+  .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table td[data-label="Net"] {
+    color: var(--mobile-text);
+    font-size: 16px;
+    font-weight: 900;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    overflow: visible;
+    padding-bottom: 0;
+    scroll-snap-type: none;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-card {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    scroll-snap-align: none;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-item {
+    width: 100%;
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-main,
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-side {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-list .dashboard-priority-item:nth-child(n + 3) {
+    display: grid;
+  }
+}
+
+/* Mobile reports workflow: readable filters, exports and report tables. */
+@media (max-width: 640px) {
+  .reports-control-panel,
+  .reports-overview-panel,
+  .reports-export-panel,
+  .reports-table-panel {
+    gap: 12px;
+  }
+
+  .reports-control-panel h3,
+  .reports-overview-panel h3,
+  .reports-export-panel h3 {
+    margin-bottom: 6px;
+  }
+
+  .reports-period-presets {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .reports-filter-form {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .reports-filter-field {
+    min-width: 0;
+  }
+
+  .reports-filter-form button,
+  .reports-filter-form .secondary-btn {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .reports-control-panel > .hint {
+    margin: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.035);
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+
+  .reports-summary-grid,
+  .reports-profile-grid,
+  .reports-highlight-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 9px;
+    overflow: visible;
+    padding-bottom: 0;
+    scroll-snap-type: none;
+  }
+
+  .reports-summary-grid > *,
+  .reports-profile-grid > *,
+  .reports-highlight-grid > * {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    scroll-snap-align: none;
+  }
+
+  .reports-data-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .reports-export-grid {
+    width: 100%;
+  }
+
+  .reports-export-card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .reports-export-card button {
+    width: 100%;
+  }
+
+  .reports-table-panel {
+    overflow: visible;
+  }
+
+  .reports-table-header {
+    display: grid;
+    gap: 4px;
+    padding: 12px 12px 8px;
+  }
+
+  .reports-table-header h4 {
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  .reports-table-header span {
+    font-size: 11.5px;
+    line-height: 1.3;
+  }
+
+  .reports-table-wrap.mobile-auto-card-table {
+    overflow: visible;
+  }
+
+  .reports-table-wrap.mobile-auto-card-table .admin-table {
+    min-width: 0;
+  }
+
+  .reports-table-wrap.mobile-auto-card-table .admin-table tbody,
+  .reports-table-wrap.mobile-auto-card-table .admin-table tfoot {
+    gap: 10px;
+  }
+
+  .reports-table-wrap.mobile-auto-card-table .admin-table tr {
+    border-radius: 15px;
+  }
+
+  .reports-table-wrap.mobile-auto-card-table .admin-table td,
+  .reports-table-wrap.mobile-auto-card-table .admin-table th {
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  .reports-table-wrap.mobile-auto-card-table .admin-table td[data-label]::before,
+  .reports-table-wrap.mobile-auto-card-table .admin-table th[data-label]::before {
+    font-size: 10.5px;
+  }
+
+  .reports-table-wrap.mobile-auto-card-table .admin-table td[data-label="Net"],
+  .reports-table-wrap.mobile-auto-card-table .admin-table td[data-label="Solde net"],
+  .reports-table-wrap.mobile-auto-card-table .admin-table td[data-label="Solde"],
+  .reports-table-wrap.mobile-auto-card-table .admin-table td[data-label="Marge"] {
+    color: var(--mobile-text);
+    font-size: 15px;
+    font-weight: 900;
+  }
+
+  .reports-table-wrap.mobile-scroll-table {
+    border-radius: 15px;
+  }
+}
+
+@media (max-width: 420px) {
+  .reports-period-presets {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-table-header {
+    padding-inline: 10px;
+  }
+}
+
 /* Mobile form actions: keep save/cancel reachable in long operational forms. */
 .mobile-sticky-form-actions {
   display: flex;
