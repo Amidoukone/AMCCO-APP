@@ -1261,12 +1261,12 @@ export async function getDashboardFinanceSummary(
     `
       SELECT
         currency AS currency,
-        COALESCE(CAST(SUM(CASE WHEN status = 'APPROVED' AND type = 'CASH_IN' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedCashInTotal,
-        COALESCE(CAST(SUM(CASE WHEN status = 'APPROVED' AND type = 'CASH_OUT' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedCashOutTotal,
+        COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') AND type = 'CASH_IN' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedCashInTotal,
+        COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') AND type = 'CASH_OUT' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedCashOutTotal,
         COALESCE(
           CAST(
-            SUM(CASE WHEN status = 'APPROVED' AND type = 'CASH_IN' THEN amount ELSE 0 END) -
-            SUM(CASE WHEN status = 'APPROVED' AND type = 'CASH_OUT' THEN amount ELSE 0 END)
+            SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') AND type = 'CASH_IN' THEN amount ELSE 0 END) -
+            SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') AND type = 'CASH_OUT' THEN amount ELSE 0 END)
           AS CHAR),
           '0.00'
         ) AS netApprovedTotal
@@ -1458,7 +1458,7 @@ export async function listDashboardFinanceActivitySummary(
       SELECT
         activity_code AS activityCode,
         COUNT(*) AS transactionsCount,
-        COALESCE(SUM(CASE WHEN status = 'SUBMITTED' THEN 1 ELSE 0 END), 0) AS submittedTransactionsCount
+        COALESCE(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') THEN 1 ELSE 0 END), 0) AS submittedTransactionsCount
       FROM transactions
       WHERE company_id = ?
         AND activity_code IS NOT NULL
@@ -1519,7 +1519,7 @@ export async function listReportFinanceByStatus(
       FROM transactions
       WHERE ${filters.join(" AND ")}
       GROUP BY status, currency
-      ORDER BY FIELD(status, 'SUBMITTED', 'DRAFT', 'APPROVED', 'REJECTED'), currency ASC
+      ORDER BY FIELD(status, 'APPROVED', 'SUBMITTED', 'DRAFT', 'REJECTED'), currency ASC
     `,
     values
   );
@@ -1548,7 +1548,7 @@ export async function listReportFinanceByType(
         currency AS currency,
         COUNT(*) AS count,
         COALESCE(CAST(SUM(amount) AS CHAR), '0.00') AS totalAmount,
-        COALESCE(CAST(SUM(CASE WHEN status = 'APPROVED' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedAmount
+        COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedAmount
       FROM transactions
       WHERE ${filters.join(" AND ")}
       GROUP BY type, currency
@@ -1586,7 +1586,7 @@ export async function listReportFinanceByActivity(
         activity_code AS activityCode,
         COUNT(*) AS count,
         COALESCE(CAST(SUM(amount) AS CHAR), '0.00') AS totalAmount,
-        COALESCE(CAST(SUM(CASE WHEN status = 'APPROVED' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedAmount
+        COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedAmount
       FROM transactions
       WHERE ${filters.join(" AND ")}
       GROUP BY activity_code

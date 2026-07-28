@@ -34,8 +34,8 @@ export function formatAmount(value: string, currency: string): string {
 
 export function financeStatusLabel(status: FinanceStatus): string {
   if (status === "DRAFT") return "Brouillon";
-  if (status === "SUBMITTED") return "Soumise";
-  if (status === "APPROVED") return "Approuvée";
+  if (status === "SUBMITTED") return "Enregistrée";
+  if (status === "APPROVED") return "Finalisée";
   return "Rejetée";
 }
 

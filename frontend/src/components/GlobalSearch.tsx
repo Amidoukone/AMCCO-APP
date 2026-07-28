@@ -20,6 +20,20 @@ type GlobalSearchProps = {
   selectedActivityCode: string | null;
 };
 
+const FEATURE_SEARCH_KEYWORDS: Record<NavigationItem["key"], string[]> = {
+  dashboard: ["pilotage", "tableau", "indicateurs", "net", "exécution", "blocages"],
+  myWork: ["priorités", "mes tâches", "urgent", "échéance", "travail"],
+  alerts: ["alerte", "notification", "non lue", "criticité", "risque"],
+  reports: ["rapport", "export", "pdf", "excel", "guide", "synthèse", "exec", "rentabilité"],
+  financeTransactions: ["transaction", "finance", "caisse", "entrée", "sortie", "preuve", "justificatif"],
+  financeSalaries: ["salaire", "paie", "net", "employé", "preuve", "paiement"],
+  operationsTasks: ["tâche", "opération", "responsable", "blocage", "retard", "échéance"],
+  adminCompanies: ["entreprise", "société", "active", "bascule", "espace"],
+  adminUsers: ["utilisateur", "membre", "rôle", "accès", "mot de passe"],
+  adminActivities: ["secteur", "activité", "activation", "désactivation", "domaine"],
+  settingsSecurity: ["sécurité", "mot de passe", "session", "compte", "déconnexion"]
+};
+
 function buildSearchItems(
   navigation: NavigationItem[],
   role: RoleCode,
@@ -33,7 +47,7 @@ function buildSearchItems(
     label: item.label,
     description: item.section,
     to: item.to,
-    keywords: [item.label, item.section, item.key]
+    keywords: [item.label, item.section, item.key, ...FEATURE_SEARCH_KEYWORDS[item.key]]
   }));
 
   const shortcuts: SearchItem[] = [
@@ -73,6 +87,22 @@ function buildSearchItems(
           keywords: isReadOnlyOwner
             ? ["propriétaire", "contrôle", "pilotage", "synthèse", "vue propriétaire"]
             : ["rapport", "export", "pdf", "excel"]
+        }
+      : null,
+    canUse("financeSalaries")
+      ? {
+          label: isReadOnlyOwner ? "Suivi salaires" : "Salaires",
+          description: "Paie, preuves et paiements par période",
+          to: "/finance/salaries",
+          keywords: ["salaire", "salaires", "paie", "employé", "net", "preuve", "paiement"]
+        }
+      : null,
+    canUse("settingsSecurity")
+      ? {
+          label: "Sécurité du compte",
+          description: "Mot de passe et session active",
+          to: "/settings/security",
+          keywords: ["sécurité", "mot de passe", "session", "déconnexion", "compte"]
         }
       : null,
     canUse("alerts")

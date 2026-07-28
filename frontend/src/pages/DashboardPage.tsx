@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardHero } from "../components/dashboard/DashboardHero";
 import { DashboardPriorityPanels } from "../components/dashboard/DashboardPriorityPanels";
+import { PageGuide } from "../components/PageGuide";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ApiError, getDashboardSummaryRequest } from "../lib/api";
@@ -24,23 +25,28 @@ function buildActivityQuery(activityCode: string | null): string {
   return activityCode ? `?activityCode=${activityCode}` : "";
 }
 
+function getAccountedTransactionCount(summary: DashboardSummary): number {
+  return summary.finance.submittedCount + summary.finance.approvedCount;
+}
+
 function buildOwnerActionCards(
   summary: DashboardSummary,
   selectedActivityCode: string | null
 ): DashboardActionCard[] {
   const activityQuery = buildActivityQuery(selectedActivityCode);
   const blockedOrLateCount = summary.operations.blockedCount + summary.operations.overdueCount;
+  const accountedTransactionCount = getAccountedTransactionCount(summary);
 
   return [
     {
       key: "owner-finance-review",
-      eyebrow: "Contrôle",
-      title: "Transactions soumises",
-      value: String(summary.finance.submittedCount),
-      note: "À suivre avant validation comptable.",
+      eyebrow: "Finance",
+      title: "Transactions comptabilisées",
+      value: String(accountedTransactionCount),
+      note: "Entrées et sorties enregistrées dans le suivi.",
       actionLabel: "Ouvrir les transactions",
       href: `/finance/transactions${activityQuery}`,
-      tone: summary.finance.submittedCount > 0 ? "warning" : "neutral"
+      tone: "neutral"
     },
     {
       key: "owner-alerts",
@@ -79,7 +85,7 @@ function buildOwnerSummaryPills(
   summary: DashboardSummary,
   selectedActivityLabel: string | null
 ): Array<{ label: string; value: string }> {
-  const netApproved =
+  const netAccounted =
     summary.finance.totalsByCurrency.length === 1
       ? `${summary.finance.totalsByCurrency[0].netApprovedTotal} ${summary.finance.totalsByCurrency[0].currency}`
       : `${summary.finance.totalsByCurrency.length} devise(s)`;
@@ -94,8 +100,8 @@ function buildOwnerSummaryPills(
       value: selectedActivityLabel ?? "Tous les secteurs"
     },
     {
-      label: "Net approuvé",
-      value: netApproved
+      label: "Net comptabilisé",
+      value: netAccounted
     },
     {
       label: "Utilisateurs actifs",
@@ -199,6 +205,31 @@ export function DashboardPage(): JSX.Element {
 
       {!isLoading && summary ? (
         <>
+          <PageGuide
+            title="Guide de pilotage"
+            description={`Les indicateurs affichés couvrent ${
+              selectedActivity?.label ?? "tous les secteurs accessibles"
+            } pour aider à décider quoi contrôler en priorité.`}
+            items={[
+              {
+                term: "Net comptabilisé",
+                description: "Solde des entrées moins les sorties déjà enregistrées dans le suivi financier."
+              },
+              {
+                term: "Exécution",
+                description: "Part des tâches terminées par rapport au volume de tâches suivies."
+              },
+              {
+                term: "Blocage",
+                description: "Tâche arrêtée par un problème nécessitant une décision ou un appui."
+              },
+              {
+                term: "Périmètre",
+                description: "Entreprise complète ou secteur sélectionné dans le contexte courant."
+              }
+            ]}
+          />
+
           <DashboardHero
             actionCards={dailyActionCards}
             quickSummaryPills={quickSummaryPills}
@@ -221,7 +252,7 @@ export function DashboardPage(): JSX.Element {
               <div className="owner-command-grid">
                 <article className="owner-command-card">
                   <strong>Finance</strong>
-                  <span>{summary.finance.submittedCount} soumise(s)</span>
+                  <span>{getAccountedTransactionCount(summary)} comptabilisée(s)</span>
                   <span>{summary.finance.rejectedCount} rejetée(s)</span>
                   <button
                     type="button"
@@ -288,29 +319,70 @@ export function DashboardPage(): JSX.Element {
                 <p className="sidebar-section-label">Pilotage opérationnel</p>
                 <h3>Rentabilité, efficacité et exécution</h3>
                 <p className="hint">
-                  Rentabilité calculée sur les flux approuvés en XOF, avec suivi des tâches,
+                  Rentabilité calculée sur les flux comptabilisés en XOF, avec suivi des tâches,
                   blocages et retards.
                 </p>
               </div>
             </div>
-            <div className="table-wrap dashboard-operational-table-wrap">
+            <div className="table-wrap dashboard-operational-table-wrap mobile-auto-card-table">
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Périmètre</th>
-                    <th>Entrées</th>
-                    <th>Sorties</th>
-                    <th>Net</th>
-                    <th>Exécution</th>
-                    <th>Ouvertes</th>
-                    <th>Blocages</th>
-                    <th>Retards</th>
+                    <th>
+                      <abbr title="Entreprise, secteur ou sous-section analysée.">Périmètre</abbr>
+                    </th>
+                    <th>
+                      <abbr title="Total des entrées financières comptabilisées.">Entrées</abbr>
+                    </th>
+                    <th>
+                      <abbr title="Total des sorties financières comptabilisées.">Sorties</abbr>
+                    </th>
+                    <th>
+                      <abbr title="Entrées moins sorties sur le périmètre.">Net</abbr>
+                    </th>
+                    <th>
+                      <abbr title="Taux de tâches terminées dans le périmètre.">Exécution</abbr>
+                    </th>
+                    <th>
+                      <abbr title="Tâches encore non terminées.">Ouvertes</abbr>
+                    </th>
+                    <th>
+                      <abbr title="Tâches arrêtées par un problème.">Blocages</abbr>
+                    </th>
+                    <th>
+                      <abbr title="Tâches ouvertes dont l'échéance est dépassée.">Retards</abbr>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {operationalRows.length === 0 ? (
                     <tr>
-                      <td colSpan={8}>Aucune donnée opérationnelle consolidée pour ce périmètre.</td>
+                      <td colSpan={8}>
+                        <div className="dashboard-table-empty">
+                          <strong>Aucune donnée opérationnelle consolidée.</strong>
+                          <span>
+                            Créez ou consultez les tâches et transactions du périmètre pour alimenter ce tableau.
+                          </span>
+                          <div className="actions-inline">
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() => navigate(`/operations/tasks${buildActivityQuery(selectedActivityCode)}`)}
+                            >
+                              Voir les tâches
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() =>
+                                navigate(`/finance/transactions${buildActivityQuery(selectedActivityCode)}`)
+                              }
+                            >
+                              Voir les transactions
+                            </button>
+                          </div>
+                        </div>
+                      </td>
                     </tr>
                   ) : (
                     operationalRows.map((row) => (

@@ -5,7 +5,9 @@ import {
   updateAdminCompanyActivityRequest
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { PageGuide } from "../components/PageGuide";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { CompanyActivityItem } from "../types/activities";
@@ -34,6 +36,8 @@ export function AdminActivitiesPage(): JSX.Element {
   const canViewActivities = useMemo(() => {
     return user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   }, [user?.role]);
+  const enabledActivitiesCount = useMemo(() => items.filter((item) => item.isEnabled).length, [items]);
+  const disabledActivitiesCount = items.length - enabledActivitiesCount;
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -96,7 +100,31 @@ export function AdminActivitiesPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Administration secteurs</h2>
+        <p>Activation des domaines métier visibles dans les tâches, transactions, tableaux de bord et rapports.</p>
       </header>
+
+      <PageGuide
+        title="Guide des secteurs"
+        description="Un secteur activé devient utilisable dans les créations et alimente les indicateurs associés."
+        items={[
+          {
+            term: "Actif",
+            description: "Secteur disponible pour créer des tâches, transactions et rapports."
+          },
+          {
+            term: "Désactivé",
+            description: "Secteur masqué dans les créations; les données historiques restent consultables."
+          },
+          {
+            term: "Impact",
+            description: "Conséquence opérationnelle de l'état du secteur pour les équipes."
+          },
+          {
+            term: "Action",
+            description: "Commande utilisée par l'admin système pour activer ou désactiver le secteur."
+          }
+        ]}
+      />
 
       <FeedbackBanner
         errorMessage={errorMessage}
@@ -105,45 +133,69 @@ export function AdminActivitiesPage(): JSX.Element {
       />
 
       <section className="panel">
-        <h3>Configuration des secteurs</h3>
-        {!isLoading ? (
-          <div className="activity-admin-list">
-            {items.map((item) => (
-              <article key={item.code} className="activity-admin-card">
-                <div>
-                  <h4>{item.label}</h4>
-                  <div className="admin-impact-block">
-                    <p className="hint">
-                      <strong>État:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
-                    </p>
-                    <p className="hint">
-                      <strong>Impact:</strong>{" "}
-                      {item.isEnabled
-                        ? "Le secteur reste disponible pour nouvelles tâches et transactions."
-                        : "Le secteur disparaît des créations; l'historique existant reste consultable."}
-                    </p>
-                  </div>
-                </div>
-                {canManageActivities ? <div className="admin-actions-block">
-                  <p className="hint">
-                    <strong>Action</strong>
-                  </p>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => void handleToggleActivity(item)}
-                    disabled={busyActivityCode === item.code}
-                  >
-                    {busyActivityCode === item.code
-                      ? "Mise à jour..."
-                      : item.isEnabled
-                        ? "Désactiver"
-                        : "Activer"}
-                  </button>
-                </div> : null}
-              </article>
-            ))}
+        <div className="admin-section-header">
+          <div>
+            <h3>Configuration des secteurs</h3>
+            <p className="hint">{items.length} secteur(s) configuré(s) pour l'entreprise active.</p>
           </div>
+          <div className="admin-summary-strip">
+            <article className="admin-summary-pill">
+              <strong>{enabledActivitiesCount}</strong>
+              <span>Actifs</span>
+            </article>
+            <article className="admin-summary-pill">
+              <strong>{disabledActivitiesCount}</strong>
+              <span>Désactivés</span>
+            </article>
+          </div>
+        </div>
+        {!isLoading ? (
+          items.length === 0 ? (
+            <EmptyState
+              title="Aucun secteur configuré"
+              description="Aucun secteur métier n'est disponible pour cette entreprise."
+              actionLabel="Actualiser"
+              onAction={() => void loadData()}
+            />
+          ) : (
+            <div className="activity-admin-list">
+              {items.map((item) => (
+                <article key={item.code} className="activity-admin-card">
+                  <div>
+                    <h4>{item.label}</h4>
+                    <div className="admin-impact-block">
+                      <p className="hint">
+                        <strong>État:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
+                      </p>
+                      <p className="hint">
+                        <strong>Impact:</strong>{" "}
+                        {item.isEnabled
+                          ? "Le secteur reste disponible pour nouvelles tâches et transactions."
+                          : "Le secteur disparaît des créations; l'historique existant reste consultable."}
+                      </p>
+                    </div>
+                  </div>
+                  {canManageActivities ? <div className="admin-actions-block">
+                    <p className="hint">
+                      <strong>Action</strong>
+                    </p>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => void handleToggleActivity(item)}
+                      disabled={busyActivityCode === item.code}
+                    >
+                      {busyActivityCode === item.code
+                        ? "Mise à jour..."
+                        : item.isEnabled
+                          ? "Désactiver"
+                          : "Activer"}
+                    </button>
+                  </div> : null}
+                </article>
+              ))}
+            </div>
+          )
         ) : null}
       </section>
     </>

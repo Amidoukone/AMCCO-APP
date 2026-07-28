@@ -84,6 +84,70 @@ const HARDWARE_REPORT_BRANDING = {
   fiscal: "N Fiscal 084126139L",
   phone: "TEL: 79 07 24 40"
 };
+const REPORT_READING_GUIDE_ROWS: Array<{
+  term: string;
+  definition: string;
+  formula: string;
+  useCase: string;
+  includeInPdf: boolean;
+}> = [
+  {
+    term: "Comptabilisé",
+    definition: "Transaction enregistrée ou finalisée, prise en compte dans les soldes.",
+    formula: "SUBMITTED + APPROVED",
+    useCase: "Base des totaux financiers et de la rentabilité.",
+    includeInPdf: true
+  },
+  {
+    term: "Entrées XOF",
+    definition: "Recettes comptabilisées en franc CFA sur le périmètre filtré.",
+    formula: "Somme CASH_IN XOF",
+    useCase: "Lecture des encaissements du secteur.",
+    includeInPdf: false
+  },
+  {
+    term: "Sorties XOF",
+    definition: "Dépenses comptabilisées en franc CFA sur le périmètre filtré.",
+    formula: "Somme CASH_OUT XOF",
+    useCase: "Lecture des charges et coûts terrain.",
+    includeInPdf: false
+  },
+  {
+    term: "Net XOF",
+    definition: "Solde opérationnel du périmètre filtré.",
+    formula: "Entrées XOF - Sorties XOF",
+    useCase: "Repérer le résultat par secteur ou sous-section.",
+    includeInPdf: true
+  },
+  {
+    term: "Marge",
+    definition: "Part du solde conservée sur les recettes.",
+    formula: "Net XOF / Entrées XOF",
+    useCase: "Comparer la qualité des recettes.",
+    includeInPdf: true
+  },
+  {
+    term: "Rent. coûts",
+    definition: "Rentabilité sur les coûts engagés.",
+    formula: "Net XOF / Sorties XOF",
+    useCase: "Mesurer le retour obtenu sur les dépenses.",
+    includeInPdf: true
+  },
+  {
+    term: "EXEC",
+    definition: "Taux d'exécution des tâches du périmètre.",
+    formula: "Tâches terminées / Total tâches",
+    useCase: "Suivre l'avancement terrain.",
+    includeInPdf: true
+  },
+  {
+    term: "Blocages / Retards",
+    definition: "Blocages: tâches bloquées. Retards: tâches ouvertes après échéance.",
+    formula: "Comptage tâches",
+    useCase: "Identifier les points à arbitrer rapidement.",
+    includeInPdf: true
+  }
+];
 const AGRICULTURE_OPERATION_LABELS: Record<string, string> = {
   INPUT_PURCHASE: "Achat intrants",
   FIELD_EXPENSE: "Travaux champ",
@@ -557,6 +621,15 @@ function buildOverviewMetadataRows(filters: ReportPeriodFilter): Array<Record<st
   ];
 }
 
+function buildReportReadingGuideRows(): Array<Record<string, unknown>> {
+  return REPORT_READING_GUIDE_ROWS.map((item) => ({
+    term: item.term,
+    definition: item.definition,
+    formula: item.formula,
+    useCase: item.useCase
+  }));
+}
+
 type BufferedPdfPage = {
   content?: {
     uncompressedLength?: number;
@@ -678,12 +751,18 @@ function toDisplayTransactionStatusLabel(
     return "Brouillon";
   }
   if (status === "SUBMITTED") {
-    return "Soumise";
+    return "Enregistree";
   }
   if (status === "APPROVED") {
-    return "Approuvee";
+    return "Finalisee";
   }
   return "Rejetee";
+}
+
+function isReportableFinancialStatus(
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED"
+): boolean {
+  return status === "SUBMITTED" || status === "APPROVED";
 }
 
 function toDisplayTransactionTypeLabel(type: "CASH_IN" | "CASH_OUT"): string {
@@ -909,8 +988,76 @@ function drawPdfTableCell(
       width: width - 8,
       height: height - 4,
       align
-    });
+  });
   doc.restore();
+}
+
+function drawPdfReadingGuideBox(doc: PDFKit.PDFDocument): void {
+  const rows = REPORT_READING_GUIDE_ROWS.filter((item) => item.includeInPdf);
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const tableWidth = pageWidth - margin * 2;
+  const titleHeight = 24;
+  const headerHeight = 18;
+  const rowHeight = 30;
+  const totalHeight = titleHeight + headerHeight + rows.length * rowHeight + 14;
+
+  if (needsPdfPageBreak(doc, totalHeight)) {
+    doc.addPage();
+    doc.y = PDF_CONTENT_TOP;
+  }
+
+  const y = doc.y;
+  doc.roundedRect(margin, y, tableWidth, totalHeight, 4).fill("#f8fafc");
+  doc.rect(margin, y, tableWidth, totalHeight).strokeColor("#d9e2ec").lineWidth(0.8).stroke();
+  doc
+    .fillColor("#102a43")
+    .font("Helvetica-Bold")
+    .fontSize(9)
+    .text("Guide de lecture des colonnes", margin + 10, y + 8, {
+      width: tableWidth - 20
+    });
+
+  const columns: PdfTableColumn[] = [
+    { label: "ELEMENT", width: 82, align: "left" },
+    { label: "DEFINITION", width: 265, align: "left" },
+    { label: "CALCUL / USAGE", width: tableWidth - 347, align: "left" }
+  ];
+  let tableY = y + titleHeight;
+  let x = margin;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, tableY, column.width, headerHeight, {
+      align: column.align,
+      fill: "#e5eef8",
+      font: "Helvetica-Bold",
+      fontSize: 6.8,
+      borderColor: "#cbd5e1"
+    });
+    x += column.width;
+  }
+  tableY += headerHeight;
+
+  for (const row of rows) {
+    const values = [
+      row.term,
+      row.definition,
+      row.formula ? `${row.formula}. ${row.useCase}` : row.useCase
+    ];
+    x = margin;
+    values.forEach((value, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, value, x, tableY, column.width, rowHeight, {
+        align: column.align,
+        font: index === 0 ? "Helvetica-Bold" : "Helvetica",
+        fontSize: 6.5,
+        borderColor: "#d9e2ec"
+      });
+      x += column.width;
+    });
+    tableY += rowHeight;
+  }
+
+  doc.y = y + totalHeight + 10;
 }
 
 function drawHardwareReportHeader(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport): void {
@@ -1186,7 +1333,7 @@ function drawHardwareEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(8.5)
     .text(
-      "Le rapport reprend les ventes XOF soumises ou approuvées avec désignation article. Vérifiez la période, le statut des transactions et les champs quantité/prix si le tableau doit être alimenté.",
+      "Le rapport reprend les ventes XOF comptabilisées avec désignation article. Vérifiez la période et les champs quantité/prix si le tableau doit être alimenté.",
       margin + 14,
       y + 34,
       {
@@ -1288,6 +1435,7 @@ function renderHardwareReportsPdf(
   drawHardwareReportHeader(doc, report);
   drawHardwareMetadataStrip(doc, report, filters, overview.generatedAt);
   drawHardwareMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawHardwareMonthlyTable(doc, report);
 
   const note =
@@ -1626,7 +1774,7 @@ function drawAgricultureEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches agricoles de la période. Renseignez campagne, parcelle et type de champ pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF comptabilisées et les tâches agricoles de la période. Renseignez campagne, parcelle et type de champ pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -1798,6 +1946,7 @@ function renderAgricultureReportsPdf(
   drawAgricultureReportHeader(doc, report);
   drawAgricultureMetadataStrip(doc, report, filters, overview.generatedAt);
   drawAgricultureMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawAgricultureOperationsTable(doc, report);
   drawAgricultureBreakdown(doc, report);
 }
@@ -2048,7 +2197,7 @@ function drawGeneralStoreEmptyState(doc: PDFKit.PDFDocument): void {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#3730a3").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Magasins de la période. Renseignez rayon, famille, article, référence, quantité et caisse pour alimenter le suivi.",
+    "Le rapport reprend les transactions XOF comptabilisées et les tâches Magasins de la période. Renseignez rayon, famille, article, référence, quantité et caisse pour alimenter le suivi.",
     margin + 14,
     y + 34,
     { width: pageWidth - margin * 2 - 28 }
@@ -2197,6 +2346,7 @@ function renderGeneralStoreReportsPdf(
   drawGeneralStoreReportHeader(doc, report);
   drawGeneralStoreMetadataStrip(doc, report, filters, overview.generatedAt);
   drawGeneralStoreMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawGeneralStoreOperationsTable(doc, report);
   drawGeneralStoreBreakdown(doc, report);
 }
@@ -2450,7 +2600,7 @@ function drawFoodEmptyState(doc: PDFKit.PDFDocument): void {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#166534").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Alimentation de la période. Renseignez famille, produit, lot, quantité et zone pour alimenter le suivi.",
+    "Le rapport reprend les transactions XOF comptabilisées et les tâches Alimentation de la période. Renseignez famille, produit, lot, quantité et zone pour alimenter le suivi.",
     margin + 14,
     y + 34,
     {
@@ -2601,6 +2751,7 @@ function renderFoodReportsPdf(
   drawFoodReportHeader(doc, report);
   drawFoodMetadataStrip(doc, report, filters, overview.generatedAt);
   drawFoodMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawFoodOperationsTable(doc, report);
   drawFoodBreakdown(doc, report);
 }
@@ -2913,7 +3064,7 @@ function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Location de la période. Renseignez bien, lot, locataire et bail pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF comptabilisées et les tâches Location de la période. Renseignez bien, lot, locataire et bail pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -3085,6 +3236,7 @@ function renderRentalReportsPdf(
   drawRentalReportHeader(doc, report);
   drawRentalMetadataStrip(doc, report, filters, overview.generatedAt);
   drawRentalMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawRentalOperationsTable(doc, report);
   drawRentalBreakdown(doc, report);
 }
@@ -3334,7 +3486,7 @@ function drawHotelEmptyState(doc: PDFKit.PDFDocument): void {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#075985").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches Hôtellerie de la période. Renseignez réservation, chambre, service, nuitées et client pour alimenter le suivi.",
+    "Le rapport reprend les transactions XOF comptabilisées et les tâches Hôtellerie de la période. Renseignez réservation, chambre, service, nuitées et client pour alimenter le suivi.",
     margin + 14,
     y + 34,
     { width: pageWidth - margin * 2 - 28 }
@@ -3483,6 +3635,7 @@ function renderHotelReportsPdf(
   drawHotelReportHeader(doc, report);
   drawHotelMetadataStrip(doc, report, filters, overview.generatedAt);
   drawHotelMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawHotelOperationsTable(doc, report);
   drawHotelBreakdown(doc, report);
 }
@@ -3794,6 +3947,7 @@ function renderWaterReportsPdf(
   const report = overview.waterOperationsReport ?? buildEmptyWaterOperationsReport(filters);
   drawWaterReportHeader(doc, report);
   drawWaterMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawWaterOperationsTable(doc, report);
   drawWaterBreakdown(doc, report);
 }
@@ -4043,6 +4197,7 @@ function renderAgencyReportsPdf(
   const report = overview.agencyOperationsReport ?? buildEmptyAgencyOperationsReport(filters);
   drawAgencyReportHeader(doc, report);
   drawAgencyMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawAgencyOperationsTable(doc, report);
   drawAgencyBreakdown(doc, report);
 }
@@ -4386,7 +4541,7 @@ function drawBtpEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches BTP de la période. Renseignez chantier, lot, client et avancement pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF comptabilisées et les tâches BTP de la période. Renseignez chantier, lot, client et avancement pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -4558,6 +4713,7 @@ function renderBtpReportsPdf(
   drawBtpReportHeader(doc, report);
   drawBtpMetadataStrip(doc, report, filters, overview.generatedAt);
   drawBtpMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawBtpOperationsTable(doc, report);
   drawBtpBreakdown(doc, report);
 }
@@ -4901,7 +5057,7 @@ function drawFishFarmingEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches piscicoles de la période. Renseignez bassin, cycle et espèce pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF comptabilisées et les tâches piscicoles de la période. Renseignez bassin, cycle et espèce pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -5073,6 +5229,7 @@ function renderFishFarmingReportsPdf(
   drawFishFarmingReportHeader(doc, report);
   drawFishFarmingMetadataStrip(doc, report, filters, overview.generatedAt);
   drawFishFarmingMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawFishFarmingOperationsTable(doc, report);
   drawFishFarmingBreakdown(doc, report);
 }
@@ -5410,7 +5567,7 @@ function drawLivestockEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF soumises ou approuvées et les tâches d'élevage de la période. Renseignez troupeau, lot et espèce pour alimenter le suivi.",
+      "Le rapport reprend les transactions XOF comptabilisées et les tâches d'élevage de la période. Renseignez troupeau, lot et espèce pour alimenter le suivi.",
       margin + 14,
       y + 34,
       {
@@ -5582,6 +5739,7 @@ function renderLivestockReportsPdf(
   drawLivestockReportHeader(doc, report);
   drawLivestockMetadataStrip(doc, report, filters, overview.generatedAt);
   drawLivestockMetricCards(doc, report);
+  drawPdfReadingGuideBox(doc);
   drawLivestockOperationsTable(doc, report);
   drawLivestockBreakdown(doc, report);
 }
@@ -5664,7 +5822,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: item.type,
       label: `${item.type} ${item.currency}`,
       value: item.count,
-      extra: `total ${item.totalAmount} ${item.currency} | approuvé ${item.approvedAmount} ${item.currency}`
+      extra: `total ${item.totalAmount} ${item.currency} | comptabilisé ${item.approvedAmount} ${item.currency}`
     });
   }
 
@@ -5674,7 +5832,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: item.activityCode,
       label: BUSINESS_ACTIVITY_LABELS[item.activityCode],
       value: item.count,
-      extra: `total ${item.totalAmount} XOF/DEV | approuvé ${item.approvedAmount} XOF/DEV`
+      extra: `total ${item.totalAmount} XOF/DEV | comptabilisé ${item.approvedAmount} XOF/DEV`
     });
   }
 
@@ -5854,9 +6012,9 @@ function buildOperationalPerformanceRows(overview: ReportsOverview): Array<Recor
     item: item.itemLabel,
     currency: item.currency,
     transactionsCount: item.transactionsCount,
-    approvedTransactionsCount: item.approvedTransactionsCount,
-    approvedCashIn: item.approvedCashIn,
-    approvedCashOut: item.approvedCashOut,
+    activeTransactionsCount: item.approvedTransactionsCount,
+    cashIn: item.approvedCashIn,
+    cashOut: item.approvedCashOut,
     netProfit: item.netProfit,
     marginRate: item.marginRate,
     returnOnCostRate: item.returnOnCostRate,
@@ -6567,7 +6725,7 @@ function isHardwareReportableSale(transaction: ReportOperationalTransaction): bo
     transaction.type === "CASH_IN" &&
     operationKind !== "GLOBAL" &&
     (operationKind === "ITEM_EXIT" || (!operationKind && hasHardwareItemMetadata(transaction.metadata))) &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -6829,7 +6987,7 @@ function isAgricultureReportableTransaction(transaction: ReportOperationalTransa
   return (
     transaction.activityCode === "AGRICULTURE" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -7159,7 +7317,7 @@ function isGeneralStoreReportableTransaction(transaction: ReportOperationalTrans
   return (
     transaction.activityCode === "GENERAL_STORE" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -7552,7 +7710,7 @@ function isFoodReportableTransaction(transaction: ReportOperationalTransaction):
   return (
     transaction.activityCode === "FOOD" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -7942,7 +8100,7 @@ function isRentalReportableTransaction(transaction: ReportOperationalTransaction
   return (
     transaction.activityCode === "RENTAL" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -8318,7 +8476,7 @@ function isHotelReportableTransaction(transaction: ReportOperationalTransaction)
   return (
     transaction.activityCode === "HOTEL_LODGING" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -8722,7 +8880,7 @@ function isWaterReportableTransaction(transaction: ReportOperationalTransaction)
   return (
     transaction.activityCode === "WATER" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -9137,7 +9295,7 @@ function isAgencyReportableTransaction(transaction: ReportOperationalTransaction
   return (
     transaction.activityCode === "REAL_ESTATE_AGENCY" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -9551,7 +9709,7 @@ function isBtpReportableTransaction(transaction: ReportOperationalTransaction): 
   return (
     transaction.activityCode === "BTP" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -9896,7 +10054,7 @@ function isFishFarmingReportableTransaction(transaction: ReportOperationalTransa
   return (
     transaction.activityCode === "FISH_FARMING" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -10231,7 +10389,7 @@ function isLivestockReportableTransaction(transaction: ReportOperationalTransact
   return (
     transaction.activityCode === "LIVESTOCK" &&
     transaction.currency === "XOF" &&
-    (transaction.status === "SUBMITTED" || transaction.status === "APPROVED")
+    isReportableFinancialStatus(transaction.status)
   );
 }
 
@@ -10515,16 +10673,18 @@ function buildOperationalPerformance(
   }
 
   for (const transaction of transactions) {
+    if (!isReportableFinancialStatus(transaction.status)) {
+      continue;
+    }
+
     const targetBuckets = [
       getActivityBucket(transaction.activityCode),
       ...getSubsectionBuckets(transaction.activityCode, transaction.metadata)
     ];
     for (const bucket of targetBuckets) {
       bucket.transactionsCount += 1;
-      if (transaction.status === "APPROVED") {
-        bucket.approvedTransactionsCount += 1;
-      }
-      if (transaction.status === "APPROVED" && transaction.currency === "XOF") {
+      bucket.approvedTransactionsCount += 1;
+      if (transaction.currency === "XOF") {
         const amount = toNumberAmount(transaction.amount);
         if (transaction.type === "CASH_IN") {
           bucket.approvedCashInValue += amount;
@@ -10790,7 +10950,7 @@ export async function getCompanyReportsOverview(
           transactionsCount: selectedFinanceActivity?.count ?? 0,
           submittedTransactionsCount:
             financeByStatus
-              .filter((item) => item.status === "SUBMITTED")
+              .filter((item) => isReportableFinancialStatus(item.status))
               .reduce((sum, item) => sum + item.count, 0),
           totalTasksCount: selectedTaskActivity?.totalCount ?? 0,
           openTasksCount: selectedTaskActivity?.openCount ?? 0,
@@ -10847,7 +11007,6 @@ export async function exportCompanyTransactionsCsv(
       "account_allowed_activity_codes",
       "account_supports_transaction_activity",
       "created_by_email",
-      "validated_by_email",
       "proofs_count",
       "description",
       "created_at",
@@ -10868,7 +11027,6 @@ export async function exportCompanyTransactionsCsv(
       item.accountAllowedActivityCodes.join("|"),
       item.accountSupportsTransactionActivity ? "YES" : "NO",
       item.createdByEmail,
-      item.validatedByEmail,
       item.proofsCount,
       item.description,
       item.createdAt,
@@ -10937,6 +11095,11 @@ export async function exportCompanyTransactionsExcel(
       columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
     },
     {
+      name: "Guide",
+      rows: buildReportReadingGuideRows(),
+      columns: ["term", "definition", "formula", "useCase"]
+    },
+    {
       name: "Synthèse",
       rows: buildOverviewSummaryRows(overview),
       columns: ["category", "item", "label", "value", "extra"]
@@ -10951,9 +11114,9 @@ export async function exportCompanyTransactionsExcel(
         "item",
         "currency",
         "transactionsCount",
-        "approvedTransactionsCount",
-        "approvedCashIn",
-        "approvedCashOut",
+        "activeTransactionsCount",
+        "cashIn",
+        "cashOut",
         "netProfit",
         "marginRate",
         "returnOnCostRate",
@@ -11421,7 +11584,6 @@ export async function exportCompanyTransactionsExcel(
         "accountAllowedActivityCodes",
         "accountSupportsTransactionActivity",
         "createdByEmail",
-        "validatedByEmail",
         "proofsCount",
         "description",
         "createdAt",
@@ -11442,7 +11604,6 @@ export async function exportCompanyTransactionsExcel(
         accountAllowedActivityCodes: item.accountAllowedActivityCodes.join(" | "),
         accountSupportsTransactionActivity: item.accountSupportsTransactionActivity ? "YES" : "NO",
         createdByEmail: item.createdByEmail,
-        validatedByEmail: item.validatedByEmail ?? "",
         proofsCount: item.proofsCount,
         description: item.description ?? "",
         createdAt: item.createdAt,
@@ -11470,6 +11631,11 @@ export async function exportCompanyTasksExcel(
       columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
     },
     {
+      name: "Guide",
+      rows: buildReportReadingGuideRows(),
+      columns: ["term", "definition", "formula", "useCase"]
+    },
+    {
       name: "Synthèse",
       rows: buildOverviewSummaryRows(overview),
       columns: ["category", "item", "label", "value", "extra"]
@@ -11484,9 +11650,9 @@ export async function exportCompanyTasksExcel(
         "item",
         "currency",
         "transactionsCount",
-        "approvedTransactionsCount",
-        "approvedCashIn",
-        "approvedCashOut",
+        "activeTransactionsCount",
+        "cashIn",
+        "cashOut",
         "netProfit",
         "marginRate",
         "returnOnCostRate",
@@ -12138,6 +12304,8 @@ export async function exportCompanyReportsPdf(
       doc.fontSize(10).text(`Mode operatoire: ${overview.activityProfile.operationsModel}`);
     }
 
+    drawPdfReadingGuideBox(doc);
+
     writePdfSectionTitle(doc, "Synthèse consolidée");
     writePdfList(
       doc,
@@ -12174,7 +12342,7 @@ export async function exportCompanyReportsPdf(
           ),
           `TOTAL | quantité ${hardwareReport.totals.quantity} | vente ${hardwareReport.totals.salesAmount} XOF | versement ${hardwareReport.totals.paymentAmount} XOF | coût ${hardwareReport.totals.purchaseAmount} XOF | bénéfice ${hardwareReport.totals.grossProfit} XOF`
         ]),
-        "Aucune vente quincaillerie soumise ou approuvée sur cette période."
+        "Aucune vente quincaillerie comptabilisée sur cette période."
       );
     }
 
@@ -12231,7 +12399,7 @@ export async function exportCompanyReportsPdf(
       doc,
       overview.financeByType.map(
         (item) =>
-          `${toDisplayTransactionTypeLabel(item.type)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | approuvé ${item.approvedAmount} ${item.currency}`
+          `${toDisplayTransactionTypeLabel(item.type)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | comptabilisé ${item.approvedAmount} ${item.currency}`
       ),
       "Aucune transaction consolidée sur cette période."
     );

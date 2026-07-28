@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { PageGuide } from "../components/PageGuide";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ApiError, getDashboardSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
@@ -86,6 +87,31 @@ export function MyWorkPage(): JSX.Element {
         loadingLabel="Chargement des priorités..."
       />
 
+      <PageGuide
+        title="Guide de travail"
+        description={`Vue personnelle centrée sur ${
+          selectedActivityCode ? getBusinessActivityLabel(selectedActivityCode) : "tous les secteurs accessibles"
+        }.`}
+        items={[
+          {
+            term: "Priorité",
+            description: "Tâche ouverte à traiter rapidement, surtout si elle est bloquée ou proche de son échéance."
+          },
+          {
+            term: "Bloquée",
+            description: "Travail arrêté par un problème qui demande une décision ou une intervention."
+          },
+          {
+            term: "Échéance",
+            description: "Date limite de traitement; une échéance dépassée doit être régularisée ou replanifiée."
+          },
+          {
+            term: "Transaction récente",
+            description: "Dernière écriture financière comptabilisée dans le périmètre courant."
+          }
+        ]}
+      />
+
       {summary ? (
         <>
           <section className="grid my-work-metrics">
@@ -117,7 +143,9 @@ export function MyWorkPage(): JSX.Element {
               {urgentTasks.length === 0 ? (
                 <EmptyState
                   title="Aucune tâche urgente"
-                  description="Aucune priorité immédiate."
+                  description="Aucune priorité immédiate dans le périmètre courant."
+                  actionLabel="Ouvrir les tâches"
+                  onAction={() => navigate("/operations/tasks")}
                 />
               ) : (
                 <div className="dashboard-priority-list">
@@ -160,7 +188,9 @@ export function MyWorkPage(): JSX.Element {
               {recentTransactions.length === 0 ? (
                 <EmptyState
                   title="Aucune transaction récente"
-                  description="Aucune transaction disponible pour l’instant."
+                  description="Aucune écriture récente n'est disponible dans le périmètre courant."
+                  actionLabel="Ouvrir les transactions"
+                  onAction={() => navigate("/finance/transactions")}
                 />
               ) : (
                 <div className="dashboard-priority-list">

@@ -114,10 +114,6 @@ function canManageTransaction(role: RoleCode): boolean {
   return TRANSACTION_REVIEW_ROLES.includes(role);
 }
 
-function canDeleteApprovedTransaction(role: RoleCode): boolean {
-  return role === "SYS_ADMIN";
-}
-
 function canManageSalary(role: RoleCode): boolean {
   return SALARY_MANAGEMENT_ROLES.includes(role);
 }
@@ -991,8 +987,8 @@ export async function getCompanySalarySummary(input: {
   let totalBonusCents = 0;
   let totalDeductionCents = 0;
   let totalNetCents = 0;
-  let approvedNetCents = 0;
-  let pendingCount = 0;
+  let recordedNetCents = 0;
+  let draftCount = 0;
 
   for (const item of items) {
     const grossCents = toMoneyCents(item.grossAmount);
@@ -1004,11 +1000,11 @@ export async function getCompanySalarySummary(input: {
     totalBonusCents += bonusCents;
     totalDeductionCents += deductionCents;
     totalNetCents += netCents;
-    if (item.status === "APPROVED") {
-      approvedNetCents += netCents;
+    if (item.status === "SUBMITTED" || item.status === "APPROVED") {
+      recordedNetCents += netCents;
     }
-    if (item.status === "DRAFT" || item.status === "SUBMITTED") {
-      pendingCount += 1;
+    if (item.status === "DRAFT") {
+      draftCount += 1;
     }
 
     const statusSummary = byStatus.get(item.status) ?? {
@@ -1066,8 +1062,8 @@ export async function getCompanySalarySummary(input: {
     totalBonusAmount: centsToMoney(totalBonusCents),
     totalDeductionAmount: centsToMoney(totalDeductionCents),
     totalNetAmount: centsToMoney(totalNetCents),
-    approvedNetAmount: centsToMoney(approvedNetCents),
-    pendingCount,
+    approvedNetAmount: centsToMoney(recordedNetCents),
+    pendingCount: draftCount,
     items,
     byStatus: Array.from(byStatus.values()),
     byPaymentMethod: Array.from(byPaymentMethod.values()),
@@ -1148,6 +1144,10 @@ export async function createCompanySalaryTransaction(
     salaryConfirmationStatus: "NOT_REQUIRED",
     createdById: actor.actorId,
     occurredAt: new Date(input.occurredAt)
+  });
+
+  await submitCompanyTransaction(actor, {
+    transactionId
   });
 
   await createAuditLogRecord({
@@ -1266,6 +1266,10 @@ export async function updateCompanySalaryTransaction(
     occurredAt: new Date(input.occurredAt)
   });
 
+  await submitCompanyTransaction(actor, {
+    transactionId: existing.id
+  });
+
   await createAuditLogRecord({
     auditId: randomUUID(),
     companyId: actor.companyId,
@@ -1354,9 +1358,7 @@ export async function exportCompanySalaryCsv(input: {
       "net_amount",
       "currency",
       "payment_method",
-      "status",
       "created_by_email",
-      "validated_by_email",
       "occurred_at",
       "created_at",
       "updated_at",
@@ -1375,9 +1377,7 @@ export async function exportCompanySalaryCsv(input: {
       item.netAmount,
       item.currency,
       item.paymentMethod,
-      item.status,
       item.createdByEmail,
-      item.validatedByEmail,
       item.occurredAt,
       item.createdAt,
       item.updatedAt,
@@ -1405,19 +1405,16 @@ export async function exportCompanySalaryExcel(input: {
           totalBonusAmount: summary.totalBonusAmount,
           totalDeductionAmount: summary.totalDeductionAmount,
           totalNetAmount: summary.totalNetAmount,
-          approvedNetAmount: summary.approvedNetAmount,
-          pendingCount: summary.pendingCount
+          recordedNetAmount: summary.approvedNetAmount,
+          draftCount: summary.pendingCount
         }
       ]
     },
     {
-      name: "Par statut",
-      rows: summary.byStatus.map((item) => ({
-        status: item.status,
+      name: "Par paiement",
+      rows: summary.byPaymentMethod.map((item) => ({
+        paymentMethod: item.paymentMethod,
         count: item.count,
-        grossAmount: item.grossAmount,
-        bonusAmount: item.bonusAmount,
-        deductionAmount: item.deductionAmount,
         netAmount: item.netAmount
       }))
     },
@@ -1449,9 +1446,7 @@ export async function exportCompanySalaryExcel(input: {
         netAmount: item.netAmount,
         currency: item.currency,
         paymentMethod: item.paymentMethod,
-        status: item.status,
         createdByEmail: item.createdByEmail,
-        validatedByEmail: item.validatedByEmail ?? "",
         occurredAt: item.occurredAt,
         note: item.note ?? ""
       }))
@@ -1565,13 +1560,6 @@ export async function deleteCompanyTransaction(
 
   ensureTransactionManagementAccess(actor.role);
 
-  if (existing.status === "APPROVED" && !canDeleteApprovedTransaction(actor.role)) {
-    throw new HttpError(
-      403,
-      "Seul l'admin système peut supprimer une transaction déjà approuvée."
-    );
-  }
-
   const account = await findFinancialAccountById(actor.companyId, existing.accountId);
   await deleteFinancialTransaction({
     companyId: actor.companyId,
@@ -1647,16 +1635,7 @@ export async function deleteCompanySalaryTransaction(
     throw new HttpError(400, "Cette transaction n'est pas un salaire.");
   }
 
-  if (existing.status === "APPROVED") {
-    if (!canDeleteApprovedTransaction(actor.role)) {
-      throw new HttpError(
-        403,
-        "Seul l'admin système peut supprimer un salaire déjà approuvé."
-      );
-    }
-  } else {
-    ensureSalaryManagementAccess(actor.role);
-  }
+  ensureSalaryManagementAccess(actor.role);
 
   await deleteFinancialTransaction({
     companyId: actor.companyId,

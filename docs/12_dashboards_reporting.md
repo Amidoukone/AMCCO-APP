@@ -30,7 +30,7 @@ Parametres optionnels de reporting:
 - la vue taches recentes d'un `EMPLOYEE` reste limitee a son perimetre (cree par lui ou assigne a lui)
 - la charge equipe n'est exposee qu'aux roles management/reporting
 - les consolidations financieres conservent une ventilation par devise pour eviter les montants faux en multi-devise
-- la rentabilite operationnelle est calculee sur les flux approuves en `XOF`, devise de pilotage du contexte malien
+- la rentabilite operationnelle est calculee sur les flux comptabilises en `XOF`, devise de pilotage du contexte malien
 - les rapports et exports sont accessibles a tous les roles applicatifs, mais toujours limites au secteur choisi
 - le filtre temporel s'applique aux transactions via `occurred_at`
 - le filtre temporel s'applique aux taches et a la charge equipe via `updated_at`
@@ -39,9 +39,9 @@ Parametres optionnels de reporting:
 ## Contenu du dashboard
 
 - KPI entreprise: utilisateurs actifs, comptes financiers, activite d'audit, alertes non lues
-- KPI finance: brouillons, soumises, approuvees, rejetees
+- KPI finance: brouillons, flux comptabilises, rejetees
 - synthese des comptes financiers hybrides: globaux, dedies, restreints, compatibles avec le secteur actif
-- totaux approuves par devise (entrees, sorties, net)
+- totaux comptabilises par devise (entrees, sorties, net)
 - KPI operations: a faire, en cours, bloquees, terminees, echeances depassees/proches
 - pilotage operationnel: entrees XOF, sorties XOF, net XOF, taux d'execution, taches ouvertes, bloquees et en retard
 - si un secteur est selectionne, le pilotage descend automatiquement sur ses sous-sections declarees dans le profil
@@ -51,6 +51,7 @@ Parametres optionnels de reporting:
 ## Contenu des rapports
 
 - rentabilite et execution par secteur et sous-section: marge XOF, rentabilite sur couts, execution, blocages et retards
+- guide de lecture des indicateurs: comptabilise, net XOF, marge, rentabilite couts, execution/EXEC, blocages et retards
 - rapport mensuel quincaillerie: date, designation, quantite, vente du jour, versement, cout d'achat et benefice
 - rapport pisciculture: bassins, cycles d'elevage, especes, alevins, aliments, ventes, mortalite, solde et execution
 - rapport elevage: troupeaux, lots, especes, achats, aliments, ventes, produits, mortalite, solde et execution
@@ -65,6 +66,7 @@ Parametres optionnels de reporting:
 - branding PDF AMCCO integre: logo dessine, en-tete, pied de page, pagination
 - feuille Excel `Synthese` ajoutant directement les agregats du rapport
 - feuille Excel `Pilotage` ajoutant les indicateurs de rentabilite, efficacite, suivi et execution
+- feuille Excel `Guide` expliquant les indicateurs utilises dans les tableaux de rapport
 - feuille Excel `Quincaillerie` ajoutant les lignes mensuelles de ventes et benefices quand le secteur est present
 - feuilles Excel `Pisciculture` et `PiscOperations` ajoutant le suivi bassin/cycle et la ventilation des operations piscicoles
 - feuilles Excel `Elevage` et `ElevageOps` ajoutant le suivi troupeau/lot/espece et la ventilation des operations d'elevage

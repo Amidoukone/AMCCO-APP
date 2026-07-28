@@ -180,7 +180,7 @@ describe("finance.service", () => {
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });
 
-    it("creates a salary transaction in draft with salary metadata", async () => {
+    it("creates and finalizes a salary transaction with salary metadata", async () => {
       vi.mocked(findFinancialAccountById).mockResolvedValue({
         id: "account-1",
         companyId: actor.companyId,
@@ -202,6 +202,15 @@ describe("finance.service", () => {
         isActive: true
       });
       vi.mocked(findSalaryTransactionByEmployeeAndPeriod).mockResolvedValue(null);
+      vi.mocked(findTransactionById).mockResolvedValue({
+        id: "salary-1",
+        companyId: actor.companyId,
+        createdById: actor.actorId,
+        activityCode: null,
+        status: "DRAFT",
+        requiresProof: false,
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
       vi.mocked(findFinancialTransactionById).mockResolvedValue({
         id: "salary-1",
         companyId: actor.companyId,
@@ -230,12 +239,12 @@ describe("finance.service", () => {
           paymentMethod: "BANK_TRANSFER",
           note: "Prime de rendement"
         },
-        status: "DRAFT",
+        status: "APPROVED",
         requiresProof: false,
         createdById: actor.actorId,
         createdByEmail: "actor@example.com",
-        validatedById: null,
-        validatedByEmail: null,
+        validatedById: actor.actorId,
+        validatedByEmail: "actor@example.com",
         salaryConfirmationStatus: "NOT_REQUIRED",
         salaryConfirmedById: null,
         salaryConfirmedByEmail: null,
@@ -280,6 +289,17 @@ describe("finance.service", () => {
           })
         })
       );
+      expect(submitTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "salary-1",
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
+      expect(reviewTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "salary-1",
+        reviewerId: actor.actorId,
+        status: "APPROVED"
+      });
       expect(createAuditLogRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           companyId: actor.companyId,
@@ -290,11 +310,12 @@ describe("finance.service", () => {
       );
       expect(result.netAmount).toBe("92500.00");
       expect(result.employeeFullName).toBe("Agent Test");
+      expect(result.status).toBe("APPROVED");
     });
   });
 
   describe("updateCompanySalaryTransaction", () => {
-    it("updates a non-approved salary and resets employee confirmation", async () => {
+    it("updates and finalizes a salary while resetting employee confirmation", async () => {
       vi.mocked(findFinancialTransactionById)
         .mockResolvedValueOnce({
           id: "salary-3",
@@ -338,7 +359,7 @@ describe("finance.service", () => {
           updatedAt: "2026-04-20T08:00:00.000Z",
           proofsCount: 0
         })
-        .mockResolvedValueOnce({
+        .mockResolvedValue({
           id: "salary-3",
           companyId: actor.companyId,
           accountId: "account-2",
@@ -366,12 +387,12 @@ describe("finance.service", () => {
             paymentMethod: "BANK_TRANSFER",
             note: "Ajustement"
           },
-          status: "DRAFT",
+          status: "APPROVED",
           requiresProof: false,
           createdById: actor.actorId,
           createdByEmail: "actor@example.com",
-          validatedById: null,
-          validatedByEmail: null,
+          validatedById: actor.actorId,
+          validatedByEmail: "actor@example.com",
           salaryConfirmationStatus: "NOT_REQUIRED",
           salaryConfirmedById: null,
           salaryConfirmedByEmail: null,
@@ -444,6 +465,15 @@ describe("finance.service", () => {
         updatedAt: "2026-04-20T08:00:00.000Z",
         proofsCount: 0
       });
+      vi.mocked(findTransactionById).mockResolvedValue({
+        id: "salary-3",
+        companyId: actor.companyId,
+        createdById: actor.actorId,
+        activityCode: null,
+        status: "DRAFT",
+        requiresProof: false,
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
 
       const result = await updateCompanySalaryTransaction(
         {
@@ -490,7 +520,18 @@ describe("finance.service", () => {
           metadataJson: expect.stringContaining("\"previousStatus\":\"SUBMITTED\"")
         })
       );
-      expect(result.status).toBe("DRAFT");
+      expect(submitTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "salary-3",
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
+      expect(reviewTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "salary-3",
+        reviewerId: actor.actorId,
+        status: "APPROVED"
+      });
+      expect(result.status).toBe("APPROVED");
       expect(result.salaryConfirmation.status).toBe("NOT_REQUIRED");
     });
 
@@ -538,7 +579,7 @@ describe("finance.service", () => {
           updatedAt: "2026-04-20T08:00:00.000Z",
           proofsCount: 0
         })
-        .mockResolvedValueOnce({
+        .mockResolvedValue({
           id: "salary-4",
           companyId: actor.companyId,
           accountId: "account-1",
@@ -565,12 +606,12 @@ describe("finance.service", () => {
             netAmount: "94000.00",
             paymentMethod: "BANK_TRANSFER"
           },
-          status: "DRAFT",
+          status: "APPROVED",
           requiresProof: false,
           createdById: actor.actorId,
           createdByEmail: "actor@example.com",
-          validatedById: null,
-          validatedByEmail: null,
+          validatedById: actor.actorId,
+          validatedByEmail: "actor@example.com",
           salaryConfirmationStatus: "NOT_REQUIRED",
           salaryConfirmedById: null,
           salaryConfirmedByEmail: null,
@@ -602,6 +643,15 @@ describe("finance.service", () => {
         isActive: true
       });
       vi.mocked(findSalaryTransactionByEmployeeAndPeriod).mockResolvedValue(null);
+      vi.mocked(findTransactionById).mockResolvedValue({
+        id: "salary-4",
+        companyId: actor.companyId,
+        createdById: actor.actorId,
+        activityCode: null,
+        status: "DRAFT",
+        requiresProof: false,
+        salaryConfirmationStatus: "NOT_REQUIRED"
+      });
 
       await updateCompanySalaryTransaction(
         {
@@ -887,8 +937,8 @@ describe("finance.service", () => {
 
       expect(summary.totalCount).toBe(2);
       expect(summary.totalNetAmount).toBe("167500.00");
-      expect(summary.approvedNetAmount).toBe("92500.00");
-      expect(summary.pendingCount).toBe(1);
+      expect(summary.approvedNetAmount).toBe("167500.00");
+      expect(summary.pendingCount).toBe(0);
       expect(summary.byEmployee).toHaveLength(2);
 
       const csv = await exportCompanySalaryCsv({
@@ -899,6 +949,7 @@ describe("finance.service", () => {
 
       expect(csv).toContain("salary_id");
       expect(csv).toContain("employee_full_name");
+      expect(csv).not.toContain("validated_by_email");
       expect(csv).toContain("\"Agent Test\"");
       expect(csv).toContain("\"BANK_TRANSFER\"");
     });
@@ -1749,7 +1800,7 @@ describe("finance.service", () => {
       );
     });
 
-    it("rejects approved transaction deletion from accountants", async () => {
+    it("allows an accountant to delete an approved transaction", async () => {
       vi.mocked(findFinancialTransactionById).mockResolvedValue({
         id: "txn-5",
         companyId: actor.companyId,
@@ -1780,8 +1831,19 @@ describe("finance.service", () => {
         updatedAt: "2026-04-20T08:00:00.000Z",
         proofsCount: 1
       });
+      vi.mocked(findFinancialAccountById).mockResolvedValue({
+        id: "account-4",
+        companyId: actor.companyId,
+        name: "Banque principale",
+        accountRef: "BNK-01",
+        balance: "90000.00",
+        scopeType: "GLOBAL",
+        primaryActivityCode: null,
+        allowedActivityCodes: [],
+        createdAt: "2026-04-20T08:00:00.000Z"
+      });
 
-      const promise = deleteCompanyTransaction(
+      await deleteCompanyTransaction(
         {
           ...actor,
           role: "ACCOUNTANT"
@@ -1791,11 +1853,17 @@ describe("finance.service", () => {
         }
       );
 
-      await expect(promise).rejects.toMatchObject<HttpError>({
-        statusCode: 403,
-        message: "Seul l'admin système peut supprimer une transaction déjà approuvée."
+      expect(deleteFinancialTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "txn-5"
       });
-      expect(deleteFinancialTransaction).not.toHaveBeenCalled();
+      expect(createAuditLogRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "FINANCE_TRANSACTION_DELETED",
+          entityId: "txn-5",
+          metadataJson: expect.stringContaining("\"deletedStatus\":\"APPROVED\"")
+        })
+      );
     });
 
     it("allows sys admin to delete an approved transaction", async () => {

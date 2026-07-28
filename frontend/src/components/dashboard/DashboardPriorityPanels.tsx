@@ -1,3 +1,4 @@
+import { EmptyState } from "../EmptyState";
 import { getBusinessActivityLabel } from "../../config/businessActivities";
 import type { DashboardSummary } from "../../types/reporting";
 import {
@@ -80,7 +81,20 @@ export function DashboardPriorityPanels({
               </button>
             ))}
           </div>
-        ) : null}
+        ) : (
+          <EmptyState
+            title="Aucune transaction récente"
+            description="Aucune écriture financière récente dans le périmètre courant."
+            actionLabel="Ouvrir les transactions"
+            onAction={() => {
+              onNavigate(
+                selectedActivityCode
+                  ? `/finance/transactions?activityCode=${selectedActivityCode}`
+                  : "/finance/transactions"
+              );
+            }}
+          />
+        )}
       </article>
 
       <article className="panel dashboard-priority-card">
@@ -145,7 +159,20 @@ export function DashboardPriorityPanels({
               </button>
             ))}
           </div>
-        ) : null}
+        ) : (
+          <EmptyState
+            title="Aucun blocage prioritaire"
+            description="Aucune tâche bloquée ou en retard n'est remontée dans le périmètre courant."
+            actionLabel="Ouvrir les tâches"
+            onAction={() => {
+              onNavigate(
+                selectedActivityCode
+                  ? `/operations/tasks?activityCode=${selectedActivityCode}`
+                  : "/operations/tasks"
+              );
+            }}
+          />
+        )}
       </article>
     </section>
   );

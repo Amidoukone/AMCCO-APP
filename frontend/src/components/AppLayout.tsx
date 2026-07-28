@@ -103,7 +103,7 @@ export function AppLayout(): JSX.Element {
       isMounted = false;
       window.removeEventListener("amcco-alerts-changed", onAlertsChanged);
     };
-  }, [isBootstrapMode, location.pathname, withAuthorizedToken]);
+  }, [activeCompany?.id, isBootstrapMode, withAuthorizedToken]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -501,105 +501,7 @@ export function AppLayout(): JSX.Element {
                 </details>
               ) : null}
             </div>
-            {!isBootstrapMode ? (
-              <GlobalSearch
-                className="mobile-drawer-search"
-                inputId="mobile-global-search-input"
-                navigation={visibleNavigation}
-                role={user.role}
-                selectedActivityCode={selectedActivityCode}
-              />
-            ) : null}
-            {isBootstrapMode ? (
-              <div className="mobile-context-card">
-                <span>Initialisation</span>
-                <strong>Aucune entreprise active</strong>
-              </div>
-            ) : (
-              <section className="mobile-context-group" aria-label="Secteur actif">
-                <div className="mobile-context-group-header">
-                  <span>Secteur actif</span>
-                  <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
-                </div>
-                {enabledActivities.length === 0 ? (
-                  <p className="hint">Aucun secteur actif pour cette entreprise.</p>
-                ) : (
-                  <div className="mobile-choice-list" role="group" aria-label="Choisir un secteur">
-                    {enabledActivities.map((activity) => {
-                      const isSelected = selectedActivityCode === activity.code;
-                      return (
-                        <button
-                          key={activity.code}
-                          type="button"
-                          className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
-                          onClick={() => handleActivityChange(activity.code)}
-                          disabled={isLoadingActivities}
-                          aria-pressed={isSelected}
-                        >
-                          <strong>{activity.label}</strong>
-                          <span>{activity.description}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            )}
-            {activeCompany ? (
-              <section className="mobile-context-group" aria-label="Entreprise active">
-                <div className="mobile-context-group-header">
-                  <span>Entreprise</span>
-                  <strong>{activeCompany.name}</strong>
-                </div>
-                <div className="mobile-choice-list" role="group" aria-label="Choisir une entreprise">
-                  {memberships.map((membership) => {
-                    const isSelected = membership.companyId === activeCompany.id;
-                    return (
-                      <button
-                        key={membership.companyId}
-                        type="button"
-                        className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
-                        onClick={() => void handleCompanyChange(membership.companyId)}
-                        disabled={isSwitchingCompany || isSelected}
-                        aria-pressed={isSelected}
-                      >
-                        <strong>{membership.companyName}</strong>
-                        <span>{isSelected ? "Entreprise active" : "Basculer vers cette entreprise"}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ) : null}
-            {canManageCompanies ? (
-              <Link to="/admin/companies" className="secondary-btn mobile-context-link">
-                {isBootstrapMode ? "Créer une entreprise" : "Entreprises"}
-              </Link>
-            ) : null}
             {companySwitchError ? <p className="header-switch-error">{companySwitchError}</p> : null}
-            <nav className="mobile-drawer-nav" aria-label="Navigation mobile">
-              {Object.entries(navigationSections).map(([section, items]) => (
-                <div key={section} className="mobile-drawer-section">
-                  <p className="sidebar-section-label">{section}</p>
-                  <div className="mobile-drawer-list">
-                    {items.map((item) => (
-                      <NavLink
-                        key={item.key}
-                        to={item.to}
-                        className={({ isActive }) =>
-                          isActive ? "mobile-drawer-link active" : "mobile-drawer-link"
-                        }
-                      >
-                        <span>{item.label}</span>
-                        {item.key === "alerts" && unreadAlertsCount > 0 ? (
-                          <strong>{unreadAlertsCount}</strong>
-                        ) : null}
-                      </NavLink>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </nav>
           </div>
           {!isBootstrapMode ? (
             <GlobalSearch

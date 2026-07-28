@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
+import { PageGuide } from "../components/PageGuide";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   buildPersistedViewStorageKey,
@@ -3524,7 +3525,6 @@ export function FinanceTransactionsPage(): JSX.Element {
   const initialFilters = useMemo(
     () =>
       ({
-        status: "ALL" as "ALL" | FinancialTransaction["status"],
         type: "ALL" as "ALL" | FinancialTransaction["type"]
       }),
     []
@@ -3643,7 +3643,6 @@ export function FinanceTransactionsPage(): JSX.Element {
         item.accountRef,
         item.description,
         item.createdByEmail,
-        item.validatedByEmail,
         item.amount,
         item.currency,
         item.type === "CASH_IN" ? "Entree" : "Sortie",
@@ -3768,7 +3767,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   useEffect(() => {
     setVisibleTransactionsPage(1);
-  }, [searchQuery, filters.status, filters.type, selectedActivityCode]);
+  }, [searchQuery, filters.type, selectedActivityCode]);
 
   useEffect(() => {
     setVisibleTransactionsPage((previousPage) =>
@@ -3801,7 +3800,6 @@ export function FinanceTransactionsPage(): JSX.Element {
           listFinanceTransactionsRequest(accessToken, {
             limit: TRANSACTIONS_PAGE_SIZE,
             offset,
-            status: filters.status === "ALL" ? undefined : filters.status,
             type: filters.type === "ALL" ? undefined : filters.type,
             activityCode: selectedActivityCode
           })
@@ -3861,7 +3859,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         setIsLoading(false);
       }
     }
-  }, [filters.status, filters.type, requestedTransactionId, selectedActivityCode, withAuthorizedToken]);
+  }, [filters.type, requestedTransactionId, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadData();
@@ -4194,11 +4192,6 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleDeleteTransaction(transaction: FinancialTransaction): Promise<void> {
-    const isApproved = transaction.status === "APPROVED";
-    const confirmationMessage = isApproved
-      ? "Cette transaction est déjà approuvée. Confirmer sa suppression définitive ?"
-      : "Confirmer la suppression de cette transaction ?";
-
     setTransactionPendingDelete(transaction);
     return;
 
@@ -4215,11 +4208,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       if (editingTransactionId === transaction.id) {
         resetTransactionForm();
       }
-      setSuccessMessage(
-        isApproved
-          ? "Transaction approuvée supprimée par l'admin système."
-          : "Transaction supprimée."
-      );
+      setSuccessMessage("Transaction supprimée.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -4234,7 +4223,6 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
 
     const transaction = transactionPendingDelete;
-    const isApproved = transaction.status === "APPROVED";
     setBusyTransactionId(transaction.id);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -4248,11 +4236,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       if (editingTransactionId === transaction.id) {
         resetTransactionForm();
       }
-      setSuccessMessage(
-        isApproved
-          ? "Transaction approuvée supprimée par l'admin système."
-          : "Transaction supprimée."
-      );
+      setSuccessMessage("Transaction supprimée.");
       setTransactionPendingDelete(null);
       await loadData();
     } catch (error) {
@@ -4455,6 +4439,29 @@ export function FinanceTransactionsPage(): JSX.Element {
           l'administration.
         </p>
       ) : null}
+
+      <PageGuide
+        title="Guide des transactions"
+        description={`Les écritures affichées sont filtrées par secteur: ${selectedActivity?.label ?? "aucun secteur actif"}.`}
+        items={[
+          {
+            term: "Compte",
+            description: "Support financier utilisé pour enregistrer l'entrée ou la sortie."
+          },
+          {
+            term: "Comptabilisé",
+            description: "Une transaction enregistrée est prise en compte dans les rapports du secteur."
+          },
+          {
+            term: "Justificatif",
+            description: "Document lié à l'opération: reçu, facture, bordereau ou preuve terrain."
+          },
+          {
+            term: "Détail secteur",
+            description: "Les champs métier alimentent les rapports sectoriels et les exports."
+          }
+        ]}
+      />
 
       <section className={isReadOnlyOwner ? "grid finance-summary-grid owner-lite-metrics" : "grid finance-summary-grid"}>
         {financePageCards.map((card) => (
@@ -5546,7 +5553,6 @@ export function FinanceTransactionsPage(): JSX.Element {
             onAction={() => {
               setSearchQuery("");
               setFilters({
-                status: "ALL",
                 type: "ALL"
               });
             }}
@@ -5795,9 +5801,6 @@ export function FinanceTransactionsPage(): JSX.Element {
               <strong>Createur:</strong> {selectedTransaction.createdByEmail}
             </p>
             <p>
-              <strong>Validation:</strong> {selectedTransaction.validatedByEmail ?? "En attente"}
-            </p>
-            <p>
               <strong>Opération:</strong>{" "}
               {new Date(selectedTransaction.occurredAt).toLocaleString("fr-FR")}
             </p>
@@ -6031,11 +6034,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         description="Cette action supprimé la transaction sélectionnée de la vue financière."
         objectLabel="Transaction concernée"
         objectName={transactionPendingDelete?.description?.trim() || transactionPendingDelete?.id || ""}
-        impactText={
-          transactionPendingDelete?.status === "APPROVED"
-            ? "Cette transaction est déjà approuvée. Sa suppression doit rester exceptionnelle et assumée."
-            : "La transaction ne sera plus disponible pour la validation ni pour le suivi courant."
-        }
+        impactText="La transaction ne sera plus disponible dans le suivi courant."
         isConfirming={busyTransactionId === transactionPendingDelete?.id}
         onCancel={() => {
           if (busyTransactionId) {

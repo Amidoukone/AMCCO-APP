@@ -6,8 +6,8 @@ Mettre en place un flux financier exploitable:
 
 - saisie transaction terrain
 - preuve obligatoire configurable
-- soumission
-- validation/rejet comptable
+- soumission avec finalisation automatique
+- aucune validation comptable n'est requise pour comptabiliser la transaction
 
 ## API Backend
 
@@ -25,8 +25,8 @@ Mettre en place un flux financier exploitable:
 
 - une transaction est creee en `DRAFT`
 - la preuve est obligatoire avant soumission
-- validation possible seulement pour les transactions `SUBMITTED`
-- review comptable: `APPROVED` ou `REJECTED`
+- la soumission finalise la transaction en `APPROVED` sans action comptable separee
+- les anciens statuts `SUBMITTED` restent pris en compte dans les rapports comme flux comptabilises
 - chaque action critique est journalisee en audit
 - les comptes financiers suivent un modele hybride:
 - `GLOBAL`: visible/utilisable sur tous les secteurs

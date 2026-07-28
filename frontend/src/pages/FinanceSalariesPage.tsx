@@ -2,6 +2,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { PageGuide } from "../components/PageGuide";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   buildPersistedViewStorageKey,
@@ -11,7 +12,6 @@ import { matchesQuickSearch } from "../lib/quickSearch";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
-  confirmFinanceSalaryReceiptRequest,
   createFinanceSalaryRequest,
   deleteFinanceSalaryRequest,
   downloadFinanceSalaryExportRequest,
@@ -21,14 +21,11 @@ import {
   listFinanceSalariesRequest,
   listFinanceSalaryMembersRequest,
   listFinanceTransactionProofsRequest,
-  reviewFinanceTransactionRequest,
-  submitFinanceTransactionRequest,
   updateFinanceSalaryRequest
 } from "../lib/api";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import type {
   FinancialAccount,
-  SalaryConfirmationStatus,
   SalaryMember,
   SalaryPaymentMethod,
   SalarySummary,
@@ -46,19 +43,6 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Opération impossible. Vérifiez la connexion backend.";
-}
-
-function statusLabel(status: SalaryTransaction["status"]): string {
-  if (status === "DRAFT") {
-    return "Brouillon";
-  }
-  if (status === "SUBMITTED") {
-    return "Soumise";
-  }
-  if (status === "APPROVED") {
-    return "Approuvée";
-  }
-  return "Rejetée";
 }
 
 function salaryPaymentMethodLabel(method: SalaryPaymentMethod): string {
@@ -95,13 +79,40 @@ function toDateTimeLocalInput(value: string): string {
 }
 
 function toMoneyNumber(input: string): number {
-  const normalized = Number.parseFloat(input.replace(",", "."));
+  const normalized = Number.parseFloat(input.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(normalized) ? normalized : 0;
+}
+
+function normalizeMoneyForApi(input: string, fallback = ""): string {
+  const normalized = input.trim().replace(/\s/g, "").replace(",", ".");
+  return normalized || fallback;
+}
+
+function formatMoneyForDisplay(input: string | number): string {
+  const rawValue = typeof input === "number" ? String(input) : input.trim();
+  if (!rawValue) {
+    return "";
+  }
+  const normalized = rawValue.replace(/\s/g, "").replace(",", ".");
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount)) {
+    return rawValue;
+  }
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+    .format(amount)
+    .replace(/[\u202f\u00a0]/g, " ");
+}
+
+function formatMoneyForInput(input: string): string {
+  return formatMoneyForDisplay(input);
 }
 
 function formatNetSalary(gross: string, bonus: string, deduction: string): string {
   const total = toMoneyNumber(gross) + toMoneyNumber(bonus) - toMoneyNumber(deduction);
-  return total.toFixed(2);
+  return formatMoneyForDisplay(total);
 }
 
 function formatPayPeriod(period: string): string {
@@ -126,22 +137,6 @@ function triggerBlobDownload(blob: Blob, fileName: string): void {
   link.click();
   link.remove();
   window.URL.revokeObjectURL(url);
-}
-
-function salaryConfirmationLabel(
-  status: SalaryTransaction["status"],
-  confirmationStatus: SalaryConfirmationStatus
-): string {
-  if (status === "DRAFT") {
-    return "Non envoye";
-  }
-  if (confirmationStatus === "CONFIRMED") {
-    return "Confirmée";
-  }
-  if (confirmationStatus === "PENDING") {
-    return "En attente employé";
-  }
-  return "Non requise";
 }
 
 export function FinanceSalariesPage(): JSX.Element {
@@ -173,7 +168,6 @@ export function FinanceSalariesPage(): JSX.Element {
   }, [activeCompany?.id, user?.id]);
   const initialSalaryFilters = useMemo(
     () => ({
-      status: "ALL" as "ALL" | SalaryTransaction["status"],
       payPeriod: new Date().toISOString().slice(0, 7),
       employeeUserId: ""
     }),
@@ -216,9 +210,7 @@ export function FinanceSalariesPage(): JSX.Element {
     return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
-  const canReview = canManageSalaries;
   const canAccessAudit = user?.role === "OWNER" || user?.role === "SYS_ADMIN";
-  const canDeleteApprovedSalaries = user?.role === "SYS_ADMIN";
   const requestedTransactionId = searchParams.get("transactionId");
 
   const selectedSalary = useMemo(
@@ -273,12 +265,8 @@ export function FinanceSalariesPage(): JSX.Element {
   }, [salaryAccounts, salaryMembers]);
 
   const salaryCards = useMemo(() => {
-    const readyForApprovalCount = salaryItems.filter(
-      (item) => item.status === "SUBMITTED" && item.salaryConfirmation.status === "CONFIRMED"
-    ).length;
-    const pendingEmployeeCount = salaryItems.filter(
-      (item) => item.status === "SUBMITTED" && item.salaryConfirmation.status === "PENDING"
-    ).length;
+    const paidEmployeesCount = new Set(salaryItems.map((item) => item.employeeUserId)).size;
+    const paymentMethodsCount = new Set(salaryItems.map((item) => item.paymentMethod)).size;
 
     if (canManageSalaries) {
       return [
@@ -289,18 +277,18 @@ export function FinanceSalariesPage(): JSX.Element {
         },
         {
           title: "Net total",
-          value: salarySummary?.totalNetAmount ?? "0.00",
+          value: formatMoneyForDisplay(salarySummary?.totalNetAmount ?? "0.00"),
           note: "Montant net cumulé"
         },
         {
-          title: "En attente employé",
-          value: String(pendingEmployeeCount),
-          note: "Réception à confirmer"
+          title: "Collaborateurs payés",
+          value: String(paidEmployeesCount),
+          note: "Sur la période affichée"
         },
         {
-          title: "Prêts à approuver",
-          value: String(readyForApprovalCount),
-          note: "Confirmation employé reçue"
+          title: "Modes de paiement",
+          value: String(paymentMethodsCount),
+          note: "Utilisés sur la période"
         }
       ];
     }
@@ -312,14 +300,11 @@ export function FinanceSalariesPage(): JSX.Element {
         note: "Éléments visibles sur la période"
       },
       {
-        title: "En attente de moi",
-        value: String(pendingEmployeeCount),
-        note: "Réception à confirmer"
-      },
-      {
-        title: "Approuvés",
-        value: String(salaryItems.filter((item) => item.status === "APPROVED").length),
-        note: "Salaires finalisés"
+        title: "Net total",
+        value: formatMoneyForDisplay(
+          salaryItems.reduce((sum, item) => sum + toMoneyNumber(item.netAmount), 0)
+        ),
+        note: "Montant net cumulé"
       }
     ];
   }, [canManageSalaries, salaryFilters.payPeriod, salaryItems, salarySummary?.totalNetAmount]);
@@ -356,7 +341,7 @@ export function FinanceSalariesPage(): JSX.Element {
 
   useEffect(() => {
     setVisibleSalariesPage(1);
-  }, [searchQuery, salaryFilters.employeeUserId, salaryFilters.payPeriod, salaryFilters.status]);
+  }, [searchQuery, salaryFilters.employeeUserId, salaryFilters.payPeriod]);
 
   useEffect(() => {
     setVisibleSalariesPage((previousPage) =>
@@ -471,7 +456,6 @@ export function FinanceSalariesPage(): JSX.Element {
     requestedTransactionId,
     salaryFilters.employeeUserId,
     salaryFilters.payPeriod,
-    salaryFilters.status,
     withAuthorizedToken
   ]);
 
@@ -558,9 +542,9 @@ export function FinanceSalariesPage(): JSX.Element {
           accountId: salaryForm.accountId,
           employeeUserId: salaryForm.employeeUserId,
           payPeriod: salaryForm.payPeriod,
-          grossAmount: salaryForm.grossAmount.trim(),
-          bonusAmount: salaryForm.bonusAmount.trim(),
-          deductionAmount: salaryForm.deductionAmount.trim(),
+          grossAmount: normalizeMoneyForApi(salaryForm.grossAmount),
+          bonusAmount: normalizeMoneyForApi(salaryForm.bonusAmount, "0.00"),
+          deductionAmount: normalizeMoneyForApi(salaryForm.deductionAmount, "0.00"),
           currency: salaryForm.currency.trim().toUpperCase(),
           paymentMethod: salaryForm.paymentMethod,
           note: salaryForm.note.trim() || undefined,
@@ -572,7 +556,6 @@ export function FinanceSalariesPage(): JSX.Element {
             ? updateFinanceSalaryRequest(accessToken, editingSalaryId, payload)
             : createFinanceSalaryRequest(accessToken, payload)
         );
-        await submitFinanceTransactionRequest(accessToken, result.item.id);
         return result;
       })) as { item: { id: string } };
 
@@ -597,9 +580,9 @@ export function FinanceSalariesPage(): JSX.Element {
       accountId: item.accountId,
       employeeUserId: item.employeeUserId,
       payPeriod: item.payPeriod,
-      grossAmount: item.grossAmount,
-      bonusAmount: item.bonusAmount,
-      deductionAmount: item.deductionAmount,
+      grossAmount: formatMoneyForInput(item.grossAmount),
+      bonusAmount: formatMoneyForInput(item.bonusAmount),
+      deductionAmount: formatMoneyForInput(item.deductionAmount),
       currency: item.currency,
       paymentMethod: item.paymentMethod,
       note: item.note ?? "",
@@ -618,10 +601,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setSalaryPendingDelete(item);
     return;
 
-    const isApproved = item.status === "APPROVED";
-    const confirmationMessage = isApproved
-      ? "Ce salaire est déjà approuvé. Confirmer sa suppression définitive ?"
-      : "Confirmer la suppression de ce salaire ?";
+    const confirmationMessage = "Confirmer la suppression de ce salaire ?";
 
     if (false) {
       return;
@@ -638,11 +618,7 @@ export function FinanceSalariesPage(): JSX.Element {
       if (editingSalaryId === item.id) {
         resetSalaryForm();
       }
-      setSuccessMessage(
-        isApproved
-          ? "Salaire approuvé supprimé par l'admin système."
-          : "Salaire supprimé."
-      );
+      setSuccessMessage("Salaire supprimé.");
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -657,7 +633,6 @@ export function FinanceSalariesPage(): JSX.Element {
     }
 
     const item = salaryPendingDelete;
-    const isApproved = item.status === "APPROVED";
     setBusyTransactionId(item.id);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -669,11 +644,7 @@ export function FinanceSalariesPage(): JSX.Element {
       if (editingSalaryId === item.id) {
         resetSalaryForm();
       }
-      setSuccessMessage(
-        isApproved
-          ? "Salaire approuvé supprimé par l'admin système."
-          : "Salaire supprimé."
-      );
+      setSuccessMessage("Salaire supprimé.");
       setSalaryPendingDelete(null);
       await loadData();
     } catch (error) {
@@ -801,67 +772,38 @@ export function FinanceSalariesPage(): JSX.Element {
     }
   }
 
-  async function handleSubmitSalary(transactionId: string): Promise<void> {
-    setBusyTransactionId(transactionId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) => submitFinanceTransactionRequest(accessToken, transactionId));
-      setSuccessMessage("Salaire transmis à l'employé.");
-      await loadData();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyTransactionId(null);
-    }
-  }
-
-  async function handleConfirmReceipt(transactionId: string): Promise<void> {
-    setBusyTransactionId(transactionId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) =>
-        confirmFinanceSalaryReceiptRequest(accessToken, transactionId)
-      );
-      setSuccessMessage("Réception du salaire confirmée.");
-      await loadData();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyTransactionId(null);
-    }
-  }
-
-  async function handleReviewSalary(
-    transactionId: string,
-    decision: "APPROVED" | "REJECTED"
-  ): Promise<void> {
-    setBusyTransactionId(transactionId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) =>
-        reviewFinanceTransactionRequest(accessToken, transactionId, decision)
-      );
-      setSuccessMessage(decision === "APPROVED" ? "Salaire approuvé." : "Salaire rejeté.");
-      await loadData();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyTransactionId(null);
-    }
-  }
-
   return (
     <>
       <header className="section-header salaries-page-header">
         <h2>Salaires</h2>
         <p>
-          Espace dédié au cycle de paie: préparation comptable, confirmation de réception par
-          l'employé, puis approbation finale.
+          Espace dédié au cycle de paie: préparation, enregistrement, justificatifs et suivi
+          des paiements par période.
         </p>
       </header>
+
+      <PageGuide
+        title="Guide des salaires"
+        description="Les salaires enregistrés sont comptabilisés dans le suivi de paie et les exports de la période."
+        items={[
+          {
+            term: "Période",
+            description: "Mois de paie utilisé pour filtrer la synthèse, la liste et les exports."
+          },
+          {
+            term: "Net",
+            description: "Montant payé après bonus et retenues; c'est le montant suivi dans le total."
+          },
+          {
+            term: "Mode",
+            description: "Canal de paiement utilisé: virement, mobile money, chèque ou espèces."
+          },
+          {
+            term: "Preuve",
+            description: "Justificatif de paiement à conserver pour l'audit et les contrôles."
+          }
+        ]}
+      />
 
       <section className="grid">
         {salaryCards.map((card) => (
@@ -918,21 +860,6 @@ export function FinanceSalariesPage(): JSX.Element {
               ))}
             </select>
           ) : null}
-          <select
-            value={salaryFilters.status}
-            onChange={(event) =>
-              setSalaryFilters((prev) => ({
-                ...prev,
-                status: event.target.value as "ALL" | SalaryTransaction["status"]
-              }))
-            }
-          >
-            <option value="ALL">Tous les statuts</option>
-            <option value="DRAFT">Brouillon</option>
-            <option value="SUBMITTED">Soumise</option>
-            <option value="APPROVED">Approuvée</option>
-            <option value="REJECTED">Rejetée</option>
-          </select>
           <button type="submit">Actualiser</button>
         </form>
       </section>
@@ -996,7 +923,7 @@ export function FinanceSalariesPage(): JSX.Element {
               </option>
               {salaryAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name} ({account.balance} {salaryForm.currency})
+                  {account.name} ({formatMoneyForDisplay(account.balance)} {salaryForm.currency})
                 </option>
               ))}
             </select>
@@ -1027,6 +954,12 @@ export function FinanceSalariesPage(): JSX.Element {
                       grossAmount: event.target.value
                     }))
                   }
+                  onBlur={() =>
+                    setSalaryForm((prev) => ({
+                      ...prev,
+                      grossAmount: formatMoneyForInput(prev.grossAmount)
+                    }))
+                  }
                   required
                 />
               </label>
@@ -1042,6 +975,12 @@ export function FinanceSalariesPage(): JSX.Element {
                       bonusAmount: event.target.value
                     }))
                   }
+                  onBlur={() =>
+                    setSalaryForm((prev) => ({
+                      ...prev,
+                      bonusAmount: formatMoneyForInput(prev.bonusAmount)
+                    }))
+                  }
                 />
               </label>
               <label className="salary-amount-field">
@@ -1054,6 +993,12 @@ export function FinanceSalariesPage(): JSX.Element {
                     setSalaryForm((prev) => ({
                       ...prev,
                       deductionAmount: event.target.value
+                    }))
+                  }
+                  onBlur={() =>
+                    setSalaryForm((prev) => ({
+                      ...prev,
+                      deductionAmount: formatMoneyForInput(prev.deductionAmount)
                     }))
                   }
                 />
@@ -1128,8 +1073,9 @@ export function FinanceSalariesPage(): JSX.Element {
             <div>
               <h3>Synthèse</h3>
               <p className="hint">
-                Brut {salarySummary.totalGrossAmount} | Primes {salarySummary.totalBonusAmount} |
-                Retenues {salarySummary.totalDeductionAmount}
+                Brut {formatMoneyForDisplay(salarySummary.totalGrossAmount)} | Primes{" "}
+                {formatMoneyForDisplay(salarySummary.totalBonusAmount)} | Retenues{" "}
+                {formatMoneyForDisplay(salarySummary.totalDeductionAmount)}
               </p>
             </div>
             <div className="topbar-actions salaries-summary-actions">
@@ -1155,28 +1101,22 @@ export function FinanceSalariesPage(): JSX.Element {
             <table className="admin-table salaries-table">
               <thead>
                 <tr>
-                  <th>Statut</th>
-                  <th>Effectif</th>
-                  <th>Brut</th>
-                  <th>Primes</th>
-                  <th>Retenues</th>
+                  <th>Mode de paiement</th>
+                  <th>Nombre</th>
                   <th>Net</th>
                 </tr>
               </thead>
               <tbody>
-                {salarySummary.byStatus.length === 0 ? (
+                {salarySummary.byPaymentMethod.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>Aucun salaire sur cette période.</td>
+                    <td colSpan={3}>Aucun salaire sur cette période.</td>
                   </tr>
                 ) : (
-                  salarySummary.byStatus.map((item) => (
-                    <tr key={item.status}>
-                      <td data-label="Statut">{statusLabel(item.status)}</td>
-                      <td data-label="Effectif">{item.count}</td>
-                      <td data-label="Brut">{item.grossAmount}</td>
-                      <td data-label="Primes">{item.bonusAmount}</td>
-                      <td data-label="Retenues">{item.deductionAmount}</td>
-                      <td data-label="Net">{item.netAmount}</td>
+                  salarySummary.byPaymentMethod.map((item) => (
+                    <tr key={item.paymentMethod}>
+                      <td data-label="Mode de paiement">{salaryPaymentMethodLabel(item.paymentMethod)}</td>
+                      <td data-label="Nombre">{item.count}</td>
+                      <td data-label="Net">{formatMoneyForDisplay(item.netAmount)}</td>
                     </tr>
                   ))
                 )}
@@ -1208,8 +1148,6 @@ export function FinanceSalariesPage(): JSX.Element {
                   <th>Période</th>
                   <th>Collaborateur</th>
                   <th>Net</th>
-                  <th>Statut</th>
-                  <th>Réception employé</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1217,16 +1155,7 @@ export function FinanceSalariesPage(): JSX.Element {
                 {paginatedSalaryItems.map((item) => {
                   const isBusy = busyTransactionId === item.id;
                   const canEditSalary = canManageSalaries;
-                  const canDeleteSalary =
-                    item.status === "APPROVED" ? canDeleteApprovedSalaries : canManageSalaries;
-                  const canConfirmReceipt =
-                    user?.id === item.employeeUserId &&
-                    item.status === "SUBMITTED" &&
-                    item.salaryConfirmation.status === "PENDING";
-                  const canApproveSalary =
-                    canReview &&
-                    item.status === "SUBMITTED" &&
-                    item.salaryConfirmation.status === "CONFIRMED";
+                  const canDeleteSalary = canManageSalaries;
                   const canAddProof =
                     !isReadOnlyOwner && (canManageSalaries || item.createdById === user?.id);
 
@@ -1240,10 +1169,8 @@ export function FinanceSalariesPage(): JSX.Element {
                         </div>
                       </td>
                       <td className="finance-salary-net-cell" data-label="Net">
-                        {item.netAmount} {item.currency}
+                        {formatMoneyForDisplay(item.netAmount)} {item.currency}
                       </td>
-                      <td data-label="Statut">{statusLabel(item.status)}</td>
-                      <td data-label="Réception">{salaryConfirmationLabel(item.status, item.salaryConfirmation.status)}</td>
                       <td className="finance-salary-actions-cell" data-label="Actions">
                         <div className="actions-inline">
                           <button
@@ -1273,51 +1200,6 @@ export function FinanceSalariesPage(): JSX.Element {
                               Supprimer
                             </button>
                           ) : null}
-                          {false ? (
-                            <button
-                              type="button"
-                              className="secondary-btn"
-                              onClick={() => void handleSubmitSalary(item.id)}
-                              disabled={isBusy}
-                            >
-                              Publier
-                            </button>
-                          ) : null}
-                          {false ? (
-                            <button
-                              type="button"
-                              className="secondary-btn"
-                              onClick={() => void handleConfirmReceipt(item.id)}
-                              disabled={isBusy}
-                            >
-                              Confirmer
-                            </button>
-                          ) : null}
-                          {false ? (
-                            <>
-                              <button
-                                type="button"
-                                className="secondary-btn"
-                                onClick={() => void handleReviewSalary(item.id, "APPROVED")}
-                                disabled={isBusy || !canApproveSalary}
-                                title={
-                                  canApproveSalary
-                                    ? undefined
-                                    : "Attendre la confirmation de réception par l'employé."
-                                }
-                              >
-                                Approuver
-                              </button>
-                              <button
-                                type="button"
-                                className="danger-btn"
-                                onClick={() => void handleReviewSalary(item.id, "REJECTED")}
-                                disabled={isBusy}
-                              >
-                                Rejeter
-                              </button>
-                            </>
-                          ) : null}
                         </div>
                         <details className="table-inline-details">
                           <summary className="table-inline-summary">Voir plus</summary>
@@ -1329,24 +1211,14 @@ export function FinanceSalariesPage(): JSX.Element {
                               <strong>Mode:</strong> {salaryPaymentMethodLabel(item.paymentMethod)}
                             </p>
                             <p className="hint">
-                              <strong>Brut:</strong> {item.grossAmount} {item.currency}
+                              <strong>Brut:</strong> {formatMoneyForDisplay(item.grossAmount)} {item.currency}
                             </p>
                             <p className="hint">
-                              <strong>Prime:</strong> {item.bonusAmount} {item.currency}
+                              <strong>Prime:</strong> {formatMoneyForDisplay(item.bonusAmount)} {item.currency}
                             </p>
                             <p className="hint">
-                              <strong>Retenue:</strong> {item.deductionAmount} {item.currency}
+                              <strong>Retenue:</strong> {formatMoneyForDisplay(item.deductionAmount)} {item.currency}
                             </p>
-                            <p className="hint">
-                              <strong>Réception:</strong>{" "}
-                              {salaryConfirmationLabel(item.status, item.salaryConfirmation.status)}
-                            </p>
-                            {item.salaryConfirmation.confirmedAt ? (
-                              <p className="hint">
-                                <strong>Confirmée le:</strong>{" "}
-                                {new Date(item.salaryConfirmation.confirmedAt).toLocaleString("fr-FR")}
-                              </p>
-                            ) : null}
                             {item.note?.trim() ? (
                               <p className="hint">
                                 <strong>Note:</strong> {item.note}
@@ -1482,42 +1354,22 @@ export function FinanceSalariesPage(): JSX.Element {
               <strong>Compte:</strong> {selectedSalary.accountName}
             </p>
             <p>
-              <strong>Net:</strong> {selectedSalary.netAmount} {selectedSalary.currency}
+              <strong>Net:</strong> {formatMoneyForDisplay(selectedSalary.netAmount)} {selectedSalary.currency}
             </p>
             <p>
-              <strong>Brut:</strong> {selectedSalary.grossAmount} {selectedSalary.currency}
+              <strong>Brut:</strong> {formatMoneyForDisplay(selectedSalary.grossAmount)} {selectedSalary.currency}
             </p>
             <p>
-              <strong>Prime:</strong> {selectedSalary.bonusAmount} {selectedSalary.currency}
+              <strong>Prime:</strong> {formatMoneyForDisplay(selectedSalary.bonusAmount)} {selectedSalary.currency}
             </p>
             <p>
-              <strong>Retenue:</strong> {selectedSalary.deductionAmount} {selectedSalary.currency}
+              <strong>Retenue:</strong> {formatMoneyForDisplay(selectedSalary.deductionAmount)} {selectedSalary.currency}
             </p>
             <p>
               <strong>Mode:</strong> {salaryPaymentMethodLabel(selectedSalary.paymentMethod)}
             </p>
             <p>
-              <strong>Statut:</strong> {statusLabel(selectedSalary.status)}
-            </p>
-            <p>
-              <strong>Réception employé:</strong>{" "}
-              {salaryConfirmationLabel(selectedSalary.status, selectedSalary.salaryConfirmation.status)}
-            </p>
-            <p>
-              <strong>Confirmation par:</strong>{" "}
-              {selectedSalary.salaryConfirmation.confirmedByEmail ?? "En attente"}
-            </p>
-            <p>
-              <strong>Confirmée le:</strong>{" "}
-              {selectedSalary.salaryConfirmation.confirmedAt
-                ? new Date(selectedSalary.salaryConfirmation.confirmedAt).toLocaleString("fr-FR")
-                : "En attente"}
-            </p>
-            <p>
               <strong>Créateur:</strong> {selectedSalary.createdByEmail}
-            </p>
-            <p>
-              <strong>Validation:</strong> {selectedSalary.validatedByEmail ?? "En attente"}
             </p>
           </div>
 
@@ -1542,9 +1394,7 @@ export function FinanceSalariesPage(): JSX.Element {
                   Modifier
                 </button>
               ) : null}
-              {(selectedSalary.status === "APPROVED"
-                ? canDeleteApprovedSalaries
-                : canManageSalaries) ? (
+              {canManageSalaries ? (
                 <button
                   type="button"
                   className="danger-btn"
@@ -1630,11 +1480,7 @@ export function FinanceSalariesPage(): JSX.Element {
             ? `${salaryPendingDelete.employeeFullName} | ${formatPayPeriod(salaryPendingDelete.payPeriod)}`
             : ""
         }
-        impactText={
-          salaryPendingDelete?.status === "APPROVED"
-            ? "Ce salaire est déjà approuvé. Sa suppression doit rester exceptionnelle et justifiée."
-            : "Le collaborateur et les équipes de contrôle ne pourront plus suivre ce salaire dans cet écran."
-        }
+        impactText="Le collaborateur et les équipes de contrôle ne pourront plus suivre ce salaire dans cet écran."
         isConfirming={busyTransactionId === salaryPendingDelete?.id}
         onCancel={() => {
           if (busyTransactionId) {

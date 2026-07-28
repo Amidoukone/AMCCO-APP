@@ -10,7 +10,9 @@ import {
 import type { AdminCompanyItem, CreateCompanyInput, UpdateCompanyInput } from "../types/companies";
 import { ROLE_LABELS } from "../config/permissions";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { PageGuide } from "../components/PageGuide";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { repairMojibakeText } from "../utils/textEncoding";
 
@@ -108,6 +110,11 @@ export function AdminCompaniesPage(): JSX.Element {
   }, [user?.role]);
 
   const isEditingCompany = editingCompanyId !== null;
+  const activeCompaniesCount = useMemo(
+    () => items.filter((item) => item.company.isActive).length,
+    [items]
+  );
+  const inactiveCompaniesCount = items.length - activeCompaniesCount;
 
   const loadCompanies = useCallback(async () => {
     if (!canViewCompanies) {
@@ -296,7 +303,31 @@ export function AdminCompaniesPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Administration entreprises</h2>
+        <p>Gestion des espaces de travail, de l'entreprise active et de leur disponibilité opérationnelle.</p>
       </header>
+
+      <PageGuide
+        title="Guide des entreprises"
+        description="Chaque entreprise isole ses secteurs, ses utilisateurs, ses opérations et ses rapports."
+        items={[
+          {
+            term: "Active",
+            description: "Entreprise utilisée dans votre session pour créer et consulter les données métier."
+          },
+          {
+            term: "Disponible",
+            description: "Entreprise active dans le système, mais pas sélectionnée dans votre session."
+          },
+          {
+            term: "Inactive",
+            description: "Entreprise retirée de l'usage courant; l'historique reste consultable selon les droits."
+          },
+          {
+            term: "Bascule",
+            description: "Action qui change le contexte de travail vers une autre entreprise accessible."
+          }
+        ]}
+      />
 
       <FeedbackBanner
         errorMessage={errorMessage}
@@ -308,13 +339,33 @@ export function AdminCompaniesPage(): JSX.Element {
         <div className="company-admin-header">
           <div>
             <h3>Entreprises accessibles</h3>
+            <p className="hint">{items.length} entreprise(s) disponible(s) dans votre périmètre.</p>
           </div>
-          <div className="company-active-badge">
-            Entreprise active: <strong>{displayText(activeCompany?.name, "Non définie")}</strong>
+          <div className="company-admin-summary">
+            <div className="admin-summary-strip">
+              <article className="admin-summary-pill">
+                <strong>{activeCompaniesCount}</strong>
+                <span>Actives</span>
+              </article>
+              <article className="admin-summary-pill">
+                <strong>{inactiveCompaniesCount}</strong>
+                <span>Inactives</span>
+              </article>
+            </div>
+            <div className="company-active-badge">
+              Entreprise active: <strong>{displayText(activeCompany?.name, "Non définie")}</strong>
+            </div>
           </div>
         </div>
 
-        {!isLoading && items.length === 0 ? <p>Aucune entreprise disponible.</p> : null}
+        {!isLoading && items.length === 0 ? (
+          <EmptyState
+            title="Aucune entreprise disponible"
+            description="Aucune entreprise n'est accessible dans votre périmètre actuel."
+            actionLabel="Actualiser"
+            onAction={() => void loadCompanies()}
+          />
+        ) : null}
         {!isLoading && items.length > 0 ? (
           <div className="company-card-grid">
             {items.map((item) => {

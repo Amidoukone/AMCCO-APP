@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
+import { PageGuide } from "../components/PageGuide";
 import {
   buildPersistedViewStorageKey,
   usePersistedViewState
@@ -1217,6 +1218,29 @@ export function OperationsTasksPage(): JSX.Element {
           l'administration.
         </p>
       ) : null}
+
+      <PageGuide
+        title="Guide des tâches"
+        description="Les tâches structurent le suivi terrain par secteur, responsable, statut et échéance."
+        items={[
+          {
+            term: "À faire",
+            description: "Travail créé mais pas encore démarré."
+          },
+          {
+            term: "En cours",
+            description: "Travail actif, suivi par le responsable ou le superviseur."
+          },
+          {
+            term: "Bloquée",
+            description: "Tâche arrêtée par un problème qui demande une décision ou un appui."
+          },
+          {
+            term: "Retard",
+            description: "Tâche ouverte dont l'échéance est dépassée."
+          }
+        ]}
+      />
 
       <section className="panel">
         {!isReadOnlyOwner ? <h3>Recherche</h3> : null}

@@ -87,14 +87,14 @@ export function DashboardDetailsPanel({
 
             <div className="dashboard-currency-list">
               {summary.finance.totalsByCurrency.length === 0 ? (
-                <p className="hint">Aucun montant approuvé disponible.</p>
+                <p className="hint">Aucun montant comptabilisé disponible.</p>
               ) : (
                 summary.finance.totalsByCurrency.map((item) => (
                   <article key={item.currency} className="dashboard-currency-card">
                     <h4>{item.currency}</h4>
-                    <p>Entrées approuvées : {formatAmount(item.approvedCashInTotal, item.currency)}</p>
-                    <p>Sorties approuvées : {formatAmount(item.approvedCashOutTotal, item.currency)}</p>
-                    <p>Net approuvé : {formatAmount(item.netApprovedTotal, item.currency)}</p>
+                    <p>Entrées comptabilisées : {formatAmount(item.approvedCashInTotal, item.currency)}</p>
+                    <p>Sorties comptabilisées : {formatAmount(item.approvedCashOutTotal, item.currency)}</p>
+                    <p>Net comptabilisé : {formatAmount(item.netApprovedTotal, item.currency)}</p>
                   </article>
                 ))
               )}

@@ -9,7 +9,9 @@ import {
   updateAdminUserRequest
 } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { PageGuide } from "../components/PageGuide";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   buildPersistedViewStorageKey,
@@ -88,6 +90,8 @@ export function AdminUsersPage(): JSX.Element {
         ])
       );
   }, [items, roleFilter, searchQuery, statusFilter]);
+  const activeUsersCount = useMemo(() => items.filter((item) => item.isActive).length, [items]);
+  const inactiveUsersCount = items.length - activeUsersCount;
 
   const setDraftsFromItems = useCallback((rows: AdminUserItem[]) => {
     const nextDrafts: Record<string, UserDraft> = {};
@@ -244,6 +248,12 @@ export function AdminUsersPage(): JSX.Element {
     }
   }
 
+  function handleResetUserFilters(): void {
+    setSearchQuery("");
+    setRoleFilter("ALL");
+    setStatusFilter("ALL");
+  }
+
   if (!canViewUsers) {
     return (
       <section className="panel">
@@ -257,7 +267,31 @@ export function AdminUsersPage(): JSX.Element {
     <>
       <header className="section-header">
         <h2>Administration utilisateurs</h2>
+        <p>Gestion des accès, des rôles et de l'état des membres de l'entreprise.</p>
       </header>
+
+      <PageGuide
+        title="Guide des utilisateurs"
+        description="Les droits doivent rester lisibles pour éviter les accès trop larges ou les comptes inutilisables."
+        items={[
+          {
+            term: "Rôle",
+            description: "Niveau d'accès accordé à l'utilisateur dans l'entreprise active."
+          },
+          {
+            term: "Actif",
+            description: "Compte autorisé à se connecter et à travailler dans l'application."
+          },
+          {
+            term: "Sécurité",
+            description: "Zone réservée aux actions sensibles comme la réinitialisation du mot de passe."
+          },
+          {
+            term: "Filtre",
+            description: "Vue temporaire de la liste par rôle, état ou recherche rapide."
+          }
+        ]}
+      />
 
       {canManageUser ? <section className="panel admin-users-create-panel">
         <h3>Créer un utilisateur</h3>
@@ -329,7 +363,22 @@ export function AdminUsersPage(): JSX.Element {
 
       <section className={canManageUser ? "panel admin-users-panel" : "panel admin-users-panel admin-users-readonly"}>
         <div className="admin-users-management-header">
-          <h3>Utilisateurs de l'entreprise</h3>
+          <div>
+            <h3>Utilisateurs de l'entreprise</h3>
+            <p className="hint">
+              {displayItems.length} affiché(s) sur {items.length} utilisateur(s).
+            </p>
+          </div>
+          <div className="admin-summary-strip">
+            <article className="admin-summary-pill">
+              <strong>{activeUsersCount}</strong>
+              <span>Actifs</span>
+            </article>
+            <article className="admin-summary-pill">
+              <strong>{inactiveUsersCount}</strong>
+              <span>Inactifs</span>
+            </article>
+          </div>
         </div>
         <div className="admin-users-filters">
           <input
@@ -361,9 +410,23 @@ export function AdminUsersPage(): JSX.Element {
             ))}
           </select>
         </div>
-        {!isLoading && items.length === 0 ? <p>Aucun utilisateur.</p> : null}
+        {!isLoading && items.length === 0 ? (
+          <EmptyState
+            title="Aucun utilisateur"
+            description={
+              canManageUser
+                ? "Ajoutez le premier membre depuis le formulaire de création."
+                : "Aucun membre n'est disponible dans cette entreprise."
+            }
+          />
+        ) : null}
         {!isLoading && items.length > 0 && displayItems.length === 0 ? (
-          <p>Aucun utilisateur ne correspond à la recherche.</p>
+          <EmptyState
+            title="Aucun utilisateur trouvé"
+            description="Aucun membre ne correspond à la recherche ou aux filtres appliqués."
+            actionLabel="Réinitialiser les filtres"
+            onAction={handleResetUserFilters}
+          />
         ) : null}
 
         {!isLoading && displayItems.length > 0 ? (

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { PageGuide } from "../components/PageGuide";
 import { useAuth } from "../context/AuthContext";
 import {
   ApiError,
@@ -262,6 +264,21 @@ export function AlertsPage(): JSX.Element {
     });
   }
 
+  function handleResetFilters(): void {
+    setFilters({
+      unreadOnly: false,
+      entityType: ""
+    });
+    setSelectedAlertIds([]);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("entityType");
+      return next;
+    });
+  }
+
+  const hasActiveAlertFilters =
+    filters.unreadOnly || (!isReadOnlyOwner && filters.entityType.trim().length > 0);
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedAlertIds.includes(item.id));
   return (
@@ -274,6 +291,29 @@ export function AlertsPage(): JSX.Element {
             : "Suivi des événements à traiter et des notifications système."}
         </p>
       </header>
+
+      <PageGuide
+        title="Guide des alertes"
+        description="Les alertes servent à retrouver rapidement ce qui demande une lecture, une décision ou un contrôle."
+        items={[
+          {
+            term: "Non lue",
+            description: "Signal encore à examiner; il reste compté dans le compteur global."
+          },
+          {
+            term: "Criticité",
+            description: "Niveau d'attention à donner à l'événement: info, attention ou critique."
+          },
+          {
+            term: "Entité",
+            description: "Objet concerné par l'alerte: tâche, transaction, salaire ou message système."
+          },
+          {
+            term: "Sélection",
+            description: "Lot d'alertes préparé pour une action groupée, comme la suppression."
+          }
+        ]}
+      />
 
       <section className="panel">
         <div className="alerts-header">
@@ -357,7 +397,13 @@ export function AlertsPage(): JSX.Element {
       />
 
       <section className="panel">
-        <h3>Liste</h3>
+        <div className="alerts-list-header">
+          <h3>Liste</h3>
+          <p className="hint">
+            {items.length} alerte(s) chargée(s)
+            {selectedAlertIds.length > 0 ? ` | ${selectedAlertIds.length} sélectionnée(s)` : ""}
+          </p>
+        </div>
         {!isLoading && items.length > 0 ? (
           <label className="inline-checkbox">
             <input
@@ -374,7 +420,18 @@ export function AlertsPage(): JSX.Element {
             <span>Tout sélectionner</span>
           </label>
         ) : null}
-        {!isLoading && items.length === 0 ? <p>Aucune alerte ne correspond à ces filtres.</p> : null}
+        {!isLoading && items.length === 0 ? (
+          <EmptyState
+            title={hasActiveAlertFilters ? "Aucune alerte filtrée" : "Aucune alerte"}
+            description={
+              hasActiveAlertFilters
+                ? "Aucune alerte ne correspond aux filtres appliqués."
+                : "Aucun signal à traiter pour le moment."
+            }
+            actionLabel={hasActiveAlertFilters ? "Réinitialiser les filtres" : undefined}
+            onAction={hasActiveAlertFilters ? handleResetFilters : undefined}
+          />
+        ) : null}
         {!isLoading && items.length > 0 ? (
           <>
             <div className="alerts-list">

@@ -40,6 +40,53 @@ const REPORT_PERIOD_MODE_OPTIONS: Array<{ value: ReportPeriodMode; label: string
   { value: "YEAR", label: "Annee" }
 ];
 
+const REPORT_READING_GUIDE_ITEMS: Array<{
+  term: string;
+  definition: string;
+  usage: string;
+}> = [
+  {
+    term: "Comptabilisé",
+    definition: "Transaction enregistrée ou finalisée, donc prise en compte dans les soldes.",
+    usage: "Base des totaux financiers et des rapports de rentabilité."
+  },
+  {
+    term: "Entrées XOF",
+    definition: "Recettes comptabilisées en franc CFA sur le secteur ou la sous-section.",
+    usage: "Mesure les encaissements réellement suivis dans le rapport."
+  },
+  {
+    term: "Sorties XOF",
+    definition: "Dépenses comptabilisées en franc CFA sur le même périmètre.",
+    usage: "Mesure les charges, achats, paiements ou coûts terrain."
+  },
+  {
+    term: "Net XOF",
+    definition: "Entrées XOF moins sorties XOF.",
+    usage: "Indique le solde opérationnel du périmètre filtré."
+  },
+  {
+    term: "Marge",
+    definition: "Net XOF divisé par les entrées XOF.",
+    usage: "Montre la part du solde conservée sur les recettes."
+  },
+  {
+    term: "Rent. coûts",
+    definition: "Rentabilité sur coûts: Net XOF divisé par les sorties XOF.",
+    usage: "Montre le retour obtenu pour chaque coût engagé."
+  },
+  {
+    term: "Exécution / EXEC",
+    definition: "Tâches terminées divisées par le total des tâches du périmètre.",
+    usage: "Mesure l’avancement terrain; les PDF utilisent parfois l’abréviation EXEC."
+  },
+  {
+    term: "Blocages / Retards",
+    definition: "Blocages: tâches en statut bloqué. Retards: tâches ouvertes après échéance.",
+    usage: "Aide à repérer les points qui demandent une action prioritaire."
+  }
+];
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -74,10 +121,10 @@ function transactionStatusLabel(status: "DRAFT" | "SUBMITTED" | "APPROVED" | "RE
     return "Brouillon";
   }
   if (status === "SUBMITTED") {
-    return "Soumise";
+    return "Enregistrée";
   }
   if (status === "APPROVED") {
-    return "Approuvée";
+    return "Finalisée";
   }
   return "Rejetée";
 }
@@ -136,11 +183,44 @@ function formatRate(value: number): string {
   }).format(value)}%`;
 }
 
-function operationalScopeLabel(scope: "ACTIVITY" | "SUBSECTION"): string {
-  return scope === "ACTIVITY" ? "Secteur" : "Sous-section";
+function ReportReadingGuidePanel() {
+  return (
+    <section className="panel reports-reading-guide-panel">
+      <div className="dashboard-panel-header">
+        <div>
+          <h3>Guide de lecture</h3>
+          <p className="hint">
+            Définitions rapides des indicateurs repris dans les tableaux et les exports.
+          </p>
+        </div>
+      </div>
+      <div className="table-wrap">
+        <table className="admin-table reports-guide-table">
+          <thead>
+            <tr>
+              <th>Élément</th>
+              <th>Définition</th>
+              <th>Lecture métier</th>
+            </tr>
+          </thead>
+          <tbody>
+            {REPORT_READING_GUIDE_ITEMS.map((item) => (
+              <tr key={item.term}>
+                <td>
+                  <strong>{item.term}</strong>
+                </td>
+                <td>{item.definition}</td>
+                <td>{item.usage}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 }
 
-function buildApprovedCurrencyRows(overview: ReportsOverview): Array<{
+function buildAccountedCurrencyRows(overview: ReportsOverview): Array<{
   currency: string;
   cashIn: number;
   cashOut: number;
@@ -155,11 +235,11 @@ function buildApprovedCurrencyRows(overview: ReportsOverview): Array<{
       cashOut: 0,
       net: 0
     };
-    const approvedAmount = parseAmount(item.approvedAmount);
+    const accountedAmount = parseAmount(item.approvedAmount);
     if (item.type === "CASH_IN") {
-      current.cashIn += approvedAmount;
+      current.cashIn += accountedAmount;
     } else {
-      current.cashOut += approvedAmount;
+      current.cashOut += accountedAmount;
     }
     current.net = current.cashIn - current.cashOut;
     rows.set(item.currency, current);
@@ -170,11 +250,14 @@ function buildApprovedCurrencyRows(overview: ReportsOverview): Array<{
 
 function buildReportMetrics(overview: ReportsOverview) {
   const transactionCount = overview.financeByType.reduce((sum, item) => sum + item.count, 0);
-  const submittedTransactions = overview.financeByStatus
-    .filter((item) => item.status === "SUBMITTED")
+  const activeTransactions = overview.financeByStatus
+    .filter((item) => item.status === "SUBMITTED" || item.status === "APPROVED")
     .reduce((sum, item) => sum + item.count, 0);
-  const approvedTransactions = overview.financeByStatus
-    .filter((item) => item.status === "APPROVED")
+  const draftTransactions = overview.financeByStatus
+    .filter((item) => item.status === "DRAFT")
+    .reduce((sum, item) => sum + item.count, 0);
+  const rejectedTransactions = overview.financeByStatus
+    .filter((item) => item.status === "REJECTED")
     .reduce((sum, item) => sum + item.count, 0);
   const totalTasks = overview.taskByStatus.reduce((sum, item) => sum + item.count, 0);
   const openTasks = overview.taskByStatus
@@ -186,21 +269,22 @@ function buildReportMetrics(overview: ReportsOverview) {
   const doneTasks = overview.taskByStatus
     .filter((item) => item.status === "DONE")
     .reduce((sum, item) => sum + item.count, 0);
-  const approvedCurrencyRows = buildApprovedCurrencyRows(overview);
-  const netApprovedLabel = approvedCurrencyRows.length > 0
-    ? approvedCurrencyRows.map((item) => formatAmount(item.net, item.currency)).join(" / ")
+  const accountedCurrencyRows = buildAccountedCurrencyRows(overview);
+  const netAccountedLabel = accountedCurrencyRows.length > 0
+    ? accountedCurrencyRows.map((item) => formatAmount(item.net, item.currency)).join(" / ")
     : "0";
 
   return {
     transactionCount,
-    submittedTransactions,
-    approvedTransactions,
+    activeTransactions,
+    draftTransactions,
+    rejectedTransactions,
     totalTasks,
     openTasks,
     blockedTasks,
     doneTasks,
-    approvedCurrencyRows,
-    netApprovedLabel
+    accountedCurrencyRows,
+    netAccountedLabel
   };
 }
 
@@ -705,14 +789,15 @@ export function ReportsPage(): JSX.Element {
                 <span>Transactions filtrées</span>
                 <strong>{formatCount(reportMetrics.transactionCount)}</strong>
                 <small>
-                  {formatCount(reportMetrics.submittedTransactions)} soumises,{" "}
-                  {formatCount(reportMetrics.approvedTransactions)} approuvées
+                  {formatCount(reportMetrics.activeTransactions)} comptabilisées,{" "}
+                  {formatCount(reportMetrics.draftTransactions)} brouillons,{" "}
+                  {formatCount(reportMetrics.rejectedTransactions)} rejetées
                 </small>
               </article>
               <article className="reports-kpi-card">
-                <span>Solde approuvé</span>
-                <strong>{reportMetrics.netApprovedLabel}</strong>
-                <small>Entrées approuvées moins sorties approuvées</small>
+                <span>Solde comptabilisé</span>
+                <strong>{reportMetrics.netAccountedLabel}</strong>
+                <small>Entrées comptabilisées moins sorties comptabilisées</small>
               </article>
               <article className="reports-kpi-card">
                 <span>Tâches suivies</span>
@@ -749,6 +834,8 @@ export function ReportsPage(): JSX.Element {
               </div>
             </div>
           </section>
+
+          <ReportReadingGuidePanel />
 
           {!hasFocusedOperationsReport ? (
             <>
@@ -799,67 +886,6 @@ export function ReportsPage(): JSX.Element {
             ) : null}
           </section>
 
-          <section className="panel">
-            <div className="dashboard-panel-header">
-              <div>
-                <h3>Rentabilité et exécution</h3>
-                <p className="hint">
-                  Pilotage adapté au contexte malien: marge XOF, suivi des tâches,
-                  blocages, retards et efficacité opérationnelle.
-                </p>
-              </div>
-            </div>
-            <div className="table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Niveau</th>
-                    <th>Secteur</th>
-                    <th>Dimension</th>
-                    <th>Élément</th>
-                    <th>Entrées XOF</th>
-                    <th>Sorties XOF</th>
-                    <th>Net XOF</th>
-                    <th>Marge</th>
-                    <th>Rent. coûts</th>
-                    <th>Exécution</th>
-                    <th>Ouvertes</th>
-                    <th>Bloquées</th>
-                    <th>Retards</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.operationalPerformance.length === 0 ? (
-                    <tr>
-                      <td colSpan={13}>
-                        Aucune donnée de rentabilité ou d'exécution sur la période filtrée.
-                      </td>
-                    </tr>
-                  ) : (
-                    overview.operationalPerformance
-                      .filter((row) => row.transactionsCount > 0 || row.totalTasksCount > 0)
-                      .map((row) => (
-                        <tr key={`${row.scope}-${row.activityCode}-${row.dimensionKey}-${row.itemKey}`}>
-                          <td>{operationalScopeLabel(row.scope)}</td>
-                          <td>{getBusinessActivityLabel(row.activityCode)}</td>
-                          <td>{row.dimensionLabel}</td>
-                          <td>{row.itemLabel}</td>
-                          <td>{formatAmount(row.approvedCashIn, row.currency)}</td>
-                          <td>{formatAmount(row.approvedCashOut, row.currency)}</td>
-                          <td>{formatAmount(row.netProfit, row.currency)}</td>
-                          <td>{formatRate(row.marginRate)}</td>
-                          <td>{formatRate(row.returnOnCostRate)}</td>
-                          <td>{formatRate(row.executionRate)}</td>
-                          <td>{formatCount(row.openTasksCount)}</td>
-                          <td>{formatCount(row.blockedTasksCount)}</td>
-                          <td>{formatCount(row.overdueTasksCount)}</td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
             </>
           ) : null}
 
@@ -869,7 +895,7 @@ export function ReportsPage(): JSX.Element {
                 <div>
                   <h3>Rapport quincaillerie</h3>
                   <p className="hint">
-                    {overview.hardwareMonthlyReport.periodLabel} | ventes soumises ou approuvées en XOF.
+                    {overview.hardwareMonthlyReport.periodLabel} | ventes comptabilisées en XOF.
                   </p>
                 </div>
               </div>
@@ -891,7 +917,7 @@ export function ReportsPage(): JSX.Element {
                     {overview.hardwareMonthlyReport.rows.length === 0 ? (
                       <tr>
                         <td colSpan={8}>
-                          Aucune vente quincaillerie soumise ou approuvée sur la période filtrée.
+                          Aucune vente quincaillerie comptabilisée sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
@@ -2810,26 +2836,26 @@ export function ReportsPage(): JSX.Element {
             <div className="reports-data-grid">
               <article className="reports-table-panel">
                 <div className="reports-table-header">
-                  <h4>Flux approuvés par devise</h4>
-                  <span>{formatCount(reportMetrics.approvedCurrencyRows.length)} devise(s)</span>
+                  <h4>Flux comptabilisés par devise</h4>
+                  <span>{formatCount(reportMetrics.accountedCurrencyRows.length)} devise(s)</span>
                 </div>
                 <div className="table-wrap">
                   <table className="admin-table">
                     <thead>
                       <tr>
                         <th>Devise</th>
-                        <th>Entrées approuvées</th>
-                        <th>Sorties approuvées</th>
+                        <th>Entrées comptabilisées</th>
+                        <th>Sorties comptabilisées</th>
                         <th>Solde net</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {reportMetrics.approvedCurrencyRows.length === 0 ? (
+                      {reportMetrics.accountedCurrencyRows.length === 0 ? (
                         <tr>
-                          <td colSpan={4}>Aucun montant approuvé sur la période filtrée.</td>
+                          <td colSpan={4}>Aucun montant comptabilisé sur la période filtrée.</td>
                         </tr>
                       ) : (
-                        reportMetrics.approvedCurrencyRows.map((item) => (
+                        reportMetrics.accountedCurrencyRows.map((item) => (
                           <tr key={item.currency}>
                             <td>{item.currency}</td>
                             <td>{formatAmount(item.cashIn, item.currency)}</td>
@@ -2893,7 +2919,7 @@ export function ReportsPage(): JSX.Element {
                         <th>Devise</th>
                         <th>Nombre</th>
                         <th>Total</th>
-                        <th>Approuvé</th>
+                        <th>Comptabilisé</th>
                       </tr>
                     </thead>
                     <tbody>
