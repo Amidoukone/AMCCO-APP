@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { queryRows } from "../lib/db.js";
+import { toMetadataStringMap } from "../utils/metadata.js";
 import type {
   ActivityReportHighlight,
   BusinessActivityProfile
@@ -1098,28 +1099,6 @@ function toIso(value: Date | null): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
-function toMetadataMap(value: unknown): Record<string, string> {
-  if (!value) {
-    return {};
-  }
-  if (typeof value === "string") {
-    try {
-      return toMetadataMap(JSON.parse(value));
-    } catch {
-      return {};
-    }
-  }
-  if (typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => typeof item === "string")
-      .map(([key, item]) => [key, item as string])
-  );
-}
-
 function toDashboardRecentTransaction(
   row: DashboardRecentTransactionRow
 ): DashboardRecentTransaction {
@@ -1703,7 +1682,7 @@ export async function listReportOperationalTransactions(
     amount: row.amount,
     currency: row.currency,
     occurredAt: new Date(row.occurredAt).toISOString(),
-    metadata: toMetadataMap(row.metadataJson)
+    metadata: toMetadataStringMap(row.metadataJson)
   }));
 }
 
@@ -1733,7 +1712,7 @@ export async function listReportOperationalTasks(
     activityCode: row.activityCode,
     status: row.status,
     dueDate: toIso(row.dueDate),
-    metadata: toMetadataMap(row.metadataJson)
+    metadata: toMetadataStringMap(row.metadataJson)
   }));
 }
 

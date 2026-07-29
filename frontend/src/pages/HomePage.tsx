@@ -55,10 +55,41 @@ const sectors = [
 ];
 
 const serviceLines = [
-  "Courtage et mise en relation commerciale",
-  "Conseil et orientation des opérateurs",
-  "Approvisionnement et suivi des activités",
-  "Pilotage opérationnel et financier"
+  {
+    title: "Courtage et mise en relation commerciale",
+    description:
+      "Identifier les bons interlocuteurs, structurer les échanges et faciliter les opportunités."
+  },
+  {
+    title: "Conseil et orientation des opérateurs",
+    description:
+      "Clarifier les besoins, prioriser les actions et accompagner les décisions de terrain."
+  },
+  {
+    title: "Approvisionnement et suivi des activités",
+    description:
+      "Organiser les demandes, suivre les preuves et garder une lecture fiable de l'avancement."
+  },
+  {
+    title: "Pilotage opérationnel et financier",
+    description:
+      "Centraliser les indicateurs utiles pour suivre les secteurs, les dépenses et les recettes."
+  }
+];
+
+const heroHighlights = [
+  {
+    value: "4",
+    label: "secteurs prioritaires"
+  },
+  {
+    value: "Terrain",
+    label: "appui aux opérateurs"
+  },
+  {
+    value: "Suivi",
+    label: "pilotage des activités"
+  }
 ];
 
 export function HomePage(): JSX.Element {
@@ -169,31 +200,40 @@ export function HomePage(): JSX.Element {
       </aside>
 
       <section className="home-hero" aria-labelledby="home-title">
-        <div className="home-hero-copy">
-          <p className="home-eyebrow">Groupe Nioumala Diady</p>
-          <h1 id="home-title">Développe les filières qui soutiennent le terrain.</h1>
-          <p className="home-hero-text">
-            Agriculture, élevage, pisciculture et transport: l'entreprise relie les besoins des
-            opérateurs, les opportunités commerciales et le suivi opérationnel pour créer une
-            croissance structurée.
-          </p>
-          <div className="home-hero-actions">
-            <Link className="home-primary-action" to={platformPath}>
-              {platformLabel}
-            </Link>
-            <a className="home-secondary-action" href={`tel:${CONTACT_PHONE}`}>
-              Appeler {CONTACT_PHONE_DISPLAY}
-            </a>
-          </div>
-        </div>
-
-        <div className="home-hero-visual" aria-label="Identité AMCCO">
-          <div className="home-hero-media">
-            <img src={agricultureHeroUrl} alt="Tracteur préparant un champ agricole" />
-            <div className="home-hero-media-overlay">
-              <img src={amccoLogoUrl} alt="AMCCO MBAG" />
-              <span>Présence multisectorielle</span>
+        <img
+          className="home-hero-bg"
+          src={agricultureHeroUrl}
+          alt=""
+          aria-hidden="true"
+        />
+        <div className="home-hero-inner">
+          <div className="home-hero-copy">
+            <p className="home-eyebrow">Groupe Nioumala Diady</p>
+            <h1 id="home-title">AMCCO MBAG</h1>
+            <p className="home-hero-lead">
+              Courtage, conseil et orientation pour les filières agricoles, pastorales, halieutiques
+              et logistiques.
+            </p>
+            <p className="home-hero-text">
+              L'entreprise relie les besoins des opérateurs, les opportunités commerciales et le
+              suivi opérationnel pour soutenir une croissance structurée.
+            </p>
+            <div className="home-hero-actions">
+              <Link className="home-primary-action" to={platformPath}>
+                {platformLabel}
+              </Link>
+              <a className="home-secondary-action" href={`tel:${CONTACT_PHONE}`}>
+                Appeler {CONTACT_PHONE_DISPLAY}
+              </a>
             </div>
+          </div>
+          <div className="home-hero-proof" aria-label="Repères AMCCO">
+            {heroHighlights.map((highlight) => (
+              <span key={highlight.label}>
+                <strong>{highlight.value}</strong>
+                {highlight.label}
+              </span>
+            ))}
           </div>
         </div>
       </section>
@@ -211,6 +251,10 @@ export function HomePage(): JSX.Element {
         <div className="home-section-heading">
           <p className="home-eyebrow">Secteurs prioritaires</p>
           <h2>Une présence structurée sur les chaînes de valeur essentielles.</h2>
+          <p>
+            Les activités se complètent pour mieux relier production, approvisionnement,
+            commercialisation et distribution.
+          </p>
         </div>
         <div className="home-sector-grid">
           {sectors.map((sector) => (
@@ -241,12 +285,16 @@ export function HomePage(): JSX.Element {
         <div className="home-section-heading">
           <p className="home-eyebrow">Services</p>
           <h2>Un partenaire de terrain, de la décision à l'exécution.</h2>
+          <p>
+            AMCCO combine connaissance locale, organisation commerciale et outils de pilotage pour
+            sécuriser les opérations.
+          </p>
         </div>
         <div className="home-services-layout">
           <div className="home-services-copy">
             <p>
-              AMCCO combine connaissance locale, organisation commerciale et outils de pilotage pour
-              sécuriser les opérations et améliorer la visibilité des activités.
+              Une méthode simple: comprendre le besoin, connecter les parties prenantes, suivre
+              l'exécution et restituer une information exploitable.
             </p>
             <a className="home-contact-card" href={`tel:${CONTACT_PHONE}`}>
               <span>Contact direct</span>
@@ -254,10 +302,15 @@ export function HomePage(): JSX.Element {
             </a>
           </div>
           <div className="home-service-list">
-            {serviceLines.map((service) => (
-              <div key={service} className="home-service-row">
-                <span aria-hidden="true" />
-                <strong>{service}</strong>
+            {serviceLines.map((service, index) => (
+              <div key={service.title} className="home-service-row">
+                <span className="home-service-index" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div>
+                  <strong>{service.title}</strong>
+                  <p>{service.description}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -266,15 +319,24 @@ export function HomePage(): JSX.Element {
 
       <section id="contact" className="home-final-cta">
         <div>
-          <p className="home-eyebrow">Espace sécurisé</p>
-          <h2>Les collaborateurs peuvent accéder à la plateforme de gestion depuis ce site.</h2>
+          <p className="home-eyebrow">Contact & plateforme</p>
+          <h2>Un point d'entrée clair pour l'entreprise et ses collaborateurs.</h2>
+          <p className="home-final-copy">
+            Les équipes peuvent accéder à l'espace de gestion sécurisé, et les partenaires disposent
+            d'un contact direct.
+          </p>
           <a className="home-phone-inline" href={`tel:${CONTACT_PHONE}`}>
             Contact entreprise: {CONTACT_PHONE_DISPLAY}
           </a>
         </div>
-        <Link className="home-primary-action" to={platformPath}>
-          {platformLabel}
-        </Link>
+        <div className="home-final-actions">
+          <Link className="home-primary-action" to={platformPath}>
+            {platformLabel}
+          </Link>
+          <a className="home-secondary-action" href={`tel:${CONTACT_PHONE}`}>
+            Appeler
+          </a>
+        </div>
       </section>
     </main>
   );

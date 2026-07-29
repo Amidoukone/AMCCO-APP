@@ -15,6 +15,12 @@ import {
   listTaskCommentsRequest,
   updateOperationsTaskStatusRequest
 } from "../lib/api";
+import {
+  resolveImageKitFileName,
+  resolveImageKitFileSize,
+  resolveImageKitStorageKey,
+  type ImageKitUploadResult
+} from "../lib/imagekitUpload";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getBusinessActivityLabel, type BusinessActivityCode } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
@@ -394,20 +400,13 @@ export function TaskDetailsPage(): JSX.Element {
         throw new ApiError(uploadResponse.status, detail);
       }
 
-      const uploaded = (await uploadResponse.json()) as {
-        fileId?: string;
-        filePath?: string;
-        url?: string;
-        name?: string;
-        size?: number;
-        fileType?: string;
-      };
+      const uploaded = (await uploadResponse.json()) as ImageKitUploadResult;
 
       return addTaskAttachmentRequest(accessToken, currentTaskId, {
-        storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
-        fileName: uploaded.name ?? selectedFile.name,
+        storageKey: resolveImageKitStorageKey(uploaded, selectedFile.name),
+        fileName: resolveImageKitFileName(uploaded, selectedFile.name),
         mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
-        fileSize: uploaded.size ?? selectedFile.size
+        fileSize: resolveImageKitFileSize(uploaded, selectedFile.size)
       });
     });
 

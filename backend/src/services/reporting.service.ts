@@ -1435,8 +1435,8 @@ function renderHardwareReportsPdf(
   drawHardwareReportHeader(doc, report);
   drawHardwareMetadataStrip(doc, report, filters, overview.generatedAt);
   drawHardwareMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawHardwareMonthlyTable(doc, report);
+  drawPdfReadingGuideBox(doc);
 
   const note =
     "Lecture: les montants sont consolidés en F CFA. Le bénéfice brut correspond à la vente moins le coût d'achat renseigné sur les transactions article.";
@@ -1946,9 +1946,9 @@ function renderAgricultureReportsPdf(
   drawAgricultureReportHeader(doc, report);
   drawAgricultureMetadataStrip(doc, report, filters, overview.generatedAt);
   drawAgricultureMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawAgricultureOperationsTable(doc, report);
   drawAgricultureBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyGeneralStoreOperationsReport(filters: ReportPeriodFilter): GeneralStoreOperationsReport {
@@ -2346,9 +2346,9 @@ function renderGeneralStoreReportsPdf(
   drawGeneralStoreReportHeader(doc, report);
   drawGeneralStoreMetadataStrip(doc, report, filters, overview.generatedAt);
   drawGeneralStoreMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawGeneralStoreOperationsTable(doc, report);
   drawGeneralStoreBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyFoodOperationsReport(filters: ReportPeriodFilter): FoodOperationsReport {
@@ -2751,9 +2751,9 @@ function renderFoodReportsPdf(
   drawFoodReportHeader(doc, report);
   drawFoodMetadataStrip(doc, report, filters, overview.generatedAt);
   drawFoodMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawFoodOperationsTable(doc, report);
   drawFoodBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyRentalOperationsReport(filters: ReportPeriodFilter): RentalOperationsReport {
@@ -3236,9 +3236,9 @@ function renderRentalReportsPdf(
   drawRentalReportHeader(doc, report);
   drawRentalMetadataStrip(doc, report, filters, overview.generatedAt);
   drawRentalMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawRentalOperationsTable(doc, report);
   drawRentalBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyHotelOperationsReport(filters: ReportPeriodFilter): HotelOperationsReport {
@@ -3635,9 +3635,9 @@ function renderHotelReportsPdf(
   drawHotelReportHeader(doc, report);
   drawHotelMetadataStrip(doc, report, filters, overview.generatedAt);
   drawHotelMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawHotelOperationsTable(doc, report);
   drawHotelBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyWaterOperationsReport(filters: ReportPeriodFilter): WaterOperationsReport {
@@ -3947,9 +3947,9 @@ function renderWaterReportsPdf(
   const report = overview.waterOperationsReport ?? buildEmptyWaterOperationsReport(filters);
   drawWaterReportHeader(doc, report);
   drawWaterMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawWaterOperationsTable(doc, report);
   drawWaterBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyAgencyOperationsReport(filters: ReportPeriodFilter): AgencyOperationsReport {
@@ -4197,9 +4197,9 @@ function renderAgencyReportsPdf(
   const report = overview.agencyOperationsReport ?? buildEmptyAgencyOperationsReport(filters);
   drawAgencyReportHeader(doc, report);
   drawAgencyMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawAgencyOperationsTable(doc, report);
   drawAgencyBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyBtpOperationsReport(filters: ReportPeriodFilter): BtpOperationsReport {
@@ -4713,9 +4713,9 @@ function renderBtpReportsPdf(
   drawBtpReportHeader(doc, report);
   drawBtpMetadataStrip(doc, report, filters, overview.generatedAt);
   drawBtpMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawBtpOperationsTable(doc, report);
   drawBtpBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyFishFarmingOperationsReport(filters: ReportPeriodFilter): FishFarmingOperationsReport {
@@ -5229,9 +5229,9 @@ function renderFishFarmingReportsPdf(
   drawFishFarmingReportHeader(doc, report);
   drawFishFarmingMetadataStrip(doc, report, filters, overview.generatedAt);
   drawFishFarmingMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawFishFarmingOperationsTable(doc, report);
   drawFishFarmingBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyLivestockOperationsReport(filters: ReportPeriodFilter): LivestockOperationsReport {
@@ -5739,9 +5739,9 @@ function renderLivestockReportsPdf(
   drawLivestockReportHeader(doc, report);
   drawLivestockMetadataStrip(doc, report, filters, overview.generatedAt);
   drawLivestockMetricCards(doc, report);
-  drawPdfReadingGuideBox(doc);
   drawLivestockOperationsTable(doc, report);
   drawLivestockBreakdown(doc, report);
+  drawPdfReadingGuideBox(doc);
 }
 
 function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<string, unknown>> {

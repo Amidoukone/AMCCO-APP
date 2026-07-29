@@ -188,7 +188,7 @@ function ReportReadingGuidePanel() {
     <section className="panel reports-reading-guide-panel">
       <div className="dashboard-panel-header">
         <div>
-          <h3>Guide de lecture</h3>
+          <h3>Guide de lecture des colonnes</h3>
           <p className="hint">
             Définitions rapides des indicateurs repris dans les tableaux et les exports.
           </p>
@@ -452,9 +452,33 @@ function buildExportPeriodFilePart(form: PeriodFormState): string {
   return `dates-${form.dateFrom || "all"}-${form.dateTo || "all"}`;
 }
 
+function toFileNamePart(value: string): string {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || "non-renseigne";
+}
+
+function buildFileTimestamp(value = new Date()): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  const seconds = String(value.getSeconds()).padStart(2, "0");
+  const milliseconds = String(value.getMilliseconds()).padStart(3, "0");
+
+  return `${year}${month}${day}-${hours}${minutes}${seconds}-${milliseconds}`;
+}
+
 function buildExportFileName(form: PeriodFormState): string {
-  const stamp = new Date().toISOString().slice(0, 10);
-  return `amcco-rapport-${buildExportPeriodFilePart(form)}-${stamp}.pdf`;
+  const activityPart = form.activityCode ? toFileNamePart(form.activityCode) : "secteur-non-selectionne";
+
+  return `amcco-rapport-${activityPart}-${buildExportPeriodFilePart(form)}-${buildFileTimestamp()}.pdf`;
 }
 
 function formatAppliedRange(overview: ReportsOverview): string {
@@ -834,8 +858,6 @@ export function ReportsPage(): JSX.Element {
               </div>
             </div>
           </section>
-
-          <ReportReadingGuidePanel />
 
           {!hasFocusedOperationsReport ? (
             <>
@@ -3039,6 +3061,8 @@ export function ReportsPage(): JSX.Element {
           </section>
             </>
           ) : null}
+
+          <ReportReadingGuidePanel />
         </>
       ) : null}
     </>

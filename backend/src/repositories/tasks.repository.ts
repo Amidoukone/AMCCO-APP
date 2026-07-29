@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { RoleCode } from "../types/role.js";
 import { getDbPool, queryRows } from "../lib/db.js";
+import { toMetadataStringMap } from "../utils/metadata.js";
 import type { BusinessActivityCode } from "../types/business-activity.js";
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
@@ -113,28 +114,6 @@ export type TaskAttachment = {
   uploadedAt: string;
 };
 
-function toMetadataMap(value: unknown): Record<string, string> {
-  if (!value) {
-    return {};
-  }
-  if (typeof value === "string") {
-    try {
-      return toMetadataMap(JSON.parse(value));
-    } catch {
-      return {};
-    }
-  }
-  if (typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => typeof item === "string")
-      .map(([key, item]) => [key, item as string])
-  );
-}
-
 function toOperationTask(row: OperationTaskRow): OperationTask {
   return {
     id: row.id,
@@ -142,7 +121,7 @@ function toOperationTask(row: OperationTaskRow): OperationTask {
     title: row.title,
     description: row.description,
     activityCode: row.activityCode,
-    metadata: toMetadataMap(row.metadataJson),
+    metadata: toMetadataStringMap(row.metadataJson),
     status: row.status,
     createdById: row.createdById,
     createdByEmail: row.createdByEmail,
@@ -265,14 +244,15 @@ export async function listOperationsTasks(input: {
       LEFT JOIN users au ON au.id = t.assigned_to_id
       WHERE ${filters.join(" AND ")}
       ORDER BY
+        t.created_at DESC,
+        t.updated_at DESC,
         CASE t.status
           WHEN 'BLOCKED' THEN 0
           WHEN 'IN_PROGRESS' THEN 1
           WHEN 'TODO' THEN 2
           ELSE 3
         END ASC,
-        COALESCE(t.due_date, '9999-12-31') ASC,
-        t.created_at DESC
+        COALESCE(t.due_date, '9999-12-31') ASC
       LIMIT ? OFFSET ?
     `,
     values

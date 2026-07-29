@@ -22,6 +22,55 @@ const reportsQuerySchema = z.object({
 
 export const reportingRouter = Router();
 
+function toFileNamePart(value: string): string {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || "non-renseigne";
+}
+
+function buildDownloadTimestamp(value = new Date()): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  const seconds = String(value.getSeconds()).padStart(2, "0");
+  const milliseconds = String(value.getMilliseconds()).padStart(3, "0");
+
+  return `${year}${month}${day}-${hours}${minutes}${seconds}-${milliseconds}`;
+}
+
+function buildExportPeriodFilePart(query: {
+  dateFrom?: string;
+  dateTo?: string;
+}): string {
+  const from = query.dateFrom?.slice(0, 10) || "all";
+  const to = query.dateTo?.slice(0, 10) || "all";
+  return `dates-${from}-${to}`;
+}
+
+function buildReportExportFileName(
+  kind: "rapport" | "transactions" | "taches",
+  format: "pdf" | "csv" | "xlsx",
+  input: {
+    companyId: string;
+    dateFrom?: string;
+    dateTo?: string;
+    activityCode?: string;
+  }
+): string {
+  const companyPart = toFileNamePart(input.companyId);
+  const activityPart = input.activityCode ? toFileNamePart(input.activityCode) : "tous-secteurs";
+  const periodPart = buildExportPeriodFilePart(input);
+
+  return `amcco-${kind}-${companyPart}-${activityPart}-${periodPart}-${buildDownloadTimestamp()}.${format}`;
+}
+
 reportingRouter.use(authenticateAccessToken);
 
 reportingRouter.get(
@@ -99,7 +148,12 @@ reportingRouter.get(
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="amcco-report-overview-${req.auth.companyId}.pdf"`
+      `attachment; filename="${buildReportExportFileName("rapport", "pdf", {
+        companyId: req.auth.companyId,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        activityCode: query.activityCode
+      })}"`
     );
     res.status(200).send(pdf);
   })
@@ -127,7 +181,12 @@ reportingRouter.get(
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="amcco-transactions-${req.auth.companyId}.csv"`
+      `attachment; filename="${buildReportExportFileName("transactions", "csv", {
+        companyId: req.auth.companyId,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        activityCode: query.activityCode
+      })}"`
     );
     res.status(200).send(`\uFEFF${csv}`);
   })
@@ -161,7 +220,12 @@ reportingRouter.get(
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="amcco-transactions-${req.auth.companyId}.xlsx"`
+      `attachment; filename="${buildReportExportFileName("transactions", "xlsx", {
+        companyId: req.auth.companyId,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        activityCode: query.activityCode
+      })}"`
     );
     res.status(200).send(workbook);
   })
@@ -189,7 +253,12 @@ reportingRouter.get(
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="amcco-tasks-${req.auth.companyId}.csv"`
+      `attachment; filename="${buildReportExportFileName("taches", "csv", {
+        companyId: req.auth.companyId,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        activityCode: query.activityCode
+      })}"`
     );
     res.status(200).send(`\uFEFF${csv}`);
   })
@@ -223,7 +292,12 @@ reportingRouter.get(
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="amcco-tasks-${req.auth.companyId}.xlsx"`
+      `attachment; filename="${buildReportExportFileName("taches", "xlsx", {
+        companyId: req.auth.companyId,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        activityCode: query.activityCode
+      })}"`
     );
     res.status(200).send(workbook);
   })

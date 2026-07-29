@@ -6,6 +6,18 @@ import { EmptyState } from "../components/EmptyState";
 import { PageGuide } from "../components/PageGuide";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
+  formatAmountForDisplay as formatLocalizedAmountForDisplay,
+  formatAmountForInput as formatLocalizedAmountForInput,
+  normalizeAmountForApi as normalizeLocalizedAmountForApi,
+  toAmountNumber as toLocalizedAmountNumber
+} from "../lib/amountFormatting";
+import {
+  resolveImageKitFileName,
+  resolveImageKitFileSize,
+  resolveImageKitStorageKey,
+  type ImageKitUploadResult
+} from "../lib/imagekitUpload";
+import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
@@ -1336,34 +1348,19 @@ function formatFileSize(bytes: number): string {
 }
 
 function toAmountNumber(input: string): number {
-  const normalized = Number.parseFloat(input.replace(/\s/g, "").replace(",", "."));
-  return Number.isFinite(normalized) ? normalized : 0;
+  return toLocalizedAmountNumber(input);
 }
 
 function normalizeAmountForApi(input: string): string {
-  return input.trim().replace(/\s/g, "").replace(",", ".");
+  return normalizeLocalizedAmountForApi(input);
 }
 
 function formatAmountForDisplay(input: string | number): string {
-  const rawValue = typeof input === "number" ? String(input) : input.trim();
-  if (!rawValue) {
-    return "";
-  }
-  const normalized = rawValue.replace(/\s/g, "").replace(",", ".");
-  const amount = Number(normalized);
-  if (!Number.isFinite(amount)) {
-    return rawValue;
-  }
-  return new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-    .format(amount)
-    .replace(/[\u202f\u00a0]/g, " ");
+  return formatLocalizedAmountForDisplay(input);
 }
 
 function formatAmountForInput(input: string): string {
-  return formatAmountForDisplay(input);
+  return formatLocalizedAmountForInput(input);
 }
 
 function isMoneyMetadataField(key: string): boolean {
@@ -4282,20 +4279,13 @@ export function FinanceTransactionsPage(): JSX.Element {
         throw new ApiError(uploadResponse.status, detail);
       }
 
-      const uploaded = (await uploadResponse.json()) as {
-        fileId?: string;
-        filePath?: string;
-        url?: string;
-        name?: string;
-        size?: number;
-        fileType?: string;
-      };
+      const uploaded = (await uploadResponse.json()) as ImageKitUploadResult;
 
       return addFinanceTransactionProofRequest(accessToken, transactionId, {
-        storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
-        fileName: uploaded.name ?? selectedFile.name,
+        storageKey: resolveImageKitStorageKey(uploaded, selectedFile.name),
+        fileName: resolveImageKitFileName(uploaded, selectedFile.name),
         mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
-        fileSize: uploaded.size ?? selectedFile.size
+        fileSize: resolveImageKitFileSize(uploaded, selectedFile.size)
       });
     });
 
@@ -4345,20 +4335,13 @@ export function FinanceTransactionsPage(): JSX.Element {
           throw new ApiError(uploadResponse.status, detail);
         }
 
-        const uploaded = (await uploadResponse.json()) as {
-          fileId?: string;
-          filePath?: string;
-          url?: string;
-          name?: string;
-          size?: number;
-          fileType?: string;
-        };
+        const uploaded = (await uploadResponse.json()) as ImageKitUploadResult;
 
         return addFinanceTransactionProofRequest(accessToken, transactionId, {
-          storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
-          fileName: uploaded.name ?? selectedFile.name,
+          storageKey: resolveImageKitStorageKey(uploaded, selectedFile.name),
+          fileName: resolveImageKitFileName(uploaded, selectedFile.name),
           mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
-          fileSize: uploaded.size ?? selectedFile.size
+          fileSize: resolveImageKitFileSize(uploaded, selectedFile.size)
         });
       });
 
@@ -4524,7 +4507,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 onChange={(event) =>
                   setAccountForm((prev) => ({
                     ...prev,
-                    openingBalance: event.target.value
+                    openingBalance: formatAmountForInput(event.target.value)
                   }))
                 }
                 onBlur={() =>
@@ -5266,7 +5249,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 onChange={(event) =>
                   setTransactionForm((prev) => ({
                     ...prev,
-                    amount: event.target.value
+                    amount: formatAmountForInput(event.target.value)
                   }))
                 }
                 onBlur={() =>
@@ -5448,7 +5431,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                     placeholder={field.helpText || field.label}
                     value={transactionForm.metadata[field.key] ?? ""}
                     onChange={(event) => {
-                      const nextValue = event.target.value;
+                      const nextValue = isMoneyMetadataField(field.key)
+                        ? formatAmountForInput(event.target.value)
+                        : event.target.value;
                       setTransactionForm((prev) => {
                         const nextMetadata = {
                           ...prev.metadata,

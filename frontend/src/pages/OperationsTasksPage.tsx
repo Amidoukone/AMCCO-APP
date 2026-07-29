@@ -19,6 +19,12 @@ import {
 import { matchesQuickSearch } from "../lib/quickSearch";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
+  resolveImageKitFileName,
+  resolveImageKitFileSize,
+  resolveImageKitStorageKey,
+  type ImageKitUploadResult
+} from "../lib/imagekitUpload";
+import {
   addTaskAttachmentRequest,
   ApiError,
   assignOperationsTaskRequest,
@@ -937,20 +943,13 @@ export function OperationsTasksPage(): JSX.Element {
         throw new ApiError(uploadResponse.status, detail);
       }
 
-      const uploaded = (await uploadResponse.json()) as {
-        fileId?: string;
-        filePath?: string;
-        url?: string;
-        name?: string;
-        size?: number;
-        fileType?: string;
-      };
+      const uploaded = (await uploadResponse.json()) as ImageKitUploadResult;
 
       return addTaskAttachmentRequest(accessToken, taskId, {
-        storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
-        fileName: uploaded.name ?? selectedFile.name,
+        storageKey: resolveImageKitStorageKey(uploaded, selectedFile.name),
+        fileName: resolveImageKitFileName(uploaded, selectedFile.name),
         mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
-        fileSize: uploaded.size ?? selectedFile.size
+        fileSize: resolveImageKitFileSize(uploaded, selectedFile.size)
       });
     });
 
@@ -962,6 +961,7 @@ export function OperationsTasksPage(): JSX.Element {
     if (!canCreateTasks || !selectedActivityCode) {
       return;
     }
+    const wasEditingTask = Boolean(editingTaskId);
     const attachmentFileToUpload = editingTaskId ? null : taskAttachmentFile;
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -1007,6 +1007,27 @@ export function OperationsTasksPage(): JSX.Element {
       setTaskAttachmentFile(null);
       setSuccessMessage(editingTaskId ? "Tâche modifiée." : "Tâche créée.");
       await loadData();
+      if (!wasEditingTask) {
+        const createdTaskIsVisible =
+          response.item.activityCode === selectedActivityCode &&
+          (filters.status === "ALL" || filters.status === response.item.status) &&
+          (canViewAllTasks || response.item.assignedToId === user?.id);
+        if (createdTaskIsVisible) {
+          setVisibleTasksPage(1);
+          setTasks((prev) => [
+            response.item,
+            ...prev.filter((task) => task.id !== response.item.id)
+          ]);
+          setAssignments((prev) => ({
+            ...prev,
+            [response.item.id]: prev[response.item.id] ?? response.item.assignedToId ?? ""
+          }));
+          setAssignmentNotes((prev) => ({
+            ...prev,
+            [response.item.id]: prev[response.item.id] ?? ""
+          }));
+        }
+      }
       if (attachmentUploadError) {
         setErrorMessage(
           `Tâche créée, mais la pièce jointe n'a pas pu être ajoutée. ${attachmentUploadError}`

@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDbPool, queryRows } from "../lib/db.js";
+import { toMetadataStringMap } from "../utils/metadata.js";
 import {
   isBusinessActivityCode,
   type BusinessActivityCode
@@ -194,28 +195,6 @@ function toAccount(row: AccountRow): FinancialAccount {
   };
 }
 
-function toMetadataMap(value: unknown): Record<string, string> {
-  if (!value) {
-    return {};
-  }
-  if (typeof value === "string") {
-    try {
-      return toMetadataMap(JSON.parse(value));
-    } catch {
-      return {};
-    }
-  }
-  if (typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => typeof item === "string")
-      .map(([key, item]) => [key, item as string])
-  );
-}
-
 function toTransaction(row: TransactionRow): FinancialTransaction {
   return {
     id: row.id,
@@ -235,7 +214,7 @@ function toTransaction(row: TransactionRow): FinancialTransaction {
     currency: row.currency,
     activityCode: row.activityCode,
     description: row.description,
-    metadata: toMetadataMap(row.metadataJson),
+    metadata: toMetadataStringMap(row.metadataJson),
     status: row.status,
     requiresProof: row.requiresProof === 1,
     createdById: row.createdById,

@@ -5,6 +5,18 @@ import { FeedbackBanner } from "../components/FeedbackBanner";
 import { PageGuide } from "../components/PageGuide";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
+  formatAmountForDisplay as formatLocalizedAmountForDisplay,
+  formatAmountForInput as formatLocalizedAmountForInput,
+  normalizeAmountForApi as normalizeLocalizedAmountForApi,
+  toAmountNumber as toLocalizedAmountNumber
+} from "../lib/amountFormatting";
+import {
+  resolveImageKitFileName,
+  resolveImageKitFileSize,
+  resolveImageKitStorageKey,
+  type ImageKitUploadResult
+} from "../lib/imagekitUpload";
+import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
@@ -79,35 +91,19 @@ function toDateTimeLocalInput(value: string): string {
 }
 
 function toMoneyNumber(input: string): number {
-  const normalized = Number.parseFloat(input.replace(/\s/g, "").replace(",", "."));
-  return Number.isFinite(normalized) ? normalized : 0;
+  return toLocalizedAmountNumber(input);
 }
 
 function normalizeMoneyForApi(input: string, fallback = ""): string {
-  const normalized = input.trim().replace(/\s/g, "").replace(",", ".");
-  return normalized || fallback;
+  return normalizeLocalizedAmountForApi(input, fallback);
 }
 
 function formatMoneyForDisplay(input: string | number): string {
-  const rawValue = typeof input === "number" ? String(input) : input.trim();
-  if (!rawValue) {
-    return "";
-  }
-  const normalized = rawValue.replace(/\s/g, "").replace(",", ".");
-  const amount = Number(normalized);
-  if (!Number.isFinite(amount)) {
-    return rawValue;
-  }
-  return new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-    .format(amount)
-    .replace(/[\u202f\u00a0]/g, " ");
+  return formatLocalizedAmountForDisplay(input);
 }
 
 function formatMoneyForInput(input: string): string {
-  return formatMoneyForDisplay(input);
+  return formatLocalizedAmountForInput(input);
 }
 
 function formatNetSalary(gross: string, bonus: string, deduction: string): string {
@@ -740,20 +736,13 @@ export function FinanceSalariesPage(): JSX.Element {
           throw new ApiError(uploadResponse.status, "Échec de l'upload sur ImageKit.");
         }
 
-        const uploaded = (await uploadResponse.json()) as {
-          fileId?: string;
-          filePath?: string;
-          url?: string;
-          name?: string;
-          size?: number;
-          fileType?: string;
-        };
+        const uploaded = (await uploadResponse.json()) as ImageKitUploadResult;
 
         return addFinanceTransactionProofRequest(accessToken, transactionId, {
-          storageKey: uploaded.filePath ?? uploaded.url ?? uploaded.fileId ?? selectedFile.name,
-          fileName: uploaded.name ?? selectedFile.name,
+          storageKey: resolveImageKitStorageKey(uploaded, selectedFile.name),
+          fileName: resolveImageKitFileName(uploaded, selectedFile.name),
           mimeType: selectedFile.type || uploaded.fileType || "application/octet-stream",
-          fileSize: uploaded.size ?? selectedFile.size
+          fileSize: resolveImageKitFileSize(uploaded, selectedFile.size)
         });
       });
 
@@ -951,7 +940,7 @@ export function FinanceSalariesPage(): JSX.Element {
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
                       ...prev,
-                      grossAmount: event.target.value
+                      grossAmount: formatMoneyForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
@@ -972,7 +961,7 @@ export function FinanceSalariesPage(): JSX.Element {
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
                       ...prev,
-                      bonusAmount: event.target.value
+                      bonusAmount: formatMoneyForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
@@ -992,7 +981,7 @@ export function FinanceSalariesPage(): JSX.Element {
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
                       ...prev,
-                      deductionAmount: event.target.value
+                      deductionAmount: formatMoneyForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
