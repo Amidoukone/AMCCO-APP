@@ -16,6 +16,7 @@ import {
   createFinancialAccount,
   deleteFinancialAccount,
   type FinancialAccountScopeType,
+  type FinancialTransaction,
   createFinancialTransaction,
   deleteFinancialTransaction,
   findFinancialAccountById,
@@ -137,6 +138,15 @@ function ensureSalaryViewAccess(role: RoleCode): void {
 function ensureTransactionManagementAccess(role: RoleCode): void {
   if (!canManageTransaction(role)) {
     throw new HttpError(403, "Permissions insuffisantes pour modifier ou supprimer les transactions.");
+  }
+}
+
+function ensureTransactionMutationOwnership(actor: ActorContext, transaction: FinancialTransaction): void {
+  if (actor.role === "ACCOUNTANT" && transaction.createdById !== actor.actorId) {
+    throw new HttpError(
+      403,
+      "Le comptable peut modifier ou supprimer uniquement ses propres transactions."
+    );
   }
 }
 
@@ -280,6 +290,56 @@ function buildFinanceGovernanceMetadata(input: {
       )
     }
   };
+}
+
+function toActorRoleAlertLabel(role: RoleCode): string {
+  if (role === "SYS_ADMIN") {
+    return "l'admin système";
+  }
+
+  if (role === "ACCOUNTANT") {
+    return "la comptabilité";
+  }
+
+  if (role === "OWNER") {
+    return "le propriétaire";
+  }
+
+  return "un utilisateur autorisé";
+}
+
+async function alertTransactionMutationWatchers(input: {
+  actor: ActorContext;
+  transaction: FinancialTransaction;
+  code: "FINANCE_TRANSACTION_UPDATED" | "FINANCE_TRANSACTION_DELETED";
+  actionLabel: string;
+}): Promise<void> {
+  const activityLabel = input.transaction.activityCode
+    ? toActivityLabel(input.transaction.activityCode)
+    : null;
+
+  await createRoleTargetedAlerts({
+    companyId: input.actor.companyId,
+    recipientRoles: ["OWNER", "SYS_ADMIN"],
+    excludeUserIds: [input.actor.actorId],
+    code: input.code,
+    message: `La transaction ${activityLabel ?? "finance"} ${input.transaction.amount} ${input.transaction.currency} a été ${input.actionLabel} par ${toActorRoleAlertLabel(input.actor.role)}.`,
+    severity: "WARNING",
+    entityType: "TRANSACTION",
+    entityId: input.transaction.id,
+    metadata: {
+      transactionId: input.transaction.id,
+      accountId: input.transaction.accountId,
+      accountName: input.transaction.accountName,
+      actorId: input.actor.actorId,
+      actorRole: input.actor.role,
+      activityCode: input.transaction.activityCode,
+      activityLabel,
+      status: input.transaction.status,
+      createdById: input.transaction.createdById,
+      createdByEmail: input.transaction.createdByEmail
+    }
+  });
 }
 
 function buildReviewerMetadata(
@@ -819,6 +879,8 @@ export async function updateCompanyTransaction(
     throw new HttpError(400, "Les salaires doivent être gérés depuis la page salaires.");
   }
 
+  ensureTransactionMutationOwnership(actor, existing);
+
   const account = await findFinancialAccountById(actor.companyId, input.accountId);
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
@@ -890,27 +952,12 @@ export async function updateCompanyTransaction(
     throw new HttpError(500, "Impossible de recharger la transaction modifiée.");
   }
 
-  if (actor.role === "SYS_ADMIN") {
-    await createRoleTargetedAlerts({
-      companyId: actor.companyId,
-      recipientRoles: ["OWNER"],
-      excludeUserIds: [actor.actorId],
-      code: "FINANCE_TRANSACTION_UPDATED",
-      message: `La transaction ${profile.label} ${updated.amount} ${updated.currency} a été modifiée par l'admin système.`,
-      severity: "WARNING",
-      entityType: "TRANSACTION",
-      entityId: updated.id,
-      metadata: {
-        transactionId: updated.id,
-        accountId: updated.accountId,
-        accountName: updated.accountName,
-        actorRole: actor.role,
-        activityCode: updated.activityCode,
-        activityLabel: profile.label,
-        status: updated.status
-      }
-    });
-  }
+  await alertTransactionMutationWatchers({
+    actor,
+    transaction: updated,
+    code: "FINANCE_TRANSACTION_UPDATED",
+    actionLabel: "modifiée"
+  });
 
   return updated;
 }
@@ -1560,6 +1607,8 @@ export async function deleteCompanyTransaction(
 
   ensureTransactionManagementAccess(actor.role);
 
+  ensureTransactionMutationOwnership(actor, existing);
+
   const account = await findFinancialAccountById(actor.companyId, existing.accountId);
   await deleteFinancialTransaction({
     companyId: actor.companyId,
@@ -1595,28 +1644,12 @@ export async function deleteCompanyTransaction(
     })
   });
 
-  if (actor.role === "SYS_ADMIN") {
-    const activityLabel = existing.activityCode ? toActivityLabel(existing.activityCode) : null;
-    await createRoleTargetedAlerts({
-      companyId: actor.companyId,
-      recipientRoles: ["OWNER"],
-      excludeUserIds: [actor.actorId],
-      code: "FINANCE_TRANSACTION_DELETED",
-      message: `La transaction ${activityLabel ?? "finance"} ${existing.amount} ${existing.currency} a été supprimée par l'admin système.`,
-      severity: "WARNING",
-      entityType: "TRANSACTION",
-      entityId: existing.id,
-      metadata: {
-        transactionId: existing.id,
-        accountId: existing.accountId,
-        accountName: existing.accountName,
-        actorRole: actor.role,
-        activityCode: existing.activityCode,
-        activityLabel,
-        status: existing.status
-      }
-    });
-  }
+  await alertTransactionMutationWatchers({
+    actor,
+    transaction: existing,
+    code: "FINANCE_TRANSACTION_DELETED",
+    actionLabel: "supprimée"
+  });
 }
 
 export async function deleteCompanySalaryTransaction(

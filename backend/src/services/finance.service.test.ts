@@ -1496,7 +1496,7 @@ describe("finance.service", () => {
           },
           status: "SUBMITTED",
           requiresProof: true,
-          createdById: "cashier-1",
+          createdById: actor.actorId,
           createdByEmail: "cashier@example.com",
           validatedById: null,
           validatedByEmail: null,
@@ -1528,7 +1528,7 @@ describe("finance.service", () => {
           },
           status: "DRAFT",
           requiresProof: true,
-          createdById: "cashier-1",
+          createdById: actor.actorId,
           createdByEmail: "cashier@example.com",
           validatedById: null,
           validatedByEmail: null,
@@ -1544,7 +1544,7 @@ describe("finance.service", () => {
       vi.mocked(findTransactionById).mockResolvedValue({
         id: "txn-3",
         companyId: actor.companyId,
-        createdById: "cashier-1",
+        createdById: actor.actorId,
         activityCode: "SERVICES",
         status: "DRAFT",
         requiresProof: false,
@@ -1605,11 +1605,76 @@ describe("finance.service", () => {
           metadataJson: expect.stringContaining("\"previousStatus\":\"SUBMITTED\"")
         })
       );
+      expect(createRoleTargetedAlerts).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientRoles: ["OWNER", "SYS_ADMIN"],
+          excludeUserIds: [actor.actorId],
+          code: "FINANCE_TRANSACTION_UPDATED",
+          entityType: "TRANSACTION",
+          entityId: "txn-3"
+        })
+      );
       expect(result.status).toBe("DRAFT");
       expect(result.activityCode).toBe("SERVICES");
     });
 
-    it("alerts owners when sys admin updates a transaction", async () => {
+    it("rejects accountant updates on another user's transaction", async () => {
+      vi.mocked(findFinancialTransactionById).mockResolvedValueOnce({
+        id: "txn-other",
+        companyId: actor.companyId,
+        accountId: "account-1",
+        accountName: "Caisse principale",
+        accountRef: "CAI-01",
+        accountScopeType: "GLOBAL",
+        accountPrimaryActivityCode: null,
+        accountAllowedActivityCodes: [],
+        type: "CASH_OUT",
+        amount: "25000.00",
+        currency: "XOF",
+        activityCode: "GENERAL_STORE",
+        description: "Sortie initiale",
+        metadata: {},
+        status: "DRAFT",
+        requiresProof: false,
+        createdById: "other-user",
+        createdByEmail: "other@example.com",
+        validatedById: null,
+        validatedByEmail: null,
+        salaryConfirmationStatus: "NOT_REQUIRED",
+        salaryConfirmedById: null,
+        salaryConfirmedByEmail: null,
+        salaryConfirmedAt: null,
+        occurredAt: "2026-04-20T08:00:00.000Z",
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z",
+        proofsCount: 0
+      });
+
+      const promise = updateCompanyTransaction(
+        {
+          ...actor,
+          role: "ACCOUNTANT"
+        },
+        {
+          transactionId: "txn-other",
+          accountId: "account-1",
+          type: "CASH_OUT",
+          amount: "30000.00",
+          currency: "XOF",
+          activityCode: "GENERAL_STORE",
+          metadata: {}
+        }
+      );
+
+      await expect(promise).rejects.toMatchObject<HttpError>({
+        statusCode: 403,
+        message: "Le comptable peut modifier ou supprimer uniquement ses propres transactions."
+      });
+      expect(updateFinancialTransaction).not.toHaveBeenCalled();
+      expect(createRoleTargetedAlerts).not.toHaveBeenCalled();
+    });
+
+    it("alerts owners and sys admins when sys admin updates a transaction", async () => {
       vi.mocked(findFinancialTransactionById)
         .mockResolvedValueOnce({
           id: "txn-7",
@@ -1713,7 +1778,7 @@ describe("finance.service", () => {
 
       expect(createRoleTargetedAlerts).toHaveBeenCalledWith({
         companyId: actor.companyId,
-        recipientRoles: ["OWNER"],
+        recipientRoles: ["OWNER", "SYS_ADMIN"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_TRANSACTION_UPDATED",
         message: "La transaction Services divers 20000.00 XOF a été modifiée par l'admin système.",
@@ -1752,7 +1817,7 @@ describe("finance.service", () => {
         metadata: {},
         status: "DRAFT",
         requiresProof: false,
-        createdById: "cashier-2",
+        createdById: actor.actorId,
         createdByEmail: "cashier2@example.com",
         validatedById: null,
         validatedByEmail: null,
@@ -1798,6 +1863,15 @@ describe("finance.service", () => {
           metadataJson: expect.stringContaining("\"deletedStatus\":\"DRAFT\"")
         })
       );
+      expect(createRoleTargetedAlerts).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientRoles: ["OWNER", "SYS_ADMIN"],
+          excludeUserIds: [actor.actorId],
+          code: "FINANCE_TRANSACTION_DELETED",
+          entityType: "TRANSACTION",
+          entityId: "txn-4"
+        })
+      );
     });
 
     it("allows an accountant to delete an approved transaction", async () => {
@@ -1818,7 +1892,7 @@ describe("finance.service", () => {
         metadata: {},
         status: "APPROVED",
         requiresProof: false,
-        createdById: "cashier-3",
+        createdById: actor.actorId,
         createdByEmail: "cashier3@example.com",
         validatedById: "reviewer-1",
         validatedByEmail: "reviewer@example.com",
@@ -1864,6 +1938,56 @@ describe("finance.service", () => {
           metadataJson: expect.stringContaining("\"deletedStatus\":\"APPROVED\"")
         })
       );
+    });
+
+    it("rejects accountant deletes on another user's transaction", async () => {
+      vi.mocked(findFinancialTransactionById).mockResolvedValue({
+        id: "txn-other-delete",
+        companyId: actor.companyId,
+        accountId: "account-4",
+        accountName: "Banque principale",
+        accountRef: "BNK-01",
+        accountScopeType: "GLOBAL",
+        accountPrimaryActivityCode: null,
+        accountAllowedActivityCodes: [],
+        type: "CASH_IN",
+        amount: "90000.00",
+        currency: "XOF",
+        activityCode: "GENERAL_STORE",
+        description: "Versement",
+        metadata: {},
+        status: "APPROVED",
+        requiresProof: false,
+        createdById: "other-user",
+        createdByEmail: "other@example.com",
+        validatedById: "reviewer-1",
+        validatedByEmail: "reviewer@example.com",
+        salaryConfirmationStatus: "NOT_REQUIRED",
+        salaryConfirmedById: null,
+        salaryConfirmedByEmail: null,
+        salaryConfirmedAt: null,
+        occurredAt: "2026-04-20T08:00:00.000Z",
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z",
+        proofsCount: 1
+      });
+
+      const promise = deleteCompanyTransaction(
+        {
+          ...actor,
+          role: "ACCOUNTANT"
+        },
+        {
+          transactionId: "txn-other-delete"
+        }
+      );
+
+      await expect(promise).rejects.toMatchObject<HttpError>({
+        statusCode: 403,
+        message: "Le comptable peut modifier ou supprimer uniquement ses propres transactions."
+      });
+      expect(deleteFinancialTransaction).not.toHaveBeenCalled();
+      expect(createRoleTargetedAlerts).not.toHaveBeenCalled();
     });
 
     it("allows sys admin to delete an approved transaction", async () => {
@@ -1932,7 +2056,7 @@ describe("finance.service", () => {
       );
       expect(createRoleTargetedAlerts).toHaveBeenCalledWith({
         companyId: actor.companyId,
-        recipientRoles: ["OWNER"],
+        recipientRoles: ["OWNER", "SYS_ADMIN"],
         excludeUserIds: [actor.actorId],
         code: "FINANCE_TRANSACTION_DELETED",
         message: "La transaction Services divers 120000.00 XOF a été supprimée par l'admin système.",

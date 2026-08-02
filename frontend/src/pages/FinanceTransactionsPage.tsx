@@ -3498,6 +3498,21 @@ export function FinanceTransactionsPage(): JSX.Element {
     return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
   }, [user?.role]);
 
+  const canMutateTransaction = useCallback(
+    (transaction: FinancialTransaction): boolean => {
+      if (!canManageTransactions || !user) {
+        return false;
+      }
+
+      if (user.role === "SYS_ADMIN") {
+        return true;
+      }
+
+      return user.role === "ACCOUNTANT" && transaction.createdById === user.id;
+    },
+    [canManageTransactions, user?.id, user?.role]
+  );
+
   const canManageAnyAccount = canCreateAccount;
 
   const canManageSalaries = useMemo(() => {
@@ -3632,6 +3647,10 @@ export function FinanceTransactionsPage(): JSX.Element {
   const selectedTransaction = useMemo(
     () => transactions.find((item) => item.id === selectedTransactionId) ?? null,
     [selectedTransactionId, transactions]
+  );
+  const canMutateSelectedTransaction = useMemo(
+    () => (selectedTransaction ? canMutateTransaction(selectedTransaction) : false),
+    [canMutateTransaction, selectedTransaction]
   );
   const displayTransactions = useMemo(() => {
     return transactions.filter((item) =>
@@ -4168,6 +4187,11 @@ export function FinanceTransactionsPage(): JSX.Element {
   function handleStartEditTransaction(transaction: FinancialTransaction): void {
     setErrorMessage(null);
     setSuccessMessage(null);
+    if (!canMutateTransaction(transaction)) {
+      setErrorMessage("Le comptable peut modifier uniquement ses propres transactions.");
+      return;
+    }
+
     setTransactionProofFile(null);
     setEditingTransactionId(transaction.id);
     setTransactionForm({
@@ -4189,6 +4213,11 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleDeleteTransaction(transaction: FinancialTransaction): Promise<void> {
+    if (!canMutateTransaction(transaction)) {
+      setErrorMessage("Le comptable peut supprimer uniquement ses propres transactions.");
+      return;
+    }
+
     setTransactionPendingDelete(transaction);
     return;
 
@@ -5563,8 +5592,8 @@ export function FinanceTransactionsPage(): JSX.Element {
                   const isProofsOpen = openProofs[tx.id] === true;
                   const proofs = proofsByTransaction[tx.id] ?? [];
                   const isProofsLoading = loadingProofsByTransaction[tx.id] === true;
-                  const canEditTransaction = canManageTransactions;
-                  const canDeleteTransaction = canManageTransactions;
+                  const canEditTransaction = canMutateTransaction(tx);
+                  const canDeleteTransaction = canMutateTransaction(tx);
 
                   return (
                     <tr
@@ -5847,7 +5876,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
           <div className="finance-transaction-detail-actions">
             <div className="actions-inline">
-              {canManageTransactions ? (
+              {canMutateSelectedTransaction ? (
                 <button
                   type="button"
                   className="secondary-btn"
@@ -5857,7 +5886,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   Modifier
                 </button>
               ) : null}
-              {canManageTransactions ? (
+              {canMutateSelectedTransaction ? (
                 <button
                   type="button"
                   className="danger-btn"
