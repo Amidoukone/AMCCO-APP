@@ -1031,6 +1031,7 @@ type ReportOperationalTransactionRow = RowDataPacket & {
   type: "CASH_IN" | "CASH_OUT";
   amount: string;
   currency: string;
+  description: string | null;
   occurredAt: Date;
   metadataJson: unknown;
 };
@@ -1048,6 +1049,7 @@ export type ReportOperationalTransaction = {
   type: "CASH_IN" | "CASH_OUT";
   amount: string;
   currency: string;
+  description?: string | null;
   occurredAt: string;
   metadata: Record<string, string>;
 };
@@ -1667,6 +1669,7 @@ export async function listReportOperationalTransactions(
         type AS type,
         CAST(amount AS CHAR) AS amount,
         currency AS currency,
+        description AS description,
         occurred_at AS occurredAt,
         metadata_json AS metadataJson
       FROM transactions
@@ -1681,6 +1684,7 @@ export async function listReportOperationalTransactions(
     type: row.type,
     amount: row.amount,
     currency: row.currency,
+    description: row.description,
     occurredAt: new Date(row.occurredAt).toISOString(),
     metadata: toMetadataStringMap(row.metadataJson)
   }));

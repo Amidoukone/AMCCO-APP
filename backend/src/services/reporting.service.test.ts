@@ -267,23 +267,23 @@ describe("reporting.service", () => {
 
   it("builds the filtered hardware sales report from item metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
-      { status: "SUBMITTED", currency: "XOF", count: 2, totalAmount: "190000.00" }
+      { status: "SUBMITTED", currency: "XOF", count: 3, totalAmount: "250000.00" }
     ]);
     vi.mocked(listReportFinanceByType).mockResolvedValue([
       {
         type: "CASH_IN",
         currency: "XOF",
-        count: 2,
-        totalAmount: "190000.00",
-        approvedAmount: "150000.00"
+        count: 3,
+        totalAmount: "250000.00",
+        approvedAmount: "250000.00"
       }
     ]);
     vi.mocked(listReportFinanceByActivity).mockResolvedValue([
       {
         activityCode: "HARDWARE",
-        count: 2,
-        totalAmount: "190000.00",
-        approvedAmount: "150000.00"
+        count: 3,
+        totalAmount: "250000.00",
+        approvedAmount: "250000.00"
       }
     ]);
     vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
@@ -338,6 +338,18 @@ describe("reporting.service", () => {
         activityCode: "HARDWARE",
         status: "APPROVED",
         type: "CASH_IN",
+        amount: "60000.00",
+        currency: "XOF",
+        description: "Vente comptoir plomberie",
+        occurredAt: "2026-05-04T16:00:00.000Z",
+        metadata: {
+          hardwareOperationKind: "GLOBAL"
+        }
+      },
+      {
+        activityCode: "HARDWARE",
+        status: "APPROVED",
+        type: "CASH_IN",
         amount: "25000.00",
         currency: "XOF",
         occurredAt: "2026-05-05T08:00:00.000Z",
@@ -365,16 +377,28 @@ describe("reporting.service", () => {
         marginRate: 21.1,
         transactionsCount: 2,
         currency: "XOF"
+      },
+      {
+        date: "2026-05-04",
+        designation: "Vente comptoir plomberie",
+        quantity: 0,
+        salesAmount: "60000.00",
+        paymentAmount: "60000.00",
+        purchaseAmount: "0.00",
+        grossProfit: "60000.00",
+        marginRate: 100,
+        transactionsCount: 1,
+        currency: "XOF"
       }
     ]);
     expect(result.hardwareMonthlyReport?.totals).toMatchObject({
       quantity: 12,
-      salesAmount: "190000.00",
-      paymentAmount: "90000.00",
+      salesAmount: "250000.00",
+      paymentAmount: "150000.00",
       purchaseAmount: "150000.00",
-      grossProfit: "40000.00",
-      marginRate: 21.1,
-      transactionsCount: 2,
+      grossProfit: "100000.00",
+      marginRate: 40,
+      transactionsCount: 3,
       currency: "XOF"
     });
     expect(result.hardwareMonthlyReport?.periodLabel).toBe("mai 2026");

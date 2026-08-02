@@ -6629,23 +6629,32 @@ function getMetadataNumber(metadata: Record<string, string>, key: string): numbe
   return toNumberAmount(metadata[key]);
 }
 
-function getHardwareDesignation(metadata: Record<string, string>): string {
+function getHardwareDesignation(transaction: ReportOperationalTransaction): string {
+  const metadata = transaction.metadata;
   const designation =
     metadata.itemName?.trim() ||
     metadata.designation?.trim() ||
-    metadata.productFamily?.trim();
+    metadata.productFamily?.trim() ||
+    transaction.description?.trim();
   return designation || "Article quincaillerie";
 }
 
 function hasHardwareItemMetadata(metadata: Record<string, string>): boolean {
   return Boolean(
     metadata.itemName?.trim() ||
+    metadata.designation?.trim() ||
+    metadata.productFamily?.trim() ||
     metadata.quantity?.trim() ||
     metadata.purchaseUnitPrice?.trim() ||
     metadata.saleUnitPrice?.trim() ||
     metadata.dailyPayment?.trim() ||
+    metadata.paymentAmount?.trim() ||
     metadata.supplierRef?.trim()
   );
+}
+
+function hasHardwareSaleContext(transaction: ReportOperationalTransaction): boolean {
+  return hasHardwareItemMetadata(transaction.metadata) || Boolean(transaction.description?.trim());
 }
 
 function toReportDate(value: string): string {
@@ -6719,14 +6728,26 @@ function toHardwarePeriodLabel(
 
 function isHardwareReportableSale(transaction: ReportOperationalTransaction): boolean {
   const operationKind = transaction.metadata.hardwareOperationKind?.trim();
-  return (
-    transaction.activityCode === "HARDWARE" &&
-    transaction.currency === "XOF" &&
-    transaction.type === "CASH_IN" &&
-    operationKind !== "GLOBAL" &&
-    (operationKind === "ITEM_EXIT" || (!operationKind && hasHardwareItemMetadata(transaction.metadata))) &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  if (
+    !(
+      transaction.activityCode === "HARDWARE" &&
+      transaction.currency === "XOF" &&
+      transaction.type === "CASH_IN" &&
+      isReportableFinancialStatus(transaction.status)
+    )
+  ) {
+    return false;
+  }
+
+  if (operationKind === "ITEM_ENTRY") {
+    return false;
+  }
+
+  if (operationKind === "ITEM_EXIT") {
+    return true;
+  }
+
+  return hasHardwareSaleContext(transaction);
 }
 
 function buildHardwareMonthlyReport(
@@ -6748,7 +6769,7 @@ function buildHardwareMonthlyReport(
   const buckets = new Map<string, HardwareMonthlyBucket>();
   for (const transaction of reportableTransactions) {
     const date = toReportDate(transaction.occurredAt);
-    const designation = getHardwareDesignation(transaction.metadata);
+    const designation = getHardwareDesignation(transaction);
     const key = `${date}|${designation}`;
     const quantity = getMetadataNumber(transaction.metadata, "quantity");
     const saleUnitPrice = getMetadataNumber(transaction.metadata, "saleUnitPrice");
@@ -6761,7 +6782,8 @@ function buildHardwareMonthlyReport(
       : 0;
     const paymentAmount =
       getMetadataNumber(transaction.metadata, "dailyPayment") ||
-      getMetadataNumber(transaction.metadata, "paymentAmount");
+      getMetadataNumber(transaction.metadata, "paymentAmount") ||
+      toNumberAmount(transaction.amount);
     const grossProfit = computedSaleAmount - purchaseAmount;
     const bucket = buckets.get(key) ?? {
       date,
