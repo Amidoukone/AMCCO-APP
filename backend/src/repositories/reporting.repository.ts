@@ -1157,6 +1157,16 @@ function appendPeriodFilters(
   }
 }
 
+function appendTaskPeriodFilters(
+  filters: string[],
+  values: Array<string | number>,
+  period?: ReportPeriodFilter,
+  tableAlias?: string
+): void {
+  const prefix = tableAlias ? `${tableAlias}.` : "";
+  appendPeriodFilters(filters, values, `COALESCE(${prefix}due_date, ${prefix}updated_at)`, period);
+}
+
 function appendActivityFilter(
   filters: string[],
   values: Array<string | number>,
@@ -1590,7 +1600,7 @@ export async function listReportTaskByStatus(
 ): Promise<ReportTaskByStatus[]> {
   const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
   const values: Array<string | number> = [companyId];
-  appendPeriodFilters(filters, values, "updated_at", period);
+  appendTaskPeriodFilters(filters, values, period);
   appendActivityFilter(filters, values, "activity_code", period);
 
   const rows = await queryRows<ReportTaskByStatusRow[]>(
@@ -1624,7 +1634,7 @@ export async function listReportTaskByActivity(
 }>> {
   const filters: string[] = ["company_id = ?"];
   const values: Array<string | number> = [companyId];
-  appendPeriodFilters(filters, values, "updated_at", period);
+  appendTaskPeriodFilters(filters, values, period);
   appendActivityFilter(filters, values, "activity_code", period);
 
   const rows = await queryRows<ReportTaskByActivityRow[]>(
@@ -1696,7 +1706,7 @@ export async function listReportOperationalTasks(
 ): Promise<ReportOperationalTask[]> {
   const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
   const values: Array<string | number> = [companyId];
-  appendPeriodFilters(filters, values, "updated_at", period);
+  appendTaskPeriodFilters(filters, values, period);
   appendActivityFilter(filters, values, "activity_code", period);
 
   const rows = await queryRows<ReportOperationalTaskRow[]>(
@@ -1811,7 +1821,7 @@ export async function listTasksForExport(
 ): Promise<TaskExportRow[]> {
   const filters: string[] = ["t.company_id = ?", "t.activity_code IS NOT NULL"];
   const values: Array<string | number> = [companyId];
-  appendPeriodFilters(filters, values, "t.updated_at", period);
+  appendTaskPeriodFilters(filters, values, period, "t");
   appendActivityFilter(filters, values, "t.activity_code", period);
 
   return queryRows<TaskExportRow[]>(

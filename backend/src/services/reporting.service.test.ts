@@ -433,6 +433,161 @@ describe("reporting.service", () => {
     });
   });
 
+  it("builds generic operational performance for sectors without a focused report", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "SUBMITTED", currency: "XOF", count: 2, totalAmount: "180000.00" },
+      { status: "DRAFT", currency: "XOF", count: 1, totalAmount: "200000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      {
+        type: "CASH_IN",
+        currency: "XOF",
+        count: 2,
+        totalAmount: "350000.00",
+        approvedAmount: "150000.00"
+      },
+      {
+        type: "CASH_OUT",
+        currency: "XOF",
+        count: 1,
+        totalAmount: "30000.00",
+        approvedAmount: "30000.00"
+      }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      {
+        activityCode: "TRANSPORT",
+        count: 3,
+        totalAmount: "380000.00",
+        approvedAmount: "180000.00"
+      }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 1 },
+      { status: "BLOCKED", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      {
+        activityCode: "TRANSPORT",
+        totalCount: 2,
+        openCount: 1,
+        blockedCount: 1,
+        doneCount: 1
+      }
+    ]);
+    vi.mocked(listReportRoleDistribution).mockResolvedValue([]);
+    vi.mocked(listDashboardWorkload).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "TRANSPORT",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "150000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-05T10:00:00.000Z",
+        metadata: {
+          transportService: "Location camion",
+          assetType: "Camion benne",
+          vehicleRef: "TR-001"
+        }
+      },
+      {
+        activityCode: "TRANSPORT",
+        status: "SUBMITTED",
+        type: "CASH_OUT",
+        amount: "30000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-06T10:00:00.000Z",
+        metadata: {
+          transportService: "Location camion",
+          assetType: "Camion benne",
+          vehicleRef: "TR-001"
+        }
+      },
+      {
+        activityCode: "TRANSPORT",
+        status: "DRAFT",
+        type: "CASH_IN",
+        amount: "200000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-07T10:00:00.000Z",
+        metadata: {
+          transportService: "Location camion",
+          assetType: "Camion benne",
+          vehicleRef: "TR-001"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "TRANSPORT",
+        status: "DONE",
+        dueDate: "2026-09-08T10:00:00.000Z",
+        metadata: {
+          transportService: "Location camion",
+          assetType: "Camion benne",
+          vehicleRef: "TR-001"
+        }
+      },
+      {
+        activityCode: "TRANSPORT",
+        status: "BLOCKED",
+        dueDate: "2026-09-09T10:00:00.000Z",
+        metadata: {
+          transportService: "Location camion",
+          assetType: "Camion benne",
+          vehicleRef: "TR-001"
+        }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "TRANSPORT",
+      dateFrom: "2026-09-01T00:00:00.000Z",
+      dateTo: "2026-09-30T23:59:59.999Z"
+    });
+
+    expect(result.btpOperationsReport).toBeNull();
+    expect(result.fishFarmingOperationsReport).toBeNull();
+    expect(result.operationalPerformance).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          scope: "ACTIVITY",
+          activityCode: "TRANSPORT",
+          itemLabel: "Transport",
+          transactionsCount: 2,
+          approvedTransactionsCount: 2,
+          approvedCashIn: "150000.00",
+          approvedCashOut: "30000.00",
+          netProfit: "120000.00",
+          totalTasksCount: 2,
+          doneTasksCount: 1,
+          openTasksCount: 1,
+          blockedTasksCount: 1,
+          executionRate: 50
+        }),
+        expect.objectContaining({
+          scope: "SUBSECTION",
+          activityCode: "TRANSPORT",
+          dimensionKey: "transportService",
+          itemLabel: "Location camion",
+          approvedCashIn: "150000.00",
+          approvedCashOut: "30000.00",
+          totalTasksCount: 2
+        })
+      ])
+    );
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "TRANSPORT",
+      dateFrom: "2026-09-01T00:00:00.000Z",
+      dateTo: "2026-09-30T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
   it("builds the agriculture opérations report from campaign metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 2, totalAmount: "170000.00" }

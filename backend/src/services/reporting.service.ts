@@ -765,6 +765,17 @@ function isReportableFinancialStatus(
   return status === "SUBMITTED" || status === "APPROVED";
 }
 
+function isSectorReportableTransaction(
+  transaction: ReportOperationalTransaction,
+  activityCode: BusinessActivityCode
+): boolean {
+  return (
+    transaction.activityCode === activityCode &&
+    transaction.currency === "XOF" &&
+    isReportableFinancialStatus(transaction.status)
+  );
+}
+
 function toDisplayTransactionTypeLabel(type: "CASH_IN" | "CASH_OUT"): string {
   return type === "CASH_IN" ? "Entree" : "Sortie";
 }
@@ -6730,10 +6741,8 @@ function isHardwareReportableSale(transaction: ReportOperationalTransaction): bo
   const operationKind = transaction.metadata.hardwareOperationKind?.trim();
   if (
     !(
-      transaction.activityCode === "HARDWARE" &&
-      transaction.currency === "XOF" &&
-      transaction.type === "CASH_IN" &&
-      isReportableFinancialStatus(transaction.status)
+      isSectorReportableTransaction(transaction, "HARDWARE") &&
+      transaction.type === "CASH_IN"
     )
   ) {
     return false;
@@ -7006,11 +7015,7 @@ function toAgriculturePeriodLabel(
 }
 
 function isAgricultureReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "AGRICULTURE" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "AGRICULTURE");
 }
 
 function buildAgricultureOperationsReport(
@@ -7336,11 +7341,7 @@ function toGeneralStorePeriodLabel(
 }
 
 function isGeneralStoreReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "GENERAL_STORE" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "GENERAL_STORE");
 }
 
 function buildGeneralStoreOperationsReport(
@@ -7729,11 +7730,7 @@ function toFoodPeriodLabel(
 }
 
 function isFoodReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "FOOD" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "FOOD");
 }
 
 function toMarginRate(grossMargin: number, salesAmount: number): number {
@@ -8119,11 +8116,7 @@ function toRentalPeriodLabel(
 }
 
 function isRentalReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "RENTAL" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "RENTAL");
 }
 
 function buildRentalOperationsReport(
@@ -8495,11 +8488,7 @@ function toHotelPeriodLabel(
 }
 
 function isHotelReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "HOTEL_LODGING" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "HOTEL_LODGING");
 }
 
 function toAverageRoomRate(roomRevenue: number, nightsCount: number): number {
@@ -8899,11 +8888,7 @@ function toWaterPeriodLabel(filters: ReportPeriodFilter): string {
 }
 
 function isWaterReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "WATER" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "WATER");
 }
 
 function toWaterLossRate(producedVolume: number, billedVolume: number): number {
@@ -9314,11 +9299,7 @@ function toAgencyPeriodLabel(filters: ReportPeriodFilter): string {
 }
 
 function isAgencyReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "REAL_ESTATE_AGENCY" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "REAL_ESTATE_AGENCY");
 }
 
 function toAgencyCommissionRate(commissionAmount: number, dealAmount: number): number {
@@ -9728,11 +9709,7 @@ function toBtpPeriodLabel(
 }
 
 function isBtpReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "BTP" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "BTP");
 }
 
 function buildBtpOperationsReport(
@@ -10073,11 +10050,7 @@ function toFishFarmingPeriodLabel(
 }
 
 function isFishFarmingReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "FISH_FARMING" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "FISH_FARMING");
 }
 
 function buildFishFarmingOperationsReport(
@@ -10408,11 +10381,7 @@ function toLivestockPeriodLabel(
 }
 
 function isLivestockReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return (
-    transaction.activityCode === "LIVESTOCK" &&
-    transaction.currency === "XOF" &&
-    isReportableFinancialStatus(transaction.status)
-  );
+  return isSectorReportableTransaction(transaction, "LIVESTOCK");
 }
 
 function buildLivestockOperationsReport(

@@ -590,6 +590,15 @@ export function ReportsPage(): JSX.Element {
     overview?.fishFarmingOperationsReport ||
     overview?.livestockOperationsReport
   );
+  const genericOperationalPerformanceRows = useMemo(
+    () =>
+      overview
+        ? overview.operationalPerformance.filter(
+            (item) => item.transactionsCount > 0 || item.totalTasksCount > 0
+          )
+        : [],
+    [overview]
+  );
 
   async function handleExport(): Promise<void> {
     const validationMessage = validatePeriodForm(periodForm);
@@ -906,6 +915,69 @@ export function ReportsPage(): JSX.Element {
                 ))}
               </div>
             ) : null}
+          </section>
+
+          <section className="panel">
+            <div className="dashboard-panel-header">
+              <div>
+                <h3>Rentabilité et exécution XOF</h3>
+                <p className="hint">
+                  Synthèse opérationnelle par secteur ou sous-section pour la période filtrée.
+                </p>
+              </div>
+              <div className="reports-inline-metrics">
+                <span>{formatCount(genericOperationalPerformanceRows.length)} ligne(s)</span>
+              </div>
+            </div>
+
+            <div className="table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Périmètre</th>
+                    <th>Secteur</th>
+                    <th>Dimension</th>
+                    <th>Élément</th>
+                    <th>Transactions</th>
+                    <th>Entrées</th>
+                    <th>Sorties</th>
+                    <th>Net</th>
+                    <th>Marge</th>
+                    <th>Exécution</th>
+                    <th>Blocages</th>
+                    <th>Retards</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {genericOperationalPerformanceRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={12}>
+                        Aucune donnée de rentabilité ou d'exécution sur la période filtrée.
+                      </td>
+                    </tr>
+                  ) : (
+                    genericOperationalPerformanceRows.map((row) => (
+                      <tr
+                        key={`${row.scope}-${row.activityCode}-${row.dimensionKey}-${row.itemKey}`}
+                      >
+                        <td>{row.scope === "ACTIVITY" ? "Secteur" : "Sous-section"}</td>
+                        <td>{getBusinessActivityLabel(row.activityCode)}</td>
+                        <td>{row.dimensionLabel}</td>
+                        <td>{row.itemLabel}</td>
+                        <td>{formatCount(row.transactionsCount)}</td>
+                        <td>{formatAmount(row.approvedCashIn, row.currency)}</td>
+                        <td>{formatAmount(row.approvedCashOut, row.currency)}</td>
+                        <td>{formatAmount(row.netProfit, row.currency)}</td>
+                        <td>{formatRate(row.marginRate)}</td>
+                        <td>{formatRate(row.executionRate)}</td>
+                        <td>{formatCount(row.blockedTasksCount)}</td>
+                        <td>{formatCount(row.overdueTasksCount)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
 
             </>
