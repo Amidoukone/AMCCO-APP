@@ -632,7 +632,7 @@ export function ReportsPage(): JSX.Element {
   }
 
   return (
-    <>
+    <div className="reports-page">
       <header className="section-header">
         <h2>Rapports PDF</h2>
         <p>Données du secteur choisi, calculées depuis les transactions, tâches et comptes.</p>
@@ -3137,6 +3137,6 @@ export function ReportsPage(): JSX.Element {
           <ReportReadingGuidePanel />
         </>
       ) : null}
-    </>
+    </div>
   );
 }

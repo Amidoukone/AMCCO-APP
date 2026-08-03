@@ -12637,3 +12637,85 @@ textarea {
     width: 100%;
   }
 }
+
+/* Reports tables keep long labels readable by scrolling horizontally instead of breaking words. */
+.reports-page .table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.reports-page .table-wrap .admin-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.reports-page .admin-table th,
+.reports-page .admin-table td {
+  max-width: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  vertical-align: top;
+}
+
+.reports-page .reports-table-panel .table-wrap:not(.mobile-card-table):not(.mobile-auto-card-table) .admin-table th:first-child,
+.reports-page .reports-table-panel .table-wrap:not(.mobile-card-table):not(.mobile-auto-card-table) .admin-table td:first-child,
+.reports-page .panel > .table-wrap:not(.mobile-card-table):not(.mobile-auto-card-table) .admin-table th:first-child,
+.reports-page .panel > .table-wrap:not(.mobile-card-table):not(.mobile-auto-card-table) .admin-table td:first-child {
+  max-width: none;
+  white-space: nowrap;
+}
+
+.reports-page .admin-table td[colspan],
+.reports-page .reports-guide-table td {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.reports-page .reports-guide-table td:first-child {
+  white-space: nowrap;
+}
+
+/* Accessible green states: keep success/positive labels readable on light and dark surfaces. */
+.success-box,
+.feedback-banner-success,
+.company-status-pill,
+.status-done,
+.task-status-chip.status-done {
+  color: #ffffff;
+  background: #0f6a45;
+  border-color: rgba(185, 255, 221, 0.62);
+}
+
+.company-status-pill.is-inactive {
+  color: #ffffff;
+  background: #8f2433;
+  border-color: rgba(255, 190, 201, 0.58);
+}
+
+.status-in_progress,
+.task-status-chip.status-in_progress {
+  color: #1f1400;
+  background: #ffe39a;
+  border-color: rgba(255, 199, 44, 0.72);
+}
+
+.salary-amount-label.is-positive {
+  color: #ffffff;
+  background: #0f6a45;
+}
+
+.finance-transaction-row.is-cash-in .finance-transaction-amount-cell,
+.finance-salary-net-cell {
+  color: #bfffe4;
+}
+
+.home-sector-tags span,
+.home-contact-card strong {
+  color: #075a39;
+}
