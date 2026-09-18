@@ -384,26 +384,14 @@ export type FoodOperationsReport = {
 };
 
 export type RentalOperationsReportRow = {
-  propertyRef: string;
-  unitRef: string;
   tenantRef: string;
-  leaseRef: string;
-  propertyType: string;
-  rentPaymentsCount: number;
-  rentAmount: string;
-  depositAmount: string;
-  serviceChargeAmount: string;
-  maintenanceAmount: string;
-  propertyExpenseAmount: string;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInAmount: string;
-  cashOutAmount: string;
-  netAmount: string;
-  executionRate: number;
+  unitRef: string;
+  monthlyRent: string;
+  totalDue: string;
+  totalPaid: string;
+  balanceAmount: string;
+  status: "A_JOUR" | "EN_RETARD" | "AVANCE";
+  statusDetail: string;
   currency: "XOF";
 };
 
@@ -420,23 +408,16 @@ export type RentalOperationsReportOperationRow = {
 
 export type RentalOperationsReport = {
   periodLabel: string;
+  asOfLabel: string;
   rows: RentalOperationsReportRow[];
   operationRows: RentalOperationsReportOperationRow[];
   totals: {
-    propertiesCount: number;
-    unitsCount: number;
     tenantsCount: number;
-    rentPaymentsCount: number;
-    rentAmount: string;
+    upToDateTenantsCount: number;
+    lateTenantsCount: number;
+    totalArrearsAmount: string;
+    collectedAmount: string;
     depositAmount: string;
-    serviceChargeAmount: string;
-    maintenanceAmount: string;
-    propertyExpenseAmount: string;
-    transactionsCount: number;
-    tasksCount: number;
-    doneTasksCount: number;
-    openTasksCount: number;
-    blockedTasksCount: number;
     cashInAmount: string;
     cashOutAmount: string;
     netAmount: string;
@@ -1683,6 +1664,39 @@ export async function listReportOperationalTransactions(
       WHERE ${filters.join(" AND ")}
     `,
     values
+  );
+
+  return rows.map((row) => ({
+    activityCode: row.activityCode,
+    status: row.status,
+    type: row.type,
+    amount: row.amount,
+    currency: row.currency,
+    description: row.description,
+    occurredAt: new Date(row.occurredAt).toISOString(),
+    metadata: toMetadataStringMap(row.metadataJson)
+  }));
+}
+
+export async function listReportRentalTransactions(
+  companyId: string
+): Promise<ReportOperationalTransaction[]> {
+  const rows = await queryRows<ReportOperationalTransactionRow[]>(
+    `
+      SELECT
+        activity_code AS activityCode,
+        status AS status,
+        type AS type,
+        CAST(amount AS CHAR) AS amount,
+        currency AS currency,
+        description AS description,
+        occurred_at AS occurredAt,
+        metadata_json AS metadataJson
+      FROM transactions
+      WHERE company_id = ?
+        AND activity_code = 'RENTAL'
+    `,
+    [companyId]
   );
 
   return rows.map((row) => ({

@@ -151,32 +151,14 @@ const FOOD_TASK_LABELS: Record<FoodTaskKind, string> = {
   FOLLOW_UP: "Suivi alimentaire"
 };
 const RENTAL_TASK_KIND_KEY = "rentalTaskKind";
-type RentalTaskKind =
-  | "RENT_COLLECTION"
-  | "TENANT_FOLLOW_UP"
-  | "VISIT"
-  | "LEASE_RENEWAL"
-  | "MOVE_IN"
-  | "MOVE_OUT"
-  | "MAINTENANCE"
-  | "INSPECTION"
-  | "DOCUMENTS"
-  | "OWNER_REPORT"
-  | "LITIGATION"
-  | "FOLLOW_UP";
+type RentalTaskKind = "RELANCE" | "VISIT" | "MOVE_IN" | "MOVE_OUT" | "MAINTENANCE" | "FOLLOW_UP";
 const RENTAL_TASK_LABELS: Record<RentalTaskKind, string> = {
-  RENT_COLLECTION: "Recouvrement loyer",
-  TENANT_FOLLOW_UP: "Suivi locataire",
+  RELANCE: "Relance loyer",
   VISIT: "Visite",
-  LEASE_RENEWAL: "Renouvellement bail",
   MOVE_IN: "Entree locataire",
   MOVE_OUT: "Sortie locataire",
   MAINTENANCE: "Maintenance",
-  INSPECTION: "Inspection",
-  DOCUMENTS: "Documents",
-  OWNER_REPORT: "Reporting propriétaire",
-  LITIGATION: "Litige",
-  FOLLOW_UP: "Suivi locatif"
+  FOLLOW_UP: "Autre"
 };
 const HOTEL_TASK_KIND_KEY = "hotelTaskKind";
 type HotelTaskKind =
@@ -440,17 +422,11 @@ function isFoodTaskKind(value: string | undefined): value is FoodTaskKind {
 
 function isRentalTaskKind(value: string | undefined): value is RentalTaskKind {
   return (
-    value === "RENT_COLLECTION" ||
-    value === "TENANT_FOLLOW_UP" ||
+    value === "RELANCE" ||
     value === "VISIT" ||
-    value === "LEASE_RENEWAL" ||
     value === "MOVE_IN" ||
     value === "MOVE_OUT" ||
     value === "MAINTENANCE" ||
-    value === "INSPECTION" ||
-    value === "DOCUMENTS" ||
-    value === "OWNER_REPORT" ||
-    value === "LITIGATION" ||
     value === "FOLLOW_UP"
   );
 }
@@ -1551,17 +1527,11 @@ export function OperationsTasksPage(): JSX.Element {
                         required={field.required}
                       >
                         <option value="">Choisir le type d'action locative</option>
-                        <option value="RENT_COLLECTION">{RENTAL_TASK_LABELS.RENT_COLLECTION}</option>
-                        <option value="TENANT_FOLLOW_UP">{RENTAL_TASK_LABELS.TENANT_FOLLOW_UP}</option>
+                        <option value="RELANCE">{RENTAL_TASK_LABELS.RELANCE}</option>
                         <option value="VISIT">{RENTAL_TASK_LABELS.VISIT}</option>
-                        <option value="LEASE_RENEWAL">{RENTAL_TASK_LABELS.LEASE_RENEWAL}</option>
                         <option value="MOVE_IN">{RENTAL_TASK_LABELS.MOVE_IN}</option>
                         <option value="MOVE_OUT">{RENTAL_TASK_LABELS.MOVE_OUT}</option>
                         <option value="MAINTENANCE">{RENTAL_TASK_LABELS.MAINTENANCE}</option>
-                        <option value="INSPECTION">{RENTAL_TASK_LABELS.INSPECTION}</option>
-                        <option value="DOCUMENTS">{RENTAL_TASK_LABELS.DOCUMENTS}</option>
-                        <option value="OWNER_REPORT">{RENTAL_TASK_LABELS.OWNER_REPORT}</option>
-                        <option value="LITIGATION">{RENTAL_TASK_LABELS.LITIGATION}</option>
                         <option value="FOLLOW_UP">{RENTAL_TASK_LABELS.FOLLOW_UP}</option>
                       </select>
                     ) : field.key === HOTEL_TASK_KIND_KEY && selectedActivityCode === "HOTEL_LODGING" ? (

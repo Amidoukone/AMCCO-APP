@@ -18,6 +18,7 @@ import { financeRouter } from "./routes/finance.route.js";
 import { healthRouter } from "./routes/health.route.js";
 import { meRouter } from "./routes/me.route.js";
 import { reportingRouter } from "./routes/reporting.route.js";
+import { rentalTenantsRouter } from "./routes/rental-tenants.route.js";
 import { tasksRouter } from "./routes/tasks.route.js";
 
 const corsOrigins = env.CORS_ORIGIN.split(",")
@@ -56,6 +57,7 @@ app.use(env.API_PREFIX, meRouter);
 app.use(env.API_PREFIX, alertsRouter);
 app.use(env.API_PREFIX, companyActivitiesRouter);
 app.use(env.API_PREFIX, activityArticlesRouter);
+app.use(env.API_PREFIX, rentalTenantsRouter);
 app.use(env.API_PREFIX, reportingRouter);
 app.use(env.API_PREFIX, adminUsersRouter);
 app.use(env.API_PREFIX, adminCompaniesRouter);

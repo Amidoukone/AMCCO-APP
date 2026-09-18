@@ -481,16 +481,12 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       amount: "450000.00",
       currency: "XOF",
       activityCode: "RENTAL",
-      description: "Paiement loyer appartement Hamdallaye APP-2B",
+      description: "Paiement loyer Famille Keita",
       metadata: withSeedMarker({
-        rentalOperationKind: "RENT_PAYMENT",
-        propertyRef: "IMMEUBLE-HAMDALLAYE",
-        unitRef: "APP-2B",
+        rentalOperationKind: "LOYER",
         tenantRef: "Famille Keita",
-        leaseRef: "BAIL-2026-018",
-        propertyType: "Appartement",
-        serviceCharge: "25000",
-        paymentRef: "VIR-BDM-071"
+        unitLabel: "Appartement 2B Hamdallaye",
+        monthlyRent: "450000"
       }),
       status: "APPROVED",
       requiresProof: true,
@@ -506,16 +502,9 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       amount: "85000.00",
       currency: "XOF",
       activityCode: "RENTAL",
-      description: "Maintenance plomberie appartement APP-2B",
+      description: "Maintenance plomberie appartement Hamdallaye APP-2B",
       metadata: withSeedMarker({
-        rentalOperationKind: "MAINTENANCE_EXPENSE",
-        propertyRef: "IMMEUBLE-HAMDALLAYE",
-        unitRef: "APP-2B",
-        tenantRef: "Famille Keita",
-        leaseRef: "BAIL-2026-018",
-        propertyType: "Appartement",
-        supplierRef: "Plomberie Sogolon",
-        invoiceRef: "PLB-2206"
+        rentalOperationKind: "AUTRE"
       }),
       status: "APPROVED",
       requiresProof: true,
@@ -1138,16 +1127,13 @@ const demoTasks: DemoTask[] = [
   },
   {
     key: "task-rental-followup",
-    title: "Relancer quittance loyer APP-2B",
+    title: "Relancer quittance loyer Famille Keita",
     description: "Envoyer quittance et confirmer reception du paiement du mois.",
     activityCode: "RENTAL",
     metadata: withSeedMarker({
-      rentalTaskKind: "RENT_COLLECTION",
-      propertyRef: "IMMEUBLE-HAMDALLAYE",
-      unitRef: "APP-2B",
+      rentalTaskKind: "RELANCE",
       tenantRef: "Famille Keita",
-      leaseRef: "BAIL-2026-018",
-      propertyType: "Appartement"
+      unitLabel: "Appartement 2B Hamdallaye"
     }),
     status: "TODO",
     createdByKey: "supervisor",

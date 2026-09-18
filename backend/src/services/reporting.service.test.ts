@@ -19,6 +19,7 @@ import {
   listReportFinanceByType,
   listReportOperationalTasks,
   listReportOperationalTransactions,
+  listReportRentalTransactions,
   listReportRoleDistribution,
   listReportTaskByActivity,
   listReportTaskByStatus,
@@ -26,6 +27,7 @@ import {
   toTransactionExportRecord
 } from "../repositories/reporting.repository.js";
 import { listFinancialAccounts } from "../repositories/finance.repository.js";
+import { listRentalTenants } from "../repositories/rental-tenants.repository.js";
 
 vi.mock("../repositories/reporting.repository.js", () => ({
   getDashboardCompanySummary: vi.fn(),
@@ -41,6 +43,7 @@ vi.mock("../repositories/reporting.repository.js", () => ({
   listReportFinanceByType: vi.fn(),
   listReportOperationalTasks: vi.fn(),
   listReportOperationalTransactions: vi.fn(),
+  listReportRentalTransactions: vi.fn(),
   listReportRoleDistribution: vi.fn(),
   listReportTaskByActivity: vi.fn(),
   listReportTaskByStatus: vi.fn(),
@@ -52,6 +55,10 @@ vi.mock("../repositories/reporting.repository.js", () => ({
 
 vi.mock("../repositories/finance.repository.js", () => ({
   listFinancialAccounts: vi.fn()
+}));
+
+vi.mock("../repositories/rental-tenants.repository.js", () => ({
+  listRentalTenants: vi.fn()
 }));
 
 describe("reporting.service", () => {
@@ -66,6 +73,8 @@ describe("reporting.service", () => {
     vi.mocked(listFinancialAccounts).mockResolvedValue([]);
     vi.mocked(listReportOperationalTransactions).mockResolvedValue([]);
     vi.mocked(listReportOperationalTasks).mockResolvedValue([]);
+    vi.mocked(listReportRentalTransactions).mockResolvedValue([]);
+    vi.mocked(listRentalTenants).mockResolvedValue([]);
   });
 
   it("filters dashboard finance and opérations by the selected activity", async () => {
@@ -1501,157 +1510,123 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
-  it("builds the rental opérations report from property and tenant metadata", async () => {
+  it("builds the rental arrears ledger from the tenant roster and cumulative loyer payments", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
-      { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "375000.00" },
-      { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "15000.00" }
+      { status: "APPROVED", currency: "XOF", count: 2, totalAmount: "95000.00" },
+      { status: "SUBMITTED", currency: "XOF", count: 1, totalAmount: "20000.00" }
     ]);
-    vi.mocked(listReportFinanceByType).mockResolvedValue([
-      {
-        type: "CASH_IN",
-        currency: "XOF",
-        count: 2,
-        totalAmount: "360000.00",
-        approvedAmount: "360000.00"
-      },
-      {
-        type: "CASH_OUT",
-        currency: "XOF",
-        count: 2,
-        totalAmount: "50000.00",
-        approvedAmount: "35000.00"
-      }
-    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([]);
     vi.mocked(listReportFinanceByActivity).mockResolvedValue([
       {
         activityCode: "RENTAL",
-        count: 4,
-        totalAmount: "410000.00",
-        approvedAmount: "395000.00"
+        count: 5,
+        totalAmount: "590000.00",
+        approvedAmount: "570000.00"
       }
     ]);
-    vi.mocked(listReportTaskByStatus).mockResolvedValue([
-      { status: "DONE", count: 1 },
-      { status: "BLOCKED", count: 1 }
-    ]);
-    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    vi.mocked(listRentalTenants).mockResolvedValue([
       {
-        activityCode: "RENTAL",
-        totalCount: 2,
-        openCount: 1,
-        blockedCount: 1,
-        doneCount: 1
+        id: "tenant-issa",
+        companyId: actor.companyId,
+        name: "Issa Guido",
+        unitLabel: "Appartement 2 pièces salon",
+        monthlyRent: "30000.00",
+        phone: null,
+        tenancyStart: "2026-01",
+        isActive: true,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z")
+      },
+      {
+        id: "tenant-dramane",
+        companyId: actor.companyId,
+        name: "Dramane Manta",
+        unitLabel: "Chambre salon",
+        monthlyRent: "20000.00",
+        phone: null,
+        tenancyStart: "2026-06",
+        isActive: true,
+        createdAt: new Date("2026-06-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-01T00:00:00.000Z")
+      },
+      {
+        id: "tenant-cisse",
+        companyId: actor.companyId,
+        name: "Mahamadou Cisse",
+        unitLabel: "Boutique",
+        monthlyRent: "20000.00",
+        phone: null,
+        tenancyStart: "2025-01",
+        isActive: true,
+        createdAt: new Date("2025-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2025-01-01T00:00:00.000Z")
       }
     ]);
-    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+    vi.mocked(listReportRentalTransactions).mockResolvedValue([
       {
         activityCode: "RENTAL",
         status: "APPROVED",
         type: "CASH_IN",
-        amount: "240000.00",
+        amount: "150000.00",
         currency: "XOF",
-        occurredAt: "2026-11-03T09:00:00.000Z",
-        metadata: {
-          rentalOperationKind: "RENT_PAYMENT",
-          propertyRef: "Villa A",
-          unitRef: "A1",
-          tenantRef: "Client Traore",
-          leaseRef: "BAIL-01",
-          propertyType: "Villa",
-          locationZone: "ACI",
-          periodRef: "2026-11",
-          monthsCount: "2",
-          monthlyRent: "120000",
-          paymentRef: "QUIT-01"
-        }
+        occurredAt: "2026-03-10T09:00:00.000Z",
+        metadata: { rentalOperationKind: "LOYER", tenantRef: "Issa Guido" }
       },
       {
         activityCode: "RENTAL",
         status: "APPROVED",
         type: "CASH_IN",
-        amount: "120000.00",
+        amount: "150000.00",
         currency: "XOF",
-        occurredAt: "2026-11-04T09:00:00.000Z",
-        metadata: {
-          rentalOperationKind: "SECURITY_DEPOSIT",
-          propertyRef: "Villa A",
-          unitRef: "A1",
-          tenantRef: "Client Traore",
-          leaseRef: "BAIL-01",
-          propertyType: "Villa",
-          depositAmount: "120000",
-          paymentRef: "CAUT-01"
-        }
-      },
-      {
-        activityCode: "RENTAL",
-        status: "APPROVED",
-        type: "CASH_OUT",
-        amount: "35000.00",
-        currency: "XOF",
-        occurredAt: "2026-11-08T09:00:00.000Z",
-        metadata: {
-          rentalOperationKind: "MAINTENANCE_EXPENSE",
-          propertyRef: "Villa A",
-          unitRef: "A1",
-          tenantRef: "Client Traore",
-          leaseRef: "BAIL-01",
-          propertyType: "Villa",
-          maintenanceType: "Plomberie",
-          supplierRef: "Plombier",
-          invoiceRef: "FAC-MAINT-01",
-          invoiceAmount: "35000"
-        }
+        occurredAt: "2026-09-15T09:00:00.000Z",
+        metadata: { rentalOperationKind: "LOYER", tenantRef: "Issa Guido" }
       },
       {
         activityCode: "RENTAL",
         status: "SUBMITTED",
-        type: "CASH_OUT",
-        amount: "15000.00",
+        type: "CASH_IN",
+        amount: "20000.00",
         currency: "XOF",
-        occurredAt: "2026-11-12T09:00:00.000Z",
-        metadata: {
-          rentalOperationKind: "PROPERTY_EXPENSE",
-          propertyRef: "Villa A",
-          unitRef: "A1",
-          tenantRef: "Client Traore",
-          leaseRef: "BAIL-01",
-          propertyType: "Villa",
-          chargeLabel: "Gardiennage",
-          supplierRef: "Gardien",
-          invoiceRef: "FAC-CHG-01",
-          invoiceAmount: "15000"
-        }
-      }
-    ]);
-    vi.mocked(listReportOperationalTasks).mockResolvedValue([
-      {
-        activityCode: "RENTAL",
-        status: "DONE",
-        dueDate: "2026-11-15T09:00:00.000Z",
-        metadata: {
-          rentalTaskKind: "RENT_COLLECTION",
-          propertyRef: "Villa A",
-          unitRef: "A1",
-          tenantRef: "Client Traore",
-          leaseRef: "BAIL-01",
-          propertyType: "Villa",
-          periodRef: "2026-11"
-        }
+        occurredAt: "2026-06-10T09:00:00.000Z",
+        metadata: { rentalOperationKind: "LOYER", tenantRef: "Dramane Manta" }
       },
       {
         activityCode: "RENTAL",
-        status: "BLOCKED",
-        dueDate: "2026-11-20T09:00:00.000Z",
-        metadata: {
-          rentalTaskKind: "MAINTENANCE",
-          propertyRef: "Villa A",
-          unitRef: "A1",
-          tenantRef: "Client Traore",
-          leaseRef: "BAIL-01",
-          propertyType: "Villa",
-          issueRef: "Fuite cuisine"
-        }
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "20000.00",
+        currency: "XOF",
+        occurredAt: "2026-11-05T09:00:00.000Z",
+        metadata: { rentalOperationKind: "LOYER", tenantRef: "Dramane Manta" }
+      },
+      {
+        activityCode: "RENTAL",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "460000.00",
+        currency: "XOF",
+        occurredAt: "2026-02-01T09:00:00.000Z",
+        metadata: { rentalOperationKind: "LOYER", tenantRef: "Mahamadou Cisse" }
+      },
+      {
+        activityCode: "RENTAL",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "60000.00",
+        currency: "XOF",
+        occurredAt: "2026-11-02T09:00:00.000Z",
+        metadata: { rentalOperationKind: "CAUTION", tenantRef: "Issa Guido" }
+      },
+      {
+        activityCode: "RENTAL",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "15000.00",
+        currency: "XOF",
+        occurredAt: "2026-11-08T09:00:00.000Z",
+        metadata: { rentalOperationKind: "AUTRE" }
       }
     ]);
 
@@ -1661,61 +1636,58 @@ describe("reporting.service", () => {
       dateTo: "2026-11-30T23:59:59.999Z"
     });
 
-    expect(result.rentalOperationsReport?.periodLabel).toBe("novembre 2026");
+    expect(result.rentalOperationsReport?.asOfLabel).toBe("30/11/2026");
     expect(result.rentalOperationsReport?.rows).toEqual([
       expect.objectContaining({
-        propertyRef: "Villa A",
-        unitRef: "A1",
-        tenantRef: "Client Traore",
-        leaseRef: "BAIL-01",
-        propertyType: "Villa",
-        rentPaymentsCount: 1,
-        rentAmount: "240000.00",
-        depositAmount: "120000.00",
-        serviceChargeAmount: "0.00",
-        maintenanceAmount: "35000.00",
-        propertyExpenseAmount: "15000.00",
-        transactionsCount: 4,
-        tasksCount: 2,
-        doneTasksCount: 1,
-        openTasksCount: 1,
-        blockedTasksCount: 1,
-        cashInAmount: "360000.00",
-        cashOutAmount: "50000.00",
-        netAmount: "310000.00",
-        executionRate: 50,
-        currency: "XOF"
+        tenantRef: "Dramane Manta",
+        unitRef: "Chambre salon",
+        monthlyRent: "20000.00",
+        totalDue: "100000.00",
+        totalPaid: "40000.00",
+        balanceAmount: "60000.00",
+        status: "EN_RETARD",
+        statusDetail: "En retard depuis août 2026"
+      }),
+      expect.objectContaining({
+        tenantRef: "Issa Guido",
+        unitRef: "Appartement 2 pièces salon",
+        monthlyRent: "30000.00",
+        totalDue: "300000.00",
+        totalPaid: "300000.00",
+        balanceAmount: "0.00",
+        status: "A_JOUR",
+        statusDetail: "À jour"
+      }),
+      expect.objectContaining({
+        tenantRef: "Mahamadou Cisse",
+        unitRef: "Boutique",
+        monthlyRent: "20000.00",
+        totalDue: "440000.00",
+        totalPaid: "460000.00",
+        balanceAmount: "-20000.00",
+        status: "AVANCE",
+        statusDetail: "Payé d'avance jusqu'à novembre 2026"
       })
     ]);
-    expect(result.rentalOperationsReport?.operationRows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ operationLabel: "Paiement loyer", cashInAmount: "240000.00" }),
-        expect.objectContaining({ operationLabel: "Caution", cashInAmount: "120000.00" }),
-        expect.objectContaining({ operationLabel: "Maintenance", cashOutAmount: "35000.00" }),
-        expect.objectContaining({ operationLabel: "Charge bien", cashOutAmount: "15000.00" }),
-        expect.objectContaining({ operationLabel: "Tâche: Recouvrement loyer", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tâche: Maintenance", tasksCount: 1 })
-      ])
-    );
+    expect(result.rentalOperationsReport?.operationRows).toEqual([
+      expect.objectContaining({
+        operationKind: "20000.00",
+        operationLabel: "1 loyer payé à 20 000 F CFA",
+        transactionsCount: 1,
+        cashInAmount: "20000.00"
+      })
+    ]);
     expect(result.rentalOperationsReport?.totals).toMatchObject({
-      propertiesCount: 1,
-      unitsCount: 1,
-      tenantsCount: 1,
-      rentPaymentsCount: 1,
-      rentAmount: "240000.00",
-      depositAmount: "120000.00",
-      serviceChargeAmount: "0.00",
-      maintenanceAmount: "35000.00",
-      propertyExpenseAmount: "15000.00",
-      transactionsCount: 4,
-      tasksCount: 2,
-      doneTasksCount: 1,
-      openTasksCount: 1,
-      blockedTasksCount: 1,
-      cashInAmount: "360000.00",
-      cashOutAmount: "50000.00",
-      netAmount: "310000.00",
-      executionRate: 50,
+      tenantsCount: 3,
+      upToDateTenantsCount: 2,
+      lateTenantsCount: 1,
+      totalArrearsAmount: "60000.00",
+      collectedAmount: "20000.00",
+      depositAmount: "60000.00",
+      cashInAmount: "80000.00",
+      cashOutAmount: "15000.00",
+      netAmount: "65000.00",
+      executionRate: 66.7,
       currency: "XOF"
     });
 

@@ -28,17 +28,21 @@ import {
   createActivityArticleRequest,
   createFinanceAccountRequest,
   createFinanceTransactionRequest,
+  createRentalTenantRequest,
   deleteActivityArticleRequest,
   deleteFinanceAccountRequest,
   deleteFinanceTransactionRequest,
+  deleteRentalTenantRequest,
   getFinanceProofUploadAuthRequest,
   listActivityArticlesRequest,
   listFinanceAccountsRequest,
   listFinanceTransactionProofsRequest,
   listFinanceTransactionsRequest,
+  listRentalTenantsRequest,
   updateActivityArticleRequest,
   updateFinanceAccountRequest,
-  updateFinanceTransactionRequest
+  updateFinanceTransactionRequest,
+  updateRentalTenantRequest
 } from "../lib/api";
 import {
   BUSINESS_ACTIVITY_CODES,
@@ -50,6 +54,7 @@ import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
 import type { ActivityArticle } from "../types/articles";
+import type { RentalTenant } from "../types/tenants";
 import type {
   FinancialAccount,
   FinancialAccountScopeType,
@@ -372,116 +377,22 @@ const FOOD_METADATA_FIELDS = new Set([
   "paymentRef"
 ]);
 const RENTAL_OPERATION_KIND_KEY = "rentalOperationKind";
-type RentalOperationKind =
-  | "RENT_PAYMENT"
-  | "SECURITY_DEPOSIT"
-  | "ADVANCE_PAYMENT"
-  | "SERVICE_CHARGE_INCOME"
-  | "MAINTENANCE_EXPENSE"
-  | "PROPERTY_EXPENSE"
-  | "OWNER_PAYOUT";
+type RentalOperationKind = "LOYER" | "CAUTION" | "AUTRE";
 const RENTAL_OPERATION_LABELS: Record<RentalOperationKind, string> = {
-  RENT_PAYMENT: "Paiement loyer",
-  SECURITY_DEPOSIT: "Caution",
-  ADVANCE_PAYMENT: "Avance loyer",
-  SERVICE_CHARGE_INCOME: "Charges recuperees",
-  MAINTENANCE_EXPENSE: "Maintenance",
-  PROPERTY_EXPENSE: "Charge bien",
-  OWNER_PAYOUT: "Reversement propriétaire"
+  LOYER: "Paiement loyer",
+  CAUTION: "Caution",
+  AUTRE: "Autre encaissement / dépense"
 };
-const RENTAL_NUMERIC_METADATA_FIELDS = new Set([
-  "monthsCount",
-  "monthlyRent",
-  "serviceCharge",
-  "depositAmount",
-  "invoiceAmount",
-  "payoutAmount"
-]);
-const RENTAL_AMOUNT_METADATA_FIELDS = new Set([
-  "monthsCount",
-  "monthlyRent",
-  "serviceCharge",
-  "depositAmount",
-  "invoiceAmount",
-  "payoutAmount"
-]);
-const RENTAL_COMMON_METADATA_FIELDS = new Set([
-  "propertyRef",
-  "unitRef",
-  "tenantRef",
-  "leaseRef",
-  "propertyType",
-  "locationZone"
-]);
-const RENTAL_RENT_PAYMENT_METADATA_FIELDS = new Set([
-  ...RENTAL_COMMON_METADATA_FIELDS,
-  "periodRef",
-  "monthsCount",
-  "monthlyRent",
-  "serviceCharge",
-  "paymentRef"
-]);
-const RENTAL_SECURITY_DEPOSIT_METADATA_FIELDS = new Set([
-  ...RENTAL_COMMON_METADATA_FIELDS,
-  "depositAmount",
-  "paymentRef"
-]);
-const RENTAL_ADVANCE_PAYMENT_METADATA_FIELDS = new Set([
-  ...RENTAL_COMMON_METADATA_FIELDS,
-  "periodRef",
-  "monthsCount",
-  "monthlyRent",
-  "paymentRef"
-]);
-const RENTAL_SERVICE_CHARGE_INCOME_METADATA_FIELDS = new Set([
-  ...RENTAL_COMMON_METADATA_FIELDS,
-  "periodRef",
-  "chargeLabel",
-  "serviceCharge",
-  "paymentRef"
-]);
-const RENTAL_MAINTENANCE_EXPENSE_METADATA_FIELDS = new Set([
-  ...RENTAL_COMMON_METADATA_FIELDS,
-  "maintenanceType",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const RENTAL_PROPERTY_EXPENSE_METADATA_FIELDS = new Set([
-  ...RENTAL_COMMON_METADATA_FIELDS,
-  "chargeLabel",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const RENTAL_OWNER_PAYOUT_METADATA_FIELDS = new Set([
-  ...RENTAL_COMMON_METADATA_FIELDS,
-  "ownerRef",
-  "periodRef",
-  "payoutAmount",
-  "paymentRef"
-]);
+const RENTAL_NUMERIC_METADATA_FIELDS = new Set(["monthlyRent"]);
+const RENTAL_AMOUNT_METADATA_FIELDS = new Set(["monthlyRent"]);
+const RENTAL_LOYER_METADATA_FIELDS = new Set(["tenantRef", "unitLabel", "monthlyRent"]);
+const RENTAL_CAUTION_METADATA_FIELDS = new Set(["tenantRef", "unitLabel"]);
+const RENTAL_AUTRE_METADATA_FIELDS = new Set<string>([]);
 const RENTAL_METADATA_FIELDS = new Set([
   RENTAL_OPERATION_KIND_KEY,
-  "propertyRef",
-  "unitRef",
   "tenantRef",
-  "leaseRef",
-  "propertyType",
-  "locationZone",
-  "periodRef",
-  "monthsCount",
-  "monthlyRent",
-  "serviceCharge",
-  "depositAmount",
-  "chargeLabel",
-  "maintenanceType",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "ownerRef",
-  "payoutAmount",
-  "paymentRef"
+  "unitLabel",
+  "monthlyRent"
 ]);
 const HOTEL_OPERATION_KIND_KEY = "hotelOperationKind";
 type HotelOperationKind =
@@ -1579,42 +1490,11 @@ function deriveRentalAmount(
   operationKind: RentalOperationKind,
   metadata: Record<string, string>
 ): string | null {
-  if (operationKind === "RENT_PAYMENT") {
-    const monthsCount = toAmountNumber(metadata.monthsCount ?? "");
-    const monthlyRent = toAmountNumber(metadata.monthlyRent ?? "");
-    const serviceCharge = toAmountNumber(metadata.serviceCharge ?? "");
-    if (monthsCount <= 0 || monthlyRent <= 0) {
-      return serviceCharge > 0 ? serviceCharge.toFixed(2) : null;
-    }
-    return (monthsCount * monthlyRent + serviceCharge).toFixed(2);
+  if (operationKind !== "LOYER") {
+    return null;
   }
-
-  if (operationKind === "ADVANCE_PAYMENT") {
-    const monthsCount = toAmountNumber(metadata.monthsCount ?? "");
-    const monthlyRent = toAmountNumber(metadata.monthlyRent ?? "");
-    if (monthsCount <= 0 || monthlyRent <= 0) {
-      return null;
-    }
-    return (monthsCount * monthlyRent).toFixed(2);
-  }
-
-  if (operationKind === "SECURITY_DEPOSIT") {
-    const depositAmount = toAmountNumber(metadata.depositAmount ?? "");
-    return depositAmount > 0 ? depositAmount.toFixed(2) : null;
-  }
-
-  if (operationKind === "SERVICE_CHARGE_INCOME") {
-    const serviceCharge = toAmountNumber(metadata.serviceCharge ?? "");
-    return serviceCharge > 0 ? serviceCharge.toFixed(2) : null;
-  }
-
-  if (operationKind === "MAINTENANCE_EXPENSE" || operationKind === "PROPERTY_EXPENSE") {
-    const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
-    return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
-  }
-
-  const payoutAmount = toAmountNumber(metadata.payoutAmount ?? "");
-  return payoutAmount > 0 ? payoutAmount.toFixed(2) : null;
+  const monthlyRent = toAmountNumber(metadata.monthlyRent ?? "");
+  return monthlyRent > 0 ? monthlyRent.toFixed(2) : null;
 }
 
 function deriveHotelAmount(
@@ -2063,39 +1943,11 @@ function getFoodVisibleKeys(kind: FoodOperationKind): Set<string> {
 }
 
 function isRentalOperationKind(value: string | undefined): value is RentalOperationKind {
-  return (
-    value === "RENT_PAYMENT" ||
-    value === "SECURITY_DEPOSIT" ||
-    value === "ADVANCE_PAYMENT" ||
-    value === "SERVICE_CHARGE_INCOME" ||
-    value === "MAINTENANCE_EXPENSE" ||
-    value === "PROPERTY_EXPENSE" ||
-    value === "OWNER_PAYOUT"
-  );
+  return value === "LOYER" || value === "CAUTION" || value === "AUTRE";
 }
 
 function hasRentalMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "propertyRef",
-    "unitRef",
-    "tenantRef",
-    "leaseRef",
-    "propertyType",
-    "locationZone",
-    "periodRef",
-    "monthsCount",
-    "monthlyRent",
-    "serviceCharge",
-    "depositAmount",
-    "chargeLabel",
-    "maintenanceType",
-    "supplierRef",
-    "invoiceRef",
-    "invoiceAmount",
-    "ownerRef",
-    "payoutAmount",
-    "paymentRef"
-  ].some((key) => metadata[key]?.trim());
+  return ["tenantRef", "unitLabel", "monthlyRent"].some((key) => metadata[key]?.trim());
 }
 
 function getRentalOperationKind(
@@ -2106,43 +1958,24 @@ function getRentalOperationKind(
   if (isRentalOperationKind(configuredKind)) {
     return configuredKind;
   }
-  if (!hasRentalMetadata(metadata)) {
-    return type === "CASH_IN" ? "RENT_PAYMENT" : "MAINTENANCE_EXPENSE";
+  if (type === "CASH_IN" || hasRentalMetadata(metadata)) {
+    return "LOYER";
   }
-  return type === "CASH_IN" ? "RENT_PAYMENT" : "PROPERTY_EXPENSE";
+  return "AUTRE";
 }
 
-function getRentalOperationType(kind: RentalOperationKind): "CASH_IN" | "CASH_OUT" {
-  return (
-    kind === "RENT_PAYMENT" ||
-    kind === "SECURITY_DEPOSIT" ||
-    kind === "ADVANCE_PAYMENT" ||
-    kind === "SERVICE_CHARGE_INCOME"
-  )
-    ? "CASH_IN"
-    : "CASH_OUT";
+function getRentalOperationType(kind: RentalOperationKind): "CASH_IN" | "CASH_OUT" | null {
+  return kind === "LOYER" || kind === "CAUTION" ? "CASH_IN" : null;
 }
 
 function getRentalVisibleKeys(kind: RentalOperationKind): Set<string> {
-  if (kind === "RENT_PAYMENT") {
-    return RENTAL_RENT_PAYMENT_METADATA_FIELDS;
+  if (kind === "LOYER") {
+    return RENTAL_LOYER_METADATA_FIELDS;
   }
-  if (kind === "SECURITY_DEPOSIT") {
-    return RENTAL_SECURITY_DEPOSIT_METADATA_FIELDS;
+  if (kind === "CAUTION") {
+    return RENTAL_CAUTION_METADATA_FIELDS;
   }
-  if (kind === "ADVANCE_PAYMENT") {
-    return RENTAL_ADVANCE_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "SERVICE_CHARGE_INCOME") {
-    return RENTAL_SERVICE_CHARGE_INCOME_METADATA_FIELDS;
-  }
-  if (kind === "MAINTENANCE_EXPENSE") {
-    return RENTAL_MAINTENANCE_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "PROPERTY_EXPENSE") {
-    return RENTAL_PROPERTY_EXPENSE_METADATA_FIELDS;
-  }
-  return RENTAL_OWNER_PAYOUT_METADATA_FIELDS;
+  return RENTAL_AUTRE_METADATA_FIELDS;
 }
 
 function isHotelOperationKind(value: string | undefined): value is HotelOperationKind {
@@ -3139,25 +2972,13 @@ function getBtpFormModeLabel(kind: BtpOperationKind): string {
 }
 
 function getRentalFormModeLabel(kind: RentalOperationKind): string {
-  if (kind === "RENT_PAYMENT") {
-    return "Paiement loyer: bien, lot, locataire, bail, période, nombre de mois, loyer mensuel et charges.";
+  if (kind === "LOYER") {
+    return "Paiement loyer: choisissez le locataire et le montant versé (plusieurs mois d'avance possibles).";
   }
-  if (kind === "SECURITY_DEPOSIT") {
-    return "Caution: bien, lot, locataire, bail, montant caution et référence du paiement.";
+  if (kind === "CAUTION") {
+    return "Caution: choisissez le locataire et le montant de la caution versée.";
   }
-  if (kind === "ADVANCE_PAYMENT") {
-    return "Avance loyer: période couverte, nombre de mois, loyer mensuel et référence du paiement.";
-  }
-  if (kind === "SERVICE_CHARGE_INCOME") {
-    return "Charges recuperees: période, nature de charge, montant des charges et référence du paiement.";
-  }
-  if (kind === "MAINTENANCE_EXPENSE") {
-    return "Maintenance: type d'intervention, prestataire, facture et montant de la dépense.";
-  }
-  if (kind === "PROPERTY_EXPENSE") {
-    return "Charge bien: nature de charge, prestataire, facture et montant rattaché au bien.";
-  }
-  return "Reversement propriétaire: propriétaire, période, montant reverse et référence du paiement.";
+  return "Autre opération: encaissement ou dépense locative ne correspondant pas à un loyer.";
 }
 
 function getHotelFormModeLabel(kind: HotelOperationKind): string {
@@ -3452,6 +3273,39 @@ function buildDefaultArticleForm(): {
   };
 }
 
+function currentMonthInputValue(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatTenancyStartLabel(tenancyStart: string): string {
+  const parsed = new Date(`${tenancyStart}-01T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return tenancyStart;
+  }
+  return parsed.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC"
+  });
+}
+
+function buildDefaultTenantForm(): {
+  name: string;
+  unitLabel: string;
+  monthlyRent: string;
+  phone: string;
+  tenancyStart: string;
+} {
+  return {
+    name: "",
+    unitLabel: "",
+    monthlyRent: "",
+    phone: "",
+    tenancyStart: currentMonthInputValue()
+  };
+}
+
 function normalizeAccountFormForActivities(
   previous: ReturnType<typeof buildDefaultAccountForm>,
   enabledActivityCodes: BusinessActivityCode[],
@@ -3512,6 +3366,11 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
   const [articlePendingDelete, setArticlePendingDelete] = useState<ActivityArticle | null>(null);
+  const [tenants, setTenants] = useState<RentalTenant[]>([]);
+  const [tenantForm, setTenantForm] = useState(buildDefaultTenantForm());
+  const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
+  const [busyTenantId, setBusyTenantId] = useState<string | null>(null);
+  const [tenantPendingDelete, setTenantPendingDelete] = useState<RentalTenant | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
@@ -3538,6 +3397,12 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [user?.role]);
 
   const canManageArticles = useMemo(() => {
+    return (
+      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
+    );
+  }, [user?.role]);
+
+  const canManageTenants = useMemo(() => {
     return (
       user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
     );
@@ -3647,7 +3512,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     : "MATERIAL_PURCHASE";
   const rentalOperationKind = selectedActivityCode === "RENTAL"
     ? getRentalOperationKind(transactionForm.type, transactionForm.metadata)
-    : "RENT_PAYMENT";
+    : "LOYER";
   const hotelOperationKind = selectedActivityCode === "HOTEL_LODGING"
     ? getHotelOperationKind(transactionForm.type, transactionForm.metadata)
     : "ROOM_PAYMENT";
@@ -3736,6 +3601,11 @@ export function FinanceTransactionsPage(): JSX.Element {
   const resetArticleForm = useCallback(() => {
     setEditingArticleId(null);
     setArticleForm(buildDefaultArticleForm());
+  }, []);
+
+  const resetTenantForm = useCallback(() => {
+    setEditingTenantId(null);
+    setTenantForm(buildDefaultTenantForm());
   }, []);
 
   const resetTransactionForm = useCallback(() => {
@@ -3953,6 +3823,25 @@ export function FinanceTransactionsPage(): JSX.Element {
   useEffect(() => {
     void loadArticles();
   }, [loadArticles]);
+
+  const loadTenants = useCallback(async () => {
+    if (selectedActivityCode !== "RENTAL") {
+      setTenants([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        listRentalTenantsRequest(accessToken)
+      );
+      setTenants(payload.items);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadTenants();
+  }, [loadTenants]);
 
   async function handleLoadMoreTransactions(): Promise<void> {
     if (isLoading || isLoadingMoreTransactions || !hasMoreTransactions) {
@@ -4243,6 +4132,80 @@ export function FinanceTransactionsPage(): JSX.Element {
       setErrorMessage(toErrorMessage(error));
     } finally {
       setBusyArticleId(null);
+    }
+  }
+
+  async function handleSaveTenant(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload = {
+        name: tenantForm.name.trim(),
+        unitLabel: tenantForm.unitLabel.trim(),
+        monthlyRent: normalizeAmountForApi(tenantForm.monthlyRent),
+        phone: tenantForm.phone.trim() ? tenantForm.phone.trim() : undefined,
+        tenancyStart: tenantForm.tenancyStart.trim() || undefined
+      };
+
+      await withAuthorizedToken((accessToken) =>
+        editingTenantId
+          ? updateRentalTenantRequest(accessToken, editingTenantId, payload)
+          : createRentalTenantRequest(accessToken, payload)
+      );
+      setSuccessMessage(editingTenantId ? "Locataire modifié." : "Locataire ajouté.");
+      resetTenantForm();
+      await loadTenants();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  function handleStartEditTenant(tenant: RentalTenant): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingTenantId(tenant.id);
+    setTenantForm({
+      name: tenant.name,
+      unitLabel: tenant.unitLabel,
+      monthlyRent: formatAmountForInput(tenant.monthlyRent),
+      phone: tenant.phone ?? "",
+      tenancyStart: tenant.tenancyStart || currentMonthInputValue()
+    });
+  }
+
+  function handleCancelEditTenant(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    resetTenantForm();
+  }
+
+  function handleDeleteTenant(tenant: RentalTenant): void {
+    setTenantPendingDelete(tenant);
+  }
+
+  async function handleConfirmDeleteTenant(): Promise<void> {
+    if (!tenantPendingDelete) {
+      return;
+    }
+
+    const tenant = tenantPendingDelete;
+    setBusyTenantId(tenant.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteRentalTenantRequest(accessToken, tenant.id));
+      if (editingTenantId === tenant.id) {
+        resetTenantForm();
+      }
+      setSuccessMessage("Locataire supprimé.");
+      setTenantPendingDelete(null);
+      await loadTenants();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyTenantId(null);
     }
   }
 
@@ -4866,6 +4829,153 @@ export function FinanceTransactionsPage(): JSX.Element {
         </section>
       ) : null}
 
+      {selectedActivityCode === "RENTAL" && canManageTenants ? (
+        <section className="panel finance-page-panel">
+          <details className="finance-section-toggle">
+            <summary className="finance-section-summary">
+              <span>{editingTenantId ? "Modifier un locataire" : "Gérer mes locataires"}</span>
+              <small>
+                {editingTenantId
+                  ? "Modification d'un locataire enregistré."
+                  : "Ajoutez vos locataires (nom, logement occupé et loyer mensuel) pour les retrouver en sélection lors du paiement."}
+              </small>
+            </summary>
+            <form className="finance-account-form" onSubmit={handleSaveTenant}>
+              <label className="operations-inline-group">
+                <span>Nom du locataire</span>
+                <input
+                  type="text"
+                  placeholder="Ex: Issa Guido"
+                  value={tenantForm.name}
+                  onChange={(event) =>
+                    setTenantForm((prev) => ({
+                      ...prev,
+                      name: event.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Logement occupé</span>
+                <input
+                  type="text"
+                  placeholder="Ex: Appartement 2 chambres salon, Boutique n°3"
+                  value={tenantForm.unitLabel}
+                  onChange={(event) =>
+                    setTenantForm((prev) => ({
+                      ...prev,
+                      unitLabel: event.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Loyer mensuel</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ex: 30000"
+                  value={tenantForm.monthlyRent}
+                  onChange={(event) =>
+                    setTenantForm((prev) => ({
+                      ...prev,
+                      monthlyRent: formatAmountForInput(event.target.value)
+                    }))
+                  }
+                  onBlur={() =>
+                    setTenantForm((prev) => ({
+                      ...prev,
+                      monthlyRent: formatAmountForInput(prev.monthlyRent)
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Téléphone</span>
+                <input
+                  type="text"
+                  placeholder="Optionnel"
+                  value={tenantForm.phone}
+                  onChange={(event) =>
+                    setTenantForm((prev) => ({
+                      ...prev,
+                      phone: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Locataire depuis</span>
+                <input
+                  type="month"
+                  value={tenantForm.tenancyStart}
+                  onChange={(event) =>
+                    setTenantForm((prev) => ({
+                      ...prev,
+                      tenancyStart: event.target.value
+                    }))
+                  }
+                  required
+                />
+                <small className="hint">
+                  Mois d'entrée du locataire, utilisé pour calculer les retards de paiement. Pour un
+                  locataire déjà en place, indiquez son mois d'entrée réel.
+                </small>
+              </label>
+              <div className="mobile-sticky-form-actions">
+                <button type="submit">
+                  {editingTenantId ? "Enregistrer les modifications" : "Ajouter le locataire"}
+                </button>
+                {editingTenantId ? (
+                  <button type="button" className="secondary-btn" onClick={handleCancelEditTenant}>
+                    Annuler la modification
+                  </button>
+                ) : null}
+              </div>
+            </form>
+            {tenants.length > 0 ? (
+              <div className="operations-member-grid">
+                {tenants.map((tenant) => {
+                  const isBusy = busyTenantId === tenant.id;
+                  return (
+                    <article key={tenant.id} className="operations-member-card">
+                      <h4>{tenant.name}</h4>
+                      <p className="hint">
+                        {tenant.unitLabel} | Loyer mensuel: {formatAmountForDisplay(tenant.monthlyRent)}
+                      </p>
+                      <p className="hint">Locataire depuis: {formatTenancyStartLabel(tenant.tenancyStart)}</p>
+                      <div className="actions-inline">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => handleStartEditTenant(tenant)}
+                          disabled={isBusy}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          onClick={() => handleDeleteTenant(tenant)}
+                          disabled={isBusy}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="hint">Aucun locataire enregistré pour le moment.</p>
+            )}
+          </details>
+        </section>
+      ) : null}
+
       {canManageSalaries ? (
         <section className="panel finance-page-panel">
           <div className="dashboard-panel-header">
@@ -5220,13 +5330,13 @@ export function FinanceTransactionsPage(): JSX.Element {
             ) : selectedActivityCode === "RENTAL" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Opération locative</span>
+                  <span>Opération</span>
                   <select
                     value={rentalOperationKind}
                     onChange={(event) => {
                       const nextKind = event.target.value as RentalOperationKind;
                       setTransactionForm((prev) => {
-                        const nextType = getRentalOperationType(nextKind);
+                        const nextType = getRentalOperationType(nextKind) ?? prev.type;
                         const nextMetadata = cleanSectorFinanceMetadata(
                           selectedActivityCode,
                           nextType,
@@ -5245,22 +5355,43 @@ export function FinanceTransactionsPage(): JSX.Element {
                       });
                     }}
                   >
-                    <option value="RENT_PAYMENT">{RENTAL_OPERATION_LABELS.RENT_PAYMENT}</option>
-                    <option value="SECURITY_DEPOSIT">{RENTAL_OPERATION_LABELS.SECURITY_DEPOSIT}</option>
-                    <option value="ADVANCE_PAYMENT">{RENTAL_OPERATION_LABELS.ADVANCE_PAYMENT}</option>
-                    <option value="SERVICE_CHARGE_INCOME">{RENTAL_OPERATION_LABELS.SERVICE_CHARGE_INCOME}</option>
-                    <option value="MAINTENANCE_EXPENSE">{RENTAL_OPERATION_LABELS.MAINTENANCE_EXPENSE}</option>
-                    <option value="PROPERTY_EXPENSE">{RENTAL_OPERATION_LABELS.PROPERTY_EXPENSE}</option>
-                    <option value="OWNER_PAYOUT">{RENTAL_OPERATION_LABELS.OWNER_PAYOUT}</option>
+                    <option value="LOYER">{RENTAL_OPERATION_LABELS.LOYER}</option>
+                    <option value="CAUTION">{RENTAL_OPERATION_LABELS.CAUTION}</option>
+                    <option value="AUTRE">{RENTAL_OPERATION_LABELS.AUTRE}</option>
                   </select>
                 </label>
 
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette locative" : "Dépense locative"}
-                  </strong>
-                </div>
+                {rentalOperationKind === "LOYER" || rentalOperationKind === "CAUTION" ? (
+                  <div className="operations-inline-group">
+                    <span>Flux financier</span>
+                    <strong>Recette locative</strong>
+                  </div>
+                ) : (
+                  <label className="operations-inline-group">
+                    <span>Flux financier</span>
+                    <select
+                      value={transactionForm.type}
+                      onChange={(event) => {
+                        const nextType = event.target.value as "CASH_IN" | "CASH_OUT";
+                        setTransactionForm((prev) => ({
+                          ...prev,
+                          type: nextType,
+                          metadata: cleanSectorFinanceMetadata(
+                            selectedActivityCode,
+                            nextType,
+                            {
+                              ...prev.metadata,
+                              [RENTAL_OPERATION_KIND_KEY]: "AUTRE"
+                            }
+                          )
+                        }));
+                      }}
+                    >
+                      <option value="CASH_IN">Encaissement</option>
+                      <option value="CASH_OUT">Decaissement</option>
+                    </select>
+                  </label>
+                )}
               </>
             ) : selectedActivityCode === "HOTEL_LODGING" ? (
               <>
@@ -5698,6 +5829,72 @@ export function FinanceTransactionsPage(): JSX.Element {
               </label>
 
               {visibleFinanceMetadataFields.map((field) => {
+                if (selectedActivityCode === "RENTAL" && field.key === "tenantRef") {
+                  const tenantNameValue = transactionForm.metadata.tenantRef ?? "";
+                  const selectedTenantId =
+                    tenants.find((tenant) => tenant.name === tenantNameValue)?.id ?? "";
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select
+                        value={selectedTenantId}
+                        onChange={(event) => {
+                          const nextTenantId = event.target.value;
+                          const selectedTenant = tenants.find((tenant) => tenant.id === nextTenantId);
+                          setTransactionForm((prev) => {
+                            const nextMetadata = {
+                              ...prev.metadata,
+                              tenantRef: selectedTenant?.name ?? "",
+                              unitLabel: selectedTenant?.unitLabel ?? "",
+                              monthlyRent: selectedTenant
+                                ? formatAmountForInput(selectedTenant.monthlyRent)
+                                : ""
+                            };
+                            const derivedAmount = deriveRentalAmount(rentalOperationKind, nextMetadata);
+                            const descriptionPrefix = rentalOperationKind === "CAUTION" ? "Caution" : "Loyer";
+                            return {
+                              ...prev,
+                              amount: formatAmountForInput(derivedAmount ?? prev.amount),
+                              description: selectedTenant
+                                ? `${descriptionPrefix} ${selectedTenant.name}`
+                                : prev.description,
+                              metadata: nextMetadata
+                            };
+                          });
+                        }}
+                        required={field.required}
+                      >
+                        <option value="">-- Choisir un locataire --</option>
+                        {tenants.map((tenant) => (
+                          <option key={tenant.id} value={tenant.id}>
+                            {tenant.name} — {tenant.unitLabel}
+                          </option>
+                        ))}
+                      </select>
+                      {tenants.length === 0 ? (
+                        <small className="hint">
+                          Aucun locataire enregistré. Ajoutez-en un dans "Gérer mes locataires"
+                          ci-dessus.
+                        </small>
+                      ) : null}
+                    </label>
+                  );
+                }
+
+                if (selectedActivityCode === "RENTAL" && field.key === "unitLabel") {
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <input
+                        type="text"
+                        value={transactionForm.metadata.unitLabel ?? ""}
+                        readOnly
+                        disabled
+                      />
+                    </label>
+                  );
+                }
+
                 if (selectedActivityCode === "HARDWARE" && field.key === "itemName") {
                   const itemNameValue = transactionForm.metadata.itemName ?? "";
                   const matchesCatalogArticle = articles.some(
@@ -6387,6 +6584,23 @@ export function FinanceTransactionsPage(): JSX.Element {
           setArticlePendingDelete(null);
         }}
         onConfirm={() => void handleConfirmDeleteArticle()}
+      />
+
+      <ConfirmDialog
+        open={tenantPendingDelete !== null}
+        title="Confirmer la suppression du locataire"
+        description="Cette action retire le locataire de la liste de sélection du formulaire."
+        objectLabel="Locataire concerné"
+        objectName={tenantPendingDelete?.name ?? ""}
+        impactText="Les paiements déjà enregistrés pour ce locataire ne sont pas modifiés."
+        isConfirming={busyTenantId === tenantPendingDelete?.id}
+        onCancel={() => {
+          if (busyTenantId) {
+            return;
+          }
+          setTenantPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteTenant()}
       />
 
       <ConfirmDialog

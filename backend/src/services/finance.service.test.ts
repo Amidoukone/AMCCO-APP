@@ -1442,7 +1442,7 @@ describe("finance.service", () => {
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });
 
-    it("rejects a rental transaction without property metadata", async () => {
+    it("rejects a rental transaction without tenant metadata", async () => {
       vi.mocked(findFinancialAccountById).mockResolvedValue({
         id: "account-1",
         companyId: actor.companyId,
@@ -1468,7 +1468,7 @@ describe("finance.service", () => {
       await expect(promise).rejects.toMatchObject<HttpError>({
         statusCode: 400,
         message:
-          "Le secteur Location immobilière exige le champ référence bien pour chaque transaction."
+          "Le secteur Location immobilière exige le champ locataire pour chaque transaction."
       });
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });

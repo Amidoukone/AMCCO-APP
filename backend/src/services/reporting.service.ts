@@ -23,6 +23,7 @@ import {
   listReportFinanceByType,
   listReportOperationalTasks,
   listReportOperationalTransactions,
+  listReportRentalTransactions,
   listReportTaskByActivity,
   listReportTaskByStatus,
   listTasksForExport,
@@ -48,6 +49,7 @@ import {
   type ReportsOverview
 } from "../repositories/reporting.repository.js";
 import { listFinancialAccounts, type FinancialAccount } from "../repositories/finance.repository.js";
+import { listRentalTenants, type RentalTenant } from "../repositories/rental-tenants.repository.js";
 import {
   BUSINESS_ACTIVITIES,
   BUSINESS_ACTIVITY_LABELS,
@@ -232,32 +234,9 @@ const FOOD_REPORT_BRANDING = {
   fiscal: "N Fiscal 084126139L",
   phone: "TEL: 79 07 24 40"
 };
-const RENTAL_OPERATION_LABELS: Record<string, string> = {
-  RENT_PAYMENT: "Paiement loyer",
-  SECURITY_DEPOSIT: "Caution",
-  ADVANCE_PAYMENT: "Avance loyer",
-  SERVICE_CHARGE_INCOME: "Charges recuperees",
-  MAINTENANCE_EXPENSE: "Maintenance",
-  PROPERTY_EXPENSE: "Charge bien",
-  OWNER_PAYOUT: "Reversement propriétaire"
-};
-const RENTAL_TASK_LABELS: Record<string, string> = {
-  RENT_COLLECTION: "Recouvrement loyer",
-  TENANT_FOLLOW_UP: "Suivi locataire",
-  VISIT: "Visite",
-  LEASE_RENEWAL: "Renouvellement bail",
-  MOVE_IN: "Entree locataire",
-  MOVE_OUT: "Sortie locataire",
-  MAINTENANCE: "Maintenance",
-  INSPECTION: "Inspection",
-  DOCUMENTS: "Documents",
-  OWNER_REPORT: "Reporting propriétaire",
-  LITIGATION: "Litige",
-  FOLLOW_UP: "Suivi locatif"
-};
 const RENTAL_REPORT_BRANDING = {
-  title: "LOCATION IMMOBILIERE",
-  subtitle: "Suivi des biens, lots, locataires, loyers, charges, maintenances et relances",
+  title: "SITUATION LOYER",
+  subtitle: "Suivi mensuel des paiements de loyer par locataire",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -832,8 +811,10 @@ function drawPdfBrandingFrame(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = 40;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc.rect(0, 0, pageWidth, 74).fill("#f4f7fb");
   doc.moveTo(margin, 74).lineTo(pageWidth - margin, 74).strokeColor("#d7e3f1").lineWidth(1).stroke();
 
@@ -873,7 +854,8 @@ function drawPdfBrandingFrame(
     .font("Helvetica")
     .fontSize(8)
     .text("AMCCO APP - Export reporting", margin, pageHeight - 32, {
-      width: 180
+      width: 180,
+      lineBreak: false
     });
   doc
     .fillColor("#627d98")
@@ -881,8 +863,10 @@ function drawPdfBrandingFrame(
     .fontSize(8)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right"
+      align: "right",
+      lineBreak: false
     });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -1417,8 +1401,10 @@ function drawHardwarePdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc
     .moveTo(margin, pageHeight - 44)
     .lineTo(pageWidth - margin, pageHeight - 44)
@@ -1430,7 +1416,8 @@ function drawHardwarePdfFooter(
     .font("Helvetica")
     .fontSize(8)
     .text(`AMCCO MBAG - Rapport quincaillerie | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 300
+      width: 300,
+      lineBreak: false
     });
   doc
     .fillColor("#627d98")
@@ -1438,8 +1425,10 @@ function drawHardwarePdfFooter(
     .fontSize(8)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right"
+      align: "right",
+      lineBreak: false
     });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -1927,8 +1916,10 @@ function drawAgriculturePdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc
     .moveTo(margin, pageHeight - 44)
     .lineTo(pageWidth - margin, pageHeight - 44)
@@ -1940,7 +1931,8 @@ function drawAgriculturePdfFooter(
     .font("Helvetica")
     .fontSize(8.5)
     .text(`AMCCO - Rapport agricole | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 300
+      width: 300,
+      lineBreak: false
     });
   doc
     .fillColor("#627d98")
@@ -1948,8 +1940,10 @@ function drawAgriculturePdfFooter(
     .fontSize(8.5)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right"
+      align: "right",
+      lineBreak: false
     });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -2340,16 +2334,21 @@ function drawGeneralStorePdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#c7d2fe").lineWidth(1).stroke();
   doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport magasins | ${periodLabel}`, margin, pageHeight - 32, {
-    width: 330
+    width: 330,
+    lineBreak: false
   });
   doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
     width: 80,
-    align: "right"
+    align: "right",
+    lineBreak: false
   });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -2745,16 +2744,21 @@ function drawFoodPdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#bbf7d0").lineWidth(1).stroke();
   doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport alimentation | ${periodLabel}`, margin, pageHeight - 32, {
-    width: 330
+    width: 330,
+    lineBreak: false
   });
   doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
     width: 80,
-    align: "right"
+    align: "right",
+    lineBreak: false
   });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -2775,24 +2779,17 @@ function renderFoodReportsPdf(
 
 function buildEmptyRentalOperationsReport(filters: ReportPeriodFilter): RentalOperationsReport {
   return {
-    periodLabel: toRentalPeriodLabel(filters, []),
+    periodLabel: toDisplayPeriodLabel(filters),
+    asOfLabel: formatPdfDate(resolveRentalAsOfDate(filters).toISOString()),
     rows: [],
     operationRows: [],
     totals: {
-      propertiesCount: 0,
-      unitsCount: 0,
       tenantsCount: 0,
-      rentPaymentsCount: 0,
-      rentAmount: "0.00",
+      upToDateTenantsCount: 0,
+      lateTenantsCount: 0,
+      totalArrearsAmount: "0.00",
+      collectedAmount: "0.00",
       depositAmount: "0.00",
-      serviceChargeAmount: "0.00",
-      maintenanceAmount: "0.00",
-      propertyExpenseAmount: "0.00",
-      transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
       cashInAmount: "0.00",
       cashOutAmount: "0.00",
       netAmount: "0.00",
@@ -2803,18 +2800,37 @@ function buildEmptyRentalOperationsReport(filters: ReportPeriodFilter): RentalOp
 }
 
 const RENTAL_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "BIEN", width: 56, align: "left" },
-  { label: "LOT", width: 42, align: "left" },
-  { label: "LOCATAIRE", width: 56, align: "left" },
-  { label: "LOYERS", width: 50, align: "right" },
-  { label: "CAUTION", width: 46, align: "right" },
-  { label: "CHARGES", width: 46, align: "right" },
-  { label: "MAINT.", width: 46, align: "right" },
-  { label: "DEP.", width: 48, align: "right" },
-  { label: "NET", width: 52, align: "right" },
-  { label: "EXEC.%", width: 33, align: "right" },
-  { label: "BLQ", width: 20, align: "right" }
+  { label: "LOCATAIRE", width: 170, align: "left" },
+  { label: "LOGEMENT OCCUPE", width: 170, align: "left" },
+  { label: "LOYER MENSUEL", width: 100, align: "right" },
+  { label: "STATUT", width: 90, align: "center" },
+  { label: "MONTANT", width: 100, align: "right" },
+  { label: "MOIS", width: 132, align: "center" }
 ];
+
+function toRentalStatusLabel(status: RentalOperationsReport["rows"][number]["status"]): string {
+  if (status === "EN_RETARD") {
+    return "En retard";
+  }
+  if (status === "AVANCE") {
+    return "Avance";
+  }
+  return "À jour";
+}
+
+function toRentalPivotMonthLabel(row: RentalOperationsReport["rows"][number]): string {
+  if (row.status === "EN_RETARD") {
+    return row.statusDetail.replace("En retard depuis ", "");
+  }
+  if (row.status === "AVANCE") {
+    return row.statusDetail.replace("Payé d'avance jusqu'à ", "");
+  }
+  return "-";
+}
+
+function toRentalPdfTitle(report: RentalOperationsReport): string {
+  return `SITUATION LOYER - AU ${report.asOfLabel.toUpperCase()}`;
+}
 
 function drawRentalPropertyMark(doc: PDFKit.PDFDocument, x: number, y: number): void {
   doc.save();
@@ -2842,45 +2858,37 @@ function drawRentalReportHeader(doc: PDFKit.PDFDocument, report: RentalOperation
   const centerX = margin + 118;
   const centerWidth = pageWidth - margin * 2 - 220;
 
-  drawRentalPropertyMark(doc, margin, 16);
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
+  drawRentalPropertyMark(doc, margin, 20);
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(16)
-    .text(RENTAL_REPORT_BRANDING.title, centerX, 22, {
+    .fontSize(17)
+    .text(RENTAL_REPORT_BRANDING.title, centerX, 24, {
       width: centerWidth,
       align: "center"
     });
   doc
     .fillColor("#0f766e")
-    .font("Helvetica")
-    .fontSize(9.2)
-    .text(RENTAL_REPORT_BRANDING.agency, centerX, 42, {
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
+    .text(RENTAL_REPORT_BRANDING.agency, centerX, 43, {
       width: centerWidth,
       align: "center"
     });
   doc
     .fillColor("#d21f1f")
     .font("Helvetica-Bold")
-    .fontSize(11)
-    .text(`"${RENTAL_REPORT_BRANDING.brand}"`, centerX, 55, {
+    .fontSize(12.5)
+    .text(`"${RENTAL_REPORT_BRANDING.brand}"`, centerX, 57, {
       width: centerWidth,
       align: "center"
     });
   doc
     .fillColor("#115e59")
     .font("Helvetica-Bold")
-    .fontSize(8.5)
-    .text(`${RENTAL_REPORT_BRANDING.fiscal}     ${RENTAL_REPORT_BRANDING.phone}`, centerX, 69, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#115e59")
-    .font("Helvetica-Bold")
-    .fontSize(8.5)
-    .text(RENTAL_REPORT_BRANDING.subtitle, centerX, 82, {
+    .fontSize(10.5)
+    .text(`${RENTAL_REPORT_BRANDING.fiscal}     ${RENTAL_REPORT_BRANDING.phone}`, centerX, 72, {
       width: centerWidth,
       align: "center"
     });
@@ -2893,12 +2901,12 @@ function drawRentalReportHeader(doc: PDFKit.PDFDocument, report: RentalOperation
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(13)
-    .text("SUIVI DES OPERATIONS LOCATIVES PAR BIEN", margin, 114, {
+    .fontSize(16)
+    .text(toRentalPdfTitle(report), margin, 116, {
       width: pageWidth - margin * 2,
       align: "center"
     });
-  doc.y = 140;
+  doc.y = 144;
 }
 
 function drawRentalMetadataStrip(
@@ -2915,29 +2923,45 @@ function drawRentalMetadataStrip(
     ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
     : report.periodLabel;
 
-  doc.roundedRect(margin, y, width, 42, 4).fill("#ecfeff");
-  doc.rect(margin, y, width, 42).strokeColor("#99f6e4").lineWidth(0.8).stroke();
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Location immobilière", margin + 205, y + 21, { width: 170 });
+  doc.roundedRect(margin, y, width, 50, 4).fill("#ecfeff");
+  doc.rect(margin, y, width, 50).strokeColor("#99f6e4").lineWidth(0.8).stroke();
   doc
     .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8.8)
-    .text("Genere le", pageWidth - margin - 150, y + 8, {
-      width: 140,
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Période", margin + 10, y + 10, { width: 160 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text(period, margin + 10, y + 26, { width: 190 });
+  doc
+    .fillColor("#486581")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Situation au", margin + 220, y + 10, { width: 130 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text(report.asOfLabel, margin + 220, y + 26, { width: 190 });
+  doc
+    .fillColor("#486581")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Genere le", pageWidth - margin - 160, y + 10, {
+      width: 150,
       align: "right"
     });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(10)
-    .text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
-      width: 140,
+    .fontSize(11.5)
+    .text(formatPdfDate(generatedAt), pageWidth - margin - 160, y + 26, {
+      width: 150,
       align: "right"
     });
-  doc.y = y + 56;
+  doc.y = y + 54;
 }
 
 function drawRentalMetricCards(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
@@ -2948,54 +2972,62 @@ function drawRentalMetricCards(doc: PDFKit.PDFDocument, report: RentalOperations
   const y = doc.y;
   const metrics = [
     {
-      label: "Biens / lots",
-      value: `${formatPdfNumber(report.totals.propertiesCount)} | ${formatPdfNumber(report.totals.unitsCount)}`
+      label: "Locataires a jour",
+      value: `${formatPdfNumber(report.totals.upToDateTenantsCount)} / ${formatPdfNumber(report.totals.tenantsCount)}`
     },
-    { label: "Loyers", value: formatPdfMoney(report.totals.rentAmount) },
-    { label: "Dépenses", value: formatPdfMoney(report.totals.cashOutAmount) },
-    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+    { label: "Arrieres cumules", value: formatPdfMoney(report.totals.totalArrearsAmount) },
+    { label: "Loyers encaisses (periode)", value: formatPdfMoney(report.totals.collectedAmount) },
+    { label: "Cautions percues (periode)", value: formatPdfMoney(report.totals.depositAmount) }
   ];
 
   metrics.forEach((metric, index) => {
     const x = margin + index * (cardWidth + gap);
-    doc.roundedRect(x, y, cardWidth, 45, 4).fill("#ecfeff");
-    doc.rect(x, y, cardWidth, 45).strokeColor("#99f6e4").lineWidth(0.8).stroke();
-    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 8, y + 8, {
-      width: cardWidth - 16
-    });
-    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, {
-      width: cardWidth - 16
-    });
+    doc.roundedRect(x, y, cardWidth, 54, 4).fill("#ecfeff");
+    doc.rect(x, y, cardWidth, 54).strokeColor("#99f6e4").lineWidth(0.8).stroke();
+    doc
+      .fillColor("#486581")
+      .font("Helvetica-Bold")
+      .fontSize(9.5)
+      .text(metric.label, x + 8, y + 10, {
+        width: cardWidth - 16
+      });
+    doc
+      .fillColor("#111827")
+      .font("Helvetica-Bold")
+      .fontSize(13)
+      .text(metric.value, x + 8, y + 27, {
+        width: cardWidth - 16
+      });
   });
-  doc.y = y + 60;
   doc
     .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8.8)
+    .font("Helvetica-Bold")
+    .fontSize(10)
     .text(
-      `Locataires: ${formatPdfNumber(report.totals.tenantsCount)} | cautions ${formatPdfMoney(report.totals.depositAmount)} | charges ${formatPdfMoney(report.totals.serviceChargeAmount)} | maintenance ${formatPdfMoney(report.totals.maintenanceAmount)} | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
+      `${formatPdfNumber(report.totals.lateTenantsCount)} locataire(s) en retard de paiement sur ${formatPdfNumber(report.totals.tenantsCount)}.`,
       margin,
-      doc.y - 8,
+      y + 62,
       {
         width: pageWidth - margin * 2,
         align: "center"
       }
     );
-  doc.moveDown(0.8);
+  doc.y = y + 72;
+  doc.moveDown(0.4);
 }
 
 function drawRentalTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
   for (const column of RENTAL_PDF_COLUMNS) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
       align: "center",
       fill: "#ccfbf1",
       font: "Helvetica-Bold",
-      fontSize: 5.8
+      fontSize: 11
     });
     x += column.width;
   }
-  return y + 22;
+  return y + 27;
 }
 
 function drawRentalDataRow(
@@ -3003,63 +3035,70 @@ function drawRentalDataRow(
   row: RentalOperationsReport["rows"][number],
   y: number
 ): number {
+  const balanceValue = toNumberAmount(row.balanceAmount);
   const values = [
-    { value: truncatePdfText(row.propertyRef, 12), align: "left" as const },
-    { value: truncatePdfText(row.unitRef, 9), align: "left" as const },
-    { value: truncatePdfText(row.tenantRef, 12), align: "left" as const },
-    { value: formatPdfMoney(row.rentAmount), align: "right" as const },
-    { value: formatPdfMoney(row.depositAmount), align: "right" as const },
-    { value: formatPdfMoney(row.serviceChargeAmount), align: "right" as const },
-    { value: formatPdfMoney(row.maintenanceAmount), align: "right" as const },
-    { value: formatPdfMoney(row.propertyExpenseAmount), align: "right" as const },
-    { value: formatPdfMoney(row.netAmount), align: "right" as const },
-    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const },
-    { value: formatPdfNumber(row.blockedTasksCount), align: "right" as const }
+    { value: truncatePdfText(row.tenantRef, 28), align: "left" as const },
+    { value: truncatePdfText(row.unitRef, 28), align: "left" as const },
+    { value: formatPdfMoney(row.monthlyRent), align: "right" as const },
+    { value: toRentalStatusLabel(row.status), align: "center" as const },
+    {
+      value: row.status === "A_JOUR" ? "-" : formatPdfMoney(Math.abs(balanceValue)),
+      align: "right" as const
+    },
+    { value: truncatePdfText(toRentalPivotMonthLabel(row), 22), align: "center" as const }
   ];
+  const fillColor = row.status === "EN_RETARD" ? "#fef2f2" : undefined;
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
     const column = RENTAL_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+    drawPdfTableCell(doc, item.value, x, y, column.width, 26, {
       align: item.align,
-      fontSize: 5.55
+      fontSize: 10.5,
+      fill: fillColor
     });
     x += column.width;
   });
-  return y + 20;
+  return y + 26;
 }
 
 function drawRentalTotalsRow(doc: PDFKit.PDFDocument, report: RentalOperationsReport, y: number): number {
-  const firstColumnsWidth = RENTAL_PDF_COLUMNS.slice(0, 3).reduce((sum, item) => sum + item.width, 0);
+  const firstColumnsWidth =
+    RENTAL_PDF_COLUMNS[0].width + RENTAL_PDF_COLUMNS[1].width + RENTAL_PDF_COLUMNS[2].width;
   let x = PDF_PAGE_MARGIN;
-  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+  drawPdfTableCell(doc, "TOTAL ARRIERES", x, y, firstColumnsWidth, 28, {
     align: "center",
     fill: "#f8fafc",
     font: "Helvetica-Bold",
-    fontSize: 7
+    fontSize: 11
   });
   x += firstColumnsWidth;
 
-  const values = [
-    formatPdfMoney(report.totals.rentAmount),
-    formatPdfMoney(report.totals.depositAmount),
-    formatPdfMoney(report.totals.serviceChargeAmount),
-    formatPdfMoney(report.totals.maintenanceAmount),
-    formatPdfMoney(report.totals.propertyExpenseAmount),
-    formatPdfMoney(report.totals.netAmount),
-    `${formatPdfNumber(report.totals.executionRate, 0)}%`,
-    formatPdfNumber(report.totals.blockedTasksCount)
-  ];
-  for (let index = 0; index < values.length; index += 1) {
-    const column = RENTAL_PDF_COLUMNS[index + 3];
-    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
-      align: "right",
+  drawPdfTableCell(
+    doc,
+    `${formatPdfNumber(report.totals.lateTenantsCount)} locataire(s)`,
+    x,
+    y,
+    RENTAL_PDF_COLUMNS[3].width,
+    28,
+    {
+      align: "center",
       fill: "#ecfeff",
       font: "Helvetica-Bold",
-      fontSize: 5.55
-    });
-    x += column.width;
-  }
-  return y + 22;
+      fontSize: 10
+    }
+  );
+  x += RENTAL_PDF_COLUMNS[3].width;
+
+  drawPdfTableCell(doc, formatPdfMoney(report.totals.totalArrearsAmount), x, y, RENTAL_PDF_COLUMNS[4].width, 28, {
+    align: "right",
+    fill: "#ecfeff",
+    font: "Helvetica-Bold",
+    fontSize: 11
+  });
+  x += RENTAL_PDF_COLUMNS[4].width;
+
+  drawPdfTableCell(doc, "", x, y, RENTAL_PDF_COLUMNS[5].width, 28, { fill: "#ecfeff" });
+  return y + 28;
 }
 
 function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
@@ -3073,7 +3112,7 @@ function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text("Aucune opération locative reportable", margin + 14, y + 16, {
+    .text("Aucun locataire enregistré", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -3081,7 +3120,7 @@ function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Le rapport reprend les transactions XOF comptabilisées et les tâches Location de la période. Renseignez bien, lot, locataire et bail pour alimenter le suivi.",
+      "Ajoutez vos locataires (nom, logement occupé et loyer mensuel) pour faire apparaître la situation loyer du mois.",
       margin + 14,
       y + 34,
       {
@@ -3105,15 +3144,15 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
   doc
     .fillColor("#115e59")
     .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text("Synthèse par bien, lot et locataire", PDF_PAGE_MARGIN, doc.y, {
+    .fontSize(12)
+    .text("Solde de chaque locataire, à jour ou en retard", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
   let y = drawRentalTableHeader(doc, doc.y);
 
   for (const row of report.rows) {
-    if (y + 20 + 22 > tableBottom) {
+    if (y + 26 + 28 > tableBottom) {
       doc.addPage();
       drawRentalReportHeader(doc, report);
       y = drawRentalTableHeader(doc, doc.y);
@@ -3121,12 +3160,12 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
     y = drawRentalDataRow(doc, row, y);
   }
 
-  if (y + 22 > tableBottom) {
+  if (y + 28 > tableBottom) {
     doc.addPage();
     drawRentalReportHeader(doc, report);
     y = drawRentalTableHeader(doc, doc.y);
   }
-  doc.y = drawRentalTotalsRow(doc, report, y) + 14;
+  doc.y = drawRentalTotalsRow(doc, report, y) + 6;
 }
 
 function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
@@ -3134,7 +3173,8 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
     return;
   }
 
-  if (needsPdfPageBreak(doc, 62)) {
+  const breakdownHeight = 34 + 24 + report.operationRows.length * 24;
+  if (needsPdfPageBreak(doc, breakdownHeight)) {
     doc.addPage();
     drawRentalReportHeader(doc, report);
   }
@@ -3142,68 +3182,62 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
   doc
     .fillColor("#115e59")
     .font("Helvetica-Bold")
-    .fontSize(12)
-    .text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
+    .fontSize(13)
+    .text(`Loyers encaissés sur la période (${report.periodLabel})`, PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
 
   const columns: PdfTableColumn[] = [
-    { label: "OPERATION", width: 170, align: "left" },
-    { label: "TRANS.", width: 50, align: "right" },
-    { label: "TACHES", width: 50, align: "right" },
-    { label: "RECETTES", width: 80, align: "right" },
-    { label: "DÉPENSES", width: 80, align: "right" },
-    { label: "NET", width: 85, align: "right" }
+    { label: "MONTANT DU LOYER", width: 320, align: "left" },
+    { label: "NB LOYERS", width: 180, align: "right" },
+    { label: "SOUS-TOTAL", width: 262, align: "right" }
   ];
   let x = PDF_PAGE_MARGIN;
   let y = doc.y;
   for (const column of columns) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 24, {
       align: "center",
       fill: "#ccfbf1",
       font: "Helvetica-Bold",
-      fontSize: 7.5
+      fontSize: 10.5
     });
     x += column.width;
   }
-  y += 20;
+  y += 24;
 
   for (const row of report.operationRows) {
-    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
+    if (y + 24 > doc.page.height - PDF_CONTENT_BOTTOM) {
       doc.addPage();
       drawRentalReportHeader(doc, report);
       y = doc.y;
       x = PDF_PAGE_MARGIN;
       for (const column of columns) {
-        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 24, {
           align: "center",
           fill: "#ccfbf1",
           font: "Helvetica-Bold",
-          fontSize: 7.5
+          fontSize: 10.5
         });
         x += column.width;
       }
-      y += 20;
+      y += 24;
     }
     x = PDF_PAGE_MARGIN;
     const values = [
-      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
+      { value: row.operationLabel, align: "left" as const },
       { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
-      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
-      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
-      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
-      { value: formatPdfMoney(row.netAmount), align: "right" as const }
+      { value: formatPdfMoney(row.cashInAmount), align: "right" as const }
     ];
     values.forEach((item, index) => {
       const column = columns[index];
-      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
+      drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
         align: item.align,
-        fontSize: 7.4
+        fontSize: 10.5
       });
       x += column.width;
     });
-    y += 19;
+    y += 24;
   }
   doc.y = y + 10;
 }
@@ -3217,8 +3251,10 @@ function drawRentalPdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc
     .moveTo(margin, pageHeight - 44)
     .lineTo(pageWidth - margin, pageHeight - 44)
@@ -3229,8 +3265,9 @@ function drawRentalPdfFooter(
     .fillColor("#627d98")
     .font("Helvetica")
     .fontSize(8.5)
-    .text(`AMCCO - Rapport location immobilière | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 330
+    .text(`AMCCO - Situation loyer | ${periodLabel}`, margin, pageHeight - 32, {
+      width: 330,
+      lineBreak: false
     });
   doc
     .fillColor("#627d98")
@@ -3238,8 +3275,10 @@ function drawRentalPdfFooter(
     .fontSize(8.5)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right"
+      align: "right",
+      lineBreak: false
     });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -3255,7 +3294,6 @@ function renderRentalReportsPdf(
   drawRentalMetricCards(doc, report);
   drawRentalOperationsTable(doc, report);
   drawRentalBreakdown(doc, report);
-  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyHotelOperationsReport(filters: ReportPeriodFilter): HotelOperationsReport {
@@ -3629,16 +3667,21 @@ function drawHotelPdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#bae6fd").lineWidth(1).stroke();
   doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport hôtellerie | ${periodLabel}`, margin, pageHeight - 32, {
-    width: 330
+    width: 330,
+    lineBreak: false
   });
   doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
     width: 80,
-    align: "right"
+    align: "right",
+    lineBreak: false
   });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -4694,8 +4737,10 @@ function drawBtpPdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc
     .moveTo(margin, pageHeight - 44)
     .lineTo(pageWidth - margin, pageHeight - 44)
@@ -4707,7 +4752,8 @@ function drawBtpPdfFooter(
     .font("Helvetica")
     .fontSize(8.5)
     .text(`AMCCO - Rapport BTP | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 300
+      width: 300,
+      lineBreak: false
     });
   doc
     .fillColor("#627d98")
@@ -4715,8 +4761,10 @@ function drawBtpPdfFooter(
     .fontSize(8.5)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right"
+      align: "right",
+      lineBreak: false
     });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -5210,8 +5258,10 @@ function drawFishFarmingPdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc
     .moveTo(margin, pageHeight - 44)
     .lineTo(pageWidth - margin, pageHeight - 44)
@@ -5223,7 +5273,8 @@ function drawFishFarmingPdfFooter(
     .font("Helvetica")
     .fontSize(8.5)
     .text(`AMCCO - Rapport pisciculture | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 320
+      width: 320,
+      lineBreak: false
     });
   doc
     .fillColor("#627d98")
@@ -5231,8 +5282,10 @@ function drawFishFarmingPdfFooter(
     .fontSize(8.5)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right"
+      align: "right",
+      lineBreak: false
     });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -5720,8 +5773,10 @@ function drawLivestockPdfFooter(
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
   const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
 
   doc.save();
+  doc.page.margins.bottom = 0;
   doc
     .moveTo(margin, pageHeight - 44)
     .lineTo(pageWidth - margin, pageHeight - 44)
@@ -5733,7 +5788,8 @@ function drawLivestockPdfFooter(
     .font("Helvetica")
     .fontSize(8.5)
     .text(`AMCCO - Rapport élevage | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 320
+      width: 320,
+      lineBreak: false
     });
   doc
     .fillColor("#627d98")
@@ -5741,8 +5797,10 @@ function drawLivestockPdfFooter(
     .fontSize(8.5)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right"
+      align: "right",
+      lineBreak: false
     });
+  doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
 
@@ -5934,7 +5992,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Location ${overview.rentalOperationsReport.periodLabel}`,
       value: overview.rentalOperationsReport.totals.netAmount,
-      extra: `biens ${overview.rentalOperationsReport.totals.propertiesCount} | lots ${overview.rentalOperationsReport.totals.unitsCount} | locataires ${overview.rentalOperationsReport.totals.tenantsCount} | loyers ${overview.rentalOperationsReport.totals.rentAmount} XOF | cautions ${overview.rentalOperationsReport.totals.depositAmount} XOF | charges ${overview.rentalOperationsReport.totals.serviceChargeAmount} XOF | maintenance ${overview.rentalOperationsReport.totals.maintenanceAmount} XOF | recettes ${overview.rentalOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.rentalOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.rentalOperationsReport.totals.executionRate}%`
+      extra: `locataires ${overview.rentalOperationsReport.totals.tenantsCount} | a jour ${overview.rentalOperationsReport.totals.upToDateTenantsCount} | en retard ${overview.rentalOperationsReport.totals.lateTenantsCount} | arrieres ${overview.rentalOperationsReport.totals.totalArrearsAmount} XOF | encaisse ${overview.rentalOperationsReport.totals.collectedAmount} XOF | cautions ${overview.rentalOperationsReport.totals.depositAmount} XOF | exécution ${overview.rentalOperationsReport.totals.executionRate}%`
     });
   }
 
@@ -6180,26 +6238,14 @@ function buildFoodOperationsBreakdownRows(overview: ReportsOverview): Array<Reco
 
 function buildRentalOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
   return (overview.rentalOperationsReport?.rows ?? []).map((item) => ({
-    propertyRef: item.propertyRef,
-    unitRef: item.unitRef,
     tenantRef: item.tenantRef,
-    leaseRef: item.leaseRef,
-    propertyType: item.propertyType,
-    rentPaymentsCount: item.rentPaymentsCount,
-    rentAmount: item.rentAmount,
-    depositAmount: item.depositAmount,
-    serviceChargeAmount: item.serviceChargeAmount,
-    maintenanceAmount: item.maintenanceAmount,
-    propertyExpenseAmount: item.propertyExpenseAmount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    executionRate: item.executionRate,
+    unitRef: item.unitRef,
+    monthlyRent: item.monthlyRent,
+    totalDue: item.totalDue,
+    totalPaid: item.totalPaid,
+    balanceAmount: item.balanceAmount,
+    status: item.status,
+    statusDetail: item.statusDetail,
     currency: item.currency
   }));
 }
@@ -7904,369 +7950,247 @@ function buildFoodOperationsReport(
   };
 }
 
-type RentalReportBucket = {
-  propertyRef: string;
-  unitRef: string;
-  tenantRef: string;
-  leaseRef: string;
-  propertyType: string;
-  rentPaymentsCount: number;
-  rentValue: number;
-  depositValue: number;
-  serviceChargeValue: number;
-  maintenanceValue: number;
-  propertyExpenseValue: number;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
-};
-
-type RentalOperationBucket = {
-  operationKind: string;
-  operationLabel: string;
-  transactionsCount: number;
-  tasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
-};
-
-function getRentalMetadataLabel(
-  metadata: Record<string, string>,
-  key: string,
-  fallback: string
-): string {
-  const value = metadata[key]?.trim();
-  return value || fallback;
-}
-
-function getRentalBucketKey(input: {
-  propertyRef: string;
-  unitRef: string;
-  tenantRef: string;
-  leaseRef: string;
-  propertyType: string;
-}): string {
-  return [
-    input.propertyRef,
-    input.unitRef,
-    input.tenantRef,
-    input.leaseRef,
-    input.propertyType
-  ].join("|");
-}
-
-function getRentalReportBucket(
-  buckets: Map<string, RentalReportBucket>,
-  metadata: Record<string, string>
-): RentalReportBucket {
-  const input = {
-    propertyRef: getRentalMetadataLabel(metadata, "propertyRef", "Bien non renseigné"),
-    unitRef: getRentalMetadataLabel(metadata, "unitRef", "Lot non renseigné"),
-    tenantRef: getRentalMetadataLabel(metadata, "tenantRef", "Locataire non renseigné"),
-    leaseRef: getRentalMetadataLabel(metadata, "leaseRef", "Bail non renseigné"),
-    propertyType: getRentalMetadataLabel(metadata, "propertyType", "Type non renseigné")
-  };
-  const key = getRentalBucketKey(input);
-  const existing = buckets.get(key);
-  if (existing) {
-    return existing;
-  }
-
-  const created: RentalReportBucket = {
-    ...input,
-    rentPaymentsCount: 0,
-    rentValue: 0,
-    depositValue: 0,
-    serviceChargeValue: 0,
-    maintenanceValue: 0,
-    propertyExpenseValue: 0,
-    transactionsCount: 0,
-    tasksCount: 0,
-    doneTasksCount: 0,
-    openTasksCount: 0,
-    blockedTasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(key, created);
-  return created;
-}
-
-function getRentalOperationBucket(
-  buckets: Map<string, RentalOperationBucket>,
-  operationKind: string,
-  operationLabel: string
-): RentalOperationBucket {
-  const existing = buckets.get(operationKind);
-  if (existing) {
-    return existing;
-  }
-
-  const created: RentalOperationBucket = {
-    operationKind,
-    operationLabel,
-    transactionsCount: 0,
-    tasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(operationKind, created);
-  return created;
-}
-
-function getRentalTransactionOperationKind(transaction: ReportOperationalTransaction): string {
-  const configuredKind = transaction.metadata.rentalOperationKind?.trim();
-  if (configuredKind) {
-    return configuredKind;
-  }
-  return transaction.type === "CASH_IN" ? "RENT_PAYMENT" : "PROPERTY_EXPENSE";
-}
-
-function getRentalTaskOperationKind(task: ReportOperationalTask): string {
-  const configuredKind = task.metadata.rentalTaskKind?.trim();
-  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
-}
-
-function toRentalOperationLabel(operationKind: string): string {
-  if (RENTAL_OPERATION_LABELS[operationKind]) {
-    return RENTAL_OPERATION_LABELS[operationKind];
-  }
-  if (operationKind.startsWith("TASK_")) {
-    const taskKind = operationKind.slice("TASK_".length);
-    return `Tâche: ${RENTAL_TASK_LABELS[taskKind] ?? taskKind}`;
-  }
-  return operationKind;
-}
-
-function toRentalPeriodLabel(
-  filters: ReportPeriodFilter,
-  _rows: RentalReportBucket[]
-): string {
-  if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes périodes";
-  }
-
-  if (!filters.dateFrom || !filters.dateTo) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  const fromDate = new Date(filters.dateFrom);
-  const toDate = new Date(filters.dateTo);
-  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  const sameMonth =
-    fromDate.getFullYear() === toDate.getFullYear() &&
-    fromDate.getMonth() === toDate.getMonth();
-  if (!sameMonth) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  return fromDate.toLocaleDateString("fr-FR", {
-    month: "long",
-    year: "numeric"
-  });
-}
-
 function isRentalReportableTransaction(transaction: ReportOperationalTransaction): boolean {
   return isSectorReportableTransaction(transaction, "RENTAL");
 }
 
+function getRentalTransactionKind(transaction: ReportOperationalTransaction): "LOYER" | "CAUTION" | "AUTRE" {
+  const kind = transaction.metadata.rentalOperationKind?.trim();
+  if (kind === "CAUTION") {
+    return "CAUTION";
+  }
+  if (kind === "AUTRE") {
+    return "AUTRE";
+  }
+  return "LOYER";
+}
+
+function monthKeyToIndex(monthKey: string): number {
+  const [year, month] = monthKey.split("-").map((part) => Number(part));
+  return year * 12 + (month - 1);
+}
+
+function indexToMonthKey(index: number): string {
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function monthKeyLabel(monthKey: string): string {
+  const parsed = new Date(`${monthKey}-01T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return monthKey;
+  }
+  return parsed.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC"
+  });
+}
+
+function resolveRentalAsOfDate(filters: ReportPeriodFilter): Date {
+  if (filters.dateTo) {
+    const parsed = new Date(filters.dateTo);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return new Date();
+}
+
+function toRentalMonthKey(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+type RentalTenantLedger = {
+  status: "A_JOUR" | "EN_RETARD" | "AVANCE";
+  statusDetail: string;
+  totalDueValue: number;
+  balanceValue: number;
+};
+
+function computeRentalTenantLedger(input: {
+  tenancyStart: string;
+  monthlyRentValue: number;
+  totalPaidValue: number;
+  lastDueMonthIndex: number;
+}): RentalTenantLedger {
+  const sinceIndex = monthKeyToIndex(input.tenancyStart);
+  const dueMonthsCount = Math.max(0, input.lastDueMonthIndex - sinceIndex + 1);
+  const totalDueValue = dueMonthsCount * input.monthlyRentValue;
+  const balanceValue = totalDueValue - input.totalPaidValue;
+
+  if (input.monthlyRentValue <= 0) {
+    return { status: "A_JOUR", statusDetail: "-", totalDueValue, balanceValue: 0 };
+  }
+
+  const monthsCoveredByPayment = Math.floor(input.totalPaidValue / input.monthlyRentValue);
+  const coveredThroughIndex = sinceIndex + monthsCoveredByPayment - 1;
+
+  if (coveredThroughIndex >= input.lastDueMonthIndex) {
+    if (coveredThroughIndex === input.lastDueMonthIndex) {
+      return { status: "A_JOUR", statusDetail: "À jour", totalDueValue, balanceValue };
+    }
+    return {
+      status: "AVANCE",
+      statusDetail: `Payé d'avance jusqu'à ${monthKeyLabel(indexToMonthKey(coveredThroughIndex))}`,
+      totalDueValue,
+      balanceValue
+    };
+  }
+
+  const firstUnpaidIndex = coveredThroughIndex + 1;
+  return {
+    status: "EN_RETARD",
+    statusDetail: `En retard depuis ${monthKeyLabel(indexToMonthKey(firstUnpaidIndex))}`,
+    totalDueValue,
+    balanceValue
+  };
+}
+
 function buildRentalOperationsReport(
   transactions: ReportOperationalTransaction[],
-  tasks: ReportOperationalTask[],
+  tenants: RentalTenant[],
   filters: ReportPeriodFilter
 ): RentalOperationsReport | null {
   if (filters.activityCode && filters.activityCode !== "RENTAL") {
     return null;
   }
 
-  const rentalTransactions = transactions.filter(isRentalReportableTransaction);
-  const rentalTasks = tasks.filter((task) => task.activityCode === "RENTAL");
-  if (!filters.activityCode && rentalTransactions.length === 0 && rentalTasks.length === 0) {
+  if (!filters.activityCode && tenants.length === 0 && transactions.length === 0) {
     return null;
   }
 
-  const rowBuckets = new Map<string, RentalReportBucket>();
-  const operationBuckets = new Map<string, RentalOperationBucket>();
+  const reportableTransactions = transactions.filter(isRentalReportableTransaction);
+  const asOfDate = resolveRentalAsOfDate(filters);
+  const lastDueMonthIndex = monthKeyToIndex(toRentalMonthKey(asOfDate)) - 1;
+  const asOfIso = asOfDate.toISOString();
 
-  for (const transaction of rentalTransactions) {
-    const operationKind = getRentalTransactionOperationKind(transaction);
-    const rowBucket = getRentalReportBucket(rowBuckets, transaction.metadata);
+  const totalPaidByTenant = new Map<string, number>();
+  for (const transaction of reportableTransactions) {
+    if (getRentalTransactionKind(transaction) !== "LOYER") {
+      continue;
+    }
+    if (transaction.occurredAt > asOfIso) {
+      continue;
+    }
+    const tenantKey = transaction.metadata.tenantRef?.trim();
+    if (!tenantKey) {
+      continue;
+    }
     const amount = toNumberAmount(transaction.amount);
-    rowBucket.transactionsCount += 1;
-
-    if (operationKind === "RENT_PAYMENT" || operationKind === "ADVANCE_PAYMENT") {
-      const serviceCharge = getMetadataNumber(transaction.metadata, "serviceCharge");
-      const rentAmount = serviceCharge > 0 && amount > serviceCharge ? amount - serviceCharge : amount;
-      rowBucket.rentPaymentsCount += 1;
-      rowBucket.rentValue += rentAmount;
-      rowBucket.serviceChargeValue += operationKind === "RENT_PAYMENT" ? serviceCharge : 0;
-    }
-    if (operationKind === "SECURITY_DEPOSIT") {
-      rowBucket.depositValue += amount;
-    }
-    if (operationKind === "SERVICE_CHARGE_INCOME") {
-      rowBucket.serviceChargeValue += amount;
-    }
-    if (operationKind === "MAINTENANCE_EXPENSE") {
-      rowBucket.maintenanceValue += amount;
-    }
-    if (operationKind === "PROPERTY_EXPENSE" || operationKind === "OWNER_PAYOUT") {
-      rowBucket.propertyExpenseValue += amount;
-    }
-
-    if (transaction.type === "CASH_IN") {
-      rowBucket.cashInValue += amount;
-    } else {
-      rowBucket.cashOutValue += amount;
-    }
-
-    const operationBucket = getRentalOperationBucket(
-      operationBuckets,
-      operationKind,
-      toRentalOperationLabel(operationKind)
-    );
-    operationBucket.transactionsCount += 1;
-    if (transaction.type === "CASH_IN") {
-      operationBucket.cashInValue += amount;
-    } else {
-      operationBucket.cashOutValue += amount;
-    }
+    totalPaidByTenant.set(tenantKey, (totalPaidByTenant.get(tenantKey) ?? 0) + amount);
   }
 
-  for (const task of rentalTasks) {
-    const rowBucket = getRentalReportBucket(rowBuckets, task.metadata);
-    rowBucket.tasksCount += 1;
-    if (task.status === "DONE") {
-      rowBucket.doneTasksCount += 1;
-    } else {
-      rowBucket.openTasksCount += 1;
-    }
-    if (task.status === "BLOCKED") {
-      rowBucket.blockedTasksCount += 1;
-    }
+  const activeTenants = [...tenants].sort((left, right) => left.name.localeCompare(right.name));
 
-    const operationKind = getRentalTaskOperationKind(task);
-    const operationBucket = getRentalOperationBucket(
-      operationBuckets,
-      operationKind,
-      toRentalOperationLabel(operationKind)
-    );
-    operationBucket.tasksCount += 1;
-  }
+  const rows: RentalOperationsReport["rows"] = activeTenants.map((tenant) => {
+    const monthlyRentValue = toNumberAmount(tenant.monthlyRent);
+    const totalPaidValue = totalPaidByTenant.get(tenant.name) ?? 0;
+    const ledger = computeRentalTenantLedger({
+      tenancyStart: tenant.tenancyStart,
+      monthlyRentValue,
+      totalPaidValue,
+      lastDueMonthIndex
+    });
 
-  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
-    return (
-      left.propertyRef.localeCompare(right.propertyRef) ||
-      left.unitRef.localeCompare(right.unitRef) ||
-      left.tenantRef.localeCompare(right.tenantRef) ||
-      left.leaseRef.localeCompare(right.leaseRef) ||
-      left.propertyType.localeCompare(right.propertyType)
-    );
+    return {
+      tenantRef: tenant.name,
+      unitRef: tenant.unitLabel,
+      monthlyRent: toMoneyString(monthlyRentValue),
+      totalDue: toMoneyString(ledger.totalDueValue),
+      totalPaid: toMoneyString(totalPaidValue),
+      balanceAmount: toMoneyString(ledger.balanceValue),
+      status: ledger.status,
+      statusDetail: ledger.statusDetail,
+      currency: "XOF" as const
+    };
   });
 
-  const totals = bucketRows.reduce(
-    (sum, row) => ({
-      rentPaymentsCount: sum.rentPaymentsCount + row.rentPaymentsCount,
-      rentValue: sum.rentValue + row.rentValue,
-      depositValue: sum.depositValue + row.depositValue,
-      serviceChargeValue: sum.serviceChargeValue + row.serviceChargeValue,
-      maintenanceValue: sum.maintenanceValue + row.maintenanceValue,
-      propertyExpenseValue: sum.propertyExpenseValue + row.propertyExpenseValue,
-      transactionsCount: sum.transactionsCount + row.transactionsCount,
-      tasksCount: sum.tasksCount + row.tasksCount,
-      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
-      openTasksCount: sum.openTasksCount + row.openTasksCount,
-      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
-      cashInValue: sum.cashInValue + row.cashInValue,
-      cashOutValue: sum.cashOutValue + row.cashOutValue
-    }),
-    {
-      rentPaymentsCount: 0,
-      rentValue: 0,
-      depositValue: 0,
-      serviceChargeValue: 0,
-      maintenanceValue: 0,
-      propertyExpenseValue: 0,
-      transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
-      cashInValue: 0,
-      cashOutValue: 0
+  // "Encaissements de la période": cash actually received within the selected date range,
+  // independent of the cumulative arrears ledger above.
+  const periodTransactions = reportableTransactions.filter((transaction) => {
+    if (filters.dateFrom && transaction.occurredAt < filters.dateFrom) {
+      return false;
     }
-  );
+    if (filters.dateTo && transaction.occurredAt > filters.dateTo) {
+      return false;
+    }
+    return true;
+  });
 
-  const propertyKeys = new Set(bucketRows.map((row) => row.propertyRef));
-  const unitKeys = new Set(bucketRows.map((row) => `${row.propertyRef}|${row.unitRef}`));
-  const tenantKeys = new Set(bucketRows.map((row) => row.tenantRef));
+  let collectedAmountValue = 0;
+  let depositAmountValue = 0;
+  let otherCashIn = 0;
+  let otherCashOut = 0;
+  const tranches = new Map<string, { amount: number; count: number }>();
+
+  for (const transaction of periodTransactions) {
+    const amount = toNumberAmount(transaction.amount);
+    const kind = getRentalTransactionKind(transaction);
+
+    if (kind === "LOYER") {
+      collectedAmountValue += amount;
+      const key = toMoneyString(amount);
+      const existing = tranches.get(key) ?? { amount: 0, count: 0 };
+      existing.amount += amount;
+      existing.count += 1;
+      tranches.set(key, existing);
+      continue;
+    }
+
+    if (kind === "CAUTION") {
+      depositAmountValue += amount;
+      continue;
+    }
+
+    if (transaction.type === "CASH_IN") {
+      otherCashIn += amount;
+    } else {
+      otherCashOut += amount;
+    }
+  }
+
+  const operationRows: RentalOperationsReport["operationRows"] = Array.from(tranches.entries())
+    .map(([amountKey, bucket]) => ({
+      operationKind: amountKey,
+      operationLabel: `${bucket.count} loyer${bucket.count > 1 ? "s" : ""} payé${
+        bucket.count > 1 ? "s" : ""
+      } à ${formatPdfMoney(amountKey)}`,
+      transactionsCount: bucket.count,
+      tasksCount: 0,
+      cashInAmount: toMoneyString(bucket.amount),
+      cashOutAmount: "0.00",
+      netAmount: toMoneyString(bucket.amount),
+      currency: "XOF" as const
+    }))
+    .sort((left, right) => toNumberAmount(right.operationKind) - toNumberAmount(left.operationKind));
+
+  const tenantsCount = activeTenants.length;
+  const upToDateTenantsCount = rows.filter((row) => row.status !== "EN_RETARD").length;
+  const totalArrearsAmountValue = rows.reduce(
+    (sum, row) => sum + Math.max(0, toNumberAmount(row.balanceAmount)),
+    0
+  );
+  const cashInAmountValue = collectedAmountValue + depositAmountValue + otherCashIn;
+  const cashOutAmountValue = otherCashOut;
 
   return {
-    periodLabel: toRentalPeriodLabel(filters, bucketRows),
-    rows: bucketRows.map((row) => {
-      const netAmount = row.cashInValue - row.cashOutValue;
-      return {
-        propertyRef: row.propertyRef,
-        unitRef: row.unitRef,
-        tenantRef: row.tenantRef,
-        leaseRef: row.leaseRef,
-        propertyType: row.propertyType,
-        rentPaymentsCount: row.rentPaymentsCount,
-        rentAmount: toMoneyString(row.rentValue),
-        depositAmount: toMoneyString(row.depositValue),
-        serviceChargeAmount: toMoneyString(row.serviceChargeValue),
-        maintenanceAmount: toMoneyString(row.maintenanceValue),
-        propertyExpenseAmount: toMoneyString(row.propertyExpenseValue),
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        doneTasksCount: row.doneTasksCount,
-        openTasksCount: row.openTasksCount,
-        blockedTasksCount: row.blockedTasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(netAmount),
-        executionRate: toRate(row.doneTasksCount, row.tasksCount),
-        currency: "XOF" as const
-      };
-    }),
-    operationRows: Array.from(operationBuckets.values())
-      .map((row) => ({
-        operationKind: row.operationKind,
-        operationLabel: row.operationLabel,
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
-        currency: "XOF" as const
-      }))
-      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    periodLabel: toDisplayPeriodLabel(filters),
+    asOfLabel: formatPdfDate(asOfIso),
+    rows,
+    operationRows,
     totals: {
-      propertiesCount: propertyKeys.size,
-      unitsCount: unitKeys.size,
-      tenantsCount: tenantKeys.size,
-      rentPaymentsCount: totals.rentPaymentsCount,
-      rentAmount: toMoneyString(totals.rentValue),
-      depositAmount: toMoneyString(totals.depositValue),
-      serviceChargeAmount: toMoneyString(totals.serviceChargeValue),
-      maintenanceAmount: toMoneyString(totals.maintenanceValue),
-      propertyExpenseAmount: toMoneyString(totals.propertyExpenseValue),
-      transactionsCount: totals.transactionsCount,
-      tasksCount: totals.tasksCount,
-      doneTasksCount: totals.doneTasksCount,
-      openTasksCount: totals.openTasksCount,
-      blockedTasksCount: totals.blockedTasksCount,
-      cashInAmount: toMoneyString(totals.cashInValue),
-      cashOutAmount: toMoneyString(totals.cashOutValue),
-      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
-      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      tenantsCount,
+      upToDateTenantsCount,
+      lateTenantsCount: tenantsCount - upToDateTenantsCount,
+      totalArrearsAmount: toMoneyString(totalArrearsAmountValue),
+      collectedAmount: toMoneyString(collectedAmountValue),
+      depositAmount: toMoneyString(depositAmountValue),
+      cashInAmount: toMoneyString(cashInAmountValue),
+      cashOutAmount: toMoneyString(cashOutAmountValue),
+      netAmount: toMoneyString(cashInAmountValue - cashOutAmountValue),
+      executionRate: toRate(upToDateTenantsCount, tenantsCount),
       currency: "XOF" as const
     }
   };
@@ -10845,6 +10769,8 @@ export async function getCompanyReportsOverview(
   const filters = normalizeReportFilters(input);
   ensureSectorReportFilter(filters);
 
+  const shouldLoadRentalData = !filters.activityCode || filters.activityCode === "RENTAL";
+
   const [
     financeByStatus,
     financeByType,
@@ -10853,7 +10779,9 @@ export async function getCompanyReportsOverview(
     taskByStatus,
     taskByActivity,
     operationalTransactions,
-    operationalTasks
+    operationalTasks,
+    rentalTransactions,
+    rentalTenants
   ] =
     await Promise.all([
       listReportFinanceByStatus(actor.companyId, filters),
@@ -10863,7 +10791,13 @@ export async function getCompanyReportsOverview(
       listReportTaskByStatus(actor.companyId, filters),
       listReportTaskByActivity(actor.companyId, filters),
       listReportOperationalTransactions(actor.companyId, filters),
-      listReportOperationalTasks(actor.companyId, filters)
+      listReportOperationalTasks(actor.companyId, filters),
+      shouldLoadRentalData
+        ? listReportRentalTransactions(actor.companyId)
+        : Promise.resolve([] as ReportOperationalTransaction[]),
+      shouldLoadRentalData
+        ? listRentalTenants({ companyId: actor.companyId, activeOnly: true })
+        : Promise.resolve([] as RentalTenant[])
     ]);
 
   const financeByActivitySummary = buildReportFinanceByActivitySummary(financeByActivity)
@@ -10918,7 +10852,7 @@ export async function getCompanyReportsOverview(
     agricultureOperationsReport: buildAgricultureOperationsReport(operationalTransactions, operationalTasks, filters),
     generalStoreOperationsReport: buildGeneralStoreOperationsReport(operationalTransactions, operationalTasks, filters),
     foodOperationsReport: buildFoodOperationsReport(operationalTransactions, operationalTasks, filters),
-    rentalOperationsReport: buildRentalOperationsReport(operationalTransactions, operationalTasks, filters),
+    rentalOperationsReport: buildRentalOperationsReport(rentalTransactions, rentalTenants, filters),
     btpOperationsReport: buildBtpOperationsReport(operationalTransactions, operationalTasks, filters),
     fishFarmingOperationsReport: buildFishFarmingOperationsReport(operationalTransactions, operationalTasks, filters),
     livestockOperationsReport: buildLivestockOperationsReport(operationalTransactions, operationalTasks, filters),
@@ -11222,26 +11156,14 @@ export async function exportCompanyTransactionsExcel(
       name: "Location",
       rows: buildRentalOperationsReportRows(overview),
       columns: [
-        "propertyRef",
-        "unitRef",
         "tenantRef",
-        "leaseRef",
-        "propertyType",
-        "rentPaymentsCount",
-        "rentAmount",
-        "depositAmount",
-        "serviceChargeAmount",
-        "maintenanceAmount",
-        "propertyExpenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
+        "unitRef",
+        "monthlyRent",
+        "totalDue",
+        "totalPaid",
+        "balanceAmount",
+        "status",
+        "statusDetail",
         "currency"
       ]
     },
@@ -11757,26 +11679,14 @@ export async function exportCompanyTasksExcel(
       name: "Location",
       rows: buildRentalOperationsReportRows(overview),
       columns: [
-        "propertyRef",
-        "unitRef",
         "tenantRef",
-        "leaseRef",
-        "propertyType",
-        "rentPaymentsCount",
-        "rentAmount",
-        "depositAmount",
-        "serviceChargeAmount",
-        "maintenanceAmount",
-        "propertyExpenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
+        "unitRef",
+        "monthlyRent",
+        "totalDue",
+        "totalPaid",
+        "balanceAmount",
+        "status",
+        "statusDetail",
         "currency"
       ]
     },
@@ -12151,7 +12061,7 @@ export async function exportCompanyReportsPdf(
         totalPages,
         overview.rentalOperationsReport?.periodLabel ?? periodLabel
       );
-    });
+    }, { layout: "landscape" });
   }
 
   if (filters.activityCode === "HOTEL_LODGING") {

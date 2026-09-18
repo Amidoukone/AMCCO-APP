@@ -335,6 +335,42 @@ async function ensureActivityArticlesTable(): Promise<void> {
   );
 }
 
+async function ensureRentalTenantsTable(): Promise<void> {
+  await getDbPool().execute(
+    `
+      CREATE TABLE IF NOT EXISTS rental_tenants (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        unit_label VARCHAR(160) NOT NULL,
+        monthly_rent DECIMAL(14,2) NOT NULL,
+        phone VARCHAR(40) NULL,
+        tenancy_start CHAR(7) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_rental_tenant_company (company_id, is_active),
+        CONSTRAINT fk_rental_tenant_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `
+  );
+
+  const hasTenancyStart = await columnExists("rental_tenants", "tenancy_start");
+  if (!hasTenancyStart) {
+    await getDbPool().execute(
+      `ALTER TABLE rental_tenants ADD COLUMN tenancy_start CHAR(7) NULL AFTER phone`
+    );
+  }
+
+  await getDbPool().execute(
+    `
+      UPDATE rental_tenants
+      SET tenancy_start = DATE_FORMAT(created_at, '%Y-%m')
+      WHERE tenancy_start IS NULL
+    `
+  );
+}
+
 async function ensureCompanyActivitiesSeeded(): Promise<void> {
   const companies = await queryRows<CompanyIdRow[]>(`SELECT id FROM companies`);
   if (companies.length === 0) {
@@ -375,6 +411,7 @@ export async function ensureBusinessActivitySchemaReady(): Promise<void> {
     await ensureFinancialAccountActivitiesTable();
     await ensureCompanyActivitiesTable();
     await ensureActivityArticlesTable();
+    await ensureRentalTenantsTable();
     await ensureCompanyActivitiesSeeded();
     logger.info("Business activity schema ready");
   } catch (error) {

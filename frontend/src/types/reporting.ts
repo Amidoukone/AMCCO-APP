@@ -324,26 +324,14 @@ export type FoodOperationsReport = {
 };
 
 export type RentalOperationsReportRow = {
-  propertyRef: string;
-  unitRef: string;
   tenantRef: string;
-  leaseRef: string;
-  propertyType: string;
-  rentPaymentsCount: number;
-  rentAmount: string;
-  depositAmount: string;
-  serviceChargeAmount: string;
-  maintenanceAmount: string;
-  propertyExpenseAmount: string;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInAmount: string;
-  cashOutAmount: string;
-  netAmount: string;
-  executionRate: number;
+  unitRef: string;
+  monthlyRent: string;
+  totalDue: string;
+  totalPaid: string;
+  balanceAmount: string;
+  status: "A_JOUR" | "EN_RETARD" | "AVANCE";
+  statusDetail: string;
   currency: "XOF";
 };
 
@@ -360,23 +348,16 @@ export type RentalOperationsReportOperationRow = {
 
 export type RentalOperationsReport = {
   periodLabel: string;
+  asOfLabel: string;
   rows: RentalOperationsReportRow[];
   operationRows: RentalOperationsReportOperationRow[];
   totals: {
-    propertiesCount: number;
-    unitsCount: number;
     tenantsCount: number;
-    rentPaymentsCount: number;
-    rentAmount: string;
+    upToDateTenantsCount: number;
+    lateTenantsCount: number;
+    totalArrearsAmount: string;
+    collectedAmount: string;
     depositAmount: string;
-    serviceChargeAmount: string;
-    maintenanceAmount: string;
-    propertyExpenseAmount: string;
-    transactionsCount: number;
-    tasksCount: number;
-    doneTasksCount: number;
-    openTasksCount: number;
-    blockedTasksCount: number;
     cashInAmount: string;
     cashOutAmount: string;
     netAmount: string;

@@ -821,11 +821,7 @@ export function ReportsPage(): JSX.Element {
               <article className="reports-kpi-card">
                 <span>{selectedActivityCode === "HARDWARE" ? "Achats filtrés" : "Transactions filtrées"}</span>
                 <strong>{formatCount(reportMetrics.transactionCount)}</strong>
-                <small>
-                  {formatCount(reportMetrics.activeTransactions)} comptabilisées,{" "}
-                  {formatCount(reportMetrics.draftTransactions)} brouillons,{" "}
-                  {formatCount(reportMetrics.rejectedTransactions)} rejetées
-                </small>
+                <small>{formatCount(reportMetrics.activeTransactions)} comptabilisées</small>
               </article>
               {selectedActivityCode === "HARDWARE" && overview.hardwareMonthlyReport ? (
                 <article className="reports-kpi-card">
@@ -1582,189 +1578,155 @@ export function ReportsPage(): JSX.Element {
             <section className="panel">
               <div className="dashboard-panel-header">
                 <div>
-                  <h3>Rapport location immobilière</h3>
+                  <h3>Situation loyer</h3>
                   <p className="hint">
-                    {overview.rentalOperationsReport.periodLabel} | suivi par bien, lot,
-                    locataire, bail, loyers, cautions, charges et interventions.
+                    Situation au {overview.rentalOperationsReport.asOfLabel} | encaissements sur{" "}
+                    {overview.rentalOperationsReport.periodLabel}.
                   </p>
                 </div>
               </div>
 
               <div className="reports-summary-grid">
                 <article className="reports-kpi-card">
-                  <span>Biens suivis</span>
-                  <strong>{formatCount(overview.rentalOperationsReport.totals.propertiesCount)}</strong>
+                  <span>Locataires à jour</span>
+                  <strong>
+                    {formatCount(overview.rentalOperationsReport.totals.upToDateTenantsCount)} /{" "}
+                    {formatCount(overview.rentalOperationsReport.totals.tenantsCount)}
+                  </strong>
                   <small>
-                    {formatCount(overview.rentalOperationsReport.totals.unitsCount)} lot(s),{" "}
-                    {formatCount(overview.rentalOperationsReport.totals.tenantsCount)} locataire(s)
+                    {formatCount(overview.rentalOperationsReport.totals.lateTenantsCount)} en retard
+                    de paiement
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Solde locatif</span>
+                  <span>Arriérés cumulés</span>
                   <strong>
                     {formatAmount(
-                      overview.rentalOperationsReport.totals.netAmount,
+                      overview.rentalOperationsReport.totals.totalArrearsAmount,
                       overview.rentalOperationsReport.totals.currency
                     )}
                   </strong>
-                  <small>
-                    Loyers, cautions et charges moins dépenses locatives.
-                  </small>
+                  <small>Somme des loyers en retard, tous locataires confondus</small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Exécution locative</span>
-                  <strong>{formatRate(overview.rentalOperationsReport.totals.executionRate)}</strong>
-                  <small>
-                    {formatCount(overview.rentalOperationsReport.totals.doneTasksCount)} terminées,{" "}
-                    {formatCount(overview.rentalOperationsReport.totals.openTasksCount)} ouvertes
-                  </small>
+                  <span>Loyers encaissés</span>
+                  <strong>
+                    {formatAmount(
+                      overview.rentalOperationsReport.totals.collectedAmount,
+                      overview.rentalOperationsReport.totals.currency
+                    )}
+                  </strong>
+                  <small>Sur la période {overview.rentalOperationsReport.periodLabel}</small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Cautions perçues</span>
+                  <strong>
+                    {formatAmount(
+                      overview.rentalOperationsReport.totals.depositAmount,
+                      overview.rentalOperationsReport.totals.currency
+                    )}
+                  </strong>
+                  <small>Sur la période {overview.rentalOperationsReport.periodLabel}</small>
                 </article>
               </div>
 
-              <div className="reports-data-grid">
-                <article className="reports-table-panel">
-                  <div className="reports-table-header">
-                    <h4>Types d'opérations</h4>
-                    <span>{formatCount(overview.rentalOperationsReport.operationRows.length)} type(s)</span>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Opération</th>
-                          <th>Transactions</th>
-                          <th>Tâches</th>
-                          <th>Recettes</th>
-                          <th>Dépenses</th>
-                          <th>Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overview.rentalOperationsReport.operationRows.length === 0 ? (
+              {overview.rentalOperationsReport.operationRows.length > 0 ? (
+                <div className="reports-data-grid">
+                  <article className="reports-table-panel">
+                    <div className="reports-table-header">
+                      <h4>Loyers encaissés sur la période, par montant</h4>
+                      <span>
+                        {formatCount(overview.rentalOperationsReport.operationRows.length)} montant(s)
+                      </span>
+                    </div>
+                    <div className="table-wrap">
+                      <table className="admin-table">
+                        <thead>
                           <tr>
-                            <td colSpan={6}>Aucune opération locative sur la période filtrée.</td>
+                            <th>Montant du loyer</th>
+                            <th>Nombre de loyers</th>
+                            <th>Sous-total</th>
                           </tr>
-                        ) : (
-                          overview.rentalOperationsReport.operationRows.map((row) => (
+                        </thead>
+                        <tbody>
+                          {overview.rentalOperationsReport.operationRows.map((row) => (
                             <tr key={row.operationKind}>
                               <td>{row.operationLabel}</td>
                               <td>{formatCount(row.transactionsCount)}</td>
-                              <td>{formatCount(row.tasksCount)}</td>
                               <td>{formatAmount(row.cashInAmount, row.currency)}</td>
-                              <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
-                              <td>{formatAmount(row.netAmount, row.currency)}</td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </article>
-              </div>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </article>
+                </div>
+              ) : null}
 
               <div className="table-wrap">
-                <table className="admin-table">
+                <table className="admin-table reports-hardware-table">
                   <thead>
                     <tr>
-                      <th>Bien</th>
-                      <th>Lot</th>
                       <th>Locataire</th>
-                      <th>Bail</th>
-                      <th>Type</th>
-                      <th>Loyers</th>
-                      <th>Cautions</th>
-                      <th>Charges</th>
-                      <th>Maintenance</th>
-                      <th>Autres dépenses</th>
-                      <th>Recettes</th>
-                      <th>Dépenses</th>
-                      <th>Net</th>
-                      <th>Exécution</th>
-                      <th>Blocages</th>
+                      <th>Logement occupé</th>
+                      <th>Loyer mensuel</th>
+                      <th>Statut</th>
+                      <th>Montant</th>
+                      <th>Détail</th>
                     </tr>
                   </thead>
                   <tbody>
                     {overview.rentalOperationsReport.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={15}>
-                          Aucun bien locatif alimenté sur la période filtrée.
+                        <td colSpan={6}>
+                          Aucun locataire enregistré. Ajoutez vos locataires depuis les
+                          transactions financières.
                         </td>
                       </tr>
                     ) : (
                       overview.rentalOperationsReport.rows.map((row) => (
-                        <tr key={`${row.propertyRef}-${row.unitRef}-${row.tenantRef}-${row.leaseRef}-${row.propertyType}`}>
-                          <td>{row.propertyRef}</td>
-                          <td>{row.unitRef}</td>
+                        <tr key={`${row.tenantRef}-${row.unitRef}`}>
                           <td>{row.tenantRef}</td>
-                          <td>{row.leaseRef}</td>
-                          <td>{row.propertyType}</td>
-                          <td>{formatAmount(row.rentAmount, row.currency)}</td>
-                          <td>{formatAmount(row.depositAmount, row.currency)}</td>
-                          <td>{formatAmount(row.serviceChargeAmount, row.currency)}</td>
-                          <td>{formatAmount(row.maintenanceAmount, row.currency)}</td>
-                          <td>{formatAmount(row.propertyExpenseAmount, row.currency)}</td>
-                          <td>{formatAmount(row.cashInAmount, row.currency)}</td>
-                          <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
-                          <td>{formatAmount(row.netAmount, row.currency)}</td>
-                          <td>{formatRate(row.executionRate)}</td>
-                          <td>{formatCount(row.blockedTasksCount)}</td>
+                          <td>{row.unitRef}</td>
+                          <td>{formatAmount(row.monthlyRent, row.currency)}</td>
+                          <td>
+                            <span
+                              className={`task-status-chip ${
+                                row.status === "A_JOUR"
+                                  ? "status-in_progress"
+                                  : row.status === "AVANCE"
+                                    ? "status-todo"
+                                    : "status-blocked"
+                              }`}
+                            >
+                              {row.status === "A_JOUR"
+                                ? "À jour"
+                                : row.status === "AVANCE"
+                                  ? "Avance"
+                                  : "En retard"}
+                            </span>
+                          </td>
+                          <td>
+                            {row.status === "A_JOUR"
+                              ? "-"
+                              : formatAmount(Math.abs(Number(row.balanceAmount)), row.currency)}
+                          </td>
+                          <td>{row.statusDetail}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <th colSpan={5}>TOTAL</th>
+                      <th colSpan={3}>TOTAL ARRIÉRÉS</th>
+                      <th>{formatCount(overview.rentalOperationsReport.totals.lateTenantsCount)} locataire(s)</th>
                       <th>
                         {formatAmount(
-                          overview.rentalOperationsReport.totals.rentAmount,
+                          overview.rentalOperationsReport.totals.totalArrearsAmount,
                           overview.rentalOperationsReport.totals.currency
                         )}
                       </th>
-                      <th>
-                        {formatAmount(
-                          overview.rentalOperationsReport.totals.depositAmount,
-                          overview.rentalOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.rentalOperationsReport.totals.serviceChargeAmount,
-                          overview.rentalOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.rentalOperationsReport.totals.maintenanceAmount,
-                          overview.rentalOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.rentalOperationsReport.totals.propertyExpenseAmount,
-                          overview.rentalOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.rentalOperationsReport.totals.cashInAmount,
-                          overview.rentalOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.rentalOperationsReport.totals.cashOutAmount,
-                          overview.rentalOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.rentalOperationsReport.totals.netAmount,
-                          overview.rentalOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>{formatRate(overview.rentalOperationsReport.totals.executionRate)}</th>
-                      <th>{formatCount(overview.rentalOperationsReport.totals.blockedTasksCount)}</th>
+                      <th />
                     </tr>
                   </tfoot>
                 </table>
@@ -3149,7 +3111,9 @@ export function ReportsPage(): JSX.Element {
             </>
           ) : null}
 
-          {selectedActivityCode !== "HARDWARE" ? <ReportReadingGuidePanel /> : null}
+          {selectedActivityCode !== "HARDWARE" && !hasFocusedOperationsReport ? (
+            <ReportReadingGuidePanel />
+          ) : null}
         </>
       ) : null}
     </div>

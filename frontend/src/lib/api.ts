@@ -46,6 +46,10 @@ import type {
   ActivityArticleListResponse,
   ActivityArticleSingleResponse
 } from "../types/articles";
+import type {
+  RentalTenantListResponse,
+  RentalTenantSingleResponse
+} from "../types/tenants";
 import type { BusinessActivityCode } from "../config/businessActivities";
 import type {
   DashboardSummaryResponse,
@@ -584,6 +588,67 @@ export function deleteActivityArticleRequest(
   articleId: string
 ): Promise<{ status: string }> {
   return request<{ status: string }>(`/activities/${activityCode}/articles/${articleId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
+export function listRentalTenantsRequest(
+  accessToken: string,
+  query: { activeOnly?: boolean } = {}
+): Promise<RentalTenantListResponse> {
+  const params = new URLSearchParams();
+  if (query.activeOnly) {
+    params.set("activeOnly", "true");
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request<RentalTenantListResponse>(`/rental/tenants${suffix}`, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function createRentalTenantRequest(
+  accessToken: string,
+  input: {
+    name: string;
+    unitLabel: string;
+    monthlyRent: string;
+    phone?: string;
+    tenancyStart?: string;
+  }
+): Promise<RentalTenantSingleResponse> {
+  return request<RentalTenantSingleResponse>("/rental/tenants", {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function updateRentalTenantRequest(
+  accessToken: string,
+  tenantId: string,
+  input: {
+    name: string;
+    unitLabel: string;
+    monthlyRent: string;
+    phone?: string;
+    tenancyStart?: string;
+    isActive?: boolean;
+  }
+): Promise<RentalTenantSingleResponse> {
+  return request<RentalTenantSingleResponse>(`/rental/tenants/${tenantId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function deleteRentalTenantRequest(
+  accessToken: string,
+  tenantId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/rental/tenants/${tenantId}`, {
     method: "DELETE",
     accessToken
   });

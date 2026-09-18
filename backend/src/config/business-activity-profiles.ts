@@ -429,44 +429,27 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   RENTAL: makeProfile("RENTAL", {
-    operationsModel: "Gestion locative détaillée par bien, lot, locataire, bail, loyer, caution, charges, interventions et relances.",
+    operationsModel: "Gestion locative simplifiée: un locataire occupe un logement pour un loyer mensuel fixe, et chaque paiement se saisit par sélection du locataire.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
-      requiresDescription: true,
+      requiresDescription: false,
       requiresProof: false,
       fields: [
-        field("accountId", "Compte locatif", true, "Compte ou caisse affecté au portefeuille locatif."),
-        field("amount", "Montant du flux", true, "Montant du loyer, dépôt ou dépense."),
-        field("description", "Bien ou locataire", true, "Référence du bien, du locataire ou de la charge.")
+        field("accountId", "Compte locatif", true, "Caisse ou compte affecté aux loyers."),
+        field("amount", "Montant", true, "Montant versé par le locataire, ou montant de l'autre opération."),
+        field("description", "Précision", false, "Précision libre si nécessaire.")
       ],
       metadataFields: [
-        field("rentalOperationKind", "Type d'opération locative", false, "Loyer, caution, avance, charge, maintenance ou reversement."),
-        field("propertyRef", "Référence bien", true, "Référence interne du bien ou lot."),
-        field("unitRef", "Lot / appartement", false, "Numéro du lot, appartement, bureau ou magasin."),
-        field("tenantRef", "Référence locataire", false, "Identifiant du locataire ou dossier."),
-        field("leaseRef", "Référence bail", false, "Contrat de bail rattaché à l'opération."),
-        field("propertyType", "Type de bien", false, "Villa, appartement, bureau, magasin ou terrain."),
-        field("locationZone", "Zone / adresse", false, "Quartier, commune ou adresse du bien."),
-        field("periodRef", "Période locative", false, "Mois ou période concernée par le flux."),
-        field("monthsCount", "Nombre de mois", false, "Nombre de mois couverts par le loyer ou l'avance."),
-        field("monthlyRent", "Loyer mensuel", false, "Montant du loyer mensuel hors charges."),
-        field("serviceCharge", "Charges locatives", false, "Charges recuperees ou facturées au locataire."),
-        field("depositAmount", "Montant caution", false, "Montant du dépôt de garantie encaissé."),
-        field("chargeLabel", "Nature charge", false, "Syndic, eau, electricite, taxe, gardiennage ou autre charge."),
-        field("maintenanceType", "Type maintenance", false, "Plomberie, electricite, peinture, serrure, climatisation ou autre intervention."),
-        field("supplierRef", "Prestataire", false, "Entreprise, artisan ou fournisseur intervenant."),
-        field("invoiceRef", "Référence facture", false, "Facture, reçu ou bon rattaché à la charge."),
-        field("invoiceAmount", "Montant facture", false, "Montant de la facture ou dépense locative."),
-        field("ownerRef", "Propriétaire", false, "Propriétaire concerné par le reversement."),
-        field("payoutAmount", "Montant reverse", false, "Montant reverse au propriétaire."),
-        field("paymentRef", "Référence paiement", false, "Référence reçu, quittance, virement ou mobile money.")
+        field("rentalOperationKind", "Type d'opération", false, "Loyer, caution ou autre opération locative."),
+        field("tenantRef", "Locataire", true, "Locataire sélectionné dans la liste des locataires enregistrés."),
+        field("unitLabel", "Logement occupé", false, "Ce que le locataire occupe, repris automatiquement du locataire choisi."),
+        field("monthlyRent", "Loyer mensuel dû", false, "Loyer mensuel du locataire au moment du paiement, repris automatiquement.")
       ],
       workflow: [
-        workflow("CREATE", "Saisie locative", "Chaque flux précise le bien, le lot, le locataire et le type d'opération."),
-        workflow("PROOF_OPTIONAL", "Quittance ou preuve", "Le reçu, la quittance, la facture ou l'avis peuvent être rattachés."),
-        workflow("PORTFOLIO", "Suivi portefeuille", "Les loyers, cautions, charges, interventions et reversements alimentent le suivi par bien."),
-        workflow("REPORTING", "Rapport locatif", "Les données consolident les recettes, dépenses, soldes et blocages par bien et locataire.")
+        workflow("SELECT", "Sélection locataire", "L'agent choisit le locataire dans la liste plutôt que de ressaisir ses informations."),
+        workflow("AMOUNT", "Montant versé", "Le montant est pré-rempli avec le loyer mensuel et peut être ajusté pour un paiement partiel ou plusieurs mois d'avance."),
+        workflow("REPORTING", "Suivi des arriérés", "Chaque paiement est cumulé par locataire pour calculer automatiquement qui est à jour, en retard ou en avance.")
       ]
     },
     tasks: {
@@ -477,56 +460,49 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       blockedRequiresAssignee: true,
       blockedAlertSeverity: "WARNING",
       fields: [
-        field("title", "Action locative", true, "Exemple: visite, relance loyer ou intervention."),
-        field("description", "Bien ou dossier", true, "Référence bien, locataire ou dossier."),
-        field("dueDate", "Échéance", true, "Les engagements locatifs doivent être dates.")
+        field("title", "Action locative", true, "Exemple: relance loyer, visite ou entretien."),
+        field("description", "Détail", true, "Locataire ou dossier concerné."),
+        field("dueDate", "Échéance", true, "Les relances et visites doivent être datées.")
       ],
       metadataFields: [
-        field("rentalTaskKind", "Type d'action locative", true, "Relance, visite, bail, entree, sortie, maintenance, inspection ou reporting."),
-        field("propertyRef", "Référence bien", true, "Bien ou lot concerné."),
-        field("unitRef", "Lot / appartement", false, "Numéro du lot, appartement, bureau ou magasin."),
-        field("tenantRef", "Référence locataire", false, "Locataire, client ou dossier rattaché."),
-        field("leaseRef", "Référence bail", false, "Contrat de bail ou dossier administratif."),
-        field("propertyType", "Type de bien", false, "Villa, appartement, bureau, magasin ou terrain."),
-        field("locationZone", "Zone / adresse", false, "Quartier, commune ou adresse du bien."),
-        field("periodRef", "Période concernée", false, "Mois, échéance ou période rattachée à l'action."),
-        field("issueRef", "Incident / dossier", false, "Référence relance, incident, litige ou intervention.")
+        field("rentalTaskKind", "Type d'action", true, "Relance loyer, visite, entrée, sortie, maintenance ou autre."),
+        field("tenantRef", "Locataire", false, "Locataire concerné par l'action."),
+        field("unitLabel", "Logement occupé", false, "Logement occupé par le locataire concerné."),
+        field("periodRef", "Mois concerné", false, "Mois de loyer rattaché à l'action, si applicable."),
+        field("issueRef", "Incident / dossier", false, "Référence relance, panne ou litige.")
       ],
       workflow: [
-        workflow("PLAN", "Planification locative", "Chaque action est planifiée avec bien, locataire et échéance."),
-        workflow("EXECUTE", "Traitement", "Relance, visite, bail, intervention ou inspection du bien."),
-        workflow("BLOCK", "Blocage", "Un dossier bloque signale impaye, litige, travaux ou validation en attente."),
-        workflow("CLOSE", "Clôture", "Clôture avec trace du dossier locatif et impact sur le rapport.")
+        workflow("PLAN", "Planification", "Chaque action est planifiée avec le locataire et une échéance."),
+        workflow("EXECUTE", "Traitement", "Relance, visite, entrée, sortie ou intervention chez le locataire."),
+        workflow("CLOSE", "Clôture", "Clôture de l'action avec trace pour le suivi locatif.")
       ]
     },
     reporting: {
-      focusArea: "Suivi du portefeuille locatif",
-      exportSections: ["loyers", "cautions", "charges", "maintenance", "relances", "baux", "interventions"],
+      focusArea: "Situation mensuelle des loyers par locataire",
+      exportSections: ["loyers", "relances"],
       operationalDimensions: [
-        dimension("propertyRef", "Bien", "Mesure rentabilité et suivi par bien ou lot."),
-        dimension("unitRef", "Lot", "Isole le suivi par appartement, bureau, magasin ou lot."),
-        dimension("tenantRef", "Locataire", "Suit les flux, relances et interventions par dossier locataire."),
-        dimension("leaseRef", "Bail", "Contrôle les opérations rattachées à chaque contrat.")
+        dimension("tenantRef", "Locataire", "Suit les paiements et impayés par locataire."),
+        dimension("unitLabel", "Logement", "Regroupe les locataires par type de logement occupé.")
       ],
       highlights: [
         {
           code: "rental-cashflow",
-          label: "Flux locatifs enregistres",
-          description: "Nombre de flux financiers rattachés au portefeuille locatif.",
+          label: "Paiements de loyer enregistrés",
+          description: "Nombre de paiements de loyer rattachés au portefeuille locatif.",
           metric: "transactionsCount",
           thresholds: { warningAt: 5 }
         },
         {
           code: "rental-open-cases",
-          label: "Dossiers locatifs ouverts",
-          description: "Interventions et relances encore ouvertes.",
+          label: "Relances et actions ouvertes",
+          description: "Relances, visites et interventions encore ouvertes.",
           metric: "openTasksCount",
           thresholds: { warningAt: 3, criticalAt: 7 }
         },
         {
           code: "rental-blockers",
-          label: "Blocages de portefeuille",
-          description: "Dossiers locatifs bloques et à arbitrer.",
+          label: "Dossiers bloqués",
+          description: "Dossiers locatifs bloqués et à arbitrer.",
           metric: "blockedTasksCount",
           thresholds: { warningAt: 1, criticalAt: 3 }
         }
