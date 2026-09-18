@@ -37,6 +37,7 @@ import {
   type DashboardSummary,
   type FishFarmingOperationsReport,
   type FoodOperationsReport,
+  type GeneralExpensesReport,
   type GeneralStoreOperationsReport,
   type HardwareMonthlyReport,
   type HotelOperationsReport,
@@ -85,6 +86,27 @@ const HARDWARE_REPORT_BRANDING = {
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
   phone: "TEL: 79 07 24 40"
+};
+const GENERAL_EXPENSES_REPORT_BRANDING = {
+  title: "DEPENSES GENERALES",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+const GENERAL_EXPENSE_KIND_LABELS: Record<string, string> = {
+  PDG_SUPPLIES: "Achat matériel / fournitures",
+  PDG_TRANSPORT: "Carburant / transport",
+  PDG_SUPPLIER_PAYMENT: "Paiement fournisseur / prestataire",
+  PDG_TRANSFER_ADVANCE: "Virement / avance / transfert",
+  PDG_PAYROLL: "Salaire / cotisation",
+  PDG_OVERHEAD: "Frais généraux / divers",
+  EMPLOYEE_MEALS: "Repas",
+  EMPLOYEE_FUEL: "Carburant",
+  EMPLOYEE_VEHICLE_UPKEEP: "Entretien véhicule",
+  EMPLOYEE_SUPPLIES: "Fournitures / consommables",
+  EMPLOYEE_PAYROLL: "Salaire",
+  EMPLOYEE_OTHER: "Autre dépense"
 };
 const REPORT_READING_GUIDE_ROWS: Array<{
   term: string;
@@ -1263,12 +1285,12 @@ function drawHardwareDataRow(
 ): number {
   const values = [
     { value: formatPdfDate(row.date), align: "center" as const },
-    { value: truncatePdfText(row.designation, 34), align: "left" as const },
+    { value: truncatePdfText(row.designation, 24), align: "left" as const },
     { value: formatPdfNumber(row.quantity, 2), align: "right" as const },
     { value: formatPdfMoney(row.purchaseUnitPrice), align: "right" as const },
     { value: formatPdfMoney(row.purchaseAmount), align: "right" as const },
     { value: formatPdfMoney(row.grossProfit), align: "right" as const },
-    { value: truncatePdfText(row.recipientRef, 26), align: "left" as const }
+    { value: truncatePdfText(row.recipientRef, 20), align: "left" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
@@ -1459,6 +1481,489 @@ function renderHardwareReportsPdf(
         width: noteWidth
       });
   }
+}
+
+function drawGeneralExpensesIcon(doc: PDFKit.PDFDocument, x: number, y: number): void {
+  doc.save();
+  doc.roundedRect(x + 6, y + 10, 104, 58, 8).fillAndStroke("#fef3c7", "#92400e");
+  doc.roundedRect(x + 6, y + 10, 104, 16, 8).fill("#f59e0b");
+  doc.rect(x + 6, y + 18, 104, 8).fill("#f59e0b");
+  doc.circle(x + 92, y + 52, 15).fillAndStroke("#fde68a", "#92400e");
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(12)
+    .text("F", x + 85, y + 45, { width: 14, align: "center" });
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(7.5)
+    .text("DEPENSES", x + 14, y + 36, { width: 68, align: "center" });
+  doc.restore();
+}
+
+const GENERAL_EXPENSES_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "DATE", width: 65, align: "center" },
+  { label: "QUI", width: 55, align: "center" },
+  { label: "CATEGORIE", width: 175, align: "left" },
+  { label: "DESIGNATION", width: 180, align: "left" },
+  { label: "QUANTITE", width: 60, align: "right" },
+  { label: "PRIX UNITAIRE", width: 105, align: "right" },
+  { label: "MONTANT", width: 121, align: "right" }
+];
+
+function toGeneralExpensesOwnerLabel(ownerType: "PDG" | "EMPLOYE"): string {
+  return ownerType === "PDG" ? "PDG" : "Employé";
+}
+
+function drawGeneralExpensesReportHeader(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 118;
+  const centerWidth = pageWidth - margin * 2 - 220;
+
+  drawGeneralExpensesIcon(doc, margin, 18);
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
+
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(17)
+    .text(GENERAL_EXPENSES_REPORT_BRANDING.title, centerX, 24, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
+    .text(GENERAL_EXPENSES_REPORT_BRANDING.agency, centerX, 43, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#d21f1f")
+    .font("Helvetica-Bold")
+    .fontSize(12.5)
+    .text(`"${GENERAL_EXPENSES_REPORT_BRANDING.brand}"`, centerX, 57, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
+    .text(`${GENERAL_EXPENSES_REPORT_BRANDING.fiscal}     ${GENERAL_EXPENSES_REPORT_BRANDING.phone}`, centerX, 72, {
+      width: centerWidth,
+      align: "center"
+    });
+
+  doc
+    .moveTo(margin, 100)
+    .lineTo(pageWidth - margin, 100)
+    .strokeColor("#f59e0b")
+    .lineWidth(2)
+    .stroke();
+
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .text(`DEPENSES GENERALES - ${report.periodLabel.toUpperCase()}`, margin, 116, {
+      width: pageWidth - margin * 2,
+      align: "center"
+    });
+  doc.y = 144;
+}
+
+function drawGeneralExpensesContinuationHeader(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+
+  drawAmccoPdfLogo(doc, margin, 22, 34);
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11)
+    .text(`DEPENSES GENERALES - suite`, margin + 44, 28, {
+      width: pageWidth - margin * 2 - 88
+    });
+  doc
+    .fillColor("#486581")
+    .font("Helvetica-Bold")
+    .fontSize(9)
+    .text(`Période: ${report.periodLabel}`, margin + 44, 43, {
+      width: pageWidth - margin * 2 - 88
+    });
+  doc
+    .moveTo(margin, 62)
+    .lineTo(pageWidth - margin, 62)
+    .strokeColor("#d7e3f1")
+    .lineWidth(1)
+    .stroke();
+  doc.y = 76;
+}
+
+function drawGeneralExpensesMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: GeneralExpensesReport,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, width, 50, 4).fill("#fffbeb");
+  doc.rect(margin, y, width, 50).strokeColor("#fde68a").lineWidth(0.8).stroke();
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Période", margin + 10, y + 10, { width: 160 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text(report.periodLabel, margin + 10, y + 26, { width: 190 });
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Secteur", margin + 220, y + 10, { width: 130 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text("Dépenses générales", margin + 220, y + 26, { width: 190 });
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Genere le", pageWidth - margin - 160, y + 10, {
+      width: 150,
+      align: "right"
+    });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text(formatPdfDate(generatedAt), pageWidth - margin - 160, y + 26, {
+      width: 150,
+      align: "right"
+    });
+  doc.y = y + 64;
+}
+
+function drawGeneralExpensesMetricCards(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const gap = 8;
+  const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
+  const y = doc.y;
+  const metrics = [
+    { label: "Dépenses PDG", value: formatPdfMoney(report.totals.pdgAmount) },
+    { label: "Dépenses employés", value: formatPdfMoney(report.totals.employeeAmount) },
+    { label: "Total dépenses", value: formatPdfMoney(report.totals.totalAmount) },
+    { label: "Lignes de dépense", value: formatPdfNumber(report.totals.transactionsCount) }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, 54, 4).fill("#fffbeb");
+    doc.rect(x, y, cardWidth, 54).strokeColor("#fde68a").lineWidth(0.8).stroke();
+    doc
+      .fillColor("#92400e")
+      .font("Helvetica-Bold")
+      .fontSize(9.5)
+      .text(metric.label, x + 8, y + 10, {
+        width: cardWidth - 16
+      });
+    doc
+      .fillColor("#111827")
+      .font("Helvetica-Bold")
+      .fontSize(13)
+      .text(metric.value, x + 8, y + 27, {
+        width: cardWidth - 16,
+        align: "left"
+      });
+  });
+  doc.y = y + 70;
+}
+
+function drawGeneralExpensesTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+  let x = PDF_PAGE_MARGIN;
+  for (const column of GENERAL_EXPENSES_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
+      align: "center",
+      fill: "#fde68a",
+      font: "Helvetica-Bold",
+      fontSize: 10.5
+    });
+    x += column.width;
+  }
+  return y + 27;
+}
+
+function drawGeneralExpensesDataRow(
+  doc: PDFKit.PDFDocument,
+  row: GeneralExpensesReport["rows"][number],
+  y: number
+): number {
+  const values = [
+    { value: formatPdfDate(row.date), align: "center" as const },
+    { value: toGeneralExpensesOwnerLabel(row.ownerType), align: "center" as const },
+    { value: truncatePdfText(row.categoryLabel, 40), align: "left" as const },
+    { value: truncatePdfText(row.designation, 28), align: "left" as const },
+    { value: row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "-", align: "right" as const },
+    { value: row.quantity > 0 ? formatPdfMoney(row.unitPrice) : "-", align: "right" as const },
+    { value: formatPdfMoney(row.amount), align: "right" as const }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  values.forEach((item, index) => {
+    const column = GENERAL_EXPENSES_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
+      align: item.align,
+      fontSize: 10
+    });
+    x += column.width;
+  });
+  return y + 24;
+}
+
+function drawGeneralExpensesTotalsRow(doc: PDFKit.PDFDocument, report: GeneralExpensesReport, y: number): number {
+  const firstColumnsWidth =
+    GENERAL_EXPENSES_PDF_COLUMNS[0].width +
+    GENERAL_EXPENSES_PDF_COLUMNS[1].width +
+    GENERAL_EXPENSES_PDF_COLUMNS[2].width +
+    GENERAL_EXPENSES_PDF_COLUMNS[3].width +
+    GENERAL_EXPENSES_PDF_COLUMNS[4].width +
+    GENERAL_EXPENSES_PDF_COLUMNS[5].width;
+  drawPdfTableCell(doc, "TOTAL", PDF_PAGE_MARGIN, y, firstColumnsWidth, 27, {
+    align: "center",
+    fill: "#fffbeb",
+    font: "Helvetica-Bold",
+    fontSize: 11
+  });
+  drawPdfTableCell(
+    doc,
+    formatPdfMoney(report.totals.totalAmount),
+    PDF_PAGE_MARGIN + firstColumnsWidth,
+    y,
+    GENERAL_EXPENSES_PDF_COLUMNS[6].width,
+    27,
+    {
+      align: "right",
+      fill: "#fde68a",
+      font: "Helvetica-Bold",
+      fontSize: 11
+    }
+  );
+  return y + 27;
+}
+
+function drawGeneralExpensesEmptyState(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#fffbeb");
+  doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#fde68a").lineWidth(0.8).stroke();
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Aucune dépense générale reportable", margin + 14, y + 16, {
+      width: pageWidth - margin * 2 - 28
+    });
+  doc
+    .fillColor("#78350f")
+    .font("Helvetica")
+    .fontSize(8.5)
+    .text(
+      "Le rapport reprend les dépenses du PDG et des employés comptabilisées sur la période. Vérifiez la période filtrée si le tableau doit être alimenté.",
+      margin + 14,
+      y + 34,
+      {
+        width: pageWidth - margin * 2 - 28
+      }
+    );
+  doc.y = y + 88;
+}
+
+function drawGeneralExpensesTable(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
+  if (report.rows.length === 0) {
+    drawGeneralExpensesEmptyState(doc);
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (doc.y + 27 + 24 + 27 > tableBottom) {
+    doc.addPage();
+    drawGeneralExpensesContinuationHeader(doc, report);
+  }
+  let y = drawGeneralExpensesTableHeader(doc, doc.y);
+
+  for (const row of report.rows) {
+    if (y + 24 + 27 > tableBottom) {
+      doc.addPage();
+      drawGeneralExpensesContinuationHeader(doc, report);
+      y = drawGeneralExpensesTableHeader(doc, doc.y);
+    }
+    y = drawGeneralExpensesDataRow(doc, row, y);
+  }
+
+  if (y + 27 > tableBottom) {
+    doc.addPage();
+    drawGeneralExpensesContinuationHeader(doc, report);
+    y = drawGeneralExpensesTableHeader(doc, doc.y);
+  }
+  doc.y = drawGeneralExpensesTotalsRow(doc, report, y) + 14;
+}
+
+function drawGeneralExpensesBreakdown(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
+  if (report.breakdownRows.length === 0) {
+    return;
+  }
+
+  const breakdownHeight = 34 + 24 + report.breakdownRows.length * 24;
+  if (needsPdfPageBreak(doc, breakdownHeight)) {
+    doc.addPage();
+    drawGeneralExpensesContinuationHeader(doc, report);
+  }
+
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .text("Répartition par catégorie de dépense", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.4);
+
+  const columns: PdfTableColumn[] = [
+    { label: "QUI", width: 100, align: "left" },
+    { label: "CATEGORIE", width: 300, align: "left" },
+    { label: "LIGNES", width: 130, align: "right" },
+    { label: "MONTANT", width: 232, align: "right" }
+  ];
+  let x = PDF_PAGE_MARGIN;
+  let y = doc.y;
+  for (const column of columns) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 24, {
+      align: "center",
+      fill: "#fde68a",
+      font: "Helvetica-Bold",
+      fontSize: 10.5
+    });
+    x += column.width;
+  }
+  y += 24;
+
+  for (const row of report.breakdownRows) {
+    if (y + 24 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawGeneralExpensesContinuationHeader(doc, report);
+      y = doc.y;
+      x = PDF_PAGE_MARGIN;
+      for (const column of columns) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 24, {
+          align: "center",
+          fill: "#fde68a",
+          font: "Helvetica-Bold",
+          fontSize: 10.5
+        });
+        x += column.width;
+      }
+      y += 24;
+    }
+    x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: toGeneralExpensesOwnerLabel(row.ownerType), align: "left" as const },
+      { value: row.categoryLabel, align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfMoney(row.amount), align: "right" as const }
+    ];
+    values.forEach((item, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
+        align: item.align,
+        fontSize: 10
+      });
+      x += column.width;
+    });
+    y += 24;
+  }
+  doc.y = y + 10;
+}
+
+function buildEmptyGeneralExpensesReport(filters: ReportPeriodFilter): GeneralExpensesReport {
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    rows: [],
+    breakdownRows: [],
+    totals: {
+      transactionsCount: 0,
+      pdgAmount: "0.00",
+      employeeAmount: "0.00",
+      totalAmount: "0.00",
+      currency: "XOF"
+    }
+  };
+}
+
+function drawGeneralExpensesPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
+
+  doc.save();
+  doc.page.margins.bottom = 0;
+  doc
+    .moveTo(margin, pageHeight - 44)
+    .lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#fde68a")
+    .lineWidth(1)
+    .stroke();
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8)
+    .text(`AMCCO - Dépenses générales | ${periodLabel}`, margin, pageHeight - 32, {
+      width: 300,
+      lineBreak: false
+    });
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80,
+      align: "right",
+      lineBreak: false
+    });
+  doc.page.margins.bottom = bottomMargin;
+  doc.restore();
+}
+
+function renderGeneralExpensesReportsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.generalExpensesReport ?? buildEmptyGeneralExpensesReport(filters);
+
+  drawGeneralExpensesReportHeader(doc, report);
+  drawGeneralExpensesMetadataStrip(doc, report, overview.generatedAt);
+  drawGeneralExpensesMetricCards(doc, report);
+  drawGeneralExpensesTable(doc, report);
+  drawGeneralExpensesBreakdown(doc, report);
 }
 
 const AGRICULTURE_PDF_COLUMNS: PdfTableColumn[] = [
@@ -5956,6 +6461,16 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     });
   }
 
+  if (overview.generalExpensesReport) {
+    rows.push({
+      category: "GeneralExpensesReport",
+      item: "totals",
+      label: `Dépenses générales ${overview.generalExpensesReport.periodLabel}`,
+      value: overview.generalExpensesReport.totals.totalAmount,
+      extra: `PDG ${overview.generalExpensesReport.totals.pdgAmount} XOF | employés ${overview.generalExpensesReport.totals.employeeAmount} XOF | lignes ${overview.generalExpensesReport.totals.transactionsCount}`
+    });
+  }
+
   if (overview.agricultureOperationsReport) {
     rows.push({
       category: "AgricultureOperationsReport",
@@ -6114,6 +6629,29 @@ function buildHardwareMonthlyReportRows(overview: ReportsOverview): Array<Record
     purchaseAmount: item.purchaseAmount,
     grossProfit: item.grossProfit,
     transactionsCount: item.transactionsCount,
+    currency: item.currency
+  }));
+}
+
+function buildGeneralExpensesReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.generalExpensesReport?.rows ?? []).map((item) => ({
+    date: item.date,
+    ownerType: item.ownerType,
+    categoryLabel: item.categoryLabel,
+    designation: item.designation,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    amount: item.amount,
+    currency: item.currency
+  }));
+}
+
+function buildGeneralExpensesBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.generalExpensesReport?.breakdownRows ?? []).map((item) => ({
+    ownerType: item.ownerType,
+    categoryLabel: item.categoryLabel,
+    transactionsCount: item.transactionsCount,
+    amount: item.amount,
     currency: item.currency
   }));
 }
@@ -6863,6 +7401,114 @@ function buildHardwareMonthlyReport(
       purchaseAmount: toMoneyString(totals.purchaseAmountValue),
       grossProfit: toMoneyString(totals.grossProfitValue),
       transactionsCount: totals.transactionsCount,
+      currency: "XOF" as const
+    }
+  };
+}
+
+function isGeneralExpensesReportable(transaction: ReportOperationalTransaction): boolean {
+  return isSectorReportableTransaction(transaction, "GENERAL_EXPENSES") && transaction.type === "CASH_OUT";
+}
+
+function getGeneralExpenseOwnerType(kind: string): "PDG" | "EMPLOYE" {
+  return kind.startsWith("PDG_") ? "PDG" : "EMPLOYE";
+}
+
+function toGeneralExpenseCategoryLabel(kind: string): string {
+  return GENERAL_EXPENSE_KIND_LABELS[kind] ?? kind;
+}
+
+function buildGeneralExpensesReport(
+  transactions: ReportOperationalTransaction[],
+  filters: ReportPeriodFilter
+): GeneralExpensesReport | null {
+  if (filters.activityCode && filters.activityCode !== "GENERAL_EXPENSES") {
+    return null;
+  }
+
+  const generalExpenseTransactions = transactions.filter(
+    (transaction) => transaction.activityCode === "GENERAL_EXPENSES"
+  );
+  const reportableTransactions = generalExpenseTransactions.filter(isGeneralExpensesReportable);
+  if (!filters.activityCode && reportableTransactions.length === 0) {
+    return null;
+  }
+
+  const sortedTransactions = [...reportableTransactions].sort((left, right) =>
+    left.occurredAt.localeCompare(right.occurredAt)
+  );
+
+  const rows = sortedTransactions.map((transaction) => {
+    const kind = transaction.metadata.generalExpenseKind?.trim() || "EMPLOYEE_OTHER";
+    const ownerType = getGeneralExpenseOwnerType(kind);
+    const quantity = getMetadataNumber(transaction.metadata, "quantity");
+    const metaUnitPrice = getMetadataNumber(transaction.metadata, "unitPrice");
+    const amountValue = toNumberAmount(transaction.amount);
+    const unitPriceValue = metaUnitPrice > 0 ? metaUnitPrice : quantity > 0 ? amountValue / quantity : 0;
+
+    return {
+      date: toReportDate(transaction.occurredAt),
+      ownerType,
+      categoryLabel: toGeneralExpenseCategoryLabel(kind),
+      designation: transaction.description?.trim() || "-",
+      quantity,
+      unitPrice: toMoneyString(unitPriceValue),
+      amount: toMoneyString(amountValue),
+      currency: "XOF" as const
+    };
+  });
+
+  type BreakdownBucket = { ownerType: "PDG" | "EMPLOYE"; categoryLabel: string; count: number; amount: number };
+  const breakdownMap = new Map<string, BreakdownBucket>();
+  for (const row of rows) {
+    const key = `${row.ownerType}|${row.categoryLabel}`;
+    const existing: BreakdownBucket = breakdownMap.get(key) ?? {
+      ownerType: row.ownerType,
+      categoryLabel: row.categoryLabel,
+      count: 0,
+      amount: 0
+    };
+    existing.count += 1;
+    existing.amount += toNumberAmount(row.amount);
+    breakdownMap.set(key, existing);
+  }
+
+  const breakdownRows: GeneralExpensesReport["breakdownRows"] = Array.from(breakdownMap.values())
+    .sort((left, right) => {
+      if (left.ownerType !== right.ownerType) {
+        return left.ownerType === "PDG" ? -1 : 1;
+      }
+      return right.amount - left.amount;
+    })
+    .map((item) => ({
+      ownerType: item.ownerType,
+      categoryLabel: item.categoryLabel,
+      transactionsCount: item.count,
+      amount: toMoneyString(item.amount),
+      currency: "XOF" as const
+    }));
+
+  const totals = rows.reduce(
+    (sum, row) => {
+      const amountValue = toNumberAmount(row.amount);
+      return {
+        transactionsCount: sum.transactionsCount + 1,
+        pdgAmountValue: sum.pdgAmountValue + (row.ownerType === "PDG" ? amountValue : 0),
+        employeeAmountValue: sum.employeeAmountValue + (row.ownerType === "EMPLOYE" ? amountValue : 0)
+      };
+    },
+    { transactionsCount: 0, pdgAmountValue: 0, employeeAmountValue: 0 }
+  );
+
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    rows,
+    breakdownRows,
+    totals: {
+      transactionsCount: totals.transactionsCount,
+      pdgAmount: toMoneyString(totals.pdgAmountValue),
+      employeeAmount: toMoneyString(totals.employeeAmountValue),
+      totalAmount: toMoneyString(totals.pdgAmountValue + totals.employeeAmountValue),
       currency: "XOF" as const
     }
   };
@@ -10859,6 +11505,7 @@ export async function getCompanyReportsOverview(
     hotelOperationsReport: buildHotelOperationsReport(operationalTransactions, operationalTasks, filters),
     waterOperationsReport: buildWaterOperationsReport(operationalTransactions, operationalTasks, filters),
     agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
+    generalExpensesReport: buildGeneralExpensesReport(operationalTransactions, filters),
     roleDistribution: [],
     topAssignees: []
   };
@@ -11027,6 +11674,25 @@ export async function exportCompanyTransactionsExcel(
         "transactionsCount",
         "currency"
       ]
+    },
+    {
+      name: "DepensesGenerales",
+      rows: buildGeneralExpensesReportRows(overview),
+      columns: [
+        "date",
+        "ownerType",
+        "categoryLabel",
+        "designation",
+        "quantity",
+        "unitPrice",
+        "amount",
+        "currency"
+      ]
+    },
+    {
+      name: "DepensesGeneralesRepartition",
+      rows: buildGeneralExpensesBreakdownRows(overview),
+      columns: ["ownerType", "categoryLabel", "transactionsCount", "amount", "currency"]
     },
     {
       name: "Agriculture",
@@ -11552,6 +12218,25 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
+      name: "DepensesGenerales",
+      rows: buildGeneralExpensesReportRows(overview),
+      columns: [
+        "date",
+        "ownerType",
+        "categoryLabel",
+        "designation",
+        "quantity",
+        "unitPrice",
+        "amount",
+        "currency"
+      ]
+    },
+    {
+      name: "DepensesGeneralesRepartition",
+      rows: buildGeneralExpensesBreakdownRows(overview),
+      columns: ["ownerType", "categoryLabel", "transactionsCount", "amount", "currency"]
+    },
+    {
       name: "Agriculture",
       rows: buildAgricultureOperationsReportRows(overview),
       columns: [
@@ -12009,6 +12694,19 @@ export async function exportCompanyReportsPdf(
       renderHardwareReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawHardwarePdfFooter(doc, pageNumber, totalPages, overview.hardwareMonthlyReport?.periodLabel ?? periodLabel);
+    }, { layout: "landscape" });
+  }
+
+  if (filters.activityCode === "GENERAL_EXPENSES") {
+    return buildPdfBuffer((doc) => {
+      renderGeneralExpensesReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawGeneralExpensesPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.generalExpensesReport?.periodLabel ?? periodLabel
+      );
     }, { layout: "landscape" });
   }
 

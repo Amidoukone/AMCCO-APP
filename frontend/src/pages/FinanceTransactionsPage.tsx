@@ -1246,6 +1246,59 @@ const LIVESTOCK_METADATA_FIELDS = new Set([
   "mortalityCount",
   "healthStatus"
 ]);
+const GENERAL_EXPENSE_KIND_KEY = "generalExpenseKind";
+type GeneralExpenseOwner = "PDG" | "EMPLOYE";
+type GeneralExpenseKind =
+  | "PDG_SUPPLIES"
+  | "PDG_TRANSPORT"
+  | "PDG_SUPPLIER_PAYMENT"
+  | "PDG_TRANSFER_ADVANCE"
+  | "PDG_PAYROLL"
+  | "PDG_OVERHEAD"
+  | "EMPLOYEE_MEALS"
+  | "EMPLOYEE_FUEL"
+  | "EMPLOYEE_VEHICLE_UPKEEP"
+  | "EMPLOYEE_SUPPLIES"
+  | "EMPLOYEE_PAYROLL"
+  | "EMPLOYEE_OTHER";
+const GENERAL_EXPENSE_KIND_LABELS: Record<GeneralExpenseKind, string> = {
+  PDG_SUPPLIES: "Achat matériel / fournitures",
+  PDG_TRANSPORT: "Carburant / transport",
+  PDG_SUPPLIER_PAYMENT: "Paiement fournisseur / prestataire",
+  PDG_TRANSFER_ADVANCE: "Virement / avance / transfert",
+  PDG_PAYROLL: "Salaire / cotisation",
+  PDG_OVERHEAD: "Frais généraux / divers",
+  EMPLOYEE_MEALS: "Repas",
+  EMPLOYEE_FUEL: "Carburant",
+  EMPLOYEE_VEHICLE_UPKEEP: "Entretien véhicule",
+  EMPLOYEE_SUPPLIES: "Fournitures / consommables",
+  EMPLOYEE_PAYROLL: "Salaire",
+  EMPLOYEE_OTHER: "Autre dépense"
+};
+const GENERAL_EXPENSE_PDG_KINDS: GeneralExpenseKind[] = [
+  "PDG_SUPPLIES",
+  "PDG_TRANSPORT",
+  "PDG_SUPPLIER_PAYMENT",
+  "PDG_TRANSFER_ADVANCE",
+  "PDG_PAYROLL",
+  "PDG_OVERHEAD"
+];
+const GENERAL_EXPENSE_EMPLOYEE_KINDS: GeneralExpenseKind[] = [
+  "EMPLOYEE_MEALS",
+  "EMPLOYEE_FUEL",
+  "EMPLOYEE_VEHICLE_UPKEEP",
+  "EMPLOYEE_SUPPLIES",
+  "EMPLOYEE_PAYROLL",
+  "EMPLOYEE_OTHER"
+];
+const GENERAL_EXPENSES_NUMERIC_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
+const GENERAL_EXPENSES_AMOUNT_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
+const GENERAL_EXPENSES_VISIBLE_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
+const GENERAL_EXPENSES_METADATA_FIELDS = new Set([
+  GENERAL_EXPENSE_KIND_KEY,
+  "quantity",
+  "unitPrice"
+]);
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -1671,6 +1724,41 @@ function deriveLivestockAmount(
   return (quantity * unitPrice).toFixed(2);
 }
 
+function isGeneralExpenseKind(value: string | undefined): value is GeneralExpenseKind {
+  return Boolean(value) && Object.prototype.hasOwnProperty.call(GENERAL_EXPENSE_KIND_LABELS, value as string);
+}
+
+function getGeneralExpenseOwner(kind: GeneralExpenseKind): GeneralExpenseOwner {
+  return kind.startsWith("PDG_") ? "PDG" : "EMPLOYE";
+}
+
+function getGeneralExpenseKind(metadata: Record<string, string>): GeneralExpenseKind {
+  const configuredKind = metadata[GENERAL_EXPENSE_KIND_KEY]?.trim();
+  if (isGeneralExpenseKind(configuredKind)) {
+    return configuredKind;
+  }
+  return "EMPLOYEE_OTHER";
+}
+
+function getGeneralExpenseKindsForOwner(owner: GeneralExpenseOwner): GeneralExpenseKind[] {
+  return owner === "PDG" ? GENERAL_EXPENSE_PDG_KINDS : GENERAL_EXPENSE_EMPLOYEE_KINDS;
+}
+
+function deriveGeneralExpensesAmount(metadata: Record<string, string>): string | null {
+  const quantity = toAmountNumber(metadata.quantity ?? "");
+  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+  if (quantity <= 0 || unitPrice <= 0) {
+    return null;
+  }
+  return (quantity * unitPrice).toFixed(2);
+}
+
+function getGeneralExpensesFormModeLabel(owner: GeneralExpenseOwner): string {
+  return owner === "PDG"
+    ? "Dépense du PDG: choisissez la catégorie, puis le montant ou la quantité et le prix unitaire."
+    : "Dépense employé: choisissez la catégorie, puis le montant ou la quantité et le prix unitaire.";
+}
+
 function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
   return STORE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     HARDWARE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
@@ -1682,7 +1770,8 @@ function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
     AGRICULTURE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     BTP_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     FISH_FARMING_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    LIVESTOCK_NUMERIC_METADATA_FIELDS.has(fieldKey)
+    LIVESTOCK_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    GENERAL_EXPENSES_NUMERIC_METADATA_FIELDS.has(fieldKey)
     ? "decimal"
     : "text";
 }
@@ -1729,6 +1818,10 @@ function shouldDeriveFishFarmingAmount(fieldKey: string): boolean {
 
 function shouldDeriveLivestockAmount(fieldKey: string): boolean {
   return LIVESTOCK_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveGeneralExpensesAmount(fieldKey: string): boolean {
+  return GENERAL_EXPENSES_AMOUNT_METADATA_FIELDS.has(fieldKey);
 }
 
 function getDefaultTransactionType(
@@ -2617,6 +2710,10 @@ function getVisibleFinanceMetadataFields(
     return fields.filter((field) => visibleKeys.has(field.key));
   }
 
+  if (activityCode === "GENERAL_EXPENSES") {
+    return fields.filter((field) => GENERAL_EXPENSES_VISIBLE_METADATA_FIELDS.has(field.key));
+  }
+
   if (activityCode !== "HARDWARE") {
     return fields;
   }
@@ -2816,6 +2913,23 @@ function cleanSectorFinanceMetadata(
     );
   }
 
+  if (activityCode === "GENERAL_EXPENSES") {
+    const kind = getGeneralExpenseKind(metadata);
+    return Object.fromEntries(
+      Object.entries({
+        ...metadata,
+        [GENERAL_EXPENSE_KIND_KEY]: kind
+      }).map(([key, value]) => [
+        key,
+        GENERAL_EXPENSES_METADATA_FIELDS.has(key) &&
+        key !== GENERAL_EXPENSE_KIND_KEY &&
+        !GENERAL_EXPENSES_VISIBLE_METADATA_FIELDS.has(key)
+          ? ""
+          : value
+      ])
+    );
+  }
+
   if (activityCode !== "HARDWARE") {
     return metadata;
   }
@@ -2880,6 +2994,9 @@ function deriveSectorAmount(
   }
   if (activityCode === "LIVESTOCK") {
     return deriveLivestockAmount(getLivestockOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "GENERAL_EXPENSES") {
+    return deriveGeneralExpensesAmount(metadata);
   }
   return null;
 }
@@ -3528,6 +3645,10 @@ export function FinanceTransactionsPage(): JSX.Element {
   const livestockOperationKind = selectedActivityCode === "LIVESTOCK"
     ? getLivestockOperationKind(transactionForm.type, transactionForm.metadata)
     : "ANIMAL_PURCHASE";
+  const generalExpenseKind = selectedActivityCode === "GENERAL_EXPENSES"
+    ? getGeneralExpenseKind(transactionForm.metadata)
+    : "EMPLOYEE_OTHER";
+  const generalExpenseOwner = getGeneralExpenseOwner(generalExpenseKind);
   const hasRequiredFinanceDetails = Boolean(
     selectedProfile?.finance.requiresDescription ||
       visibleFinanceMetadataFields.some((field) => field.required) ||
@@ -3541,7 +3662,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       selectedActivityCode === "WATER" ||
       selectedActivityCode === "REAL_ESTATE_AGENCY" ||
       selectedActivityCode === "FISH_FARMING" ||
-      selectedActivityCode === "LIVESTOCK"
+      selectedActivityCode === "LIVESTOCK" ||
+      selectedActivityCode === "GENERAL_EXPENSES"
   );
   const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
   const enabledActivityCodes = useMemo(
@@ -5626,6 +5748,73 @@ export function FinanceTransactionsPage(): JSX.Element {
                   </strong>
                 </div>
               </>
+            ) : selectedActivityCode === "GENERAL_EXPENSES" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Dépense de</span>
+                  <select
+                    value={generalExpenseOwner}
+                    onChange={(event) => {
+                      const nextOwner = event.target.value as GeneralExpenseOwner;
+                      const nextKind = getGeneralExpenseKindsForOwner(nextOwner)[0];
+                      setTransactionForm((prev) => {
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          "CASH_OUT",
+                          {
+                            ...prev.metadata,
+                            [GENERAL_EXPENSE_KIND_KEY]: nextKind
+                          }
+                        );
+                        return {
+                          ...prev,
+                          type: "CASH_OUT",
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    <option value="EMPLOYE">Employé</option>
+                    <option value="PDG">PDG</option>
+                  </select>
+                </label>
+
+                <label className="operations-inline-group">
+                  <span>Catégorie</span>
+                  <select
+                    value={generalExpenseKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as GeneralExpenseKind;
+                      setTransactionForm((prev) => {
+                        const nextMetadata = cleanSectorFinanceMetadata(
+                          selectedActivityCode,
+                          "CASH_OUT",
+                          {
+                            ...prev.metadata,
+                            [GENERAL_EXPENSE_KIND_KEY]: nextKind
+                          }
+                        );
+                        return {
+                          ...prev,
+                          type: "CASH_OUT",
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    {getGeneralExpenseKindsForOwner(generalExpenseOwner).map((kind) => (
+                      <option key={kind} value={kind}>
+                        {GENERAL_EXPENSE_KIND_LABELS[kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>Dépense</strong>
+                </div>
+              </>
             ) : (
               <label className="operations-inline-group">
                 <span>Type</span>
@@ -5793,6 +5982,11 @@ export function FinanceTransactionsPage(): JSX.Element {
               {selectedActivityCode === "LIVESTOCK" ? (
                 <p className="hint finance-form-mode-hint">
                   {getLivestockFormModeLabel(livestockOperationKind)}
+                </p>
+              ) : null}
+              {selectedActivityCode === "GENERAL_EXPENSES" ? (
+                <p className="hint finance-form-mode-hint">
+                  {getGeneralExpensesFormModeLabel(generalExpenseOwner)}
                 </p>
               ) : null}
 
@@ -5998,7 +6192,8 @@ export function FinanceTransactionsPage(): JSX.Element {
                           (selectedActivityCode === "WATER" && shouldDeriveWaterAmount(field.key)) ||
                           (selectedActivityCode === "REAL_ESTATE_AGENCY" && shouldDeriveAgencyAmount(field.key)) ||
                           (selectedActivityCode === "FISH_FARMING" && shouldDeriveFishFarmingAmount(field.key)) ||
-                          (selectedActivityCode === "LIVESTOCK" && shouldDeriveLivestockAmount(field.key));
+                          (selectedActivityCode === "LIVESTOCK" && shouldDeriveLivestockAmount(field.key)) ||
+                          (selectedActivityCode === "GENERAL_EXPENSES" && shouldDeriveGeneralExpensesAmount(field.key));
                         const derivedAmount = shouldDeriveAmount
                           ? deriveSectorAmount(selectedActivityCode, prev.type, nextMetadata)
                           : null;

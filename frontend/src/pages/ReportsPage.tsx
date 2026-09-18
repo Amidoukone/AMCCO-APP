@@ -588,7 +588,8 @@ export function ReportsPage(): JSX.Element {
     overview?.agencyOperationsReport ||
     overview?.btpOperationsReport ||
     overview?.fishFarmingOperationsReport ||
-    overview?.livestockOperationsReport
+    overview?.livestockOperationsReport ||
+    overview?.generalExpensesReport
   );
   const genericOperationalPerformanceRows = useMemo(
     () =>
@@ -2395,6 +2396,137 @@ export function ReportsPage(): JSX.Element {
                       <th>{formatRate(overview.agencyOperationsReport.totals.commissionRate)}</th>
                       <th>{formatRate(overview.agencyOperationsReport.totals.executionRate)}</th>
                       <th>{formatCount(overview.agencyOperationsReport.totals.blockedTasksCount)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {overview.generalExpensesReport ? (
+            <section className="panel">
+              <div className="dashboard-panel-header">
+                <div>
+                  <h3>Rapport dépenses générales</h3>
+                  <p className="hint">
+                    {overview.generalExpensesReport.periodLabel} | dépenses de fonctionnement du
+                    PDG et des employés, hors secteurs d'activité.
+                  </p>
+                </div>
+              </div>
+
+              <div className="reports-summary-grid">
+                <article className="reports-kpi-card">
+                  <span>Dépenses PDG</span>
+                  <strong>
+                    {formatAmount(
+                      overview.generalExpensesReport.totals.pdgAmount,
+                      overview.generalExpensesReport.totals.currency
+                    )}
+                  </strong>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Dépenses employés</span>
+                  <strong>
+                    {formatAmount(
+                      overview.generalExpensesReport.totals.employeeAmount,
+                      overview.generalExpensesReport.totals.currency
+                    )}
+                  </strong>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Total dépenses</span>
+                  <strong>
+                    {formatAmount(
+                      overview.generalExpensesReport.totals.totalAmount,
+                      overview.generalExpensesReport.totals.currency
+                    )}
+                  </strong>
+                  <small>
+                    {formatCount(overview.generalExpensesReport.totals.transactionsCount)} ligne(s)
+                    de dépense
+                  </small>
+                </article>
+              </div>
+
+              <div className="reports-data-grid">
+                <article className="reports-table-panel">
+                  <div className="reports-table-header">
+                    <h4>Répartition par catégorie</h4>
+                    <span>{formatCount(overview.generalExpensesReport.breakdownRows.length)} catégorie(s)</span>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Qui</th>
+                          <th>Catégorie</th>
+                          <th>Lignes</th>
+                          <th>Montant</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {overview.generalExpensesReport.breakdownRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={4}>Aucune dépense générale sur la période filtrée.</td>
+                          </tr>
+                        ) : (
+                          overview.generalExpensesReport.breakdownRows.map((row) => (
+                            <tr key={`${row.ownerType}-${row.categoryLabel}`}>
+                              <td>{row.ownerType === "PDG" ? "PDG" : "Employé"}</td>
+                              <td>{row.categoryLabel}</td>
+                              <td>{formatCount(row.transactionsCount)}</td>
+                              <td>{formatAmount(row.amount, row.currency)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </div>
+
+              <div className="table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Qui</th>
+                      <th>Catégorie</th>
+                      <th>Désignation</th>
+                      <th>Quantité</th>
+                      <th>Prix unitaire</th>
+                      <th>Montant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.generalExpensesReport.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7}>Aucune dépense générale enregistrée sur la période filtrée.</td>
+                      </tr>
+                    ) : (
+                      overview.generalExpensesReport.rows.map((row, index) => (
+                        <tr key={`${row.date}-${row.ownerType}-${row.categoryLabel}-${index}`}>
+                          <td>{row.date}</td>
+                          <td>{row.ownerType === "PDG" ? "PDG" : "Employé"}</td>
+                          <td>{row.categoryLabel}</td>
+                          <td>{row.designation}</td>
+                          <td>{row.quantity > 0 ? formatCount(row.quantity) : "-"}</td>
+                          <td>{row.quantity > 0 ? formatAmount(row.unitPrice, row.currency) : "-"}</td>
+                          <td>{formatAmount(row.amount, row.currency)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colSpan={6}>TOTAL</th>
+                      <th>
+                        {formatAmount(
+                          overview.generalExpensesReport.totals.totalAmount,
+                          overview.generalExpensesReport.totals.currency
+                        )}
+                      </th>
                     </tr>
                   </tfoot>
                 </table>

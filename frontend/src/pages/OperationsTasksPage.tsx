@@ -282,6 +282,38 @@ const LIVESTOCK_TASK_LABELS: Record<LivestockTaskKind, string> = {
   SALE_PREP: "Préparation vente",
   FOLLOW_UP: "Suivi élevage"
 };
+const GENERAL_EXPENSE_KIND_KEY = "generalExpenseKind";
+type GeneralExpenseKind =
+  | "PDG_SUPPLIES"
+  | "PDG_TRANSPORT"
+  | "PDG_SUPPLIER_PAYMENT"
+  | "PDG_TRANSFER_ADVANCE"
+  | "PDG_PAYROLL"
+  | "PDG_OVERHEAD"
+  | "EMPLOYEE_MEALS"
+  | "EMPLOYEE_FUEL"
+  | "EMPLOYEE_VEHICLE_UPKEEP"
+  | "EMPLOYEE_SUPPLIES"
+  | "EMPLOYEE_PAYROLL"
+  | "EMPLOYEE_OTHER";
+const GENERAL_EXPENSE_KIND_LABELS: Record<GeneralExpenseKind, string> = {
+  PDG_SUPPLIES: "PDG - Achat matériel / fournitures",
+  PDG_TRANSPORT: "PDG - Carburant / transport",
+  PDG_SUPPLIER_PAYMENT: "PDG - Paiement fournisseur / prestataire",
+  PDG_TRANSFER_ADVANCE: "PDG - Virement / avance / transfert",
+  PDG_PAYROLL: "PDG - Salaire / cotisation",
+  PDG_OVERHEAD: "PDG - Frais généraux / divers",
+  EMPLOYEE_MEALS: "Employé - Repas",
+  EMPLOYEE_FUEL: "Employé - Carburant",
+  EMPLOYEE_VEHICLE_UPKEEP: "Employé - Entretien véhicule",
+  EMPLOYEE_SUPPLIES: "Employé - Fournitures / consommables",
+  EMPLOYEE_PAYROLL: "Employé - Salaire",
+  EMPLOYEE_OTHER: "Employé - Autre dépense"
+};
+
+function isGeneralExpenseKind(value: string | undefined): value is GeneralExpenseKind {
+  return Boolean(value) && Object.prototype.hasOwnProperty.call(GENERAL_EXPENSE_KIND_LABELS, value as string);
+}
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -537,6 +569,9 @@ function formatMetadataValue(key: string, value: string): string {
   }
   if (key === LIVESTOCK_TASK_KIND_KEY && isLivestockTaskKind(value)) {
     return LIVESTOCK_TASK_LABELS[value];
+  }
+  if (key === GENERAL_EXPENSE_KIND_KEY && isGeneralExpenseKind(value)) {
+    return GENERAL_EXPENSE_KIND_LABELS[value];
   }
   return value;
 }
@@ -1674,6 +1709,36 @@ export function OperationsTasksPage(): JSX.Element {
                         <option value="BREEDING">{LIVESTOCK_TASK_LABELS.BREEDING}</option>
                         <option value="SALE_PREP">{LIVESTOCK_TASK_LABELS.SALE_PREP}</option>
                         <option value="FOLLOW_UP">{LIVESTOCK_TASK_LABELS.FOLLOW_UP}</option>
+                      </select>
+                    ) : field.key === GENERAL_EXPENSE_KIND_KEY && selectedActivityCode === "GENERAL_EXPENSES" ? (
+                      <select
+                        key={field.key}
+                        value={createForm.metadata[field.key] ?? ""}
+                        onChange={(event) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              [field.key]: event.target.value
+                            }
+                          }))
+                        }
+                        title={field.helpText}
+                        required={field.required}
+                      >
+                        <option value="">Choisir le type de dépense concerné</option>
+                        <option value="PDG_SUPPLIES">{GENERAL_EXPENSE_KIND_LABELS.PDG_SUPPLIES}</option>
+                        <option value="PDG_TRANSPORT">{GENERAL_EXPENSE_KIND_LABELS.PDG_TRANSPORT}</option>
+                        <option value="PDG_SUPPLIER_PAYMENT">{GENERAL_EXPENSE_KIND_LABELS.PDG_SUPPLIER_PAYMENT}</option>
+                        <option value="PDG_TRANSFER_ADVANCE">{GENERAL_EXPENSE_KIND_LABELS.PDG_TRANSFER_ADVANCE}</option>
+                        <option value="PDG_PAYROLL">{GENERAL_EXPENSE_KIND_LABELS.PDG_PAYROLL}</option>
+                        <option value="PDG_OVERHEAD">{GENERAL_EXPENSE_KIND_LABELS.PDG_OVERHEAD}</option>
+                        <option value="EMPLOYEE_MEALS">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_MEALS}</option>
+                        <option value="EMPLOYEE_FUEL">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_FUEL}</option>
+                        <option value="EMPLOYEE_VEHICLE_UPKEEP">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_VEHICLE_UPKEEP}</option>
+                        <option value="EMPLOYEE_SUPPLIES">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_SUPPLIES}</option>
+                        <option value="EMPLOYEE_PAYROLL">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_PAYROLL}</option>
+                        <option value="EMPLOYEE_OTHER">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_OTHER}</option>
                       </select>
                     ) : (
                       <input

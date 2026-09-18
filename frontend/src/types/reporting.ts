@@ -840,6 +840,38 @@ export type FinancialAccountGovernanceItem = {
   isCompatibleWithSelectedActivity: boolean;
 };
 
+export type GeneralExpensesReportRow = {
+  date: string;
+  ownerType: "PDG" | "EMPLOYE";
+  categoryLabel: string;
+  designation: string;
+  quantity: number;
+  unitPrice: string;
+  amount: string;
+  currency: "XOF";
+};
+
+export type GeneralExpensesReportBreakdownRow = {
+  ownerType: "PDG" | "EMPLOYE";
+  categoryLabel: string;
+  transactionsCount: number;
+  amount: string;
+  currency: "XOF";
+};
+
+export type GeneralExpensesReport = {
+  periodLabel: string;
+  rows: GeneralExpensesReportRow[];
+  breakdownRows: GeneralExpensesReportBreakdownRow[];
+  totals: {
+    transactionsCount: number;
+    pdgAmount: string;
+    employeeAmount: string;
+    totalAmount: string;
+    currency: "XOF";
+  };
+};
+
 export type ReportsOverview = {
   generatedAt: string;
   sectorRulesVersion: string;
@@ -870,6 +902,7 @@ export type ReportsOverview = {
   hotelOperationsReport: HotelOperationsReport | null;
   waterOperationsReport: WaterOperationsReport | null;
   agencyOperationsReport: AgencyOperationsReport | null;
+  generalExpensesReport: GeneralExpensesReport | null;
   roleDistribution: ReportRoleDistribution[];
   topAssignees: DashboardWorkloadItem[];
 };

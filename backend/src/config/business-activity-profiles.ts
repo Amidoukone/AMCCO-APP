@@ -1587,6 +1587,66 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         }
       ]
     }
+  }),
+  GENERAL_EXPENSES: makeProfile("GENERAL_EXPENSES", {
+    operationsModel: "Suivi des dépenses de fonctionnement du PDG et des employés, hors secteurs d'activité, avec des types de dépense distincts pour chaque profil.",
+    finance: {
+      allowedTransactionTypes: ["CASH_OUT"],
+      allowedCurrencies: ["XOF", "EUR", "USD"],
+      requiresDescription: false,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte", true, "Caisse ou compte utilisé pour la dépense."),
+        field("amount", "Montant", true, "Montant de la dépense."),
+        field("description", "Bénéficiaire / précision", false, "Fournisseur, prestataire, employé ou précision utile.")
+      ],
+      metadataFields: [
+        field("generalExpenseKind", "Type de dépense", true, "Catégorie de dépense, distincte pour le PDG et pour les employés."),
+        field("quantity", "Quantité", false, "Quantité si applicable, par exemple nombre de litres ou de sacs."),
+        field("unitPrice", "Prix unitaire", false, "Prix unitaire si applicable, repris pour calculer le montant.")
+      ],
+      workflow: [
+        workflow("SELECT", "Sélection du type", "L'agent choisit d'abord si la dépense concerne le PDG ou un employé, puis la catégorie."),
+        workflow("AMOUNT", "Montant", "Le montant peut être calculé depuis la quantité et le prix unitaire, ou saisi directement."),
+        workflow("REPORTING", "Suivi global", "Chaque dépense alimente le rapport mensuel, séparé entre PDG et employés.")
+      ]
+    },
+    tasks: {
+      requiresDescription: false,
+      requiresDueDate: false,
+      requiresAssignee: false,
+      completionRequiresAssignee: false,
+      blockedRequiresAssignee: false,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Action", true, "Exemple: relance justificatif ou validation dépense."),
+        field("description", "Détail", false, "Précision sur l'action à mener.")
+      ],
+      metadataFields: [
+        field("generalExpenseKind", "Type de dépense concerné", false, "Catégorie de dépense rattachée à l'action.")
+      ],
+      workflow: [
+        workflow("PLAN", "Planification", "L'action est planifiée si nécessaire."),
+        workflow("EXECUTE", "Traitement", "Traitement de l'action."),
+        workflow("CLOSE", "Clôture", "Clôture de l'action.")
+      ]
+    },
+    reporting: {
+      focusArea: "Suivi des dépenses générales, séparées entre PDG et employés",
+      exportSections: ["dépenses PDG", "dépenses employés"],
+      operationalDimensions: [
+        dimension("generalExpenseKind", "Type de dépense", "Compare les montants par catégorie de dépense.")
+      ],
+      highlights: [
+        {
+          code: "general-expenses-volume",
+          label: "Dépenses enregistrées",
+          description: "Nombre de dépenses générales enregistrées sur la période.",
+          metric: "transactionsCount",
+          thresholds: { warningAt: 20 }
+        }
+      ]
+    }
   })
 };
 

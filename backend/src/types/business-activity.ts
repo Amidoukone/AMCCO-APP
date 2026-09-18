@@ -13,7 +13,8 @@ export const BUSINESS_ACTIVITY_CODES = [
   "SERVICES",
   "MINING",
   "WATER",
-  "REAL_ESTATE_AGENCY"
+  "REAL_ESTATE_AGENCY",
+  "GENERAL_EXPENSES"
 ] as const;
 
 export type BusinessActivityCode = (typeof BUSINESS_ACTIVITY_CODES)[number];
@@ -99,6 +100,11 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     code: "REAL_ESTATE_AGENCY",
     label: "Agence immobilière",
     description: "Commercialisation, intermédiation et suivi de mandats immobiliers."
+  },
+  {
+    code: "GENERAL_EXPENSES",
+    label: "Dépenses générales",
+    description: "Dépenses de fonctionnement du PDG et des employés, indépendantes des secteurs d'activité."
   }
 ];
 

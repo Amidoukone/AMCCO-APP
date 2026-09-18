@@ -445,6 +445,159 @@ describe("reporting.service", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
+  it("builds the general expenses report split between PDG and employees", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    vi.mocked(listReportRoleDistribution).mockResolvedValue([]);
+    vi.mocked(listDashboardWorkload).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "GENERAL_EXPENSES",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "2000.00",
+        currency: "XOF",
+        description: "Diner",
+        occurredAt: "2026-06-01T09:00:00.000Z",
+        metadata: { generalExpenseKind: "EMPLOYEE_MEALS" }
+      },
+      {
+        activityCode: "GENERAL_EXPENSES",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "46000.00",
+        currency: "XOF",
+        description: "Gazoil groupe",
+        occurredAt: "2026-06-02T09:00:00.000Z",
+        metadata: { generalExpenseKind: "EMPLOYEE_FUEL" }
+      },
+      {
+        activityCode: "GENERAL_EXPENSES",
+        status: "DRAFT",
+        type: "CASH_OUT",
+        amount: "2000.00",
+        currency: "XOF",
+        description: "Diner brouillon",
+        occurredAt: "2026-06-03T09:00:00.000Z",
+        metadata: { generalExpenseKind: "EMPLOYEE_MEALS" }
+      },
+      {
+        activityCode: "GENERAL_EXPENSES",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "100000.00",
+        currency: "XOF",
+        description: "Achat ciment",
+        occurredAt: "2026-06-05T09:00:00.000Z",
+        metadata: { generalExpenseKind: "PDG_SUPPLIES", quantity: "2", unitPrice: "50000" }
+      },
+      {
+        activityCode: "GENERAL_EXPENSES",
+        status: "SUBMITTED",
+        type: "CASH_OUT",
+        amount: "500000.00",
+        currency: "XOF",
+        description: "Avance chantier",
+        occurredAt: "2026-06-10T09:00:00.000Z",
+        metadata: { generalExpenseKind: "PDG_TRANSFER_ADVANCE" }
+      },
+      {
+        activityCode: "GENERAL_EXPENSES",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "999999.00",
+        currency: "XOF",
+        description: "Ne doit pas apparaitre",
+        occurredAt: "2026-06-12T09:00:00.000Z",
+        metadata: { generalExpenseKind: "PDG_SUPPLIES" }
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "GENERAL_EXPENSES",
+      dateFrom: "2026-06-01T00:00:00.000Z",
+      dateTo: "2026-06-30T23:59:59.999Z"
+    });
+
+    expect(result.generalExpensesReport?.rows).toEqual([
+      expect.objectContaining({
+        date: "2026-06-01",
+        ownerType: "EMPLOYE",
+        categoryLabel: "Repas",
+        designation: "Diner",
+        amount: "2000.00"
+      }),
+      expect.objectContaining({
+        date: "2026-06-02",
+        ownerType: "EMPLOYE",
+        categoryLabel: "Carburant",
+        designation: "Gazoil groupe",
+        amount: "46000.00"
+      }),
+      expect.objectContaining({
+        date: "2026-06-05",
+        ownerType: "PDG",
+        categoryLabel: "Achat matériel / fournitures",
+        designation: "Achat ciment",
+        quantity: 2,
+        unitPrice: "50000.00",
+        amount: "100000.00"
+      }),
+      expect.objectContaining({
+        date: "2026-06-10",
+        ownerType: "PDG",
+        categoryLabel: "Virement / avance / transfert",
+        designation: "Avance chantier",
+        amount: "500000.00"
+      })
+    ]);
+    expect(result.generalExpensesReport?.breakdownRows).toEqual([
+      expect.objectContaining({
+        ownerType: "PDG",
+        categoryLabel: "Virement / avance / transfert",
+        transactionsCount: 1,
+        amount: "500000.00"
+      }),
+      expect.objectContaining({
+        ownerType: "PDG",
+        categoryLabel: "Achat matériel / fournitures",
+        transactionsCount: 1,
+        amount: "100000.00"
+      }),
+      expect.objectContaining({
+        ownerType: "EMPLOYE",
+        categoryLabel: "Carburant",
+        transactionsCount: 1,
+        amount: "46000.00"
+      }),
+      expect.objectContaining({
+        ownerType: "EMPLOYE",
+        categoryLabel: "Repas",
+        transactionsCount: 1,
+        amount: "2000.00"
+      })
+    ]);
+    expect(result.generalExpensesReport?.totals).toMatchObject({
+      transactionsCount: 4,
+      pdgAmount: "600000.00",
+      employeeAmount: "48000.00",
+      totalAmount: "648000.00",
+      currency: "XOF"
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "GENERAL_EXPENSES",
+      dateFrom: "2026-06-01T00:00:00.000Z",
+      dateTo: "2026-06-30T23:59:59.999Z"
+    });
+
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
   it("requires a selected activity for reports", async () => {
     await expect(getCompanyReportsOverview(actor, {})).rejects.toMatchObject({
       statusCode: 400
