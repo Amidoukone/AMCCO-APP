@@ -265,7 +265,7 @@ describe("reporting.service", () => {
     expect(result.topAssignees).toEqual([]);
   });
 
-  it("builds the filtered hardware sales report from item metadata", async () => {
+  it("builds the filtered hardware purchases report from item metadata", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "SUBMITTED", currency: "XOF", count: 3, totalAmount: "250000.00" }
     ]);
@@ -294,53 +294,55 @@ describe("reporting.service", () => {
       {
         activityCode: "HARDWARE",
         status: "SUBMITTED",
-        type: "CASH_IN",
-        amount: "150000.00",
+        type: "CASH_OUT",
+        amount: "120000.00",
         currency: "XOF",
         occurredAt: "2026-05-03T09:00:00.000Z",
         metadata: {
+          hardwareOperationKind: "ITEM_ENTRY",
           itemName: "CIMENT ET FER",
           quantity: "10",
           purchaseUnitPrice: "12000",
-          saleUnitPrice: "15000",
-          dailyPayment: "50000"
+          marginAmount: "15000",
+          recipientRef: "Quincaillerie Almoustapha"
         }
       },
       {
         activityCode: "HARDWARE",
         status: "APPROVED",
-        type: "CASH_IN",
-        amount: "40000.00",
+        type: "CASH_OUT",
+        amount: "30000.00",
         currency: "XOF",
         occurredAt: "2026-05-03T14:00:00.000Z",
         metadata: {
+          hardwareOperationKind: "ITEM_ENTRY",
           itemName: "CIMENT ET FER",
           quantity: "2",
           purchaseUnitPrice: "15000",
-          saleUnitPrice: "20000",
-          dailyPayment: "40000"
+          marginAmount: "5000"
         }
       },
       {
         activityCode: "HARDWARE",
         status: "DRAFT",
-        type: "CASH_IN",
+        type: "CASH_OUT",
         amount: "9000.00",
         currency: "XOF",
         occurredAt: "2026-05-04T08:00:00.000Z",
         metadata: {
+          hardwareOperationKind: "ITEM_ENTRY",
           itemName: "BROUETTE",
           quantity: "1",
-          saleUnitPrice: "9000"
+          purchaseUnitPrice: "9000"
         }
       },
       {
         activityCode: "HARDWARE",
         status: "APPROVED",
-        type: "CASH_IN",
+        type: "CASH_OUT",
         amount: "60000.00",
         currency: "XOF",
-        description: "Vente comptoir plomberie",
+        description: "Achat comptoir plomberie",
         occurredAt: "2026-05-04T16:00:00.000Z",
         metadata: {
           hardwareOperationKind: "GLOBAL"
@@ -349,7 +351,7 @@ describe("reporting.service", () => {
       {
         activityCode: "HARDWARE",
         status: "APPROVED",
-        type: "CASH_IN",
+        type: "CASH_OUT",
         amount: "25000.00",
         currency: "XOF",
         occurredAt: "2026-05-05T08:00:00.000Z",
@@ -369,35 +371,42 @@ describe("reporting.service", () => {
       {
         date: "2026-05-03",
         designation: "CIMENT ET FER",
-        quantity: 12,
-        salesAmount: "190000.00",
-        paymentAmount: "90000.00",
-        purchaseAmount: "150000.00",
-        grossProfit: "40000.00",
-        marginRate: 21.1,
-        transactionsCount: 2,
+        recipientRef: "Quincaillerie Almoustapha",
+        quantity: 10,
+        purchaseUnitPrice: "12000.00",
+        purchaseAmount: "120000.00",
+        grossProfit: "15000.00",
+        transactionsCount: 1,
+        currency: "XOF"
+      },
+      {
+        date: "2026-05-03",
+        designation: "CIMENT ET FER",
+        recipientRef: "-",
+        quantity: 2,
+        purchaseUnitPrice: "15000.00",
+        purchaseAmount: "30000.00",
+        grossProfit: "5000.00",
+        transactionsCount: 1,
         currency: "XOF"
       },
       {
         date: "2026-05-04",
-        designation: "Vente comptoir plomberie",
+        designation: "Achat comptoir plomberie",
+        recipientRef: "-",
         quantity: 0,
-        salesAmount: "60000.00",
-        paymentAmount: "60000.00",
-        purchaseAmount: "0.00",
-        grossProfit: "60000.00",
-        marginRate: 100,
+        purchaseUnitPrice: "0.00",
+        purchaseAmount: "60000.00",
+        grossProfit: "0.00",
         transactionsCount: 1,
         currency: "XOF"
       }
     ]);
     expect(result.hardwareMonthlyReport?.totals).toMatchObject({
       quantity: 12,
-      salesAmount: "250000.00",
-      paymentAmount: "150000.00",
-      purchaseAmount: "150000.00",
-      grossProfit: "100000.00",
-      marginRate: 40,
+      purchaseUnitPrice: "27000.00",
+      purchaseAmount: "210000.00",
+      grossProfit: "20000.00",
       transactionsCount: 3,
       currency: "XOF"
     });

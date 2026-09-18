@@ -677,11 +677,13 @@ function needsPdfPageBreak(doc: PDFKit.PDFDocument, requiredHeight: number): boo
 
 async function buildPdfBuffer(
   render: (doc: PDFKit.PDFDocument) => void,
-  decorate?: (doc: PDFKit.PDFDocument, pageNumber: number, totalPages: number) => void
+  decorate?: (doc: PDFKit.PDFDocument, pageNumber: number, totalPages: number) => void,
+  options?: { layout?: "portrait" | "landscape" }
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
+      layout: options?.layout ?? "portrait",
       margin: 40,
       bufferPages: true
     });
@@ -956,13 +958,13 @@ type PdfTableColumn = {
 };
 
 const HARDWARE_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "DATE", width: 58, align: "center" },
-  { label: "DESIGNATION", width: 115, align: "left" },
-  { label: "QUANTITE", width: 52, align: "right" },
-  { label: "VENTE/JOUR", width: 75, align: "right" },
-  { label: "VERSEMENT", width: 75, align: "right" },
-  { label: "COÛT ACHAT", width: 70, align: "right" },
-  { label: "BENEFICE", width: 70, align: "right" }
+  { label: "DATE", width: 72, align: "center" },
+  { label: "DESIGNATION", width: 169, align: "left" },
+  { label: "QUANTITE", width: 68, align: "right" },
+  { label: "PRIX D'ACHAT", width: 105, align: "right" },
+  { label: "MONTANT", width: 105, align: "right" },
+  { label: "BENEFICE", width: 105, align: "right" },
+  { label: "REMIS A", width: 137, align: "left" }
 ];
 
 function drawPdfTableCell(
@@ -1083,29 +1085,32 @@ function drawHardwareReportHeader(doc: PDFKit.PDFDocument, report: HardwareMonth
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(14)
+    .fontSize(17)
     .text(HARDWARE_REPORT_BRANDING.title, centerX, 24, {
       width: centerWidth,
       align: "center"
     });
   doc
     .fillColor("#2f7d32")
-    .fontSize(8.5)
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
     .text(HARDWARE_REPORT_BRANDING.agency, centerX, 43, {
       width: centerWidth,
       align: "center"
     });
   doc
     .fillColor("#d21f1f")
-    .fontSize(10)
-    .text(`"${HARDWARE_REPORT_BRANDING.brand}"`, centerX, 56, {
+    .font("Helvetica-Bold")
+    .fontSize(12.5)
+    .text(`"${HARDWARE_REPORT_BRANDING.brand}"`, centerX, 57, {
       width: centerWidth,
       align: "center"
     });
   doc
     .fillColor("#173fcb")
-    .fontSize(8.5)
-    .text(`${HARDWARE_REPORT_BRANDING.fiscal}     ${HARDWARE_REPORT_BRANDING.phone}`, centerX, 70, {
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
+    .text(`${HARDWARE_REPORT_BRANDING.fiscal}     ${HARDWARE_REPORT_BRANDING.phone}`, centerX, 72, {
       width: centerWidth,
       align: "center"
     });
@@ -1120,7 +1125,7 @@ function drawHardwareReportHeader(doc: PDFKit.PDFDocument, report: HardwareMonth
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(13)
+    .fontSize(16)
     .text(toHardwarePdfTitle(report), margin, 116, {
       width: pageWidth - margin * 2,
       align: "center"
@@ -1136,14 +1141,14 @@ function drawHardwareContinuationHeader(doc: PDFKit.PDFDocument, report: Hardwar
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(10)
+    .fontSize(11)
     .text(`${toHardwarePdfTitle(report)} - suite`, margin + 44, 28, {
       width: pageWidth - margin * 2 - 88
     });
   doc
     .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8)
+    .font("Helvetica-Bold")
+    .fontSize(9)
     .text(`Période: ${report.periodLabel}`, margin + 44, 43, {
       width: pageWidth - margin * 2 - 88
     });
@@ -1168,45 +1173,45 @@ function drawHardwareMetadataStrip(
   const y = doc.y;
   const period = report.periodLabel;
 
-  doc.roundedRect(margin, y, width, 42, 4).fill("#f8fafc");
-  doc.rect(margin, y, width, 42).strokeColor("#d7e3f1").lineWidth(0.8).stroke();
+  doc.roundedRect(margin, y, width, 50, 4).fill("#f8fafc");
+  doc.rect(margin, y, width, 50).strokeColor("#d7e3f1").lineWidth(0.8).stroke();
   doc
     .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8)
-    .text("Période", margin + 10, y + 8, { width: 140 });
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Période", margin + 10, y + 10, { width: 160 });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(9)
-    .text(period, margin + 10, y + 21, { width: 170 });
+    .fontSize(11.5)
+    .text(period, margin + 10, y + 26, { width: 190 });
   doc
     .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8)
-    .text("Secteur", margin + 200, y + 8, { width: 100 });
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Secteur", margin + 220, y + 10, { width: 110 });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(9)
-    .text("Quincaillerie", margin + 200, y + 21, { width: 110 });
+    .fontSize(11.5)
+    .text("Quincaillerie", margin + 220, y + 26, { width: 130 });
   doc
     .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8)
-    .text("Genere le", pageWidth - margin - 150, y + 8, {
-      width: 140,
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Genere le", pageWidth - margin - 160, y + 10, {
+      width: 150,
       align: "right"
     });
   doc
     .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(9)
-    .text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
-      width: 140,
+    .fontSize(11.5)
+    .text(formatPdfDate(generatedAt), pageWidth - margin - 160, y + 26, {
+      width: 150,
       align: "right"
     });
-  doc.y = y + 56;
+  doc.y = y + 64;
 }
 
 function drawHardwareMetricCards(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport): void {
@@ -1217,54 +1222,54 @@ function drawHardwareMetricCards(doc: PDFKit.PDFDocument, report: HardwareMonthl
   const y = doc.y;
   const metrics = [
     { label: "Quantité totale", value: formatPdfNumber(report.totals.quantity, 2) },
-    { label: "Vente totale", value: formatPdfMoney(report.totals.salesAmount) },
-    { label: "Versement", value: formatPdfMoney(report.totals.paymentAmount) },
-    { label: "Bénéfice brut", value: formatPdfMoney(report.totals.grossProfit) }
+    { label: "Montant total achats", value: formatPdfMoney(report.totals.purchaseAmount) },
+    { label: "Bénéfice total", value: formatPdfMoney(report.totals.grossProfit) },
+    { label: "Lignes d'achat", value: formatPdfNumber(report.totals.transactionsCount, 0) }
   ];
 
   metrics.forEach((metric, index) => {
     const x = margin + index * (cardWidth + gap);
-    doc.roundedRect(x, y, cardWidth, 45, 4).fill("#f7fbf4");
-    doc.rect(x, y, cardWidth, 45).strokeColor("#c9d8bf").lineWidth(0.8).stroke();
+    doc.roundedRect(x, y, cardWidth, 54, 4).fill("#f7fbf4");
+    doc.rect(x, y, cardWidth, 54).strokeColor("#c9d8bf").lineWidth(0.8).stroke();
     doc
       .fillColor("#486581")
-      .font("Helvetica")
-      .fontSize(7.5)
-      .text(metric.label, x + 8, y + 8, {
+      .font("Helvetica-Bold")
+      .fontSize(9.5)
+      .text(metric.label, x + 8, y + 10, {
         width: cardWidth - 16
       });
     doc
       .fillColor("#111827")
       .font("Helvetica-Bold")
-      .fontSize(10)
-      .text(metric.value, x + 8, y + 23, {
+      .fontSize(13)
+      .text(metric.value, x + 8, y + 27, {
         width: cardWidth - 16,
         align: "left"
       });
   });
-  doc.y = y + 60;
+  doc.y = y + 70;
 }
 
 function toHardwarePdfTitle(report: HardwareMonthlyReport): string {
   const designations = Array.from(new Set(report.rows.map((item) => item.designation.trim()).filter(Boolean)));
   if (designations.length === 1) {
-    return `VENTE DE ${truncatePdfText(designations[0].toUpperCase(), 38)} - QUINCAILLERIE`;
+    return `ACHAT DE ${truncatePdfText(designations[0].toUpperCase(), 38)} - QUINCAILLERIE`;
   }
-  return "RAPPORT DES VENTES QUINCAILLERIE";
+  return "RAPPORT DES ACHATS QUINCAILLERIE";
 }
 
 function drawHardwareTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
   for (const column of HARDWARE_PDF_COLUMNS) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 20, {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
       align: "center",
       fill: "#e7f1dc",
       font: "Helvetica-Bold",
-      fontSize: 7.5
+      fontSize: 11
     });
     x += column.width;
   }
-  return y + 20;
+  return y + 27;
 }
 
 function drawHardwareDataRow(
@@ -1274,55 +1279,59 @@ function drawHardwareDataRow(
 ): number {
   const values = [
     { value: formatPdfDate(row.date), align: "center" as const },
-    { value: truncatePdfText(row.designation, 24), align: "left" as const },
+    { value: truncatePdfText(row.designation, 34), align: "left" as const },
     { value: formatPdfNumber(row.quantity, 2), align: "right" as const },
-    { value: formatPdfMoney(row.salesAmount), align: "right" as const },
-    { value: formatPdfMoney(row.paymentAmount), align: "right" as const },
+    { value: formatPdfMoney(row.purchaseUnitPrice), align: "right" as const },
     { value: formatPdfMoney(row.purchaseAmount), align: "right" as const },
-    { value: formatPdfMoney(row.grossProfit), align: "right" as const }
+    { value: formatPdfMoney(row.grossProfit), align: "right" as const },
+    { value: truncatePdfText(row.recipientRef, 26), align: "left" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
     const column = HARDWARE_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, item.value, x, y, column.width, 18, {
+    drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
       align: item.align,
-      fontSize: 7.3
+      fontSize: 10.5
     });
     x += column.width;
   });
-  return y + 18;
+  return y + 24;
 }
 
 function drawHardwareTotalsRow(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport, y: number): number {
   const firstColumnsWidth = HARDWARE_PDF_COLUMNS[0].width + HARDWARE_PDF_COLUMNS[1].width;
   let x = PDF_PAGE_MARGIN;
-  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 21, {
+  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 27, {
     align: "center",
     fill: "#f8fafc",
     font: "Helvetica-Bold",
-    fontSize: 8
+    fontSize: 11
   });
   x += firstColumnsWidth;
 
   const totalValues = [
     formatPdfNumber(report.totals.quantity, 2),
-    formatPdfMoney(report.totals.salesAmount),
-    formatPdfMoney(report.totals.paymentAmount),
+    formatPdfMoney(report.totals.purchaseUnitPrice),
     formatPdfMoney(report.totals.purchaseAmount),
     formatPdfMoney(report.totals.grossProfit)
   ];
   for (let index = 0; index < totalValues.length; index += 1) {
     const column = HARDWARE_PDF_COLUMNS[index + 2];
-    drawPdfTableCell(doc, totalValues[index], x, y, column.width, 21, {
+    drawPdfTableCell(doc, totalValues[index], x, y, column.width, 27, {
       align: "right",
       fill: index === 0 ? "#e7f1dc" : "#f7fbf4",
       font: "Helvetica-Bold",
-      fontSize: 7.5
+      fontSize: 11
     });
     x += column.width;
   }
 
-  return y + 21;
+  const recipientColumn = HARDWARE_PDF_COLUMNS[6];
+  drawPdfTableCell(doc, "", x, y, recipientColumn.width, 27, {
+    fill: "#f7fbf4"
+  });
+
+  return y + 27;
 }
 
 function drawHardwareEmptyState(doc: PDFKit.PDFDocument): void {
@@ -1336,7 +1345,7 @@ function drawHardwareEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#9a3412")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Aucune vente quincaillerie reportable", margin + 14, y + 16, {
+    .text("Aucun achat quincaillerie reportable", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -1344,7 +1353,7 @@ function drawHardwareEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(8.5)
     .text(
-      "Le rapport reprend les ventes XOF comptabilisées avec désignation article. Vérifiez la période et les champs quantité/prix si le tableau doit être alimenté.",
+      "Le rapport reprend les achats (Acquisition) comptabilisés avec désignation article. Vérifiez la période et les champs quantité/prix d'achat si le tableau doit être alimenté.",
       margin + 14,
       y + 34,
       {
@@ -1361,14 +1370,14 @@ function drawHardwareMonthlyTable(doc: PDFKit.PDFDocument, report: HardwareMonth
   }
 
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (doc.y + 20 + 18 + 21 > tableBottom) {
+  if (doc.y + 27 + 24 + 27 > tableBottom) {
     doc.addPage();
     drawHardwareContinuationHeader(doc, report);
   }
   let y = drawHardwareTableHeader(doc, doc.y);
 
   for (const row of report.rows) {
-    if (y + 18 + 21 > tableBottom) {
+    if (y + 24 + 27 > tableBottom) {
       doc.addPage();
       drawHardwareContinuationHeader(doc, report);
       y = drawHardwareTableHeader(doc, doc.y);
@@ -1376,7 +1385,7 @@ function drawHardwareMonthlyTable(doc: PDFKit.PDFDocument, report: HardwareMonth
     y = drawHardwareDataRow(doc, row, y);
   }
 
-  if (y + 21 > tableBottom) {
+  if (y + 27 > tableBottom) {
     doc.addPage();
     drawHardwareContinuationHeader(doc, report);
     y = drawHardwareTableHeader(doc, doc.y);
@@ -1386,15 +1395,13 @@ function drawHardwareMonthlyTable(doc: PDFKit.PDFDocument, report: HardwareMonth
 
 function buildEmptyHardwareMonthlyReport(filters: ReportPeriodFilter): HardwareMonthlyReport {
   return {
-    periodLabel: toHardwarePeriodLabel(filters, []),
+    periodLabel: toHardwarePeriodLabel(filters),
     rows: [],
     totals: {
       quantity: 0,
-      salesAmount: "0.00",
-      paymentAmount: "0.00",
+      purchaseUnitPrice: "0.00",
       purchaseAmount: "0.00",
       grossProfit: "0.00",
-      marginRate: 0,
       transactionsCount: 0,
       currency: "XOF"
     }
@@ -1447,10 +1454,9 @@ function renderHardwareReportsPdf(
   drawHardwareMetadataStrip(doc, report, filters, overview.generatedAt);
   drawHardwareMetricCards(doc, report);
   drawHardwareMonthlyTable(doc, report);
-  drawPdfReadingGuideBox(doc);
 
   const note =
-    "Lecture: les montants sont consolidés en F CFA. Le bénéfice brut correspond à la vente moins le coût d'achat renseigné sur les transactions article.";
+    "Lecture: les montants sont consolidés en F CFA. Le bénéfice correspond au bénéfice de référence renseigné sur chaque achat.";
   const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
   const noteHeight = doc.heightOfString(note, {
     width: noteWidth
@@ -1458,8 +1464,8 @@ function renderHardwareReportsPdf(
   if (doc.y + noteHeight <= doc.page.height - PDF_CONTENT_BOTTOM) {
     doc
       .fillColor("#486581")
-      .font("Helvetica")
-      .fontSize(8)
+      .font("Helvetica-Bold")
+      .fontSize(10)
       .text(note, PDF_PAGE_MARGIN, doc.y, {
         width: noteWidth
       });
@@ -5887,8 +5893,8 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       category: "HardwareMonthlyReport",
       item: "totals",
       label: `Quincaillerie ${overview.hardwareMonthlyReport.periodLabel}`,
-      value: overview.hardwareMonthlyReport.totals.salesAmount,
-      extra: `quantité ${overview.hardwareMonthlyReport.totals.quantity} | versement ${overview.hardwareMonthlyReport.totals.paymentAmount} XOF | coût ${overview.hardwareMonthlyReport.totals.purchaseAmount} XOF | bénéfice ${overview.hardwareMonthlyReport.totals.grossProfit} XOF | marge ${overview.hardwareMonthlyReport.totals.marginRate}%`
+      value: overview.hardwareMonthlyReport.totals.purchaseAmount,
+      extra: `quantité ${overview.hardwareMonthlyReport.totals.quantity} | montant achats ${overview.hardwareMonthlyReport.totals.purchaseAmount} XOF | bénéfice ${overview.hardwareMonthlyReport.totals.grossProfit} XOF | lignes ${overview.hardwareMonthlyReport.totals.transactionsCount}`
     });
   }
 
@@ -6044,12 +6050,11 @@ function buildHardwareMonthlyReportRows(overview: ReportsOverview): Array<Record
   return (overview.hardwareMonthlyReport?.rows ?? []).map((item) => ({
     date: item.date,
     designation: item.designation,
+    recipientRef: item.recipientRef,
     quantity: item.quantity,
-    salesAmount: item.salesAmount,
-    paymentAmount: item.paymentAmount,
+    purchaseUnitPrice: item.purchaseUnitPrice,
     purchaseAmount: item.purchaseAmount,
     grossProfit: item.grossProfit,
-    marginRate: item.marginRate,
     transactionsCount: item.transactionsCount,
     currency: item.currency
   }));
@@ -6625,17 +6630,6 @@ function toRate(numerator: number, denominator: number): number {
   return Math.round((numerator / denominator) * 1000) / 10;
 }
 
-type HardwareMonthlyBucket = {
-  date: string;
-  designation: string;
-  quantity: number;
-  salesAmountValue: number;
-  paymentAmountValue: number;
-  purchaseAmountValue: number;
-  grossProfitValue: number;
-  transactionsCount: number;
-};
-
 function getMetadataNumber(metadata: Record<string, string>, key: string): number {
   return toNumberAmount(metadata[key]);
 }
@@ -6664,7 +6658,7 @@ function hasHardwareItemMetadata(metadata: Record<string, string>): boolean {
   );
 }
 
-function hasHardwareSaleContext(transaction: ReportOperationalTransaction): boolean {
+function hasHardwarePurchaseContext(transaction: ReportOperationalTransaction): boolean {
   return hasHardwareItemMetadata(transaction.metadata) || Boolean(transaction.description?.trim());
 }
 
@@ -6672,10 +6666,7 @@ function toReportDate(value: string): string {
   return new Date(value).toISOString().slice(0, 10);
 }
 
-function toHardwarePeriodLabel(
-  filters: ReportPeriodFilter,
-  _rows: HardwareMonthlyBucket[]
-): string {
+function toHardwarePeriodLabel(filters: ReportPeriodFilter): string {
   if (!filters.dateFrom && !filters.dateTo) {
     return "Toutes périodes";
   }
@@ -6737,26 +6728,26 @@ function toHardwarePeriodLabel(
   return toDisplayPeriodLabel(filters);
 }
 
-function isHardwareReportableSale(transaction: ReportOperationalTransaction): boolean {
+function isHardwareReportablePurchase(transaction: ReportOperationalTransaction): boolean {
   const operationKind = transaction.metadata.hardwareOperationKind?.trim();
   if (
     !(
       isSectorReportableTransaction(transaction, "HARDWARE") &&
-      transaction.type === "CASH_IN"
+      transaction.type === "CASH_OUT"
     )
   ) {
     return false;
   }
 
-  if (operationKind === "ITEM_ENTRY") {
+  if (operationKind === "ITEM_EXIT") {
     return false;
   }
 
-  if (operationKind === "ITEM_EXIT") {
+  if (operationKind === "ITEM_ENTRY") {
     return true;
   }
 
-  return hasHardwareSaleContext(transaction);
+  return hasHardwarePurchaseContext(transaction);
 }
 
 function buildHardwareMonthlyReport(
@@ -6770,67 +6761,47 @@ function buildHardwareMonthlyReport(
   const hardwareTransactions = transactions.filter(
     (transaction) => transaction.activityCode === "HARDWARE"
   );
-  const reportableTransactions = hardwareTransactions.filter(isHardwareReportableSale);
+  const reportableTransactions = hardwareTransactions.filter(isHardwareReportablePurchase);
   if (!filters.activityCode && reportableTransactions.length === 0) {
     return null;
   }
 
-  const buckets = new Map<string, HardwareMonthlyBucket>();
-  for (const transaction of reportableTransactions) {
-    const date = toReportDate(transaction.occurredAt);
-    const designation = getHardwareDesignation(transaction);
-    const key = `${date}|${designation}`;
+  const sortedTransactions = [...reportableTransactions].sort((left, right) =>
+    left.occurredAt.localeCompare(right.occurredAt)
+  );
+
+  const rows = sortedTransactions.map((transaction) => {
     const quantity = getMetadataNumber(transaction.metadata, "quantity");
-    const saleUnitPrice = getMetadataNumber(transaction.metadata, "saleUnitPrice");
-    const purchaseUnitPrice = getMetadataNumber(transaction.metadata, "purchaseUnitPrice");
-    const computedSaleAmount = quantity > 0 && saleUnitPrice > 0
-      ? quantity * saleUnitPrice
-      : toNumberAmount(transaction.amount);
-    const purchaseAmount = quantity > 0 && purchaseUnitPrice > 0
-      ? quantity * purchaseUnitPrice
-      : 0;
-    const paymentAmount =
-      getMetadataNumber(transaction.metadata, "dailyPayment") ||
-      getMetadataNumber(transaction.metadata, "paymentAmount") ||
-      toNumberAmount(transaction.amount);
-    const grossProfit = computedSaleAmount - purchaseAmount;
-    const bucket = buckets.get(key) ?? {
-      date,
-      designation,
-      quantity: 0,
-      salesAmountValue: 0,
-      paymentAmountValue: 0,
-      purchaseAmountValue: 0,
-      grossProfitValue: 0,
-      transactionsCount: 0
+    const metaUnitPrice = getMetadataNumber(transaction.metadata, "purchaseUnitPrice");
+    const purchaseAmountValue = toNumberAmount(transaction.amount);
+    const purchaseUnitPriceValue =
+      metaUnitPrice > 0 ? metaUnitPrice : quantity > 0 ? purchaseAmountValue / quantity : 0;
+    const grossProfitValue = getMetadataNumber(transaction.metadata, "marginAmount");
+
+    return {
+      date: toReportDate(transaction.occurredAt),
+      designation: getHardwareDesignation(transaction),
+      recipientRef: transaction.metadata.recipientRef?.trim() || "-",
+      quantity,
+      purchaseUnitPrice: toMoneyString(purchaseUnitPriceValue),
+      purchaseAmount: toMoneyString(purchaseAmountValue),
+      grossProfit: toMoneyString(grossProfitValue),
+      transactionsCount: 1,
+      currency: "XOF" as const
     };
-
-    bucket.quantity += quantity;
-    bucket.salesAmountValue += computedSaleAmount;
-    bucket.paymentAmountValue += paymentAmount;
-    bucket.purchaseAmountValue += purchaseAmount;
-    bucket.grossProfitValue += grossProfit;
-    bucket.transactionsCount += 1;
-    buckets.set(key, bucket);
-  }
-
-  const rows = Array.from(buckets.values()).sort((left, right) => {
-    const dateCompare = left.date.localeCompare(right.date);
-    return dateCompare !== 0 ? dateCompare : left.designation.localeCompare(right.designation);
   });
+
   const totals = rows.reduce(
     (sum, row) => ({
       quantity: sum.quantity + row.quantity,
-      salesAmountValue: sum.salesAmountValue + row.salesAmountValue,
-      paymentAmountValue: sum.paymentAmountValue + row.paymentAmountValue,
-      purchaseAmountValue: sum.purchaseAmountValue + row.purchaseAmountValue,
-      grossProfitValue: sum.grossProfitValue + row.grossProfitValue,
+      purchaseUnitPriceValue: sum.purchaseUnitPriceValue + toNumberAmount(row.purchaseUnitPrice),
+      purchaseAmountValue: sum.purchaseAmountValue + toNumberAmount(row.purchaseAmount),
+      grossProfitValue: sum.grossProfitValue + toNumberAmount(row.grossProfit),
       transactionsCount: sum.transactionsCount + row.transactionsCount
     }),
     {
       quantity: 0,
-      salesAmountValue: 0,
-      paymentAmountValue: 0,
+      purchaseUnitPriceValue: 0,
       purchaseAmountValue: 0,
       grossProfitValue: 0,
       transactionsCount: 0
@@ -6838,26 +6809,13 @@ function buildHardwareMonthlyReport(
   );
 
   return {
-    periodLabel: toHardwarePeriodLabel(filters, rows),
-    rows: rows.map((row) => ({
-      date: row.date,
-      designation: row.designation,
-      quantity: row.quantity,
-      salesAmount: toMoneyString(row.salesAmountValue),
-      paymentAmount: toMoneyString(row.paymentAmountValue),
-      purchaseAmount: toMoneyString(row.purchaseAmountValue),
-      grossProfit: toMoneyString(row.grossProfitValue),
-      marginRate: toRate(row.grossProfitValue, row.salesAmountValue),
-      transactionsCount: row.transactionsCount,
-      currency: "XOF" as const
-    })),
+    periodLabel: toHardwarePeriodLabel(filters),
+    rows,
     totals: {
       quantity: totals.quantity,
-      salesAmount: toMoneyString(totals.salesAmountValue),
-      paymentAmount: toMoneyString(totals.paymentAmountValue),
+      purchaseUnitPrice: toMoneyString(totals.purchaseUnitPriceValue),
       purchaseAmount: toMoneyString(totals.purchaseAmountValue),
       grossProfit: toMoneyString(totals.grossProfitValue),
-      marginRate: toRate(totals.grossProfitValue, totals.salesAmountValue),
       transactionsCount: totals.transactionsCount,
       currency: "XOF" as const
     }
@@ -11127,12 +11085,11 @@ export async function exportCompanyTransactionsExcel(
       columns: [
         "date",
         "designation",
+        "recipientRef",
         "quantity",
-        "salesAmount",
-        "paymentAmount",
+        "purchaseUnitPrice",
         "purchaseAmount",
         "grossProfit",
-        "marginRate",
         "transactionsCount",
         "currency"
       ]
@@ -11663,12 +11620,11 @@ export async function exportCompanyTasksExcel(
       columns: [
         "date",
         "designation",
+        "recipientRef",
         "quantity",
-        "salesAmount",
-        "paymentAmount",
+        "purchaseUnitPrice",
         "purchaseAmount",
         "grossProfit",
-        "marginRate",
         "transactionsCount",
         "currency"
       ]
@@ -12143,7 +12099,7 @@ export async function exportCompanyReportsPdf(
       renderHardwareReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawHardwarePdfFooter(doc, pageNumber, totalPages, overview.hardwareMonthlyReport?.periodLabel ?? periodLabel);
-    });
+    }, { layout: "landscape" });
   }
 
   if (filters.activityCode === "AGRICULTURE") {
@@ -12329,11 +12285,11 @@ export async function exportCompanyReportsPdf(
         limitPdfRows([
           ...hardwareReport.rows.map(
             (item) =>
-              `${item.date} | ${item.designation} | quantité ${item.quantity} | vente ${item.salesAmount} XOF | versement ${item.paymentAmount} XOF | coût ${item.purchaseAmount} XOF | bénéfice ${item.grossProfit} XOF`
+              `${item.date} | ${item.designation} | quantité ${item.quantity} | prix d'achat ${item.purchaseUnitPrice} XOF | montant ${item.purchaseAmount} XOF | bénéfice ${item.grossProfit} XOF`
           ),
-          `TOTAL | quantité ${hardwareReport.totals.quantity} | vente ${hardwareReport.totals.salesAmount} XOF | versement ${hardwareReport.totals.paymentAmount} XOF | coût ${hardwareReport.totals.purchaseAmount} XOF | bénéfice ${hardwareReport.totals.grossProfit} XOF`
+          `TOTAL | quantité ${hardwareReport.totals.quantity} | montant ${hardwareReport.totals.purchaseAmount} XOF | bénéfice ${hardwareReport.totals.grossProfit} XOF`
         ]),
-        "Aucune vente quincaillerie comptabilisée sur cette période."
+        "Aucun achat quincaillerie comptabilisé sur cette période."
       );
     }
 

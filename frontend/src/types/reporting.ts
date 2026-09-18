@@ -112,12 +112,11 @@ export type ReportOperationalMetric = {
 export type HardwareMonthlyReportRow = {
   date: string;
   designation: string;
+  recipientRef: string;
   quantity: number;
-  salesAmount: string;
-  paymentAmount: string;
+  purchaseUnitPrice: string;
   purchaseAmount: string;
   grossProfit: string;
-  marginRate: number;
   transactionsCount: number;
   currency: "XOF";
 };
@@ -127,11 +126,9 @@ export type HardwareMonthlyReport = {
   rows: HardwareMonthlyReportRow[];
   totals: {
     quantity: number;
-    salesAmount: string;
-    paymentAmount: string;
+    purchaseUnitPrice: string;
     purchaseAmount: string;
     grossProfit: string;
-    marginRate: number;
     transactionsCount: number;
     currency: "XOF";
   };

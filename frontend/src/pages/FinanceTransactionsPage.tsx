@@ -25,14 +25,18 @@ import { matchesQuickSearch } from "../lib/quickSearch";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
+  createActivityArticleRequest,
   createFinanceAccountRequest,
   createFinanceTransactionRequest,
+  deleteActivityArticleRequest,
   deleteFinanceAccountRequest,
   deleteFinanceTransactionRequest,
   getFinanceProofUploadAuthRequest,
+  listActivityArticlesRequest,
   listFinanceAccountsRequest,
   listFinanceTransactionProofsRequest,
   listFinanceTransactionsRequest,
+  updateActivityArticleRequest,
   updateFinanceAccountRequest,
   updateFinanceTransactionRequest
 } from "../lib/api";
@@ -45,6 +49,7 @@ import {
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
+import type { ActivityArticle } from "../types/articles";
 import type {
   FinancialAccount,
   FinancialAccountScopeType,
@@ -214,14 +219,14 @@ const HARDWARE_OPERATION_KIND_KEY = "hardwareOperationKind";
 type HardwareOperationKind = "GLOBAL" | "ITEM_ENTRY" | "ITEM_EXIT";
 const HARDWARE_OPERATION_LABELS: Record<HardwareOperationKind, string> = {
   GLOBAL: "Transaction globale",
-  ITEM_ENTRY: "Acquisition",
+  ITEM_ENTRY: "Achat",
   ITEM_EXIT: "Vente"
 };
 const HARDWARE_NUMERIC_METADATA_FIELDS = new Set([
   "quantity",
   "purchaseUnitPrice",
   "saleUnitPrice",
-  "dailyPayment",
+  "marginAmount",
   "paymentAmount"
 ]);
 const HARDWARE_AMOUNT_METADATA_FIELDS = new Set([
@@ -235,24 +240,25 @@ const HARDWARE_COMMON_METADATA_FIELDS = new Set([
 ]);
 const HARDWARE_CASH_IN_METADATA_FIELDS = new Set([
   ...HARDWARE_COMMON_METADATA_FIELDS,
-  "saleUnitPrice",
-  "dailyPayment"
+  "saleUnitPrice"
 ]);
 const HARDWARE_CASH_OUT_METADATA_FIELDS = new Set([
   ...HARDWARE_COMMON_METADATA_FIELDS,
   "purchaseUnitPrice",
-  "supplierRef"
+  "marginAmount",
+  "supplierRef",
+  "recipientRef"
 ]);
 const HARDWARE_METADATA_FIELDS = new Set([
   HARDWARE_OPERATION_KIND_KEY,
-  "productFamily",
   "itemName",
   "quantity",
   "purchaseUnitPrice",
   "saleUnitPrice",
-  "dailyPayment",
+  "marginAmount",
   "paymentAmount",
-  "supplierRef"
+  "supplierRef",
+  "recipientRef"
 ]);
 const FOOD_OPERATION_KIND_KEY = "foodOperationKind";
 type FoodOperationKind =
@@ -1368,6 +1374,7 @@ function isMoneyMetadataField(key: string): boolean {
     key === "purchaseUnitPrice" ||
     key === "saleUnitPrice" ||
     key === "dailyPayment" ||
+    key === "marginAmount" ||
     key === "paymentAmount" ||
     key === "unitPrice" ||
     key === "dailyRate" ||
@@ -1406,6 +1413,23 @@ function deriveHardwareAmount(
     return null;
   }
   return (quantity * unitPrice).toFixed(2);
+}
+
+function deriveHardwareMarginAmount(
+  operationKind: HardwareOperationKind,
+  metadata: Record<string, string>,
+  articles: ActivityArticle[]
+): string | null {
+  if (operationKind !== "ITEM_ENTRY") {
+    return null;
+  }
+  const quantity = toAmountNumber(metadata.quantity ?? "");
+  const article = articles.find((item) => item.name === (metadata.itemName ?? ""));
+  const defaultMargin = article?.defaultMargin ? toAmountNumber(article.defaultMargin) : 0;
+  if (quantity <= 0 || defaultMargin <= 0) {
+    return null;
+  }
+  return (quantity * defaultMargin).toFixed(2);
 }
 
 function deriveAgricultureAmount(
@@ -1831,7 +1855,6 @@ function getDefaultTransactionType(
   activityCode: BusinessActivityCode | null
 ): "CASH_IN" | "CASH_OUT" {
   return activityCode === "GENERAL_STORE" ||
-    activityCode === "HARDWARE" ||
     activityCode === "FOOD" ||
     activityCode === "RENTAL" ||
     activityCode === "HOTEL_LODGING" ||
@@ -3032,7 +3055,7 @@ function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
   return kind === "ITEM_EXIT"
     ? "Vente: renseignez la quantité, le prix de vente et le versement."
     : kind === "ITEM_ENTRY"
-      ? "Acquisition: renseignez la quantité, le prix d'achat et le fournisseur."
+      ? "Achat: choisissez l'article, la quantité, le prix d'achat et à qui il est remis."
       : "Transaction globale: renseignez seulement le montant et la description utile.";
 }
 
@@ -3419,6 +3442,16 @@ function buildDefaultAccountForm(
   };
 }
 
+function buildDefaultArticleForm(): {
+  name: string;
+  defaultMargin: string;
+} {
+  return {
+    name: "",
+    defaultMargin: ""
+  };
+}
+
 function normalizeAccountFormForActivities(
   previous: ReturnType<typeof buildDefaultAccountForm>,
   enabledActivityCodes: BusinessActivityCode[],
@@ -3473,6 +3506,12 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSelectedActivityCode
   } = useBusinessActivity();
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [articles, setArticles] = useState<ActivityArticle[]>([]);
+  const [hardwareCustomArticleMode, setHardwareCustomArticleMode] = useState(false);
+  const [articleForm, setArticleForm] = useState(buildDefaultArticleForm());
+  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
+  const [articlePendingDelete, setArticlePendingDelete] = useState<ActivityArticle | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
@@ -3496,6 +3535,12 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   const canManageTransactions = useMemo(() => {
     return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+  }, [user?.role]);
+
+  const canManageArticles = useMemo(() => {
+    return (
+      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
+    );
   }, [user?.role]);
 
   const canMutateTransaction = useCallback(
@@ -3688,16 +3733,25 @@ export function FinanceTransactionsPage(): JSX.Element {
     setAccountForm(buildDefaultAccountForm(selectedActivityCode, canManageGlobalAccounts));
   }, [canManageGlobalAccounts, selectedActivityCode]);
 
+  const resetArticleForm = useCallback(() => {
+    setEditingArticleId(null);
+    setArticleForm(buildDefaultArticleForm());
+  }, []);
+
   const resetTransactionForm = useCallback(() => {
     setEditingTransactionId(null);
     setTransactionProofFile(null);
+    const defaultMetadata = syncMetadataState({}, financeMetadataFields);
     setTransactionForm({
       accountId: accounts[0]?.id ?? "",
       type: getDefaultTransactionType(selectedActivityCode),
       amount: "",
       currency: allowedCurrencies[0] ?? "XOF",
       description: "",
-      metadata: syncMetadataState({}, financeMetadataFields),
+      metadata:
+        selectedActivityCode === "HARDWARE"
+          ? { ...defaultMetadata, [HARDWARE_OPERATION_KIND_KEY]: "ITEM_ENTRY" }
+          : defaultMetadata,
       occurredAt: ""
     });
   }, [accounts, allowedCurrencies, financeMetadataFields, selectedActivityCode]);
@@ -3880,6 +3934,25 @@ export function FinanceTransactionsPage(): JSX.Element {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const loadArticles = useCallback(async () => {
+    if (selectedActivityCode !== "HARDWARE") {
+      setArticles([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        listActivityArticlesRequest(accessToken, "HARDWARE")
+      );
+      setArticles(payload.items);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadArticles();
+  }, [loadArticles]);
 
   async function handleLoadMoreTransactions(): Promise<void> {
     if (isLoading || isLoadingMoreTransactions || !hasMoreTransactions) {
@@ -4098,6 +4171,78 @@ export function FinanceTransactionsPage(): JSX.Element {
       setErrorMessage(toErrorMessage(error));
     } finally {
       setBusyAccountId(null);
+    }
+  }
+
+  async function handleSaveArticle(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload = {
+        name: articleForm.name.trim(),
+        defaultMargin: articleForm.defaultMargin.trim()
+          ? normalizeAmountForApi(articleForm.defaultMargin)
+          : undefined
+      };
+
+      await withAuthorizedToken((accessToken) =>
+        editingArticleId
+          ? updateActivityArticleRequest(accessToken, "HARDWARE", editingArticleId, payload)
+          : createActivityArticleRequest(accessToken, "HARDWARE", payload)
+      );
+      setSuccessMessage(editingArticleId ? "Article modifié." : "Article créé.");
+      resetArticleForm();
+      await loadArticles();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  function handleStartEditArticle(article: ActivityArticle): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingArticleId(article.id);
+    setArticleForm({
+      name: article.name,
+      defaultMargin: article.defaultMargin ? formatAmountForInput(article.defaultMargin) : ""
+    });
+  }
+
+  function handleCancelEditArticle(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    resetArticleForm();
+  }
+
+  function handleDeleteArticle(article: ActivityArticle): void {
+    setArticlePendingDelete(article);
+  }
+
+  async function handleConfirmDeleteArticle(): Promise<void> {
+    if (!articlePendingDelete) {
+      return;
+    }
+
+    const article = articlePendingDelete;
+    setBusyArticleId(article.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) =>
+        deleteActivityArticleRequest(accessToken, "HARDWARE", article.id)
+      );
+      if (editingArticleId === article.id) {
+        resetArticleForm();
+      }
+      setSuccessMessage("Article supprimé.");
+      setArticlePendingDelete(null);
+      await loadArticles();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyArticleId(null);
     }
   }
 
@@ -4622,6 +4767,105 @@ export function FinanceTransactionsPage(): JSX.Element {
         </section>
       ) : null}
 
+      {selectedActivityCode === "HARDWARE" && canManageArticles ? (
+        <section className="panel finance-page-panel">
+          <details className="finance-section-toggle">
+            <summary className="finance-section-summary">
+              <span>{editingArticleId ? "Modifier un article" : "Gérer mes articles"}</span>
+              <small>
+                {editingArticleId
+                  ? "Modification d'un article du catalogue."
+                  : "Ajoutez les articles vendus par la quincaillerie pour les retrouver en sélection."}
+              </small>
+            </summary>
+            <form className="finance-account-form" onSubmit={handleSaveArticle}>
+              <label className="operations-inline-group">
+                <span>Nom de l'article</span>
+                <input
+                  type="text"
+                  placeholder="Ex: Ciment, Barre fer 08, Tôle 4kg"
+                  value={articleForm.name}
+                  onChange={(event) =>
+                    setArticleForm((prev) => ({
+                      ...prev,
+                      name: event.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Bénéfice de référence</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Optionnel, ex: 1500"
+                  value={articleForm.defaultMargin}
+                  onChange={(event) =>
+                    setArticleForm((prev) => ({
+                      ...prev,
+                      defaultMargin: formatAmountForInput(event.target.value)
+                    }))
+                  }
+                  onBlur={() =>
+                    setArticleForm((prev) => ({
+                      ...prev,
+                      defaultMargin: formatAmountForInput(prev.defaultMargin)
+                    }))
+                  }
+                />
+              </label>
+              <div className="mobile-sticky-form-actions">
+                <button type="submit">
+                  {editingArticleId ? "Enregistrer les modifications" : "Ajouter l'article"}
+                </button>
+                {editingArticleId ? (
+                  <button type="button" className="secondary-btn" onClick={handleCancelEditArticle}>
+                    Annuler la modification
+                  </button>
+                ) : null}
+              </div>
+            </form>
+            {articles.length > 0 ? (
+              <div className="operations-member-grid">
+                {articles.map((article) => {
+                  const isBusy = busyArticleId === article.id;
+                  return (
+                    <article key={article.id} className="operations-member-card">
+                      <h4>{article.name}</h4>
+                      <p className="hint">
+                        Bénéfice de référence:{" "}
+                        {article.defaultMargin ? formatAmountForDisplay(article.defaultMargin) : "Non défini"}
+                      </p>
+                      <div className="actions-inline">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => handleStartEditArticle(article)}
+                          disabled={isBusy}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          onClick={() => handleDeleteArticle(article)}
+                          disabled={isBusy}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="hint">Aucun article enregistré pour le moment.</p>
+            )}
+          </details>
+        </section>
+      ) : null}
+
       {canManageSalaries ? (
         <section className="panel finance-page-panel">
           <div className="dashboard-panel-header">
@@ -4800,7 +5044,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                   >
                     <option value="GLOBAL">{HARDWARE_OPERATION_LABELS.GLOBAL}</option>
                     <option value="ITEM_ENTRY">{HARDWARE_OPERATION_LABELS.ITEM_ENTRY}</option>
-                    <option value="ITEM_EXIT">{HARDWARE_OPERATION_LABELS.ITEM_EXIT}</option>
+                    {hardwareOperationKind === "ITEM_EXIT" ? (
+                      <option value="ITEM_EXIT">{HARDWARE_OPERATION_LABELS.ITEM_EXIT}</option>
+                    ) : null}
                   </select>
                 </label>
 
@@ -4835,7 +5081,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                     <strong>
                       {transactionForm.type === "CASH_IN"
                         ? "Vente"
-                        : "Acquisition"}
+                        : "Achat"}
                     </strong>
                   </div>
                 )}
@@ -5451,7 +5697,83 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
 
-              {visibleFinanceMetadataFields.map((field) => (
+              {visibleFinanceMetadataFields.map((field) => {
+                if (selectedActivityCode === "HARDWARE" && field.key === "itemName") {
+                  const itemNameValue = transactionForm.metadata.itemName ?? "";
+                  const matchesCatalogArticle = articles.some(
+                    (article) => article.name === itemNameValue
+                  );
+                  const showOtherArticleInput =
+                    hardwareCustomArticleMode || (itemNameValue !== "" && !matchesCatalogArticle);
+                  const selectValue = showOtherArticleInput
+                    ? "__OTHER__"
+                    : matchesCatalogArticle
+                      ? itemNameValue
+                      : "";
+
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select
+                        value={selectValue}
+                        onChange={(event) => {
+                          const nextValue = event.target.value;
+                          if (nextValue === "__OTHER__") {
+                            setHardwareCustomArticleMode(true);
+                            return;
+                          }
+                          setHardwareCustomArticleMode(false);
+                          setTransactionForm((prev) => {
+                            const nextMetadata = {
+                              ...prev.metadata,
+                              itemName: nextValue
+                            };
+                            const derivedMargin = deriveHardwareMarginAmount(
+                              hardwareOperationKind,
+                              nextMetadata,
+                              articles
+                            );
+                            return {
+                              ...prev,
+                              metadata: derivedMargin
+                                ? { ...nextMetadata, marginAmount: formatAmountForInput(derivedMargin) }
+                                : nextMetadata
+                            };
+                          });
+                        }}
+                        required={field.required}
+                      >
+                        <option value="">-- Choisir un article --</option>
+                        {articles.map((article) => (
+                          <option key={article.id} value={article.name}>
+                            {article.name}
+                          </option>
+                        ))}
+                        <option value="__OTHER__">Autre (préciser)</option>
+                      </select>
+                      {showOtherArticleInput ? (
+                        <input
+                          type="text"
+                          placeholder="Nom de l'article"
+                          value={itemNameValue}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            setTransactionForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                itemName: nextValue
+                              }
+                            }));
+                          }}
+                          required={field.required}
+                        />
+                      ) : null}
+                    </label>
+                  );
+                }
+
+                return (
                 <label key={field.key} className="operations-inline-group">
                   <span>{field.label}</span>
                   <input
@@ -5483,10 +5805,17 @@ export function FinanceTransactionsPage(): JSX.Element {
                         const derivedAmount = shouldDeriveAmount
                           ? deriveSectorAmount(selectedActivityCode, prev.type, nextMetadata)
                           : null;
+                        const derivedMargin =
+                          selectedActivityCode === "HARDWARE" && field.key === "quantity"
+                            ? deriveHardwareMarginAmount(hardwareOperationKind, nextMetadata, articles)
+                            : null;
+                        const finalMetadata = derivedMargin
+                          ? { ...nextMetadata, marginAmount: formatAmountForInput(derivedMargin) }
+                          : nextMetadata;
                         return {
                           ...prev,
                           amount: derivedAmount ? formatAmountForInput(derivedAmount) : prev.amount,
-                          metadata: nextMetadata
+                          metadata: finalMetadata
                         };
                       });
                     }}
@@ -5506,7 +5835,8 @@ export function FinanceTransactionsPage(): JSX.Element {
                     required={field.required}
                   />
                 </label>
-              ))}
+                );
+              })}
             </div>
           </details>
 
@@ -6040,6 +6370,23 @@ export function FinanceTransactionsPage(): JSX.Element {
           setAccountPendingDelete(null);
         }}
         onConfirm={() => void handleConfirmDeleteAccount()}
+      />
+
+      <ConfirmDialog
+        open={articlePendingDelete !== null}
+        title="Confirmer la suppression de l'article"
+        description="Cette action retire l'article de la liste de sélection du formulaire."
+        objectLabel="Article concerné"
+        objectName={articlePendingDelete?.name ?? ""}
+        impactText="Les transactions déjà enregistrées avec cet article ne sont pas modifiées."
+        isConfirming={busyArticleId === articlePendingDelete?.id}
+        onCancel={() => {
+          if (busyArticleId) {
+            return;
+          }
+          setArticlePendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteArticle()}
       />
 
       <ConfirmDialog

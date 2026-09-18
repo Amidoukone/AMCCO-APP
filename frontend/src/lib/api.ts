@@ -42,6 +42,10 @@ import type {
   SalaryTransactionSingleResponse,
   TransactionProofListResponse
 } from "../types/finance";
+import type {
+  ActivityArticleListResponse,
+  ActivityArticleSingleResponse
+} from "../types/articles";
 import type { BusinessActivityCode } from "../config/businessActivities";
 import type {
   DashboardSummaryResponse,
@@ -526,6 +530,61 @@ export function listAuditLogsRequest(
 
   return request<AuditLogsResponse>(path, {
     method: "GET",
+    accessToken
+  });
+}
+
+export function listActivityArticlesRequest(
+  accessToken: string,
+  activityCode: BusinessActivityCode
+): Promise<ActivityArticleListResponse> {
+  return request<ActivityArticleListResponse>(`/activities/${activityCode}/articles`, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function createActivityArticleRequest(
+  accessToken: string,
+  activityCode: BusinessActivityCode,
+  input: {
+    name: string;
+    defaultMargin?: string;
+  }
+): Promise<ActivityArticleSingleResponse> {
+  return request<ActivityArticleSingleResponse>(`/activities/${activityCode}/articles`, {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function updateActivityArticleRequest(
+  accessToken: string,
+  activityCode: BusinessActivityCode,
+  articleId: string,
+  input: {
+    name: string;
+    defaultMargin?: string;
+  }
+): Promise<ActivityArticleSingleResponse> {
+  return request<ActivityArticleSingleResponse>(
+    `/activities/${activityCode}/articles/${articleId}`,
+    {
+      method: "PATCH",
+      body: input,
+      accessToken
+    }
+  );
+}
+
+export function deleteActivityArticleRequest(
+  accessToken: string,
+  activityCode: BusinessActivityCode,
+  articleId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/activities/${activityCode}/articles/${articleId}`, {
+    method: "DELETE",
     accessToken
   });
 }

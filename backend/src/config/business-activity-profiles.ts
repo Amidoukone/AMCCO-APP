@@ -131,26 +131,25 @@ function makeProfile(
 
 const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityProfile> = {
   HARDWARE: makeProfile("HARDWARE", {
-    operationsModel: "Pilotage de points de vente, achats fournisseurs, ventes articlees et approvisionnement terrain.",
+    operationsModel: "Achat d'articles de quincaillerie remis ensuite aux quincailliers, avec un bénéfice fixe par article.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: false,
       requiresProof: false,
       fields: [
-        field("accountId", "Compte de caisse", true, "Caisse ou compte de vente utilisé."),
+        field("accountId", "Compte de caisse", true, "Caisse ou compte utilisé."),
         field("amount", "Montant", true, "Montant encaissé ou dépense."),
-        field("description", "Objet", false, "Référence achat, dépôt fournisseur ou vente spéciale.")
+        field("description", "Objet", false, "Référence achat, dépôt fournisseur ou opération diverse.")
       ],
       metadataFields: [
-        field("hardwareOperationKind", "Nature quincaillerie", false, "GLOBAL, ITEM_ENTRY ou ITEM_EXIT selon la nature de l'opération."),
-        field("productFamily", "Famille produit", false, "Ciment, fer, outillage, plomberie ou autre famille."),
-        field("itemName", "Désignation", false, "Article vendu ou acheté: ciment, fer, outillage ou référence précise."),
-        field("quantity", "Quantité", false, "Nombre d'articles, sacs, barres, lots ou unités."),
-        field("purchaseUnitPrice", "Prix d'achat unitaire", false, "Coût d'achat unitaire en XOF pour calculer le bénéfice."),
-        field("saleUnitPrice", "Prix de vente unitaire", false, "Prix de vente unitaire en XOF pour calculer la vente du jour."),
-        field("dailyPayment", "Versement du jour", false, "Montant effectivement versé ou déposé pour cette vente."),
-        field("supplierRef", "Fournisseur", false, "Fournisseur ou source d'approvisionnement.")
+        field("hardwareOperationKind", "Nature quincaillerie", false, "GLOBAL ou ITEM_ENTRY selon la nature de l'opération."),
+        field("itemName", "Article", false, "Article acheté, choisi dans le catalogue de la quincaillerie."),
+        field("quantity", "Quantité", false, "Nombre d'articles, sacs, barres, tonnes ou unités."),
+        field("purchaseUnitPrice", "Prix d'achat unitaire", false, "Coût d'achat unitaire en XOF, saisi à chaque achat."),
+        field("marginAmount", "Bénéfice", false, "Bénéfice fixe prévu sur cette ligne, pré-rempli selon l'article choisi et modifiable."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur ou source d'approvisionnement."),
+        field("recipientRef", "Remis à", false, "Quincaillerie ou client à qui l'article a été remis.")
       ],
       workflow: [
         workflow("CREATE", "Saisie terrain", "Le point de vente saisit le flux financier."),
@@ -186,9 +185,9 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       focusArea: "Rotation commerciale, marge article et exécution magasin",
       exportSections: ["transactions", "tâches", "inventaire commercial", "rapport mensuel ventes"],
       operationalDimensions: [
-        dimension("productFamily", "Famille produit", "Mesure la rentabilité et l'exécution par famille de produits."),
-        dimension("itemName", "Désignation", "Suit les ventes, coûts et bénéfices par article ou désignation."),
-        dimension("supplierRef", "Fournisseur", "Suit les flux et blocages par fournisseur.")
+        dimension("itemName", "Article", "Suit les achats, coûts et bénéfices par article."),
+        dimension("supplierRef", "Fournisseur", "Suit les flux et blocages par fournisseur."),
+        dimension("recipientRef", "Remis à", "Suit les achats remis à chaque quincaillerie ou client.")
       ],
       highlights: [
         {

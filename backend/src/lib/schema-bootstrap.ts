@@ -316,6 +316,25 @@ async function ensureFinancialAccountActivitiesTable(): Promise<void> {
   );
 }
 
+async function ensureActivityArticlesTable(): Promise<void> {
+  await getDbPool().execute(
+    `
+      CREATE TABLE IF NOT EXISTS activity_articles (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) NOT NULL,
+        activity_code VARCHAR(32) NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        default_margin DECIMAL(14,2) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_activity_article_name (company_id, activity_code, name),
+        KEY idx_activity_article_company_activity (company_id, activity_code),
+        CONSTRAINT fk_activity_article_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `
+  );
+}
+
 async function ensureCompanyActivitiesSeeded(): Promise<void> {
   const companies = await queryRows<CompanyIdRow[]>(`SELECT id FROM companies`);
   if (companies.length === 0) {
@@ -355,6 +374,7 @@ export async function ensureBusinessActivitySchemaReady(): Promise<void> {
     await ensureFinancialAccountScopeColumns();
     await ensureFinancialAccountActivitiesTable();
     await ensureCompanyActivitiesTable();
+    await ensureActivityArticlesTable();
     await ensureCompanyActivitiesSeeded();
     logger.info("Business activity schema ready");
   } catch (error) {

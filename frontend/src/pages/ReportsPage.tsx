@@ -819,7 +819,7 @@ export function ReportsPage(): JSX.Element {
 
             <div className="reports-summary-grid">
               <article className="reports-kpi-card">
-                <span>Transactions filtrées</span>
+                <span>{selectedActivityCode === "HARDWARE" ? "Achats filtrés" : "Transactions filtrées"}</span>
                 <strong>{formatCount(reportMetrics.transactionCount)}</strong>
                 <small>
                   {formatCount(reportMetrics.activeTransactions)} comptabilisées,{" "}
@@ -827,21 +827,36 @@ export function ReportsPage(): JSX.Element {
                   {formatCount(reportMetrics.rejectedTransactions)} rejetées
                 </small>
               </article>
-              <article className="reports-kpi-card">
-                <span>Solde comptabilisé</span>
-                <strong>{reportMetrics.netAccountedLabel}</strong>
-                <small>Entrées comptabilisées moins sorties comptabilisées</small>
-              </article>
-              <article className="reports-kpi-card">
-                <span>Tâches suivies</span>
-                <strong>
-                  {formatCount(reportMetrics.openTasks)} / {formatCount(reportMetrics.totalTasks)}
-                </strong>
-                <small>
-                  {formatCount(reportMetrics.blockedTasks)} bloquées,{" "}
-                  {formatCount(reportMetrics.doneTasks)} terminées
-                </small>
-              </article>
+              {selectedActivityCode === "HARDWARE" && overview.hardwareMonthlyReport ? (
+                <article className="reports-kpi-card">
+                  <span>Bénéfice total</span>
+                  <strong>
+                    {formatAmount(
+                      overview.hardwareMonthlyReport.totals.grossProfit,
+                      overview.hardwareMonthlyReport.totals.currency
+                    )}
+                  </strong>
+                  <small>Bénéfice cumulé sur les achats comptabilisés</small>
+                </article>
+              ) : (
+                <>
+                  <article className="reports-kpi-card">
+                    <span>Solde comptabilisé</span>
+                    <strong>{reportMetrics.netAccountedLabel}</strong>
+                    <small>Entrées comptabilisées moins sorties comptabilisées</small>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Tâches suivies</span>
+                    <strong>
+                      {formatCount(reportMetrics.openTasks)} / {formatCount(reportMetrics.totalTasks)}
+                    </strong>
+                    <small>
+                      {formatCount(reportMetrics.blockedTasks)} bloquées,{" "}
+                      {formatCount(reportMetrics.doneTasks)} terminées
+                    </small>
+                  </article>
+                </>
+              )}
             </div>
           </section>
 
@@ -870,6 +885,7 @@ export function ReportsPage(): JSX.Element {
 
           {!hasFocusedOperationsReport ? (
             <>
+          {!overview.hardwareMonthlyReport ? (
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
@@ -916,7 +932,9 @@ export function ReportsPage(): JSX.Element {
               </div>
             ) : null}
           </section>
+          ) : null}
 
+          {!overview.hardwareMonthlyReport ? (
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
@@ -979,6 +997,7 @@ export function ReportsPage(): JSX.Element {
               </table>
             </div>
           </section>
+          ) : null}
 
             </>
           ) : null}
@@ -989,42 +1008,40 @@ export function ReportsPage(): JSX.Element {
                 <div>
                   <h3>Rapport quincaillerie</h3>
                   <p className="hint">
-                    {overview.hardwareMonthlyReport.periodLabel} | ventes comptabilisées en XOF.
+                    {overview.hardwareMonthlyReport.periodLabel} | achats comptabilisés en XOF.
                   </p>
                 </div>
               </div>
               <div className="table-wrap">
-                <table className="admin-table">
+                <table className="admin-table reports-hardware-table">
                   <thead>
                     <tr>
                       <th>Date</th>
                       <th>Désignation</th>
                       <th>Quantité</th>
-                      <th>Vente par jour</th>
-                      <th>Versement</th>
-                      <th>Coût achat</th>
+                      <th>Prix d'achat</th>
+                      <th>Montant</th>
                       <th>Bénéfice</th>
-                      <th>Marge</th>
+                      <th>Remis à</th>
                     </tr>
                   </thead>
                   <tbody>
                     {overview.hardwareMonthlyReport.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={8}>
-                          Aucune vente quincaillerie comptabilisée sur la période filtrée.
+                        <td colSpan={7}>
+                          Aucun achat quincaillerie comptabilisé sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
-                      overview.hardwareMonthlyReport.rows.map((row) => (
-                        <tr key={`${row.date}-${row.designation}`}>
+                      overview.hardwareMonthlyReport.rows.map((row, index) => (
+                        <tr key={`${row.date}-${row.designation}-${index}`}>
                           <td>{formatReportDate(row.date)}</td>
                           <td>{row.designation}</td>
                           <td>{formatCount(row.quantity)}</td>
-                          <td>{formatAmount(row.salesAmount, row.currency)}</td>
-                          <td>{formatAmount(row.paymentAmount, row.currency)}</td>
+                          <td>{formatAmount(row.purchaseUnitPrice, row.currency)}</td>
                           <td>{formatAmount(row.purchaseAmount, row.currency)}</td>
                           <td>{formatAmount(row.grossProfit, row.currency)}</td>
-                          <td>{formatRate(row.marginRate)}</td>
+                          <td>{row.recipientRef}</td>
                         </tr>
                       ))
                     )}
@@ -1035,13 +1052,7 @@ export function ReportsPage(): JSX.Element {
                       <th>{formatCount(overview.hardwareMonthlyReport.totals.quantity)}</th>
                       <th>
                         {formatAmount(
-                          overview.hardwareMonthlyReport.totals.salesAmount,
-                          overview.hardwareMonthlyReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.hardwareMonthlyReport.totals.paymentAmount,
+                          overview.hardwareMonthlyReport.totals.purchaseUnitPrice,
                           overview.hardwareMonthlyReport.totals.currency
                         )}
                       </th>
@@ -1057,7 +1068,7 @@ export function ReportsPage(): JSX.Element {
                           overview.hardwareMonthlyReport.totals.currency
                         )}
                       </th>
-                      <th>{formatRate(overview.hardwareMonthlyReport.totals.marginRate)}</th>
+                      <th />
                     </tr>
                   </tfoot>
                 </table>
@@ -2919,6 +2930,7 @@ export function ReportsPage(): JSX.Element {
 
           {!hasFocusedOperationsReport ? (
             <>
+          {!overview.hardwareMonthlyReport ? (
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
@@ -3039,6 +3051,7 @@ export function ReportsPage(): JSX.Element {
 
             </div>
           </section>
+          ) : null}
             </>
           ) : null}
 
@@ -3089,6 +3102,7 @@ export function ReportsPage(): JSX.Element {
             </div>
           </section>
 
+          {!overview.hardwareMonthlyReport ? (
           <section className="panel">
             <div className="dashboard-panel-header">
               <div>
@@ -3131,10 +3145,11 @@ export function ReportsPage(): JSX.Element {
 
             </div>
           </section>
+          ) : null}
             </>
           ) : null}
 
-          <ReportReadingGuidePanel />
+          {selectedActivityCode !== "HARDWARE" ? <ReportReadingGuidePanel /> : null}
         </>
       ) : null}
     </div>

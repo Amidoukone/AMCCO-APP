@@ -1247,6 +1247,19 @@ a {
   margin-top: 0;
 }
 
+.reports-hardware-table th {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.reports-hardware-table td {
+  font-size: 15.5px;
+}
+
+.reports-hardware-table tfoot th {
+  font-size: 15.5px;
+}
+
 .reports-table-header {
   display: flex;
   align-items: center;
