@@ -589,23 +589,17 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       metadataFields: [
         field("btpOperationKind", "Opération BTP", false, "CLIENT_PAYMENT, MATERIAL_PURCHASE, LABOR_PAYMENT, EQUIPMENT_RENTAL, SUBCONTRACTING ou SITE_EXPENSE."),
         field("projectRef", "Chantier", true, "Chantier concerné, choisi dans la liste des chantiers."),
-        field("workPackage", "Lot de travaux", false, "Terrassement, fondation, gros oeuvre, second oeuvre, finition ou autre lot."),
+        field("progressPercent", "Avancement (%)", false, "Pourcentage d'avancement constate sur le chantier."),
         field("materialName", "Matériau / fourniture", false, "Ciment, fer, sable, gravier, plomberie, electricite ou autre fourniture."),
-        field("quantity", "Quantité", false, "Quantité achetée, posee ou facturée."),
-        field("unit", "Unité", false, "Sac, tonne, m3, m2, jour, heure, lot ou autre unité."),
+        field("quantity", "Quantité", false, "Quantité achetée ou facturée."),
         field("unitPrice", "Prix unitaire", false, "Prix unitaire pour calculer automatiquement le montant."),
-        field("supplierRef", "Fournisseur", false, "Fournisseur, dépôt ou prestataire d'approvisionnement."),
-        field("teamRef", "Equipe / corps de métier", false, "Equipe interne, macons, ferrailleurs, electriciens ou autre corps de métier."),
         field("workerCount", "Nombre d'ouvriers", false, "Effectif concerné par le paiement de main-d'oeuvre."),
         field("workDays", "Jours travailles", false, "Nombre de jours ou vacations payes."),
         field("dailyRate", "Taux journalier", false, "Coût journalier par ouvrier."),
         field("equipmentRef", "Engin / matériel", false, "Betonniere, camion, pelle, grue, compacteur ou autre équipement."),
         field("equipmentHours", "Heures engin", false, "Nombre d'heures ou vacations d'utilisation."),
         field("hourlyRate", "Taux horaire", false, "Coût horaire ou vacation de l'engin."),
-        field("subcontractorRef", "Sous-traitant", false, "Entreprise ou artisan sous-traitant."),
-        field("invoiceRef", "Facture / situation", false, "Numéro de facture, situation de travaux, bon ou pièce associée."),
-        field("progressPercent", "Avancement (%)", false, "Pourcentage d'avancement constate sur le chantier ou le lot."),
-        field("retentionAmount", "Retenue / garantie", false, "Retenue de garantie, réserve ou montant conservé.")
+        field("subcontractorRef", "Sous-traitant", false, "Entreprise ou artisan sous-traitant.")
       ],
       workflow: [
         workflow("CREATE", "Saisie chantier", "Le flux est saisi en choisissant le chantier dans la liste."),
@@ -628,12 +622,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("btpTaskKind", "Type d'action BTP", true, "Préparation, terrassement, fondation, structure, second oeuvre, finition, contrôle, réserve ou réception."),
-        field("projectRef", "Chantier", true, "Chantier concerné, choisi dans la liste des chantiers."),
-        field("workPackage", "Lot de travaux", false, "Terrassement, fondation, gros oeuvre, second oeuvre, finition ou autre lot."),
-        field("teamRef", "Equipe / corps de métier", false, "Equipe interne ou corps de métier responsable."),
-        field("materialName", "Matériau / fourniture", false, "Matériau ou fourniture à contrôler, poser ou réceptionner."),
-        field("progressPercent", "Avancement (%)", false, "Avancement constate pour l'action ou le lot."),
-        field("issueRef", "Réserve / point bloquant", false, "Réserve, malfacon, retard, rupture ou point à arbitrer.")
+        field("projectRef", "Chantier", true, "Chantier concerné, choisi dans la liste des chantiers.")
       ],
       workflow: [
         workflow("PLAN", "Planification chantier", "L'action est affectée, datée et rattachée à un lot."),
@@ -647,10 +636,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       focusArea: "Encaissements, coûts par nature et marge par chantier",
       exportSections: ["situation chantiers", "achats matériaux", "main-d'oeuvre", "engins", "sous-traitance", "actions chantier"],
       operationalDimensions: [
-        dimension("projectRef", "Chantier", "Mesure encaissements, coûts et marge par chantier."),
-        dimension("workPackage", "Lot de travaux", "Compare les coûts et l'exécution par lot de travaux."),
-        dimension("teamRef", "Equipe / corps de métier", "Suit l'exécution et les blocages par équipe ou corps de métier."),
-        dimension("supplierRef", "Fournisseur", "Suit les achats et dépenses par fournisseur chantier.")
+        dimension("projectRef", "Chantier", "Mesure encaissements, coûts et marge par chantier.")
       ],
       highlights: [
         {

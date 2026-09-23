@@ -699,14 +699,6 @@ const AGRICULTURE_METADATA_FIELDS = new Set([
   "buyerRef",
   "sourceRef"
 ]);
-const BTP_WORK_PACKAGE_OPTIONS = [
-  "Terrassement",
-  "Fondation",
-  "Gros oeuvre",
-  "Second oeuvre",
-  "Finition",
-  "Autre"
-];
 const BTP_OPERATION_KIND_KEY = "btpOperationKind";
 type BtpOperationKind =
   | "CLIENT_PAYMENT"
@@ -731,8 +723,7 @@ const BTP_NUMERIC_METADATA_FIELDS = new Set([
   "dailyRate",
   "equipmentHours",
   "hourlyRate",
-  "progressPercent",
-  "retentionAmount"
+  "progressPercent"
 ]);
 const BTP_AMOUNT_METADATA_FIELDS = new Set([
   "quantity",
@@ -745,26 +736,17 @@ const BTP_AMOUNT_METADATA_FIELDS = new Set([
 ]);
 const BTP_COMMON_METADATA_FIELDS = new Set([
   "projectRef",
-  "workPackage"
+  "progressPercent"
 ]);
-const BTP_CLIENT_PAYMENT_METADATA_FIELDS = new Set([
-  ...BTP_COMMON_METADATA_FIELDS,
-  "invoiceRef",
-  "progressPercent",
-  "retentionAmount"
-]);
+const BTP_CLIENT_PAYMENT_METADATA_FIELDS = new Set([...BTP_COMMON_METADATA_FIELDS]);
 const BTP_MATERIAL_PURCHASE_METADATA_FIELDS = new Set([
   ...BTP_COMMON_METADATA_FIELDS,
   "materialName",
   "quantity",
-  "unit",
-  "unitPrice",
-  "supplierRef",
-  "invoiceRef"
+  "unitPrice"
 ]);
 const BTP_LABOR_PAYMENT_METADATA_FIELDS = new Set([
   ...BTP_COMMON_METADATA_FIELDS,
-  "teamRef",
   "workerCount",
   "workDays",
   "dailyRate"
@@ -773,50 +755,27 @@ const BTP_EQUIPMENT_RENTAL_METADATA_FIELDS = new Set([
   ...BTP_COMMON_METADATA_FIELDS,
   "equipmentRef",
   "equipmentHours",
-  "hourlyRate",
-  "supplierRef",
-  "invoiceRef"
+  "hourlyRate"
 ]);
 const BTP_SUBCONTRACTING_METADATA_FIELDS = new Set([
   ...BTP_COMMON_METADATA_FIELDS,
-  "subcontractorRef",
-  "quantity",
-  "unit",
-  "unitPrice",
-  "progressPercent",
-  "invoiceRef",
-  "retentionAmount"
+  "subcontractorRef"
 ]);
-const BTP_SITE_EXPENSE_METADATA_FIELDS = new Set([
-  ...BTP_COMMON_METADATA_FIELDS,
-  "materialName",
-  "teamRef",
-  "equipmentRef",
-  "supplierRef",
-  "invoiceRef",
-  "progressPercent",
-  "retentionAmount"
-]);
+const BTP_SITE_EXPENSE_METADATA_FIELDS = new Set([...BTP_COMMON_METADATA_FIELDS]);
 const BTP_METADATA_FIELDS = new Set([
   BTP_OPERATION_KIND_KEY,
   "projectRef",
-  "workPackage",
+  "progressPercent",
   "materialName",
   "quantity",
-  "unit",
   "unitPrice",
-  "supplierRef",
-  "teamRef",
   "workerCount",
   "workDays",
   "dailyRate",
   "equipmentRef",
   "equipmentHours",
   "hourlyRate",
-  "subcontractorRef",
-  "invoiceRef",
-  "progressPercent",
-  "retentionAmount"
+  "subcontractorRef"
 ]);
 const FISH_FARMING_OPERATION_KIND_KEY = "fishOperationKind";
 type FishFarmingOperationKind =
@@ -1103,7 +1062,6 @@ function isMoneyMetadataField(key: string): boolean {
     key === "unitPrice" ||
     key === "dailyRate" ||
     key === "hourlyRate" ||
-    key === "retentionAmount" ||
     key === "monthlyRent" ||
     key === "serviceCharge" ||
     key === "depositAmount" ||
@@ -1231,7 +1189,7 @@ function deriveBtpAmount(
   operationKind: BtpOperationKind,
   metadata: Record<string, string>
 ): string | null {
-  if (operationKind === "MATERIAL_PURCHASE" || operationKind === "SUBCONTRACTING") {
+  if (operationKind === "MATERIAL_PURCHASE") {
     const quantity = toAmountNumber(metadata.quantity ?? "");
     const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
     if (quantity <= 0 || unitPrice <= 0) {
@@ -2030,12 +1988,9 @@ function isBtpOperationKind(value: string | undefined): value is BtpOperationKin
 function hasBtpMetadata(metadata: Record<string, string>): boolean {
   return [
     "projectRef",
-    "workPackage",
     "materialName",
     "quantity",
     "unitPrice",
-    "supplierRef",
-    "teamRef",
     "workerCount",
     "workDays",
     "dailyRate",
@@ -2043,9 +1998,7 @@ function hasBtpMetadata(metadata: Record<string, string>): boolean {
     "equipmentHours",
     "hourlyRate",
     "subcontractorRef",
-    "invoiceRef",
-    "progressPercent",
-    "retentionAmount"
+    "progressPercent"
   ].some((key) => metadata[key]?.trim());
 }
 
@@ -2627,21 +2580,21 @@ function getAgricultureFormModeLabel(kind: AgricultureOperationKind): string {
 
 function getBtpFormModeLabel(kind: BtpOperationKind): string {
   if (kind === "CLIENT_PAYMENT") {
-    return "Encaissement client: chantier, marché/devis, client, situation de travaux et avancement.";
+    return "Encaissement client: choisissez le chantier et indiquez le montant reçu.";
   }
   if (kind === "MATERIAL_PURCHASE") {
-    return "Achat matériaux: chantier, lot, matériau, quantité, prix unitaire et fournisseur.";
+    return "Achat matériaux: chantier, matériau, quantité et prix unitaire.";
   }
   if (kind === "LABOR_PAYMENT") {
-    return "Main-d'oeuvre: chantier, lot, équipe, nombre d'ouvriers, jours travailles et taux journalier.";
+    return "Main-d'oeuvre: chantier, nombre d'ouvriers, jours travailles et taux journalier.";
   }
   if (kind === "EQUIPMENT_RENTAL") {
-    return "Location engin: chantier, engin, heures ou vacations, taux horaire et fournisseur.";
+    return "Location engin: chantier, engin, heures et taux horaire.";
   }
   if (kind === "SUBCONTRACTING") {
-    return "Sous-traitance: chantier, lot, sous-traitant, quantité ou avancement, facture et retenue.";
+    return "Sous-traitance: chantier, sous-traitant et montant payé.";
   }
-  return "Charge chantier: dépense générale, réserve, approvisionnement ou autre charge rattachée au chantier.";
+  return "Charge chantier: choisissez le chantier et indiquez le montant dépensé.";
 }
 
 function getRentalFormModeLabel(kind: RentalOperationKind): string {
@@ -6204,34 +6157,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                           {selectedProject.location ? ` | Lieu: ${selectedProject.location}` : ""}
                         </small>
                       ) : null}
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "BTP" && field.key === "workPackage") {
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <select
-                        value={transactionForm.metadata.workPackage ?? ""}
-                        onChange={(event) =>
-                          setTransactionForm((prev) => ({
-                            ...prev,
-                            metadata: {
-                              ...prev.metadata,
-                              workPackage: event.target.value
-                            }
-                          }))
-                        }
-                        required={field.required}
-                      >
-                        <option value="">-- Choisir un lot --</option>
-                        {BTP_WORK_PACKAGE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
                     </label>
                   );
                 }

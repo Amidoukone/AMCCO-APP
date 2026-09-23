@@ -76,14 +76,6 @@ const AGRICULTURE_TASK_LABELS: Record<AgricultureTaskKind, string> = {
   STORAGE: "Stockage",
   FOLLOW_UP: "Suivi terrain"
 };
-const BTP_WORK_PACKAGE_OPTIONS = [
-  "Terrassement",
-  "Fondation",
-  "Gros oeuvre",
-  "Second oeuvre",
-  "Finition",
-  "Autre"
-];
 const BTP_TASK_KIND_KEY = "btpTaskKind";
 type BtpTaskKind =
   | "SITE_PREPARATION"
@@ -1602,31 +1594,6 @@ export function OperationsTasksPage(): JSX.Element {
                           {projects.map((project) => (
                             <option key={project.id} value={project.id}>
                               {project.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : field.key === "workPackage" && selectedActivityCode === "BTP" ? (
-                      <label key={field.key} className="operations-inline-group">
-                        <span>{field.label}</span>
-                        <select
-                          value={createForm.metadata.workPackage ?? ""}
-                          onChange={(event) =>
-                            setCreateForm((prev) => ({
-                              ...prev,
-                              metadata: {
-                                ...prev.metadata,
-                                workPackage: event.target.value
-                              }
-                            }))
-                          }
-                          title={field.helpText}
-                          required={field.required}
-                        >
-                          <option value="">Choisir un lot</option>
-                          {BTP_WORK_PACKAGE_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
                             </option>
                           ))}
                         </select>
