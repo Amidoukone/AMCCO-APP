@@ -366,25 +366,16 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       createdAt: daysFromNow(-9, 15, 20)
     },
     {
-      key: "store-sale-rice",
+      key: "store-collection-nord",
       accountKey: "storeCash",
       type: "CASH_IN",
       amount: "185000.00",
       currency: "XOF",
       activityCode: "GENERAL_STORE",
-      description: "Vente caisse riz Gambiaka 50kg",
+      description: "Recouvrement Boutique Nord",
       metadata: withSeedMarker({
-        storeOperationKind: "STORE_SALE",
-        department: "Epicerie",
-        productFamily: "Riz",
-        itemName: "Riz Gambiaka 50kg",
-        skuRef: "RIZ-GAM-50",
-        registerRef: "Caisse 1",
-        cashierRef: "Mamadou Sissoko",
-        quantity: "10",
-        purchaseUnitPrice: "16000",
-        saleUnitPrice: "18500",
-        receiptRef: "TK-2026-071"
+        storeOperationKind: "RECOUVREMENT",
+        shopRef: "Boutique Nord"
       }),
       status: "APPROVED",
       requiresProof: false,
@@ -394,24 +385,16 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       createdAt: daysFromNow(-8, 18, 10)
     },
     {
-      key: "store-purchase-stock",
+      key: "store-purchase-nord",
       accountKey: "storeCash",
       type: "CASH_OUT",
       amount: "820000.00",
       currency: "XOF",
       activityCode: "GENERAL_STORE",
-      description: "Achat stock epicerie aupres grossiste Dibida",
+      description: "Achat livre a Boutique Nord aupres grossiste Dibida",
       metadata: withSeedMarker({
-        storeOperationKind: "STOCK_PURCHASE",
-        department: "Epicerie",
-        productFamily: "Huile",
-        itemName: "Huile 20L",
-        skuRef: "HUILE-20L",
-        shelfRef: "Reserve A",
-        quantity: "40",
-        purchaseUnitPrice: "20500",
-        supplierRef: "Grossiste Dibida",
-        invoiceRef: "FAC-DIB-441"
+        storeOperationKind: "ACHAT",
+        shopRef: "Boutique Nord"
       }),
       status: "APPROVED",
       requiresProof: true,
@@ -573,10 +556,8 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       description: "Encaissement client chantier villa A45",
       metadata: withSeedMarker({
         btpOperationKind: "CLIENT_PAYMENT",
-        projectRef: "CHANTIER-BAMAKO-A45",
+        projectRef: "Chantier Villa A45",
         workPackage: "Gros oeuvre",
-        siteLocation: "ACI 2000",
-        clientRef: "Famille Sangare",
         progressPercent: "45",
         paymentRef: "VIR-CLIENT-A45"
       }),
@@ -597,13 +578,10 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       description: "Achat ciment et fer pour gros oeuvre A45",
       metadata: withSeedMarker({
         btpOperationKind: "MATERIAL_PURCHASE",
-        projectRef: "CHANTIER-BAMAKO-A45",
+        projectRef: "Chantier Villa A45",
         workPackage: "Gros oeuvre",
-        siteLocation: "ACI 2000",
-        clientRef: "Famille Sangare",
-        progressPercent: "48",
         quantity: "300",
-        materialRef: "Ciment et fer",
+        materialName: "Ciment et fer",
         supplierRef: "Depot Koulikoro"
       }),
       status: "APPROVED",
@@ -623,10 +601,8 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       description: "Paiement main-d'oeuvre chantier A45",
       metadata: withSeedMarker({
         btpOperationKind: "LABOR_PAYMENT",
-        projectRef: "CHANTIER-BAMAKO-A45",
+        projectRef: "Chantier Villa A45",
         workPackage: "Gros oeuvre",
-        siteLocation: "ACI 2000",
-        clientRef: "Famille Sangare",
         progressPercent: "52",
         workerCount: "12",
         workDays: "5",
@@ -808,16 +784,11 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       amount: "1250000.00",
       currency: "XOF",
       activityCode: "WATER",
-      description: "Encaissement factures eau zone sud",
+      description: "Vente de paquets d'eau, zone Sud",
       metadata: withSeedMarker({
-        waterOperationKind: "WATER_BILLING",
-        facilityRef: "Forage Kati",
-        networkZone: "Zone Sud",
-        productionLine: "Distribution",
-        producedVolumeM3: "1800",
-        volumeM3: "1320",
-        meterRef: "CTR-ZS-01",
-        paymentRef: "OM-EAU-072"
+        waterOperationKind: "WATER_SALE",
+        quantity: "2500",
+        unitPrice: "500"
       }),
       status: "APPROVED",
       requiresProof: false,
@@ -835,13 +806,7 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       activityCode: "WATER",
       description: "Reparation fuite reseau zone sud",
       metadata: withSeedMarker({
-        waterOperationKind: "NETWORK_REPAIR",
-        facilityRef: "Forage Kati",
-        networkZone: "Zone Sud",
-        productionLine: "Maintenance",
-        equipmentRef: "Conduite DN90",
-        issueRef: "FUITE-ZS-044",
-        supplierRef: "Equipe hydraulique Kati"
+        waterOperationKind: "WATER_EXPENSE_MAINTENANCE"
       }),
       status: "APPROVED",
       requiresProof: true,
@@ -1069,15 +1034,13 @@ const demoTasks: DemoTask[] = [
     createdAt: daysFromNow(0, 8, 30)
   },
   {
-    key: "task-store-closing",
-    title: "Cloturer la caisse epicerie",
-    description: "Comparer les ventes tickets avec le versement caisse 1.",
+    key: "task-store-inventory-nord",
+    title: "Inventaire Boutique Nord",
+    description: "Controle mensuel du stock en boutique.",
     activityCode: "GENERAL_STORE",
     metadata: withSeedMarker({
-      storeTaskKind: "CLOSING_CASH",
-      department: "Epicerie",
-      registerRef: "Caisse 1",
-      issueRef: "Controle journalier"
+      shopRef: "Boutique Nord",
+      remainingStockValue: "500000.00"
     }),
     status: "DONE",
     createdByKey: "supervisor",
@@ -1086,18 +1049,13 @@ const demoTasks: DemoTask[] = [
     createdAt: daysFromNow(-2, 9)
   },
   {
-    key: "task-store-inventory-blocked",
-    title: "Verifier ecart inventaire huile 20L",
-    description: "Ecart entre stock systeme et stock reserve A, besoin arbitrage superviseur.",
+    key: "task-store-inventory-sud-blocked",
+    title: "Inventaire Boutique Sud",
+    description: "Ecart constate, besoin arbitrage superviseur avant cloture.",
     activityCode: "GENERAL_STORE",
     metadata: withSeedMarker({
-      storeTaskKind: "INVENTORY",
-      department: "Epicerie",
-      productFamily: "Huile",
-      itemName: "Huile 20L",
-      skuRef: "HUILE-20L",
-      shelfRef: "Reserve A",
-      issueRef: "Ecart inventaire"
+      shopRef: "Boutique Sud",
+      remainingStockValue: "120000.00"
     }),
     status: "BLOCKED",
     createdByKey: "supervisor",
@@ -1186,10 +1144,8 @@ const demoTasks: DemoTask[] = [
     activityCode: "BTP",
     metadata: withSeedMarker({
       btpTaskKind: "PROCUREMENT",
-      projectRef: "CHANTIER-BAMAKO-A45",
+      projectRef: "Chantier Villa A45",
       workPackage: "Gros oeuvre",
-      siteLocation: "ACI 2000",
-      clientRef: "Famille Sangare",
       progressPercent: "52",
       issueRef: "Bon livraison en attente"
     }),
@@ -1279,15 +1235,7 @@ const demoTasks: DemoTask[] = [
     title: "Reparer fuite reseau Zone Sud",
     description: "Localiser fuite DN90 et remettre la pression avant 18h.",
     activityCode: "WATER",
-    metadata: withSeedMarker({
-      waterTaskKind: "LEAK_REPAIR",
-      facilityRef: "Forage Kati",
-      networkZone: "Zone Sud",
-      productionLine: "Maintenance",
-      equipmentRef: "Conduite DN90",
-      issueRef: "FUITE-ZS-044",
-      supplierRef: "Equipe hydraulique Kati"
-    }),
+    metadata: withSeedMarker({}),
     status: "BLOCKED",
     createdByKey: "supervisor",
     assignedToKey: "waterLead",
@@ -1299,13 +1247,7 @@ const demoTasks: DemoTask[] = [
     title: "Releve production forage Kati",
     description: "Saisir index compteur production et volume distribue.",
     activityCode: "WATER",
-    metadata: withSeedMarker({
-      waterTaskKind: "PRODUCTION_READING",
-      facilityRef: "Forage Kati",
-      networkZone: "Zone Sud",
-      productionLine: "Production",
-      meterRef: "CTR-PROD-01"
-    }),
+    metadata: withSeedMarker({}),
     status: "DONE",
     createdByKey: "supervisor",
     assignedToKey: "waterLead",
@@ -1380,7 +1322,7 @@ const demoProofs: DemoProof[] = [
   },
   {
     key: "proof-store-purchase-stock",
-    transactionKey: "store-purchase-stock",
+    transactionKey: "store-purchase-nord",
     fileName: "facture-grossiste-dibida.pdf",
     mimeType: "application/pdf",
     fileSize: 221184,
@@ -1415,9 +1357,9 @@ const demoProofs: DemoProof[] = [
 const demoTaskAttachments: DemoTaskAttachment[] = [
   {
     key: "attachment-store-inventory",
-    taskKey: "task-store-inventory-blocked",
+    taskKey: "task-store-inventory-sud-blocked",
     uploadedByKey: "storeLead",
-    fileName: "photo-ecart-huile-20l.jpg",
+    fileName: "photo-ecart-inventaire-boutique-sud.jpg",
     mimeType: "image/jpeg",
     fileSize: 312000,
     uploadedAt: daysFromNow(-1, 9)
@@ -1454,16 +1396,16 @@ const demoTaskAttachments: DemoTaskAttachment[] = [
 const demoTaskComments: DemoTaskComment[] = [
   {
     key: "comment-store-inventory-1",
-    taskKey: "task-store-inventory-blocked",
+    taskKey: "task-store-inventory-sud-blocked",
     authorKey: "storeLead",
-    body: "Stock physique: 38 bidons. Stock systeme: 42. Ecart a valider avant ajustement.",
+    body: "Ecart constate entre le stock physique et le dernier achat livre. A valider avant cloture.",
     createdAt: daysFromNow(-1, 9, 30)
   },
   {
     key: "comment-store-inventory-2",
-    taskKey: "task-store-inventory-blocked",
+    taskKey: "task-store-inventory-sud-blocked",
     authorKey: "supervisor",
-    body: "Verifier les sorties fournisseur Dibida avant correction du stock.",
+    body: "Verifier les derniers recouvrements de la boutique avant arbitrage.",
     createdAt: daysFromNow(-1, 10)
   },
   {
@@ -1505,10 +1447,10 @@ const demoAlerts: DemoAlert[] = [
     key: "alert-store-warning",
     targetUserKey: "accountant",
     code: "DEMO_STORE_INVENTORY",
-    message: "Ecart inventaire huile 20L en attente de validation comptable.",
+    message: "Ecart inventaire Boutique Sud en attente de validation comptable.",
     severity: "WARNING",
     entityType: "TASK",
-    entityKey: "task-store-inventory-blocked",
+    entityKey: "task-store-inventory-sud-blocked",
     readAt: null,
     createdAt: daysFromNow(-1, 10, 15)
   },

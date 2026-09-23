@@ -50,6 +50,14 @@ import type {
   RentalTenantListResponse,
   RentalTenantSingleResponse
 } from "../types/tenants";
+import type {
+  GeneralStoreShopListResponse,
+  GeneralStoreShopSingleResponse
+} from "../types/shops";
+import type {
+  BtpProjectListResponse,
+  BtpProjectSingleResponse
+} from "../types/projects";
 import type { BusinessActivityCode } from "../config/businessActivities";
 import type {
   DashboardSummaryResponse,
@@ -554,6 +562,7 @@ export function createActivityArticleRequest(
   input: {
     name: string;
     defaultMargin?: string;
+    defaultPurchaseUnitPrice?: string;
   }
 ): Promise<ActivityArticleSingleResponse> {
   return request<ActivityArticleSingleResponse>(`/activities/${activityCode}/articles`, {
@@ -570,6 +579,7 @@ export function updateActivityArticleRequest(
   input: {
     name: string;
     defaultMargin?: string;
+    defaultPurchaseUnitPrice?: string;
   }
 ): Promise<ActivityArticleSingleResponse> {
   return request<ActivityArticleSingleResponse>(
@@ -649,6 +659,122 @@ export function deleteRentalTenantRequest(
   tenantId: string
 ): Promise<{ status: string }> {
   return request<{ status: string }>(`/rental/tenants/${tenantId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
+export function listGeneralStoreShopsRequest(
+  accessToken: string,
+  query: { activeOnly?: boolean } = {}
+): Promise<GeneralStoreShopListResponse> {
+  const params = new URLSearchParams();
+  if (query.activeOnly) {
+    params.set("activeOnly", "true");
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request<GeneralStoreShopListResponse>(`/general-store/shops${suffix}`, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function createGeneralStoreShopRequest(
+  accessToken: string,
+  input: {
+    name: string;
+    location?: string;
+    phone?: string;
+  }
+): Promise<GeneralStoreShopSingleResponse> {
+  return request<GeneralStoreShopSingleResponse>("/general-store/shops", {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function updateGeneralStoreShopRequest(
+  accessToken: string,
+  shopId: string,
+  input: {
+    name: string;
+    location?: string;
+    phone?: string;
+    isActive?: boolean;
+  }
+): Promise<GeneralStoreShopSingleResponse> {
+  return request<GeneralStoreShopSingleResponse>(`/general-store/shops/${shopId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function deleteGeneralStoreShopRequest(
+  accessToken: string,
+  shopId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/general-store/shops/${shopId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
+export function listBtpProjectsRequest(
+  accessToken: string,
+  query: { activeOnly?: boolean } = {}
+): Promise<BtpProjectListResponse> {
+  const params = new URLSearchParams();
+  if (query.activeOnly) {
+    params.set("activeOnly", "true");
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request<BtpProjectListResponse>(`/btp/projects${suffix}`, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function createBtpProjectRequest(
+  accessToken: string,
+  input: {
+    name: string;
+    clientRef?: string;
+    contractRef?: string;
+    location?: string;
+  }
+): Promise<BtpProjectSingleResponse> {
+  return request<BtpProjectSingleResponse>("/btp/projects", {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function updateBtpProjectRequest(
+  accessToken: string,
+  projectId: string,
+  input: {
+    name: string;
+    clientRef?: string;
+    contractRef?: string;
+    location?: string;
+    isActive?: boolean;
+  }
+): Promise<BtpProjectSingleResponse> {
+  return request<BtpProjectSingleResponse>(`/btp/projects/${projectId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function deleteBtpProjectRequest(
+  accessToken: string,
+  projectId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/btp/projects/${projectId}`, {
     method: "DELETE",
     accessToken
   });

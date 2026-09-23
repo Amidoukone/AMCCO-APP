@@ -30,12 +30,19 @@ import {
   assignOperationsTaskRequest,
   createOperationsTaskRequest,
   deleteOperationsTaskRequest,
+  getReportsOverviewRequest,
   getTaskAttachmentUploadAuthRequest,
+  listBtpProjectsRequest,
+  listGeneralStoreShopsRequest,
   listOperationsMembersRequest,
   listOperationsTasksRequest,
   updateOperationsTaskRequest,
   updateOperationsTaskStatusRequest
 } from "../lib/api";
+import {
+  formatAmountForDisplay,
+  formatAmountForInput
+} from "../lib/amountFormatting";
 import {
   getBusinessActivityLabel,
   type BusinessActivityCode
@@ -44,6 +51,9 @@ import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
 import type { OperationTask, OperationTaskMember, TaskAttachment, TaskScope, TaskStatus } from "../types/tasks";
+import type { GeneralStoreShop } from "../types/shops";
+import type { BtpProject } from "../types/projects";
+import type { GeneralStoreOperationsReportRow } from "../types/reporting";
 
 const TASKS_PAGE_SIZE = 200;
 const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
@@ -66,6 +76,14 @@ const AGRICULTURE_TASK_LABELS: Record<AgricultureTaskKind, string> = {
   STORAGE: "Stockage",
   FOLLOW_UP: "Suivi terrain"
 };
+const BTP_WORK_PACKAGE_OPTIONS = [
+  "Terrassement",
+  "Fondation",
+  "Gros oeuvre",
+  "Second oeuvre",
+  "Finition",
+  "Autre"
+];
 const BTP_TASK_KIND_KEY = "btpTaskKind";
 type BtpTaskKind =
   | "SITE_PREPARATION"
@@ -93,34 +111,6 @@ const BTP_TASK_LABELS: Record<BtpTaskKind, string> = {
   RESERVE: "Réserve / reprise",
   HANDOVER: "Réception",
   FOLLOW_UP: "Suivi chantier"
-};
-const STORE_TASK_KIND_KEY = "storeTaskKind";
-type StoreTaskKind =
-  | "OPENING_CASH"
-  | "CLOSING_CASH"
-  | "STOCK_CONTROL"
-  | "INVENTORY"
-  | "REPLENISHMENT"
-  | "MERCHANDISING"
-  | "PRICE_UPDATE"
-  | "SUPPLIER_FOLLOW_UP"
-  | "CUSTOMER_RETURN"
-  | "CLEANING"
-  | "SECURITY_CHECK"
-  | "FOLLOW_UP";
-const STORE_TASK_LABELS: Record<StoreTaskKind, string> = {
-  OPENING_CASH: "Ouverture caisse",
-  CLOSING_CASH: "Clôture caisse",
-  STOCK_CONTROL: "Contrôle stock",
-  INVENTORY: "Inventaire",
-  REPLENISHMENT: "Réassort rayon",
-  MERCHANDISING: "Implantation rayon",
-  PRICE_UPDATE: "Mise à jour prix",
-  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
-  CUSTOMER_RETURN: "Retour client",
-  CLEANING: "Nettoyage rayon",
-  SECURITY_CHECK: "Contrôle sécurité",
-  FOLLOW_UP: "Suivi magasin"
 };
 const FOOD_TASK_KIND_KEY = "foodTaskKind";
 type FoodTaskKind =
@@ -187,34 +177,6 @@ const HOTEL_TASK_LABELS: Record<HotelTaskKind, string> = {
   SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
   NIGHT_AUDIT: "Audit nuit",
   FOLLOW_UP: "Suivi hotelier"
-};
-const WATER_TASK_KIND_KEY = "waterTaskKind";
-type WaterTaskKind =
-  | "PRODUCTION_READING"
-  | "QUALITY_CONTROL"
-  | "PUMP_MAINTENANCE"
-  | "NETWORK_INSPECTION"
-  | "LEAK_REPAIR"
-  | "METER_READING"
-  | "CONNECTION_WORK"
-  | "CHEMICAL_DOSING"
-  | "BILLING_FOLLOW_UP"
-  | "SUPPLIER_FOLLOW_UP"
-  | "SERVICE_RESTORE"
-  | "FOLLOW_UP";
-const WATER_TASK_LABELS: Record<WaterTaskKind, string> = {
-  PRODUCTION_READING: "Releve production",
-  QUALITY_CONTROL: "Contrôle qualité",
-  PUMP_MAINTENANCE: "Maintenance pompe",
-  NETWORK_INSPECTION: "Inspection réseau",
-  LEAK_REPAIR: "Réparation fuite",
-  METER_READING: "Releve compteur",
-  CONNECTION_WORK: "Branchement",
-  CHEMICAL_DOSING: "Dosage traitement",
-  BILLING_FOLLOW_UP: "Suivi facturation",
-  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
-  SERVICE_RESTORE: "Remise en service",
-  FOLLOW_UP: "Suivi eau"
 };
 const AGENCY_TASK_KIND_KEY = "agencyTaskKind";
 type AgencyTaskKind =
@@ -288,26 +250,26 @@ type GeneralExpenseKind =
   | "PDG_TRANSPORT"
   | "PDG_SUPPLIER_PAYMENT"
   | "PDG_TRANSFER_ADVANCE"
-  | "PDG_PAYROLL"
+  | "PDG_INVESTMENT"
+  | "PDG_LOAN"
   | "PDG_OVERHEAD"
   | "EMPLOYEE_MEALS"
   | "EMPLOYEE_FUEL"
   | "EMPLOYEE_VEHICLE_UPKEEP"
   | "EMPLOYEE_SUPPLIES"
-  | "EMPLOYEE_PAYROLL"
   | "EMPLOYEE_OTHER";
 const GENERAL_EXPENSE_KIND_LABELS: Record<GeneralExpenseKind, string> = {
   PDG_SUPPLIES: "PDG - Achat matériel / fournitures",
   PDG_TRANSPORT: "PDG - Carburant / transport",
   PDG_SUPPLIER_PAYMENT: "PDG - Paiement fournisseur / prestataire",
   PDG_TRANSFER_ADVANCE: "PDG - Virement / avance / transfert",
-  PDG_PAYROLL: "PDG - Salaire / cotisation",
+  PDG_INVESTMENT: "PDG - Investissement",
+  PDG_LOAN: "PDG - Prêt",
   PDG_OVERHEAD: "PDG - Frais généraux / divers",
   EMPLOYEE_MEALS: "Employé - Repas",
   EMPLOYEE_FUEL: "Employé - Carburant",
   EMPLOYEE_VEHICLE_UPKEEP: "Employé - Entretien véhicule",
   EMPLOYEE_SUPPLIES: "Employé - Fournitures / consommables",
-  EMPLOYEE_PAYROLL: "Employé - Salaire",
   EMPLOYEE_OTHER: "Employé - Autre dépense"
 };
 
@@ -418,23 +380,6 @@ function isBtpTaskKind(value: string | undefined): value is BtpTaskKind {
   );
 }
 
-function isStoreTaskKind(value: string | undefined): value is StoreTaskKind {
-  return (
-    value === "OPENING_CASH" ||
-    value === "CLOSING_CASH" ||
-    value === "STOCK_CONTROL" ||
-    value === "INVENTORY" ||
-    value === "REPLENISHMENT" ||
-    value === "MERCHANDISING" ||
-    value === "PRICE_UPDATE" ||
-    value === "SUPPLIER_FOLLOW_UP" ||
-    value === "CUSTOMER_RETURN" ||
-    value === "CLEANING" ||
-    value === "SECURITY_CHECK" ||
-    value === "FOLLOW_UP"
-  );
-}
-
 function isFoodTaskKind(value: string | undefined): value is FoodTaskKind {
   return (
     value === "RECEPTION" ||
@@ -476,23 +421,6 @@ function isHotelTaskKind(value: string | undefined): value is HotelTaskKind {
     value === "GUEST_FOLLOW_UP" ||
     value === "SUPPLIER_FOLLOW_UP" ||
     value === "NIGHT_AUDIT" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isWaterTaskKind(value: string | undefined): value is WaterTaskKind {
-  return (
-    value === "PRODUCTION_READING" ||
-    value === "QUALITY_CONTROL" ||
-    value === "PUMP_MAINTENANCE" ||
-    value === "NETWORK_INSPECTION" ||
-    value === "LEAK_REPAIR" ||
-    value === "METER_READING" ||
-    value === "CONNECTION_WORK" ||
-    value === "CHEMICAL_DOSING" ||
-    value === "BILLING_FOLLOW_UP" ||
-    value === "SUPPLIER_FOLLOW_UP" ||
-    value === "SERVICE_RESTORE" ||
     value === "FOLLOW_UP"
   );
 }
@@ -546,9 +474,6 @@ function formatMetadataValue(key: string, value: string): string {
   if (key === BTP_TASK_KIND_KEY && isBtpTaskKind(value)) {
     return BTP_TASK_LABELS[value];
   }
-  if (key === STORE_TASK_KIND_KEY && isStoreTaskKind(value)) {
-    return STORE_TASK_LABELS[value];
-  }
   if (key === FOOD_TASK_KIND_KEY && isFoodTaskKind(value)) {
     return FOOD_TASK_LABELS[value];
   }
@@ -557,9 +482,6 @@ function formatMetadataValue(key: string, value: string): string {
   }
   if (key === HOTEL_TASK_KIND_KEY && isHotelTaskKind(value)) {
     return HOTEL_TASK_LABELS[value];
-  }
-  if (key === WATER_TASK_KIND_KEY && isWaterTaskKind(value)) {
-    return WATER_TASK_LABELS[value];
   }
   if (key === AGENCY_TASK_KIND_KEY && isAgencyTaskKind(value)) {
     return AGENCY_TASK_LABELS[value];
@@ -624,6 +546,9 @@ export function OperationsTasksPage(): JSX.Element {
   } = useBusinessActivity();
   const [tasks, setTasks] = useState<OperationTask[]>([]);
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
+  const [shops, setShops] = useState<GeneralStoreShop[]>([]);
+  const [shopLedgerRows, setShopLedgerRows] = useState<GeneralStoreOperationsReportRow[]>([]);
+  const [projects, setProjects] = useState<BtpProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
@@ -836,6 +761,63 @@ export function OperationsTasksPage(): JSX.Element {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const loadShops = useCallback(async () => {
+    if (selectedActivityCode !== "GENERAL_STORE") {
+      setShops([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        listGeneralStoreShopsRequest(accessToken)
+      );
+      setShops(payload.items);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadShops();
+  }, [loadShops]);
+
+  const loadShopLedger = useCallback(async () => {
+    if (selectedActivityCode !== "GENERAL_STORE") {
+      setShopLedgerRows([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        getReportsOverviewRequest(accessToken, { activityCode: "GENERAL_STORE" })
+      );
+      setShopLedgerRows(payload.item.generalStoreOperationsReport?.rows ?? []);
+    } catch {
+      setShopLedgerRows([]);
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadShopLedger();
+  }, [loadShopLedger]);
+
+  const loadProjects = useCallback(async () => {
+    if (selectedActivityCode !== "BTP") {
+      setProjects([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        listBtpProjectsRequest(accessToken)
+      );
+      setProjects(payload.items);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
 
   useEffect(() => {
     setVisibleTasksPage(1);
@@ -1485,36 +1467,159 @@ export function OperationsTasksPage(): JSX.Element {
                         <option value="HANDOVER">{BTP_TASK_LABELS.HANDOVER}</option>
                         <option value="FOLLOW_UP">{BTP_TASK_LABELS.FOLLOW_UP}</option>
                       </select>
-                    ) : field.key === STORE_TASK_KIND_KEY && selectedActivityCode === "GENERAL_STORE" ? (
-                      <select
-                        key={field.key}
-                        value={createForm.metadata[field.key] ?? ""}
-                        onChange={(event) =>
-                          setCreateForm((prev) => ({
-                            ...prev,
-                            metadata: {
-                              ...prev.metadata,
-                              [field.key]: event.target.value
-                            }
-                          }))
-                        }
-                        title={field.helpText}
-                        required={field.required}
-                      >
-                        <option value="">Choisir le type d'action magasin</option>
-                        <option value="OPENING_CASH">{STORE_TASK_LABELS.OPENING_CASH}</option>
-                        <option value="CLOSING_CASH">{STORE_TASK_LABELS.CLOSING_CASH}</option>
-                        <option value="STOCK_CONTROL">{STORE_TASK_LABELS.STOCK_CONTROL}</option>
-                        <option value="INVENTORY">{STORE_TASK_LABELS.INVENTORY}</option>
-                        <option value="REPLENISHMENT">{STORE_TASK_LABELS.REPLENISHMENT}</option>
-                        <option value="MERCHANDISING">{STORE_TASK_LABELS.MERCHANDISING}</option>
-                        <option value="PRICE_UPDATE">{STORE_TASK_LABELS.PRICE_UPDATE}</option>
-                        <option value="SUPPLIER_FOLLOW_UP">{STORE_TASK_LABELS.SUPPLIER_FOLLOW_UP}</option>
-                        <option value="CUSTOMER_RETURN">{STORE_TASK_LABELS.CUSTOMER_RETURN}</option>
-                        <option value="CLEANING">{STORE_TASK_LABELS.CLEANING}</option>
-                        <option value="SECURITY_CHECK">{STORE_TASK_LABELS.SECURITY_CHECK}</option>
-                        <option value="FOLLOW_UP">{STORE_TASK_LABELS.FOLLOW_UP}</option>
-                      </select>
+                    ) : field.key === "shopRef" && selectedActivityCode === "GENERAL_STORE" ? (
+                      <label key={field.key} className="operations-inline-group">
+                        <span>{field.label}</span>
+                        <select
+                          value={shops.find((shop) => shop.name === (createForm.metadata.shopRef ?? ""))?.id ?? ""}
+                          onChange={(event) => {
+                            const selectedShop = shops.find((shop) => shop.id === event.target.value);
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                shopRef: selectedShop?.name ?? ""
+                              }
+                            }));
+                          }}
+                          title={field.helpText}
+                          required={field.required}
+                        >
+                          <option value="">Choisir une boutique</option>
+                          {shops.map((shop) => (
+                            <option key={shop.id} value={shop.id}>
+                              {shop.name}
+                            </option>
+                          ))}
+                        </select>
+                        {createForm.metadata.shopRef ? (
+                          (() => {
+                            const ledgerRow = shopLedgerRows.find(
+                              (row) => row.shopRef === createForm.metadata.shopRef
+                            );
+                            return (
+                              <small className="hint">
+                                Achats: {formatAmountForDisplay(ledgerRow?.purchaseAmount ?? "0")} XOF |
+                                Déjà recouvré: {formatAmountForDisplay(ledgerRow?.collectedAmount ?? "0")} XOF |
+                                Solde dû: {formatAmountForDisplay(ledgerRow?.balanceAmount ?? "0")} XOF
+                              </small>
+                            );
+                          })()
+                        ) : null}
+                      </label>
+                    ) : field.key === "remainingStockValue" && selectedActivityCode === "GENERAL_STORE" ? (
+                      (() => {
+                        const ledgerRow = shopLedgerRows.find(
+                          (row) => row.shopRef === createForm.metadata.shopRef
+                        );
+                        const purchaseValue = Number(ledgerRow?.purchaseAmount ?? "0");
+                        const collectedValue = Number(ledgerRow?.collectedAmount ?? "0");
+                        const remainingValue = Number(
+                          (createForm.metadata.remainingStockValue ?? "").replace(",", ".").replace(/\s/g, "")
+                        );
+                        const hasRemainingValue = createForm.metadata.remainingStockValue?.trim();
+                        const estimatedSold = hasRemainingValue ? purchaseValue - remainingValue : null;
+                        const variance = estimatedSold !== null ? estimatedSold - collectedValue : null;
+                        return (
+                          <label key={field.key} className="operations-inline-group">
+                            <span>{field.label}</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="Ex: 30000"
+                              value={createForm.metadata.remainingStockValue ?? ""}
+                              onChange={(event) =>
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  metadata: {
+                                    ...prev.metadata,
+                                    remainingStockValue: formatAmountForInput(event.target.value)
+                                  }
+                                }))
+                              }
+                              onBlur={() =>
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  metadata: {
+                                    ...prev.metadata,
+                                    remainingStockValue: formatAmountForInput(
+                                      prev.metadata.remainingStockValue ?? ""
+                                    )
+                                  }
+                                }))
+                              }
+                              title={field.helpText}
+                              required={field.required}
+                            />
+                            {estimatedSold !== null && variance !== null ? (
+                              <small className="hint">
+                                Vendu estimé: {formatAmountForDisplay(String(estimatedSold))} XOF | Écart vs
+                                recouvré: {formatAmountForDisplay(String(variance))} XOF
+                              </small>
+                            ) : (
+                              <small className="hint">
+                                Valeur des articles encore présents en boutique aujourd'hui.
+                              </small>
+                            )}
+                          </label>
+                        );
+                      })()
+                    ) : field.key === "projectRef" && selectedActivityCode === "BTP" ? (
+                      <label key={field.key} className="operations-inline-group">
+                        <span>{field.label}</span>
+                        <select
+                          value={
+                            projects.find((project) => project.name === (createForm.metadata.projectRef ?? ""))
+                              ?.id ?? ""
+                          }
+                          onChange={(event) => {
+                            const selectedProject = projects.find(
+                              (project) => project.id === event.target.value
+                            );
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                projectRef: selectedProject?.name ?? ""
+                              }
+                            }));
+                          }}
+                          title={field.helpText}
+                          required={field.required}
+                        >
+                          <option value="">Choisir un chantier</option>
+                          {projects.map((project) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : field.key === "workPackage" && selectedActivityCode === "BTP" ? (
+                      <label key={field.key} className="operations-inline-group">
+                        <span>{field.label}</span>
+                        <select
+                          value={createForm.metadata.workPackage ?? ""}
+                          onChange={(event) =>
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                workPackage: event.target.value
+                              }
+                            }))
+                          }
+                          title={field.helpText}
+                          required={field.required}
+                        >
+                          <option value="">Choisir un lot</option>
+                          {BTP_WORK_PACKAGE_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     ) : field.key === FOOD_TASK_KIND_KEY && selectedActivityCode === "FOOD" ? (
                       <select
                         key={field.key}
@@ -1598,36 +1703,6 @@ export function OperationsTasksPage(): JSX.Element {
                         <option value="SUPPLIER_FOLLOW_UP">{HOTEL_TASK_LABELS.SUPPLIER_FOLLOW_UP}</option>
                         <option value="NIGHT_AUDIT">{HOTEL_TASK_LABELS.NIGHT_AUDIT}</option>
                         <option value="FOLLOW_UP">{HOTEL_TASK_LABELS.FOLLOW_UP}</option>
-                      </select>
-                    ) : field.key === WATER_TASK_KIND_KEY && selectedActivityCode === "WATER" ? (
-                      <select
-                        key={field.key}
-                        value={createForm.metadata[field.key] ?? ""}
-                        onChange={(event) =>
-                          setCreateForm((prev) => ({
-                            ...prev,
-                            metadata: {
-                              ...prev.metadata,
-                              [field.key]: event.target.value
-                            }
-                          }))
-                        }
-                        title={field.helpText}
-                        required={field.required}
-                      >
-                        <option value="">Choisir le type d'action eau</option>
-                        <option value="PRODUCTION_READING">{WATER_TASK_LABELS.PRODUCTION_READING}</option>
-                        <option value="QUALITY_CONTROL">{WATER_TASK_LABELS.QUALITY_CONTROL}</option>
-                        <option value="PUMP_MAINTENANCE">{WATER_TASK_LABELS.PUMP_MAINTENANCE}</option>
-                        <option value="NETWORK_INSPECTION">{WATER_TASK_LABELS.NETWORK_INSPECTION}</option>
-                        <option value="LEAK_REPAIR">{WATER_TASK_LABELS.LEAK_REPAIR}</option>
-                        <option value="METER_READING">{WATER_TASK_LABELS.METER_READING}</option>
-                        <option value="CONNECTION_WORK">{WATER_TASK_LABELS.CONNECTION_WORK}</option>
-                        <option value="CHEMICAL_DOSING">{WATER_TASK_LABELS.CHEMICAL_DOSING}</option>
-                        <option value="BILLING_FOLLOW_UP">{WATER_TASK_LABELS.BILLING_FOLLOW_UP}</option>
-                        <option value="SUPPLIER_FOLLOW_UP">{WATER_TASK_LABELS.SUPPLIER_FOLLOW_UP}</option>
-                        <option value="SERVICE_RESTORE">{WATER_TASK_LABELS.SERVICE_RESTORE}</option>
-                        <option value="FOLLOW_UP">{WATER_TASK_LABELS.FOLLOW_UP}</option>
                       </select>
                     ) : field.key === AGENCY_TASK_KIND_KEY && selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
                       <select
@@ -1731,13 +1806,13 @@ export function OperationsTasksPage(): JSX.Element {
                         <option value="PDG_TRANSPORT">{GENERAL_EXPENSE_KIND_LABELS.PDG_TRANSPORT}</option>
                         <option value="PDG_SUPPLIER_PAYMENT">{GENERAL_EXPENSE_KIND_LABELS.PDG_SUPPLIER_PAYMENT}</option>
                         <option value="PDG_TRANSFER_ADVANCE">{GENERAL_EXPENSE_KIND_LABELS.PDG_TRANSFER_ADVANCE}</option>
-                        <option value="PDG_PAYROLL">{GENERAL_EXPENSE_KIND_LABELS.PDG_PAYROLL}</option>
+                        <option value="PDG_INVESTMENT">{GENERAL_EXPENSE_KIND_LABELS.PDG_INVESTMENT}</option>
+                        <option value="PDG_LOAN">{GENERAL_EXPENSE_KIND_LABELS.PDG_LOAN}</option>
                         <option value="PDG_OVERHEAD">{GENERAL_EXPENSE_KIND_LABELS.PDG_OVERHEAD}</option>
                         <option value="EMPLOYEE_MEALS">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_MEALS}</option>
                         <option value="EMPLOYEE_FUEL">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_FUEL}</option>
                         <option value="EMPLOYEE_VEHICLE_UPKEEP">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_VEHICLE_UPKEEP}</option>
                         <option value="EMPLOYEE_SUPPLIES">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_SUPPLIES}</option>
-                        <option value="EMPLOYEE_PAYROLL">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_PAYROLL}</option>
                         <option value="EMPLOYEE_OTHER">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_OTHER}</option>
                       </select>
                     ) : (

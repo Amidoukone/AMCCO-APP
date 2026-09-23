@@ -42,6 +42,7 @@ export async function createCompanyActivityArticle(
     activityCode: BusinessActivityCode;
     name: string;
     defaultMargin?: string;
+    defaultPurchaseUnitPrice?: string;
   }
 ) {
   if (!canManageActivityArticles(actor.role)) {
@@ -55,7 +56,8 @@ export async function createCompanyActivityArticle(
       companyId: actor.companyId,
       activityCode: input.activityCode,
       name: input.name.trim(),
-      defaultMargin: input.defaultMargin ?? null
+      defaultMargin: input.defaultMargin ?? null,
+      defaultPurchaseUnitPrice: input.defaultPurchaseUnitPrice ?? null
     });
   } catch (error) {
     if (mysqlErrorCode(error) === "ER_DUP_ENTRY") {
@@ -79,7 +81,8 @@ export async function createCompanyActivityArticle(
     metadataJson: JSON.stringify({
       activityCode: created.activityCode,
       name: created.name,
-      defaultMargin: created.defaultMargin
+      defaultMargin: created.defaultMargin,
+      defaultPurchaseUnitPrice: created.defaultPurchaseUnitPrice
     })
   });
 
@@ -92,6 +95,7 @@ export async function updateCompanyActivityArticle(
     articleId: string;
     name: string;
     defaultMargin?: string;
+    defaultPurchaseUnitPrice?: string;
   }
 ) {
   if (!canManageActivityArticles(actor.role)) {
@@ -108,7 +112,8 @@ export async function updateCompanyActivityArticle(
       companyId: actor.companyId,
       articleId: input.articleId,
       name: input.name.trim(),
-      defaultMargin: input.defaultMargin ?? null
+      defaultMargin: input.defaultMargin ?? null,
+      defaultPurchaseUnitPrice: input.defaultPurchaseUnitPrice ?? null
     });
   } catch (error) {
     if (mysqlErrorCode(error) === "ER_DUP_ENTRY") {
@@ -132,7 +137,8 @@ export async function updateCompanyActivityArticle(
     metadataJson: JSON.stringify({
       activityCode: updated.activityCode,
       name: updated.name,
-      defaultMargin: updated.defaultMargin
+      defaultMargin: updated.defaultMargin,
+      defaultPurchaseUnitPrice: updated.defaultPurchaseUnitPrice
     })
   });
 

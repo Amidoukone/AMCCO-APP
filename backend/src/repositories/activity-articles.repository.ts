@@ -8,6 +8,7 @@ export type ActivityArticle = {
   activityCode: BusinessActivityCode;
   name: string;
   defaultMargin: string | null;
+  defaultPurchaseUnitPrice: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -18,6 +19,7 @@ type ActivityArticleRow = RowDataPacket & {
   activityCode: BusinessActivityCode;
   name: string;
   defaultMargin: string | null;
+  defaultPurchaseUnitPrice: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -29,6 +31,7 @@ function toActivityArticle(row: ActivityArticleRow): ActivityArticle {
     activityCode: row.activityCode,
     name: row.name,
     defaultMargin: row.defaultMargin,
+    defaultPurchaseUnitPrice: row.defaultPurchaseUnitPrice,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };
@@ -40,6 +43,7 @@ const SELECT_COLUMNS = `
   activity_code AS activityCode,
   name AS name,
   CAST(default_margin AS CHAR) AS defaultMargin,
+  CAST(default_purchase_unit_price AS CHAR) AS defaultPurchaseUnitPrice,
   created_at AS createdAt,
   updated_at AS updatedAt
 `;
@@ -84,13 +88,21 @@ export async function createActivityArticle(input: {
   activityCode: BusinessActivityCode;
   name: string;
   defaultMargin: string | null;
+  defaultPurchaseUnitPrice: string | null;
 }): Promise<void> {
   await getDbPool().execute<ResultSetHeader>(
     `
-      INSERT INTO activity_articles (id, company_id, activity_code, name, default_margin)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO activity_articles (id, company_id, activity_code, name, default_margin, default_purchase_unit_price)
+      VALUES (?, ?, ?, ?, ?, ?)
     `,
-    [input.id, input.companyId, input.activityCode, input.name, input.defaultMargin]
+    [
+      input.id,
+      input.companyId,
+      input.activityCode,
+      input.name,
+      input.defaultMargin,
+      input.defaultPurchaseUnitPrice
+    ]
   );
 }
 
@@ -99,17 +111,25 @@ export async function updateActivityArticle(input: {
   articleId: string;
   name: string;
   defaultMargin: string | null;
+  defaultPurchaseUnitPrice: string | null;
 }): Promise<void> {
   await getDbPool().execute<ResultSetHeader>(
     `
       UPDATE activity_articles
       SET
         name = ?,
-        default_margin = ?
+        default_margin = ?,
+        default_purchase_unit_price = ?
       WHERE company_id = ?
         AND id = ?
     `,
-    [input.name, input.defaultMargin, input.companyId, input.articleId]
+    [
+      input.name,
+      input.defaultMargin,
+      input.defaultPurchaseUnitPrice,
+      input.companyId,
+      input.articleId
+    ]
   );
 }
 

@@ -184,74 +184,29 @@ export type AgricultureOperationsReport = {
 };
 
 export type GeneralStoreOperationsReportRow = {
-  department: string;
-  productFamily: string;
-  itemName: string;
-  skuRef: string;
-  soldQuantity: number;
-  purchaseQuantity: number;
-  returnQuantity: number;
-  adjustmentQuantity: number;
-  transferQuantity: number;
-  salesAmount: string;
+  shopRef: string;
+  location: string;
+  lastOperationDate: string;
   purchaseAmount: string;
-  returnAmount: string;
-  discountAmount: string;
-  expenseAmount: string;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInAmount: string;
-  cashOutAmount: string;
-  netAmount: string;
-  grossMargin: string;
-  marginRate: number;
-  executionRate: number;
-  currency: "XOF";
-};
-
-export type GeneralStoreOperationsReportOperationRow = {
-  operationKind: string;
-  operationLabel: string;
-  transactionsCount: number;
-  tasksCount: number;
-  cashInAmount: string;
-  cashOutAmount: string;
-  netAmount: string;
+  collectedAmount: string;
+  balanceAmount: string;
+  lastInventoryDate: string;
+  remainingStockValue: string | null;
+  estimatedSoldAmount: string | null;
+  varianceAmount: string | null;
   currency: "XOF";
 };
 
 export type GeneralStoreOperationsReport = {
   periodLabel: string;
+  asOfLabel: string;
   rows: GeneralStoreOperationsReportRow[];
-  operationRows: GeneralStoreOperationsReportOperationRow[];
   totals: {
-    departmentsCount: number;
-    productFamiliesCount: number;
-    itemsCount: number;
-    soldQuantity: number;
-    purchaseQuantity: number;
-    returnQuantity: number;
-    adjustmentQuantity: number;
-    transferQuantity: number;
-    salesAmount: string;
+    shopsCount: number;
     purchaseAmount: string;
-    returnAmount: string;
-    discountAmount: string;
-    expenseAmount: string;
+    collectedAmount: string;
+    balanceAmount: string;
     transactionsCount: number;
-    tasksCount: number;
-    doneTasksCount: number;
-    openTasksCount: number;
-    blockedTasksCount: number;
-    cashInAmount: string;
-    cashOutAmount: string;
-    netAmount: string;
-    grossMargin: string;
-    marginRate: number;
-    executionRate: number;
     currency: "XOF";
   };
 };
@@ -441,74 +396,35 @@ export type HotelOperationsReport = {
 };
 
 export type WaterOperationsReportRow = {
-  facilityRef: string;
-  networkZone: string;
-  productionLine: string;
-  producedVolumeM3: number;
-  billedVolumeM3: number;
-  waterRevenue: string;
-  bulkSaleAmount: string;
-  connectionAmount: string;
-  subsidyAmount: string;
-  treatmentCost: string;
-  energyCost: string;
-  maintenanceCost: string;
-  qualityCost: string;
-  repairCost: string;
-  supplierPaymentAmount: string;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInAmount: string;
-  cashOutAmount: string;
-  netAmount: string;
-  lossRate: number;
-  executionRate: number;
+  date: string;
+  kind: "IN" | "OUT";
+  categoryLabel: string;
+  designation: string;
+  quantity: number;
+  unitPrice: string;
+  amount: string;
   currency: "XOF";
 };
 
-export type WaterOperationsReportOperationRow = {
-  operationKind: string;
-  operationLabel: string;
+export type WaterOperationsReportBreakdownRow = {
+  kind: "IN" | "OUT";
+  categoryLabel: string;
   transactionsCount: number;
-  tasksCount: number;
-  cashInAmount: string;
-  cashOutAmount: string;
-  netAmount: string;
+  amount: string;
   currency: "XOF";
 };
 
 export type WaterOperationsReport = {
   periodLabel: string;
   rows: WaterOperationsReportRow[];
-  operationRows: WaterOperationsReportOperationRow[];
+  breakdownRows: WaterOperationsReportBreakdownRow[];
   totals: {
-    facilitiesCount: number;
-    zonesCount: number;
-    producedVolumeM3: number;
-    billedVolumeM3: number;
-    waterRevenue: string;
-    bulkSaleAmount: string;
-    connectionAmount: string;
-    subsidyAmount: string;
-    treatmentCost: string;
-    energyCost: string;
-    maintenanceCost: string;
-    qualityCost: string;
-    repairCost: string;
-    supplierPaymentAmount: string;
     transactionsCount: number;
-    tasksCount: number;
-    doneTasksCount: number;
-    openTasksCount: number;
-    blockedTasksCount: number;
-    cashInAmount: string;
-    cashOutAmount: string;
+    packagesSold: number;
+    averagePackagePrice: string;
+    salesAmount: string;
+    expensesAmount: string;
     netAmount: string;
-    lossRate: number;
-    executionRate: number;
     currency: "XOF";
   };
 };
@@ -593,56 +509,38 @@ export type AgencyOperationsReport = {
 
 export type BtpOperationsReportRow = {
   projectRef: string;
-  workPackage: string;
-  siteLocation: string;
   clientRef: string;
-  progressPercent: number;
-  materialQuantity: number;
-  laborDays: number;
-  equipmentHours: number;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
+  location: string;
   cashInAmount: string;
-  cashOutAmount: string;
+  materialAmount: string;
+  laborAmount: string;
+  equipmentAmount: string;
+  subcontractingAmount: string;
+  siteExpenseAmount: string;
+  totalCostAmount: string;
   netAmount: string;
-  executionRate: number;
-  currency: "XOF";
-};
-
-export type BtpOperationsReportOperationRow = {
-  operationKind: string;
-  operationLabel: string;
+  retentionAmount: string;
+  lastProgressPercent: number | null;
+  lastOperationDate: string;
   transactionsCount: number;
-  tasksCount: number;
-  cashInAmount: string;
-  cashOutAmount: string;
-  netAmount: string;
   currency: "XOF";
 };
 
 export type BtpOperationsReport = {
   periodLabel: string;
+  asOfLabel: string;
   rows: BtpOperationsReportRow[];
-  operationRows: BtpOperationsReportOperationRow[];
   totals: {
     projectsCount: number;
-    workPackagesCount: number;
-    progressPercent: number;
-    materialQuantity: number;
-    laborDays: number;
-    equipmentHours: number;
-    transactionsCount: number;
-    tasksCount: number;
-    doneTasksCount: number;
-    openTasksCount: number;
-    blockedTasksCount: number;
     cashInAmount: string;
-    cashOutAmount: string;
+    materialAmount: string;
+    laborAmount: string;
+    equipmentAmount: string;
+    subcontractingAmount: string;
+    siteExpenseAmount: string;
+    totalCostAmount: string;
     netAmount: string;
-    executionRate: number;
+    transactionsCount: number;
     currency: "XOF";
   };
 };

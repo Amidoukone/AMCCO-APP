@@ -210,7 +210,8 @@ describe("tasks.service", () => {
         description: " Avant la fin de semaine ",
         activityCode: "GENERAL_STORE",
         metadata: {
-          storeTaskKind: "Relance client"
+          shopRef: "Boutique Test",
+          remainingStockValue: "50000"
         },
         assignedToId: "employee-1",
         dueDate: "2026-04-25"
@@ -396,7 +397,8 @@ describe("tasks.service", () => {
           description: "Version initiale",
           activityCode: "GENERAL_STORE",
           metadata: {
-            storeTaskKind: "Inventaire"
+            shopRef: "Boutique Test",
+            remainingStockValue: "50000"
           },
           status: "TODO",
           createdById: "employee-1",
@@ -416,7 +418,8 @@ describe("tasks.service", () => {
           description: "Version ajustee",
           activityCode: "GENERAL_STORE",
           metadata: {
-            storeTaskKind: "Inventaire"
+            shopRef: "Boutique Test",
+            remainingStockValue: "50000"
           },
           status: "TODO",
           createdById: "employee-1",
@@ -449,7 +452,8 @@ describe("tasks.service", () => {
         title: "Contrôle stock urgent",
         description: "Version ajustee",
         metadata: {
-          storeTaskKind: "Inventaire"
+          shopRef: "Boutique Test",
+          remainingStockValue: "50000"
         },
         dueDate: null
       });
@@ -645,7 +649,7 @@ describe("tasks.service", () => {
         excludeUserIds: [actor.actorId],
         code: "TASK_BLOCKED",
         message: "Une tâche Production d'eau potable est bloquée et requiert une attention management : Document manquant",
-        severity: "CRITICAL",
+        severity: "WARNING",
         entityType: "TASK",
         entityId: "task-4",
         metadata: {

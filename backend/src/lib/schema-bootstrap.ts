@@ -325,6 +325,7 @@ async function ensureActivityArticlesTable(): Promise<void> {
         activity_code VARCHAR(32) NOT NULL,
         name VARCHAR(120) NOT NULL,
         default_margin DECIMAL(14,2) NULL,
+        default_purchase_unit_price DECIMAL(14,2) NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_activity_article_name (company_id, activity_code, name),
@@ -333,6 +334,13 @@ async function ensureActivityArticlesTable(): Promise<void> {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `
   );
+
+  const hasDefaultPurchaseUnitPrice = await columnExists("activity_articles", "default_purchase_unit_price");
+  if (!hasDefaultPurchaseUnitPrice) {
+    await getDbPool().execute(
+      `ALTER TABLE activity_articles ADD COLUMN default_purchase_unit_price DECIMAL(14,2) NULL AFTER default_margin`
+    );
+  }
 }
 
 async function ensureRentalTenantsTable(): Promise<void> {
@@ -367,6 +375,47 @@ async function ensureRentalTenantsTable(): Promise<void> {
       UPDATE rental_tenants
       SET tenancy_start = DATE_FORMAT(created_at, '%Y-%m')
       WHERE tenancy_start IS NULL
+    `
+  );
+}
+
+async function ensureGeneralStoreShopsTable(): Promise<void> {
+  await getDbPool().execute(
+    `
+      CREATE TABLE IF NOT EXISTS general_store_shops (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        location VARCHAR(160) NULL,
+        phone VARCHAR(40) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_general_store_shop_name (company_id, name),
+        KEY idx_general_store_shop_company (company_id, is_active),
+        CONSTRAINT fk_general_store_shop_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `
+  );
+}
+
+async function ensureBtpProjectsTable(): Promise<void> {
+  await getDbPool().execute(
+    `
+      CREATE TABLE IF NOT EXISTS btp_projects (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        client_ref VARCHAR(160) NULL,
+        contract_ref VARCHAR(160) NULL,
+        location VARCHAR(160) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_btp_project_name (company_id, name),
+        KEY idx_btp_project_company (company_id, is_active),
+        CONSTRAINT fk_btp_project_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `
   );
 }
@@ -412,6 +461,8 @@ export async function ensureBusinessActivitySchemaReady(): Promise<void> {
     await ensureCompanyActivitiesTable();
     await ensureActivityArticlesTable();
     await ensureRentalTenantsTable();
+    await ensureGeneralStoreShopsTable();
+    await ensureBtpProjectsTable();
     await ensureCompanyActivitiesSeeded();
     logger.info("Business activity schema ready");
   } catch (error) {

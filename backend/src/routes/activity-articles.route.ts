@@ -21,7 +21,8 @@ const articleParamSchema = activityCodeParamSchema.extend({
 
 const articleBodySchema = z.object({
   name: z.string().trim().min(1).max(120),
-  defaultMargin: z.string().regex(/^\d+(\.\d{1,2})?$/).optional()
+  defaultMargin: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+  defaultPurchaseUnitPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional()
 });
 
 export const activityArticlesRouter = Router();
@@ -63,7 +64,8 @@ activityArticlesRouter.post(
       {
         activityCode: params.activityCode,
         name: body.name,
-        defaultMargin: body.defaultMargin
+        defaultMargin: body.defaultMargin,
+        defaultPurchaseUnitPrice: body.defaultPurchaseUnitPrice
       }
     );
     res.status(201).json({ item });
@@ -89,7 +91,8 @@ activityArticlesRouter.patch(
       {
         articleId: params.articleId,
         name: body.name,
-        defaultMargin: body.defaultMargin
+        defaultMargin: body.defaultMargin,
+        defaultPurchaseUnitPrice: body.defaultPurchaseUnitPrice
       }
     );
     res.status(200).json({ item });

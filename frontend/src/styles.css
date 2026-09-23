@@ -1247,17 +1247,30 @@ a {
   margin-top: 0;
 }
 
+.reports-owner-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 2px solid var(--theme-border, #d9e2ec);
+}
+
+.reports-owner-section-title {
+  margin: 0 0 10px;
+  color: var(--theme-text, #102a43);
+  font-size: 15px;
+  font-weight: 800;
+}
+
 .reports-hardware-table th {
   font-weight: 800;
   font-size: 15px;
 }
 
 .reports-hardware-table td {
-  font-size: 15.5px;
+  font-size: 15px;
 }
 
 .reports-hardware-table tfoot th {
-  font-size: 15.5px;
+  font-size: 15px;
 }
 
 .reports-table-header {
@@ -6432,6 +6445,85 @@ textarea:focus,
   --ui-panel-padding: clamp(16px, 2vw, 22px);
 }
 
+/* Typography scale: a single, consistent set of sizes and line-heights so
+   every page reads at the same rhythm instead of one-off tweaks per panel. */
+:root {
+  --ui-font-family:
+    "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --ui-font-2xs: 11px;
+  --ui-font-xs: 12px;
+  --ui-font-sm: 13px;
+  --ui-font-base: 14px;
+  --ui-font-md: 15px;
+  --ui-font-lg: 16px;
+  --ui-font-xl: 18px;
+  --ui-font-2xl: 20px;
+  --ui-font-3xl: 24px;
+  --ui-font-4xl: 28px;
+  --ui-line-tight: 1.25;
+  --ui-line-normal: 1.5;
+  --ui-line-relaxed: 1.65;
+}
+
+html {
+  font-size: var(--ui-font-md);
+}
+
+body {
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-md);
+  line-height: var(--ui-line-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--ui-font-family);
+  line-height: var(--ui-line-tight);
+  margin: 0 0 8px;
+}
+
+h1 {
+  font-size: var(--ui-font-4xl);
+}
+
+h2 {
+  font-size: var(--ui-font-3xl);
+}
+
+h3 {
+  font-size: var(--ui-font-2xl);
+}
+
+h4 {
+  font-size: var(--ui-font-xl);
+}
+
+h5 {
+  font-size: var(--ui-font-lg);
+}
+
+h6 {
+  font-size: var(--ui-font-md);
+}
+
+p {
+  line-height: var(--ui-line-normal);
+}
+
+small,
+.hint {
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-line-normal);
+}
+
 .app-content {
   display: grid;
   align-content: start;
@@ -7109,7 +7201,7 @@ textarea {
     gap: 4px;
     padding: 9px 8px;
     border-radius: 18px;
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.15;
     scroll-snap-align: center;
     transform: none;
@@ -9411,7 +9503,7 @@ textarea {
 
 @media (max-width: 420px) {
   .header-mobile-kicker {
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .header-mobile-title {
@@ -9967,7 +10059,7 @@ textarea {
   }
 
   .header-mobile-kicker {
-    font-size: 9px;
+    font-size: 11px;
     line-height: 1.05;
   }
 
@@ -10057,7 +10149,7 @@ textarea {
   .mobile-context-summary span {
     max-width: 48%;
     padding-inline: 7px;
-    font-size: 10.5px;
+    font-size: 11px;
   }
 
   .mobile-alert-shortcut {
@@ -10218,7 +10310,7 @@ textarea {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 800;
     line-height: 1.1;
   }
@@ -10515,7 +10607,7 @@ textarea {
 
   .finance-transactions-table-wrap.mobile-card-table .admin-table td[data-label]::before {
     align-self: start;
-    font-size: 10.5px;
+    font-size: 11px;
   }
 
   .finance-transactions-table-wrap.mobile-card-table .admin-table td[data-label="Compte"] {
@@ -10751,7 +10843,7 @@ textarea {
   .finance-salaries-table-wrap.mobile-card-table .admin-table td[data-label]::before,
   .admin-users-table-wrap.mobile-card-table .admin-table td[data-label]::before {
     align-self: start;
-    font-size: 10.5px;
+    font-size: 11px;
   }
 
   .finance-salaries-table-wrap.mobile-card-table .admin-table td[data-label="Collaborateur"] > strong,
@@ -11331,7 +11423,7 @@ textarea {
     padding: 8px 7px;
     overflow: visible;
     border-radius: 14px;
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.15;
     text-align: center;
     white-space: normal;
@@ -11428,7 +11520,7 @@ textarea {
   }
 
   .alert-message {
-    font-size: 14.5px;
+    font-size: 15px;
     line-height: 1.42;
   }
 
@@ -11438,7 +11530,7 @@ textarea {
     border: 1px solid var(--mobile-border);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.035);
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.4;
   }
 
@@ -11521,7 +11613,7 @@ textarea {
   }
 
   .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table td[data-label]::before {
-    font-size: 10.5px;
+    font-size: 11px;
   }
 
   .dashboard-operational-table-wrap.mobile-auto-card-table .admin-table td[data-label="Net"] {
@@ -11612,7 +11704,7 @@ textarea {
     border: 1px solid var(--mobile-border);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.035);
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.35;
   }
 
@@ -11686,7 +11778,7 @@ textarea {
   }
 
   .reports-table-header span {
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.3;
   }
 
@@ -11719,7 +11811,7 @@ textarea {
 
   .reports-table-wrap.mobile-auto-card-table .admin-table td[data-label]::before,
   .reports-table-wrap.mobile-auto-card-table .admin-table th[data-label]::before {
-    font-size: 10.5px;
+    font-size: 11px;
   }
 
   .reports-table-wrap.mobile-auto-card-table .admin-table td[data-label="Net"],

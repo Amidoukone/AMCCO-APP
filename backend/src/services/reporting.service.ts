@@ -21,6 +21,9 @@ import {
   listReportFinanceByActivity,
   listReportFinanceByStatus,
   listReportFinanceByType,
+  listReportBtpTransactions,
+  listReportGeneralStoreInventorySnapshots,
+  listReportGeneralStoreTransactions,
   listReportOperationalTasks,
   listReportOperationalTransactions,
   listReportRentalTransactions,
@@ -38,6 +41,7 @@ import {
   type FishFarmingOperationsReport,
   type FoodOperationsReport,
   type GeneralExpensesReport,
+  type GeneralStoreInventorySnapshot,
   type GeneralStoreOperationsReport,
   type HardwareMonthlyReport,
   type HotelOperationsReport,
@@ -51,6 +55,14 @@ import {
 } from "../repositories/reporting.repository.js";
 import { listFinancialAccounts, type FinancialAccount } from "../repositories/finance.repository.js";
 import { listRentalTenants, type RentalTenant } from "../repositories/rental-tenants.repository.js";
+import {
+  listGeneralStoreShops,
+  type GeneralStoreShop
+} from "../repositories/general-store-shops.repository.js";
+import {
+  listBtpProjects,
+  type BtpProject
+} from "../repositories/btp-projects.repository.js";
 import {
   BUSINESS_ACTIVITIES,
   BUSINESS_ACTIVITY_LABELS,
@@ -99,14 +111,19 @@ const GENERAL_EXPENSE_KIND_LABELS: Record<string, string> = {
   PDG_TRANSPORT: "Carburant / transport",
   PDG_SUPPLIER_PAYMENT: "Paiement fournisseur / prestataire",
   PDG_TRANSFER_ADVANCE: "Virement / avance / transfert",
-  PDG_PAYROLL: "Salaire / cotisation",
+  PDG_INVESTMENT: "Investissement",
+  PDG_LOAN: "Prêt",
   PDG_OVERHEAD: "Frais généraux / divers",
   EMPLOYEE_MEALS: "Repas",
   EMPLOYEE_FUEL: "Carburant",
   EMPLOYEE_VEHICLE_UPKEEP: "Entretien véhicule",
   EMPLOYEE_SUPPLIES: "Fournitures / consommables",
-  EMPLOYEE_PAYROLL: "Salaire",
-  EMPLOYEE_OTHER: "Autre dépense"
+  EMPLOYEE_OTHER: "Autre dépense",
+  // Conservés uniquement pour libeller correctement les anciennes dépenses
+  // déjà enregistrées avant que les salaires ne soient déplacés vers le
+  // module Salaires dédié. Ne plus proposer à la saisie.
+  PDG_PAYROLL: "Salaire / cotisation (ancien)",
+  EMPLOYEE_PAYROLL: "Salaire (ancien)"
 };
 const REPORT_READING_GUIDE_ROWS: Array<{
   term: string;
@@ -194,32 +211,12 @@ const AGRICULTURE_REPORT_BRANDING = {
   brand: "AMCCO"
 };
 const GENERAL_STORE_OPERATION_LABELS: Record<string, string> = {
-  STORE_SALE: "Vente caisse",
-  STOCK_PURCHASE: "Achat stock",
-  SUPPLIER_PAYMENT: "Paiement fournisseur",
-  CUSTOMER_RETURN: "Retour client",
-  DISCOUNT_ADJUSTMENT: "Remise / écart",
-  INVENTORY_ADJUSTMENT: "Ajustement inventaire",
-  INTERNAL_TRANSFER: "Transfert interne",
-  STORE_EXPENSE: "Charge magasin"
-};
-const GENERAL_STORE_TASK_LABELS: Record<string, string> = {
-  OPENING_CASH: "Ouverture caisse",
-  CLOSING_CASH: "Clôture caisse",
-  STOCK_CONTROL: "Contrôle stock",
-  INVENTORY: "Inventaire",
-  REPLENISHMENT: "Réassort rayon",
-  MERCHANDISING: "Implantation rayon",
-  PRICE_UPDATE: "Mise à jour prix",
-  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
-  CUSTOMER_RETURN: "Retour client",
-  CLEANING: "Nettoyage rayon",
-  SECURITY_CHECK: "Contrôle sécurité",
-  FOLLOW_UP: "Suivi magasin"
+  ACHAT: "Achat boutique",
+  RECOUVREMENT: "Recouvrement"
 };
 const GENERAL_STORE_REPORT_BRANDING = {
-  title: "MAGASINS - COMMERCE GENERAL",
-  subtitle: "Suivi des rayons, articles, ventes caisse, achats, retours, remises, inventaire et charges",
+  title: "SITUATION DES BOUTIQUES",
+  subtitle: "Suivi des achats livrés et des recouvrements par boutique",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -299,34 +296,21 @@ const HOTEL_REPORT_BRANDING = {
   phone: "TEL: 79 07 24 40"
 };
 const WATER_OPERATION_LABELS: Record<string, string> = {
-  WATER_BILLING: "Facture eau",
-  BULK_WATER_SALE: "Vente eau en gros",
-  CONNECTION_FEE: "Frais branchement",
-  SUBSIDY_INCOME: "Subvention / appui",
-  CHEMICAL_PURCHASE: "Produit traitement",
-  ENERGY_PAYMENT: "Énergie",
-  MAINTENANCE_EXPENSE: "Maintenance",
-  QUALITY_TEST_EXPENSE: "Analyse qualité",
-  NETWORK_REPAIR: "Réparation réseau",
-  SUPPLIER_PAYMENT: "Paiement fournisseur"
-};
-const WATER_TASK_LABELS: Record<string, string> = {
-  PRODUCTION_READING: "Relevé production",
-  QUALITY_CONTROL: "Contrôle qualité",
-  PUMP_MAINTENANCE: "Maintenance pompe",
-  NETWORK_INSPECTION: "Inspection réseau",
-  LEAK_REPAIR: "Réparation fuite",
-  METER_READING: "Releve compteur",
-  CONNECTION_WORK: "Branchement",
-  CHEMICAL_DOSING: "Dosage traitement",
-  BILLING_FOLLOW_UP: "Suivi facturation",
-  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
-  SERVICE_RESTORE: "Remise en service",
-  FOLLOW_UP: "Suivi eau"
+  WATER_SALE: "Vente de paquets d'eau",
+  WATER_OTHER_INCOME: "Autre recette",
+  WATER_EXPENSE_MEALS: "Repas",
+  WATER_EXPENSE_FUEL: "Carburant (essence / gazoil)",
+  WATER_EXPENSE_VEHICLE_UPKEEP: "Entretien moto / véhicule",
+  WATER_EXPENSE_PACKAGING_LOSS: "Emballage / paquet perdu",
+  WATER_EXPENSE_SUPPLIES: "Fournitures (lait, sucre, etc.)",
+  WATER_EXPENSE_ENERGY: "Énergie / combustible",
+  WATER_EXPENSE_CLEANING: "Nettoyage / balayage",
+  WATER_EXPENSE_MAINTENANCE: "Entretien équipement / réparation",
+  WATER_EXPENSE_SUPPLIER: "Paiement fournisseur",
+  WATER_EXPENSE_OTHER: "Autre dépense"
 };
 const WATER_REPORT_BRANDING = {
-  title: "PRODUCTION D'EAU POTABLE",
-  subtitle: "Suivi des stations, volumes, facturation, qualité, maintenance et continuité de service",
+  title: "PRODUCTION D'EAU",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -375,23 +359,9 @@ const BTP_OPERATION_LABELS: Record<string, string> = {
   SUBCONTRACTING: "Sous-traitance",
   SITE_EXPENSE: "Charge chantier"
 };
-const BTP_TASK_LABELS: Record<string, string> = {
-  SITE_PREPARATION: "Préparation chantier",
-  EARTHWORKS: "Terrassement",
-  FOUNDATION: "Fondation",
-  STRUCTURAL_WORK: "Structure",
-  MASONRY: "Maconnerie",
-  MEP: "Electricite / plomberie",
-  FINISHING: "Finition",
-  PROCUREMENT: "Approvisionnement",
-  QUALITY_CONTROL: "Contrôle qualité",
-  RESERVE: "Réserve / reprise",
-  HANDOVER: "Réception",
-  FOLLOW_UP: "Suivi chantier"
-};
 const BTP_REPORT_BRANDING = {
-  title: "BTP",
-  subtitle: "Suivi de chantiers, lots, coûts, avancement et réserves",
+  title: "SITUATION DES CHANTIERS",
+  subtitle: "Encaissements, coûts par nature et marge par chantier",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -1504,17 +1474,12 @@ function drawGeneralExpensesIcon(doc: PDFKit.PDFDocument, x: number, y: number):
 
 const GENERAL_EXPENSES_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "DATE", width: 65, align: "center" },
-  { label: "QUI", width: 55, align: "center" },
-  { label: "CATEGORIE", width: 175, align: "left" },
-  { label: "DESIGNATION", width: 180, align: "left" },
+  { label: "CATEGORIE", width: 205, align: "left" },
+  { label: "DESIGNATION", width: 205, align: "left" },
   { label: "QUANTITE", width: 60, align: "right" },
   { label: "PRIX UNITAIRE", width: 105, align: "right" },
   { label: "MONTANT", width: 121, align: "right" }
 ];
-
-function toGeneralExpensesOwnerLabel(ownerType: "PDG" | "EMPLOYE"): string {
-  return ownerType === "PDG" ? "PDG" : "Employé";
-}
 
 function drawGeneralExpensesReportHeader(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
   const pageWidth = doc.page.width;
@@ -1712,7 +1677,6 @@ function drawGeneralExpensesDataRow(
 ): number {
   const values = [
     { value: formatPdfDate(row.date), align: "center" as const },
-    { value: toGeneralExpensesOwnerLabel(row.ownerType), align: "center" as const },
     { value: truncatePdfText(row.categoryLabel, 40), align: "left" as const },
     { value: truncatePdfText(row.designation, 28), align: "left" as const },
     { value: row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "-", align: "right" as const },
@@ -1731,15 +1695,17 @@ function drawGeneralExpensesDataRow(
   return y + 24;
 }
 
-function drawGeneralExpensesTotalsRow(doc: PDFKit.PDFDocument, report: GeneralExpensesReport, y: number): number {
-  const firstColumnsWidth =
-    GENERAL_EXPENSES_PDF_COLUMNS[0].width +
-    GENERAL_EXPENSES_PDF_COLUMNS[1].width +
-    GENERAL_EXPENSES_PDF_COLUMNS[2].width +
-    GENERAL_EXPENSES_PDF_COLUMNS[3].width +
-    GENERAL_EXPENSES_PDF_COLUMNS[4].width +
-    GENERAL_EXPENSES_PDF_COLUMNS[5].width;
-  drawPdfTableCell(doc, "TOTAL", PDF_PAGE_MARGIN, y, firstColumnsWidth, 27, {
+function drawGeneralExpensesTotalsRow(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  label: string,
+  amount: string
+): number {
+  const amountColumn = GENERAL_EXPENSES_PDF_COLUMNS[GENERAL_EXPENSES_PDF_COLUMNS.length - 1];
+  const firstColumnsWidth = GENERAL_EXPENSES_PDF_COLUMNS
+    .slice(0, -1)
+    .reduce((sum, column) => sum + column.width, 0);
+  drawPdfTableCell(doc, label, PDF_PAGE_MARGIN, y, firstColumnsWidth, 27, {
     align: "center",
     fill: "#fffbeb",
     font: "Helvetica-Bold",
@@ -1747,10 +1713,10 @@ function drawGeneralExpensesTotalsRow(doc: PDFKit.PDFDocument, report: GeneralEx
   });
   drawPdfTableCell(
     doc,
-    formatPdfMoney(report.totals.totalAmount),
+    formatPdfMoney(amount),
     PDF_PAGE_MARGIN + firstColumnsWidth,
     y,
-    GENERAL_EXPENSES_PDF_COLUMNS[6].width,
+    amountColumn.width,
     27,
     {
       align: "right",
@@ -1791,9 +1757,33 @@ function drawGeneralExpensesEmptyState(doc: PDFKit.PDFDocument): void {
   doc.y = y + 88;
 }
 
-function drawGeneralExpensesTable(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
-  if (report.rows.length === 0) {
-    drawGeneralExpensesEmptyState(doc);
+function drawGeneralExpensesSectionTitle(doc: PDFKit.PDFDocument, title: string): void {
+  const pageWidth = doc.page.width;
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(12.5)
+    .text(title, PDF_PAGE_MARGIN, doc.y, { width: pageWidth - PDF_PAGE_MARGIN * 2 });
+  doc.y += 18;
+}
+
+function drawGeneralExpensesOwnerTable(
+  doc: PDFKit.PDFDocument,
+  report: GeneralExpensesReport,
+  rows: GeneralExpensesReport["rows"],
+  title: string,
+  totalLabel: string,
+  totalAmount: string
+): void {
+  drawGeneralExpensesSectionTitle(doc, title);
+
+  if (rows.length === 0) {
+    doc
+      .fillColor("#78350f")
+      .font("Helvetica")
+      .fontSize(9)
+      .text("Aucune dépense sur la période.", PDF_PAGE_MARGIN, doc.y);
+    doc.y += 20;
     return;
   }
 
@@ -1804,7 +1794,7 @@ function drawGeneralExpensesTable(doc: PDFKit.PDFDocument, report: GeneralExpens
   }
   let y = drawGeneralExpensesTableHeader(doc, doc.y);
 
-  for (const row of report.rows) {
+  for (const row of rows) {
     if (y + 24 + 27 > tableBottom) {
       doc.addPage();
       drawGeneralExpensesContinuationHeader(doc, report);
@@ -1818,15 +1808,40 @@ function drawGeneralExpensesTable(doc: PDFKit.PDFDocument, report: GeneralExpens
     drawGeneralExpensesContinuationHeader(doc, report);
     y = drawGeneralExpensesTableHeader(doc, doc.y);
   }
-  doc.y = drawGeneralExpensesTotalsRow(doc, report, y) + 14;
+  doc.y = drawGeneralExpensesTotalsRow(doc, y, totalLabel, totalAmount) + 18;
 }
 
-function drawGeneralExpensesBreakdown(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
-  if (report.breakdownRows.length === 0) {
+function drawGeneralExpensesTable(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
+  if (report.rows.length === 0) {
+    drawGeneralExpensesEmptyState(doc);
     return;
   }
 
-  const breakdownHeight = 34 + 24 + report.breakdownRows.length * 24;
+  const pdgRows = report.rows.filter((row) => row.ownerType === "PDG");
+  const employeeRows = report.rows.filter((row) => row.ownerType === "EMPLOYE");
+
+  drawGeneralExpensesOwnerTable(doc, report, pdgRows, "DEPENSES PDG", "TOTAL PDG", report.totals.pdgAmount);
+  drawGeneralExpensesOwnerTable(
+    doc,
+    report,
+    employeeRows,
+    "DEPENSES EMPLOYES",
+    "TOTAL EMPLOYES",
+    report.totals.employeeAmount
+  );
+}
+
+function drawGeneralExpensesBreakdownTable(
+  doc: PDFKit.PDFDocument,
+  report: GeneralExpensesReport,
+  rows: GeneralExpensesReport["breakdownRows"],
+  title: string
+): void {
+  if (rows.length === 0) {
+    return;
+  }
+
+  const breakdownHeight = 20 + 24 + rows.length * 24;
   if (needsPdfPageBreak(doc, breakdownHeight)) {
     doc.addPage();
     drawGeneralExpensesContinuationHeader(doc, report);
@@ -1835,51 +1850,41 @@ function drawGeneralExpensesBreakdown(doc: PDFKit.PDFDocument, report: GeneralEx
   doc
     .fillColor("#92400e")
     .font("Helvetica-Bold")
-    .fontSize(13)
-    .text("Répartition par catégorie de dépense", PDF_PAGE_MARGIN, doc.y, {
+    .fontSize(11.5)
+    .text(title, PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
-  doc.moveDown(0.4);
+  doc.moveDown(0.3);
 
   const columns: PdfTableColumn[] = [
-    { label: "QUI", width: 100, align: "left" },
-    { label: "CATEGORIE", width: 300, align: "left" },
+    { label: "CATEGORIE", width: 400, align: "left" },
     { label: "LIGNES", width: 130, align: "right" },
     { label: "MONTANT", width: 232, align: "right" }
   ];
-  let x = PDF_PAGE_MARGIN;
-  let y = doc.y;
-  for (const column of columns) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 24, {
-      align: "center",
-      fill: "#fde68a",
-      font: "Helvetica-Bold",
-      fontSize: 10.5
-    });
-    x += column.width;
-  }
-  y += 24;
+  const drawHeaderRow = (headerY: number): number => {
+    let headerX = PDF_PAGE_MARGIN;
+    for (const column of columns) {
+      drawPdfTableCell(doc, column.label, headerX, headerY, column.width, 24, {
+        align: "center",
+        fill: "#fde68a",
+        font: "Helvetica-Bold",
+        fontSize: 10.5
+      });
+      headerX += column.width;
+    }
+    return headerY + 24;
+  };
 
-  for (const row of report.breakdownRows) {
+  let y = drawHeaderRow(doc.y);
+
+  for (const row of rows) {
     if (y + 24 > doc.page.height - PDF_CONTENT_BOTTOM) {
       doc.addPage();
       drawGeneralExpensesContinuationHeader(doc, report);
-      y = doc.y;
-      x = PDF_PAGE_MARGIN;
-      for (const column of columns) {
-        drawPdfTableCell(doc, column.label, x, y, column.width, 24, {
-          align: "center",
-          fill: "#fde68a",
-          font: "Helvetica-Bold",
-          fontSize: 10.5
-        });
-        x += column.width;
-      }
-      y += 24;
+      y = drawHeaderRow(doc.y);
     }
-    x = PDF_PAGE_MARGIN;
+    let x = PDF_PAGE_MARGIN;
     const values = [
-      { value: toGeneralExpensesOwnerLabel(row.ownerType), align: "left" as const },
       { value: row.categoryLabel, align: "left" as const },
       { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
       { value: formatPdfMoney(row.amount), align: "right" as const }
@@ -1894,7 +1899,28 @@ function drawGeneralExpensesBreakdown(doc: PDFKit.PDFDocument, report: GeneralEx
     });
     y += 24;
   }
-  doc.y = y + 10;
+  doc.y = y + 14;
+}
+
+function drawGeneralExpensesBreakdown(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
+  if (report.breakdownRows.length === 0) {
+    return;
+  }
+
+  doc
+    .fillColor("#92400e")
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .text("Répartition par catégorie de dépense", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.4);
+
+  const pdgBreakdownRows = report.breakdownRows.filter((row) => row.ownerType === "PDG");
+  const employeeBreakdownRows = report.breakdownRows.filter((row) => row.ownerType === "EMPLOYE");
+
+  drawGeneralExpensesBreakdownTable(doc, report, pdgBreakdownRows, "Répartition PDG");
+  drawGeneralExpensesBreakdownTable(doc, report, employeeBreakdownRows, "Répartition employés");
 }
 
 function buildEmptyGeneralExpensesReport(filters: ReportPeriodFilter): GeneralExpensesReport {
@@ -2469,52 +2495,27 @@ function renderAgricultureReportsPdf(
 
 function buildEmptyGeneralStoreOperationsReport(filters: ReportPeriodFilter): GeneralStoreOperationsReport {
   return {
-    periodLabel: toGeneralStorePeriodLabel(filters, []),
+    periodLabel: toDisplayPeriodLabel(filters),
+    asOfLabel: formatPdfDate(new Date().toISOString()),
     rows: [],
-    operationRows: [],
     totals: {
-      departmentsCount: 0,
-      productFamiliesCount: 0,
-      itemsCount: 0,
-      soldQuantity: 0,
-      purchaseQuantity: 0,
-      returnQuantity: 0,
-      adjustmentQuantity: 0,
-      transferQuantity: 0,
-      salesAmount: "0.00",
+      shopsCount: 0,
       purchaseAmount: "0.00",
-      returnAmount: "0.00",
-      discountAmount: "0.00",
-      expenseAmount: "0.00",
+      collectedAmount: "0.00",
+      balanceAmount: "0.00",
       transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
-      cashInAmount: "0.00",
-      cashOutAmount: "0.00",
-      netAmount: "0.00",
-      grossMargin: "0.00",
-      marginRate: 0,
-      executionRate: 0,
       currency: "XOF"
     }
   };
 }
 
 const GENERAL_STORE_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "RAYON", width: 54, align: "left" },
-  { label: "FAMILLE", width: 50, align: "left" },
-  { label: "ARTICLE", width: 52, align: "left" },
-  { label: "REF", width: 38, align: "left" },
-  { label: "VTE", width: 32, align: "right" },
-  { label: "ACH", width: 32, align: "right" },
-  { label: "RET", width: 30, align: "right" },
-  { label: "CA", width: 49, align: "right" },
-  { label: "COÛT", width: 49, align: "right" },
-  { label: "NET", width: 49, align: "right" },
-  { label: "MARGE", width: 39, align: "right" },
-  { label: "BLQ", width: 22, align: "right" }
+  { label: "BOUTIQUE", width: 180, align: "left" },
+  { label: "TOTAL ACHATS", width: 115, align: "right" },
+  { label: "TOTAL RECOUVRE", width: 115, align: "right" },
+  { label: "SOLDE DU", width: 115, align: "right" },
+  { label: "STOCK RESTANT", width: 115, align: "right" },
+  { label: "ECART", width: 115, align: "right" }
 ];
 
 function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
@@ -2526,11 +2527,9 @@ function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralSt
   doc.save();
   doc.roundedRect(margin, 22, 86, 58, 6).fill("#eef2ff");
   doc.roundedRect(margin, 22, 86, 58, 6).strokeColor("#4338ca").lineWidth(1).stroke();
-  doc.rect(margin + 16, 45, 54, 18).fill("#4f46e5");
-  doc.rect(margin + 20, 34, 14, 11).fill("#818cf8");
-  doc.rect(margin + 38, 29, 14, 16).fill("#818cf8");
-  doc.rect(margin + 56, 37, 10, 8).fill("#818cf8");
-  doc.moveTo(margin + 14, 64).lineTo(margin + 72, 64).strokeColor("#4338ca").lineWidth(2).stroke();
+  doc.rect(margin + 16, 45, 54, 24).fill("#4f46e5");
+  doc.moveTo(margin + 16, 45).lineTo(margin + 43, 30).lineTo(margin + 70, 45).strokeColor("#4338ca").lineWidth(2).stroke();
+  doc.moveTo(margin + 14, 69).lineTo(margin + 72, 69).strokeColor("#4338ca").lineWidth(2).stroke();
   doc.restore();
 
   drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
@@ -2555,7 +2554,7 @@ function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralSt
     align: "center"
   });
   doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#4f46e5").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SUIVI DES OPERATIONS MAGASIN PAR RAYON", margin, 114, {
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SITUATION DES BOUTIQUES", margin, 114, {
     width: pageWidth - margin * 2,
     align: "center"
   });
@@ -2580,8 +2579,8 @@ function drawGeneralStoreMetadataStrip(
   doc.rect(margin, y, width, 42).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Secteur", margin + 205, y + 8, { width: 120 });
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Magasins", margin + 205, y + 21, { width: 140 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Situation au", margin + 205, y + 8, { width: 120 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(report.asOfLabel, margin + 205, y + 21, { width: 140 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
     width: 140,
     align: "right"
@@ -2600,10 +2599,10 @@ function drawGeneralStoreMetricCards(doc: PDFKit.PDFDocument, report: GeneralSto
   const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
   const y = doc.y;
   const metrics = [
-    { label: "Rayons / articles", value: `${formatPdfNumber(report.totals.departmentsCount)} | ${formatPdfNumber(report.totals.itemsCount)}` },
-    { label: "Ventes", value: formatPdfMoney(report.totals.salesAmount) },
-    { label: "Achats", value: formatPdfMoney(report.totals.purchaseAmount) },
-    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+    { label: "Boutiques suivies", value: formatPdfNumber(report.totals.shopsCount) },
+    { label: "Total achats", value: formatPdfMoney(report.totals.purchaseAmount) },
+    { label: "Total recouvré", value: formatPdfMoney(report.totals.collectedAmount) },
+    { label: "Solde total dû", value: formatPdfMoney(report.totals.balanceAmount) }
   ];
 
   metrics.forEach((metric, index) => {
@@ -2614,27 +2613,21 @@ function drawGeneralStoreMetricCards(doc: PDFKit.PDFDocument, report: GeneralSto
     doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, { width: cardWidth - 16 });
   });
   doc.y = y + 60;
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
-    `Quantités: ventes ${formatPdfNumber(report.totals.soldQuantity, 2)} | achats ${formatPdfNumber(report.totals.purchaseQuantity, 2)} | retours ${formatPdfNumber(report.totals.returnQuantity, 2)} | remises ${formatPdfMoney(report.totals.discountAmount)} | marge ${formatPdfMoney(report.totals.grossMargin)} (${formatPdfNumber(report.totals.marginRate, 1)}%).`,
-    margin,
-    doc.y - 8,
-    { width: pageWidth - margin * 2, align: "center" }
-  );
   doc.moveDown(0.8);
 }
 
 function drawGeneralStoreTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
   for (const column of GENERAL_STORE_PDF_COLUMNS) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
       align: "center",
       fill: "#e0e7ff",
       font: "Helvetica-Bold",
-      fontSize: 5.55
+      fontSize: 11
     });
     x += column.width;
   }
-  return y + 22;
+  return y + 27;
 }
 
 function drawGeneralStoreDataRow(
@@ -2643,63 +2636,58 @@ function drawGeneralStoreDataRow(
   y: number
 ): number {
   const values = [
-    { value: truncatePdfText(row.department, 12), align: "left" as const },
-    { value: truncatePdfText(row.productFamily, 11), align: "left" as const },
-    { value: truncatePdfText(row.itemName, 11), align: "left" as const },
-    { value: truncatePdfText(row.skuRef, 8), align: "left" as const },
-    { value: formatPdfNumber(row.soldQuantity, 1), align: "right" as const },
-    { value: formatPdfNumber(row.purchaseQuantity, 1), align: "right" as const },
-    { value: formatPdfNumber(row.returnQuantity, 1), align: "right" as const },
-    { value: formatPdfMoney(row.salesAmount), align: "right" as const },
+    { value: truncatePdfText(row.shopRef, 24), align: "left" as const },
     { value: formatPdfMoney(row.purchaseAmount), align: "right" as const },
-    { value: formatPdfMoney(row.netAmount), align: "right" as const },
-    { value: `${formatPdfNumber(row.marginRate, 0)}%`, align: "right" as const },
-    { value: formatPdfNumber(row.blockedTasksCount), align: "right" as const }
+    { value: formatPdfMoney(row.collectedAmount), align: "right" as const },
+    { value: formatPdfMoney(row.balanceAmount), align: "right" as const },
+    { value: row.remainingStockValue ? formatPdfMoney(row.remainingStockValue) : "-", align: "right" as const },
+    { value: row.varianceAmount ? formatPdfMoney(row.varianceAmount) : "-", align: "right" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
     const column = GENERAL_STORE_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+    drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
       align: item.align,
-      fontSize: 5.25
+      fontSize: 10.5
     });
     x += column.width;
   });
-  return y + 20;
+  return y + 24;
 }
 
 function drawGeneralStoreTotalsRow(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport, y: number): number {
-  const firstColumnsWidth = GENERAL_STORE_PDF_COLUMNS.slice(0, 4).reduce((sum, item) => sum + item.width, 0);
   let x = PDF_PAGE_MARGIN;
-  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+  drawPdfTableCell(doc, "TOTAL", x, y, GENERAL_STORE_PDF_COLUMNS[0].width, 27, {
     align: "center",
     fill: "#f8fafc",
     font: "Helvetica-Bold",
-    fontSize: 7
+    fontSize: 11
   });
-  x += firstColumnsWidth;
+  x += GENERAL_STORE_PDF_COLUMNS[0].width;
 
   const values = [
-    formatPdfNumber(report.totals.soldQuantity, 1),
-    formatPdfNumber(report.totals.purchaseQuantity, 1),
-    formatPdfNumber(report.totals.returnQuantity, 1),
-    formatPdfMoney(report.totals.salesAmount),
     formatPdfMoney(report.totals.purchaseAmount),
-    formatPdfMoney(report.totals.netAmount),
-    `${formatPdfNumber(report.totals.marginRate, 0)}%`,
-    formatPdfNumber(report.totals.blockedTasksCount)
+    formatPdfMoney(report.totals.collectedAmount),
+    formatPdfMoney(report.totals.balanceAmount)
   ];
   for (let index = 0; index < values.length; index += 1) {
-    const column = GENERAL_STORE_PDF_COLUMNS[index + 4];
-    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
+    const column = GENERAL_STORE_PDF_COLUMNS[index + 1];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 27, {
       align: "right",
       fill: "#eef2ff",
       font: "Helvetica-Bold",
-      fontSize: 5.3
+      fontSize: 11
     });
     x += column.width;
   }
-  return y + 22;
+
+  for (let index = 4; index < GENERAL_STORE_PDF_COLUMNS.length; index += 1) {
+    const column = GENERAL_STORE_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, "", x, y, column.width, 27, { fill: "#eef2ff" });
+    x += column.width;
+  }
+
+  return y + 27;
 }
 
 function drawGeneralStoreEmptyState(doc: PDFKit.PDFDocument): void {
@@ -2709,11 +2697,11 @@ function drawGeneralStoreEmptyState(doc: PDFKit.PDFDocument): void {
 
   doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#eef2ff");
   doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(11).text("Aucune opération magasin reportable", margin + 14, y + 16, {
+  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(11).text("Aucune boutique reportable", margin + 14, y + 16, {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#3730a3").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les transactions XOF comptabilisées et les tâches Magasins de la période. Renseignez rayon, famille, article, référence, quantité et caisse pour alimenter le suivi.",
+    "Le rapport reprend les achats livrés et les recouvrements comptabilisés par boutique. Ajoutez une boutique et saisissez un achat ou un recouvrement pour alimenter le suivi.",
     margin + 14,
     y + 34,
     { width: pageWidth - margin * 2 - 28 }
@@ -2728,18 +2716,14 @@ function drawGeneralStoreOperationsTable(doc: PDFKit.PDFDocument, report: Genera
   }
 
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (needsPdfPageBreak(doc, 78)) {
+  if (doc.y + 27 + 24 + 27 > tableBottom) {
     doc.addPage();
     drawGeneralStoreReportHeader(doc, report);
   }
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(10.5).text("Synthèse par rayon, famille et article", PDF_PAGE_MARGIN, doc.y, {
-    width: doc.page.width - PDF_PAGE_MARGIN * 2
-  });
-  doc.moveDown(0.4);
   let y = drawGeneralStoreTableHeader(doc, doc.y);
 
   for (const row of report.rows) {
-    if (y + 20 + 22 > tableBottom) {
+    if (y + 24 + 27 > tableBottom) {
       doc.addPage();
       drawGeneralStoreReportHeader(doc, report);
       y = drawGeneralStoreTableHeader(doc, doc.y);
@@ -2747,87 +2731,12 @@ function drawGeneralStoreOperationsTable(doc: PDFKit.PDFDocument, report: Genera
     y = drawGeneralStoreDataRow(doc, row, y);
   }
 
-  if (y + 22 > tableBottom) {
+  if (y + 27 > tableBottom) {
     doc.addPage();
     drawGeneralStoreReportHeader(doc, report);
     y = drawGeneralStoreTableHeader(doc, doc.y);
   }
-  doc.y = drawGeneralStoreTotalsRow(doc, report, y) + 14;
-}
-
-function drawGeneralStoreBreakdown(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
-  if (report.operationRows.length === 0) {
-    return;
-  }
-
-  if (needsPdfPageBreak(doc, 62)) {
-    doc.addPage();
-    drawGeneralStoreReportHeader(doc, report);
-  }
-
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(12).text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
-    width: doc.page.width - PDF_PAGE_MARGIN * 2
-  });
-  doc.moveDown(0.4);
-
-  const columns: PdfTableColumn[] = [
-    { label: "OPERATION", width: 170, align: "left" },
-    { label: "TRANS.", width: 50, align: "right" },
-    { label: "TACHES", width: 50, align: "right" },
-    { label: "RECETTES", width: 80, align: "right" },
-    { label: "DÉPENSES", width: 80, align: "right" },
-    { label: "NET", width: 85, align: "right" }
-  ];
-  let x = PDF_PAGE_MARGIN;
-  let y = doc.y;
-  for (const column of columns) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
-      align: "center",
-      fill: "#e0e7ff",
-      font: "Helvetica-Bold",
-      fontSize: 7.5
-    });
-    x += column.width;
-  }
-  y += 20;
-
-  for (const row of report.operationRows) {
-    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
-      doc.addPage();
-      drawGeneralStoreReportHeader(doc, report);
-      y = doc.y;
-      x = PDF_PAGE_MARGIN;
-      for (const column of columns) {
-        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
-          align: "center",
-          fill: "#e0e7ff",
-          font: "Helvetica-Bold",
-          fontSize: 7.5
-        });
-        x += column.width;
-      }
-      y += 20;
-    }
-    x = PDF_PAGE_MARGIN;
-    const values = [
-      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
-      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
-      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
-      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
-      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
-      { value: formatPdfMoney(row.netAmount), align: "right" as const }
-    ];
-    values.forEach((item, index) => {
-      const column = columns[index];
-      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
-        align: item.align,
-        fontSize: 7.4
-      });
-      x += column.width;
-    });
-    y += 19;
-  }
-  doc.y = y + 10;
+  doc.y = drawGeneralStoreTotalsRow(doc, report, y) + 12;
 }
 
 function drawGeneralStorePdfFooter(
@@ -2844,7 +2753,7 @@ function drawGeneralStorePdfFooter(
   doc.save();
   doc.page.margins.bottom = 0;
   doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#c7d2fe").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport magasins | ${periodLabel}`, margin, pageHeight - 32, {
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport boutiques | ${periodLabel}`, margin, pageHeight - 32, {
     width: 330,
     lineBreak: false
   });
@@ -2868,8 +2777,16 @@ function renderGeneralStoreReportsPdf(
   drawGeneralStoreMetadataStrip(doc, report, filters, overview.generatedAt);
   drawGeneralStoreMetricCards(doc, report);
   drawGeneralStoreOperationsTable(doc, report);
-  drawGeneralStoreBreakdown(doc, report);
-  drawPdfReadingGuideBox(doc);
+
+  const note =
+    "Lecture: le solde dû correspond aux achats livrés moins le total déjà recouvré. L'écart compare la valeur vendue estimée (achats moins stock restant au dernier inventaire) au total recouvré: un écart positif signale un montant encore attendu ou une perte de stock.";
+  const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const noteHeight = doc.heightOfString(note, { width: noteWidth });
+  if (doc.y + noteHeight <= doc.page.height - PDF_CONTENT_BOTTOM) {
+    doc.fillColor("#486581").font("Helvetica-Bold").fontSize(10).text(note, PDF_PAGE_MARGIN, doc.y, {
+      width: noteWidth
+    });
+  }
 }
 
 function buildEmptyFoodOperationsReport(filters: ReportPeriodFilter): FoodOperationsReport {
@@ -4209,105 +4126,192 @@ function buildEmptyWaterOperationsReport(filters: ReportPeriodFilter): WaterOper
   return {
     periodLabel: toDisplayPeriodLabel(filters),
     rows: [],
-    operationRows: [],
+    breakdownRows: [],
     totals: {
-      facilitiesCount: 0,
-      zonesCount: 0,
-      producedVolumeM3: 0,
-      billedVolumeM3: 0,
-      waterRevenue: "0.00",
-      bulkSaleAmount: "0.00",
-      connectionAmount: "0.00",
-      subsidyAmount: "0.00",
-      treatmentCost: "0.00",
-      energyCost: "0.00",
-      maintenanceCost: "0.00",
-      qualityCost: "0.00",
-      repairCost: "0.00",
-      supplierPaymentAmount: "0.00",
       transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
-      cashInAmount: "0.00",
-      cashOutAmount: "0.00",
+      packagesSold: 0,
+      averagePackagePrice: "0.00",
+      salesAmount: "0.00",
+      expensesAmount: "0.00",
       netAmount: "0.00",
-      lossRate: 0,
-      executionRate: 0,
       currency: "XOF"
     }
   };
 }
 
+function drawWaterIcon(doc: PDFKit.PDFDocument, x: number, y: number): void {
+  doc.save();
+  doc.roundedRect(x + 6, y + 10, 104, 58, 8).fillAndStroke("#dbeafe", "#1e3a8a");
+  doc.roundedRect(x + 6, y + 10, 104, 16, 8).fill("#3b82f6");
+  doc.rect(x + 6, y + 18, 104, 8).fill("#3b82f6");
+  doc.circle(x + 92, y + 52, 15).fillAndStroke("#bfdbfe", "#1e3a8a");
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(12)
+    .text("E", x + 85, y + 45, { width: 14, align: "center" });
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(7.5)
+    .text("PRODUCTION", x + 14, y + 36, { width: 68, align: "center" });
+  doc.restore();
+}
+
 const WATER_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "SITE", width: 54, align: "left" },
-  { label: "ZONE", width: 48, align: "left" },
-  { label: "LIGNE", width: 50, align: "left" },
-  { label: "PROD. M3", width: 45, align: "right" },
-  { label: "FACT. M3", width: 45, align: "right" },
-  { label: "RECETTES", width: 61, align: "right" },
-  { label: "DÉPENSES", width: 61, align: "right" },
-  { label: "NET", width: 61, align: "right" },
-  { label: "PERTES", width: 38, align: "right" },
-  { label: "EXEC.", width: 38, align: "right" }
+  { label: "DATE", width: 65, align: "center" },
+  { label: "CATEGORIE", width: 205, align: "left" },
+  { label: "DESIGNATION", width: 205, align: "left" },
+  { label: "PAQUETS", width: 60, align: "right" },
+  { label: "PRIX / PAQUET", width: 105, align: "right" },
+  { label: "MONTANT", width: 121, align: "right" }
 ];
 
 function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
+  const pageWidth = doc.page.width;
   const margin = PDF_PAGE_MARGIN;
-  doc.rect(0, 0, doc.page.width, 120).fill("#eff6ff");
-  drawAmccoPdfLogo(doc, margin, 28, 38);
+  const centerX = margin + 118;
+  const centerWidth = pageWidth - margin * 2 - 220;
+
+  drawWaterIcon(doc, margin, 18);
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
+
   doc
-    .fillColor("#0f172a")
+    .fillColor("#111827")
     .font("Helvetica-Bold")
-    .fontSize(16)
-    .text(WATER_REPORT_BRANDING.title, margin + 48, 29, { width: 290 });
+    .fontSize(17)
+    .text(WATER_REPORT_BRANDING.title, centerX, 24, {
+      width: centerWidth,
+      align: "center"
+    });
   doc
     .fillColor("#1e3a8a")
-    .font("Helvetica")
-    .fontSize(8.6)
-    .text(WATER_REPORT_BRANDING.subtitle, margin + 48, 50, { width: 310 });
+    .font("Helvetica-Bold")
+    .fontSize(10.5)
+    .text(WATER_REPORT_BRANDING.agency, centerX, 43, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc
+    .fillColor("#d21f1f")
+    .font("Helvetica-Bold")
+    .fontSize(12.5)
+    .text(`"${WATER_REPORT_BRANDING.brand}"`, centerX, 57, {
+      width: centerWidth,
+      align: "center"
+    });
   doc
     .fillColor("#1e40af")
     .font("Helvetica-Bold")
-    .fontSize(8)
-    .text(WATER_REPORT_BRANDING.brand, doc.page.width - margin - 145, 28, {
-      width: 145,
-      align: "right"
+    .fontSize(10.5)
+    .text(`${WATER_REPORT_BRANDING.fiscal}     ${WATER_REPORT_BRANDING.phone}`, centerX, 72, {
+      width: centerWidth,
+      align: "center"
+    });
+
+  doc
+    .moveTo(margin, 100)
+    .lineTo(pageWidth - margin, 100)
+    .strokeColor("#3b82f6")
+    .lineWidth(2)
+    .stroke();
+
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .text(`PRODUCTION D'EAU - ${report.periodLabel.toUpperCase()}`, margin, 116, {
+      width: pageWidth - margin * 2,
+      align: "center"
+    });
+  doc.y = 144;
+}
+
+function drawWaterContinuationHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+
+  drawAmccoPdfLogo(doc, margin, 22, 34);
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11)
+    .text("PRODUCTION D'EAU - suite", margin + 44, 28, {
+      width: pageWidth - margin * 2 - 88
     });
   doc
-    .fillColor("#334155")
-    .font("Helvetica")
-    .fontSize(7.4)
-    .text(WATER_REPORT_BRANDING.agency, doc.page.width - margin - 210, 44, {
-      width: 210,
-      align: "right"
-    })
-    .text(`${WATER_REPORT_BRANDING.fiscal} | ${WATER_REPORT_BRANDING.phone}`, doc.page.width - margin - 210, 62, {
-      width: 210,
-      align: "right"
+    .fillColor("#486581")
+    .font("Helvetica-Bold")
+    .fontSize(9)
+    .text(`Période: ${report.periodLabel}`, margin + 44, 43, {
+      width: pageWidth - margin * 2 - 88
     });
   doc
-    .roundedRect(margin, 84, doc.page.width - margin * 2, 24, 4)
-    .fill("#dbeafe");
+    .moveTo(margin, 62)
+    .lineTo(pageWidth - margin, 62)
+    .strokeColor("#d7e3f1")
+    .lineWidth(1)
+    .stroke();
+  doc.y = 76;
+}
+
+function drawWaterMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: WaterOperationsReport,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, width, 50, 4).fill("#eff6ff");
+  doc.rect(margin, y, width, 50).strokeColor("#bfdbfe").lineWidth(0.8).stroke();
   doc
     .fillColor("#1e3a8a")
     .font("Helvetica-Bold")
-    .fontSize(8.6)
-    .text(`Période: ${report.periodLabel}`, margin + 12, 91, {
-      width: doc.page.width - margin * 2 - 24
+    .fontSize(10)
+    .text("Période", margin + 10, y + 10, { width: 160 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text(report.periodLabel, margin + 10, y + 26, { width: 190 });
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Secteur", margin + 220, y + 10, { width: 130 });
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text("Production d'eau", margin + 220, y + 26, { width: 190 });
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Genere le", pageWidth - margin - 160, y + 10, {
+      width: 150,
+      align: "right"
     });
-  doc.y = 138;
+  doc
+    .fillColor("#111827")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text(formatPdfDate(generatedAt), pageWidth - margin - 160, y + 26, {
+      width: 150,
+      align: "right"
+    });
+  doc.y = y + 64;
 }
 
 function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
   const cards = [
-    {
-      label: "Sites / zones",
-      value: `${formatPdfNumber(report.totals.facilitiesCount)} | ${formatPdfNumber(report.totals.zonesCount)}`
-    },
-    { label: "Volume facture", value: `${formatPdfNumber(report.totals.billedVolumeM3, 1)} m3` },
-    { label: "Recettes eau", value: formatPdfMoney(report.totals.cashInAmount) },
+    { label: "Paquets vendus", value: formatPdfNumber(report.totals.packagesSold) },
+    { label: "Prix moyen / paquet", value: formatPdfMoney(report.totals.averagePackagePrice) },
+    { label: "Ventes", value: formatPdfMoney(report.totals.salesAmount) },
+    { label: "Dépenses", value: formatPdfMoney(report.totals.expensesAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
   ];
   const margin = PDF_PAGE_MARGIN;
@@ -4331,7 +4335,7 @@ function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsRe
     .font("Helvetica")
     .fontSize(8.2)
     .text(
-      `Production ${formatPdfNumber(report.totals.producedVolumeM3, 1)} m3 | pertes apparentes ${formatPdfNumber(report.totals.lossRate, 1)}% | qualité ${formatPdfMoney(report.totals.qualityCost)} | maintenance ${formatPdfMoney(report.totals.maintenanceCost)} | réparations ${formatPdfMoney(report.totals.repairCost)} | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
+      `${formatPdfNumber(report.totals.transactionsCount)} ligne(s) enregistrée(s) sur la période.`,
       margin,
       doc.y,
       { width: doc.page.width - margin * 2 }
@@ -4342,17 +4346,15 @@ function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsRe
 function drawWaterTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
   for (const column of WATER_PDF_COLUMNS) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
-      align: column.align,
-      fill: "#1e3a8a",
+    drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
+      align: "center",
+      fill: "#dbeafe",
       font: "Helvetica-Bold",
-      fontSize: 5.8,
-      textColor: "#ffffff",
-      borderColor: "#1e3a8a"
+      fontSize: 10.5
     });
     x += column.width;
   }
-  return y + 18;
+  return y + 27;
 }
 
 function drawWaterDataRow(
@@ -4361,138 +4363,239 @@ function drawWaterDataRow(
   y: number
 ): number {
   const values = [
-    { value: row.facilityRef, align: "left" as const },
-    { value: row.networkZone, align: "left" as const },
-    { value: row.productionLine, align: "left" as const },
-    { value: formatPdfNumber(row.producedVolumeM3, 1), align: "right" as const },
-    { value: formatPdfNumber(row.billedVolumeM3, 1), align: "right" as const },
-    { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
-    { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
-    { value: formatPdfMoney(row.netAmount), align: "right" as const },
-    { value: `${formatPdfNumber(row.lossRate, 0)}%`, align: "right" as const },
-    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const }
+    { value: formatPdfDate(row.date), align: "center" as const },
+    { value: truncatePdfText(row.categoryLabel, 40), align: "left" as const },
+    { value: truncatePdfText(row.designation, 28), align: "left" as const },
+    { value: row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "-", align: "right" as const },
+    { value: row.quantity > 0 ? formatPdfMoney(row.unitPrice) : "-", align: "right" as const },
+    { value: formatPdfMoney(row.amount), align: "right" as const }
   ];
   let x = PDF_PAGE_MARGIN;
-  for (let index = 0; index < values.length; index += 1) {
+  values.forEach((item, index) => {
     const column = WATER_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, values[index].value, x, y, column.width, 20, {
-      align: values[index].align,
-      fontSize: 5.8,
-      borderColor: "#bfdbfe"
+    drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
+      align: item.align,
+      fontSize: 10
     });
     x += column.width;
-  }
-  return y + 20;
+  });
+  return y + 24;
 }
 
-function drawWaterTotalsRow(doc: PDFKit.PDFDocument, report: WaterOperationsReport, y: number): number {
-  const values = [
-    "TOTAL",
-    "",
-    "",
-    formatPdfNumber(report.totals.producedVolumeM3, 1),
-    formatPdfNumber(report.totals.billedVolumeM3, 1),
-    formatPdfMoney(report.totals.cashInAmount),
-    formatPdfMoney(report.totals.cashOutAmount),
-    formatPdfMoney(report.totals.netAmount),
-    `${formatPdfNumber(report.totals.lossRate, 0)}%`,
-    `${formatPdfNumber(report.totals.executionRate, 0)}%`
-  ];
-  let x = PDF_PAGE_MARGIN;
-  for (let index = 0; index < values.length; index += 1) {
-    const column = WATER_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, values[index], x, y, column.width, 20, {
-      align: index < 3 ? "left" : "right",
+function drawWaterTotalsRow(doc: PDFKit.PDFDocument, y: number, label: string, amount: string): number {
+  const amountColumn = WATER_PDF_COLUMNS[WATER_PDF_COLUMNS.length - 1];
+  const firstColumnsWidth = WATER_PDF_COLUMNS
+    .slice(0, -1)
+    .reduce((sum, column) => sum + column.width, 0);
+  drawPdfTableCell(doc, label, PDF_PAGE_MARGIN, y, firstColumnsWidth, 27, {
+    align: "center",
+    fill: "#f8fafc",
+    font: "Helvetica-Bold",
+    fontSize: 11
+  });
+  drawPdfTableCell(
+    doc,
+    formatPdfMoney(amount),
+    PDF_PAGE_MARGIN + firstColumnsWidth,
+    y,
+    amountColumn.width,
+    27,
+    {
+      align: "right",
       fill: "#dbeafe",
       font: "Helvetica-Bold",
-      fontSize: 5.8,
-      borderColor: "#93c5fd"
-    });
-    x += column.width;
-  }
-  return y + 20;
+      fontSize: 11
+    }
+  );
+  return y + 27;
 }
 
-function drawWaterOperationsTable(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
-  if (report.rows.length === 0) {
-    doc.roundedRect(PDF_PAGE_MARGIN, doc.y, doc.page.width - PDF_PAGE_MARGIN * 2, 64, 4).fill("#eff6ff");
+function drawWaterEmptyState(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#eff6ff");
+  doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#bfdbfe").lineWidth(0.8).stroke();
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Aucune vente ni dépense eau reportable", margin + 14, y + 16, {
+      width: pageWidth - margin * 2 - 28
+    });
+  doc
+    .fillColor("#334155")
+    .font("Helvetica")
+    .fontSize(8.5)
+    .text(
+      "Le rapport reprend les ventes de paquets d'eau et les dépenses courantes comptabilisées sur la période. Vérifiez la période filtrée si le tableau doit être alimenté.",
+      margin + 14,
+      y + 34,
+      {
+        width: pageWidth - margin * 2 - 28
+      }
+    );
+  doc.y = y + 88;
+}
+
+function drawWaterSectionTitle(doc: PDFKit.PDFDocument, title: string): void {
+  const pageWidth = doc.page.width;
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(12.5)
+    .text(title, PDF_PAGE_MARGIN, doc.y, { width: pageWidth - PDF_PAGE_MARGIN * 2 });
+  doc.y += 18;
+}
+
+function drawWaterKindTable(
+  doc: PDFKit.PDFDocument,
+  report: WaterOperationsReport,
+  rows: WaterOperationsReport["rows"],
+  title: string,
+  totalLabel: string,
+  totalAmount: string
+): void {
+  drawWaterSectionTitle(doc, title);
+
+  if (rows.length === 0) {
     doc
-      .fillColor("#1e3a8a")
-      .font("Helvetica-Bold")
-      .fontSize(11)
-      .text("Aucune opération eau potable reportable", PDF_PAGE_MARGIN + 14, doc.y + 16);
-    doc.y += 84;
+      .fillColor("#334155")
+      .font("Helvetica")
+      .fontSize(9)
+      .text("Aucune ligne sur la période.", PDF_PAGE_MARGIN, doc.y);
+    doc.y += 20;
     return;
   }
 
-  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Synthèse par site, zone et ligne exploitation", PDF_PAGE_MARGIN, doc.y);
-  doc.moveDown(0.4);
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (doc.y + 27 + 24 + 27 > tableBottom) {
+    doc.addPage();
+    drawWaterContinuationHeader(doc, report);
+  }
   let y = drawWaterTableHeader(doc, doc.y);
-  for (const row of report.rows) {
-    if (y + 42 > doc.page.height - PDF_CONTENT_BOTTOM) {
+
+  for (const row of rows) {
+    if (y + 24 + 27 > tableBottom) {
       doc.addPage();
-      drawWaterReportHeader(doc, report);
+      drawWaterContinuationHeader(doc, report);
       y = drawWaterTableHeader(doc, doc.y);
     }
     y = drawWaterDataRow(doc, row, y);
   }
-  y = drawWaterTotalsRow(doc, report, y);
-  doc.y = y + 18;
+
+  if (y + 27 > tableBottom) {
+    doc.addPage();
+    drawWaterContinuationHeader(doc, report);
+    y = drawWaterTableHeader(doc, doc.y);
+  }
+  doc.y = drawWaterTotalsRow(doc, y, totalLabel, totalAmount) + 18;
+}
+
+function drawWaterOperationsTable(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
+  if (report.rows.length === 0) {
+    drawWaterEmptyState(doc);
+    return;
+  }
+
+  const salesRows = report.rows.filter((row) => row.kind === "IN");
+  const expenseRows = report.rows.filter((row) => row.kind === "OUT");
+
+  drawWaterKindTable(doc, report, salesRows, "VENTES", "TOTAL VENTES", report.totals.salesAmount);
+  drawWaterKindTable(doc, report, expenseRows, "DEPENSES", "TOTAL DEPENSES", report.totals.expensesAmount);
+}
+
+function drawWaterBreakdownTable(
+  doc: PDFKit.PDFDocument,
+  report: WaterOperationsReport,
+  rows: WaterOperationsReport["breakdownRows"],
+  title: string
+): void {
+  if (rows.length === 0) {
+    return;
+  }
+
+  const breakdownHeight = 20 + 24 + rows.length * 24;
+  if (needsPdfPageBreak(doc, breakdownHeight)) {
+    doc.addPage();
+    drawWaterContinuationHeader(doc, report);
+  }
+
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(11.5)
+    .text(title, PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.3);
+
+  const columns: PdfTableColumn[] = [
+    { label: "CATEGORIE", width: 400, align: "left" },
+    { label: "LIGNES", width: 130, align: "right" },
+    { label: "MONTANT", width: 232, align: "right" }
+  ];
+  const drawHeaderRow = (headerY: number): number => {
+    let headerX = PDF_PAGE_MARGIN;
+    for (const column of columns) {
+      drawPdfTableCell(doc, column.label, headerX, headerY, column.width, 24, {
+        align: "center",
+        fill: "#dbeafe",
+        font: "Helvetica-Bold",
+        fontSize: 10.5
+      });
+      headerX += column.width;
+    }
+    return headerY + 24;
+  };
+
+  let y = drawHeaderRow(doc.y);
+
+  for (const row of rows) {
+    if (y + 24 > doc.page.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage();
+      drawWaterContinuationHeader(doc, report);
+      y = drawHeaderRow(doc.y);
+    }
+    let x = PDF_PAGE_MARGIN;
+    const values = [
+      { value: row.categoryLabel, align: "left" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
+      { value: formatPdfMoney(row.amount), align: "right" as const }
+    ];
+    values.forEach((item, index) => {
+      const column = columns[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
+        align: item.align,
+        fontSize: 10
+      });
+      x += column.width;
+    });
+    y += 24;
+  }
+  doc.y = y + 14;
 }
 
 function drawWaterBreakdown(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
-  if (report.operationRows.length === 0) {
+  if (report.breakdownRows.length === 0) {
     return;
   }
-  if (needsPdfPageBreak(doc, 88)) {
-    doc.addPage();
-    drawWaterReportHeader(doc, report);
-  }
-  doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5).text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y);
-  doc.moveDown(0.4);
-  const columns: PdfTableColumn[] = [
-    { label: "OPERATION", width: 168, align: "left" },
-    { label: "TRANS.", width: 52, align: "right" },
-    { label: "TACHES", width: 52, align: "right" },
-    { label: "RECETTES", width: 76, align: "right" },
-    { label: "DÉPENSES", width: 76, align: "right" },
-    { label: "NET", width: 76, align: "right" }
-  ];
-  let y = doc.y;
-  let x = PDF_PAGE_MARGIN;
-  for (const column of columns) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
-      align: column.align,
-      fill: "#1e40af",
-      font: "Helvetica-Bold",
-      fontSize: 6,
-      textColor: "#ffffff",
-      borderColor: "#1e40af"
+
+  doc
+    .fillColor("#1e3a8a")
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .text("Répartition par catégorie", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
-    x += column.width;
-  }
-  y += 18;
-  for (const row of report.operationRows.slice(0, 16)) {
-    x = PDF_PAGE_MARGIN;
-    const values = [
-      { value: row.operationLabel, align: "left" as const },
-      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
-      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
-      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
-      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
-      { value: formatPdfMoney(row.netAmount), align: "right" as const }
-    ];
-    for (let index = 0; index < values.length; index += 1) {
-      drawPdfTableCell(doc, values[index].value, x, y, columns[index].width, 18, {
-        align: values[index].align,
-        fontSize: 6,
-        borderColor: "#bfdbfe"
-      });
-      x += columns[index].width;
-    }
-    y += 18;
-  }
-  doc.y = y + 12;
+  doc.moveDown(0.4);
+
+  const salesBreakdown = report.breakdownRows.filter((row) => row.kind === "IN");
+  const expenseBreakdown = report.breakdownRows.filter((row) => row.kind === "OUT");
+
+  drawWaterBreakdownTable(doc, report, salesBreakdown, "Répartition ventes");
+  drawWaterBreakdownTable(doc, report, expenseBreakdown, "Répartition dépenses");
 }
 
 function drawWaterPdfFooter(
@@ -4501,7 +4604,38 @@ function drawWaterPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  drawPdfBrandingFrame(doc, pageNumber, totalPages, periodLabel);
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
+
+  doc.save();
+  doc.page.margins.bottom = 0;
+  doc
+    .moveTo(margin, pageHeight - 44)
+    .lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#bfdbfe")
+    .lineWidth(1)
+    .stroke();
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8)
+    .text(`AMCCO - Production d'eau | ${periodLabel}`, margin, pageHeight - 32, {
+      width: 300,
+      lineBreak: false
+    });
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80,
+      align: "right",
+      lineBreak: false
+    });
+  doc.page.margins.bottom = bottomMargin;
+  doc.restore();
 }
 
 function renderWaterReportsPdf(
@@ -4510,11 +4644,12 @@ function renderWaterReportsPdf(
   filters: ReportPeriodFilter
 ): void {
   const report = overview.waterOperationsReport ?? buildEmptyWaterOperationsReport(filters);
+
   drawWaterReportHeader(doc, report);
+  drawWaterMetadataStrip(doc, report, overview.generatedAt);
   drawWaterMetricCards(doc, report);
   drawWaterOperationsTable(doc, report);
   drawWaterBreakdown(doc, report);
-  drawPdfReadingGuideBox(doc);
 }
 
 function buildEmptyAgencyOperationsReport(filters: ReportPeriodFilter): AgencyOperationsReport {
@@ -4751,7 +4886,38 @@ function drawAgencyPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  drawPdfBrandingFrame(doc, pageNumber, totalPages, periodLabel);
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
+
+  doc.save();
+  doc.page.margins.bottom = 0;
+  doc
+    .moveTo(margin, pageHeight - 44)
+    .lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#d7e3f1")
+    .lineWidth(1)
+    .stroke();
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8)
+    .text(`AMCCO - Agence immobilière | ${periodLabel}`, margin, pageHeight - 32, {
+      width: 300,
+      lineBreak: false
+    });
+  doc
+    .fillColor("#627d98")
+    .font("Helvetica")
+    .fontSize(8)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80,
+      align: "right",
+      lineBreak: false
+    });
+  doc.page.margins.bottom = bottomMargin;
+  doc.restore();
 }
 
 function renderAgencyReportsPdf(
@@ -4769,134 +4935,75 @@ function renderAgencyReportsPdf(
 
 function buildEmptyBtpOperationsReport(filters: ReportPeriodFilter): BtpOperationsReport {
   return {
-    periodLabel: toBtpPeriodLabel(filters, []),
+    periodLabel: toDisplayPeriodLabel(filters),
+    asOfLabel: formatPdfDate(new Date().toISOString()),
     rows: [],
-    operationRows: [],
     totals: {
       projectsCount: 0,
-      workPackagesCount: 0,
-      progressPercent: 0,
-      materialQuantity: 0,
-      laborDays: 0,
-      equipmentHours: 0,
-      transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
       cashInAmount: "0.00",
-      cashOutAmount: "0.00",
+      materialAmount: "0.00",
+      laborAmount: "0.00",
+      equipmentAmount: "0.00",
+      subcontractingAmount: "0.00",
+      siteExpenseAmount: "0.00",
+      totalCostAmount: "0.00",
       netAmount: "0.00",
-      executionRate: 0,
+      transactionsCount: 0,
       currency: "XOF"
     }
   };
 }
 
 const BTP_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "CHANTIER", width: 55, align: "left" },
-  { label: "LOT", width: 50, align: "left" },
-  { label: "CLIENT/SITE", width: 62, align: "left" },
-  { label: "AV.%", width: 34, align: "right" },
-  { label: "MAT.", width: 34, align: "right" },
-  { label: "MO J/H", width: 36, align: "right" },
-  { label: "ENG.H", width: 34, align: "right" },
-  { label: "RECETTES", width: 56, align: "right" },
-  { label: "DÉPENSES", width: 56, align: "right" },
-  { label: "NET", width: 54, align: "right" },
-  { label: "EXEC.%", width: 34, align: "right" }
+  { label: "CHANTIER", width: 210, align: "left" },
+  { label: "TOTAL ENCAISSE", width: 130, align: "right" },
+  { label: "TOTAL DEPENSES", width: 130, align: "right" },
+  { label: "MARGE", width: 130, align: "right" },
+  { label: "AVANCEMENT", width: 130, align: "center" }
 ];
-
-function drawBtpSiteMark(doc: PDFKit.PDFDocument, x: number, y: number): void {
-  doc.save();
-  doc.roundedRect(x + 3, y + 18, 110, 52, 6).fill("#fef3c7");
-  doc.roundedRect(x + 3, y + 18, 110, 52, 6).strokeColor("#b45309").lineWidth(0.9).stroke();
-
-  doc.rect(x + 14, y + 51, 86, 11).fill("#d97706");
-  doc.rect(x + 20, y + 42, 20, 9).fill("#f59e0b");
-  doc.rect(x + 44, y + 35, 20, 16).fill("#f59e0b");
-  doc.rect(x + 68, y + 28, 20, 23).fill("#f59e0b");
-  doc.rect(x + 92, y + 21, 6, 41).fill("#374151");
-
-  doc.strokeColor("#111827").lineWidth(1.1);
-  for (let index = 0; index < 5; index += 1) {
-    const barX = x + 18 + index * 18;
-    doc.moveTo(barX, y + 25).lineTo(barX + 18, y + 62).stroke();
-  }
-
-  doc
-    .moveTo(x + 72, y + 14)
-    .lineTo(x + 102, y + 14)
-    .lineTo(x + 102, y + 22)
-    .strokeColor("#374151")
-    .lineWidth(2)
-    .stroke();
-  doc.rect(x + 98, y + 21, 8, 8).fill("#64748b");
-  doc.restore();
-}
 
 function drawBtpReportHeader(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
   const pageWidth = doc.page.width;
   const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 118;
-  const centerWidth = pageWidth - margin * 2 - 220;
+  const centerX = margin + 92;
+  const centerWidth = pageWidth - margin * 2 - 184;
 
-  drawBtpSiteMark(doc, margin, 16);
+  doc.save();
+  doc.roundedRect(margin, 22, 86, 58, 6).fill("#fff7ed");
+  doc.roundedRect(margin, 22, 86, 58, 6).strokeColor("#b45309").lineWidth(1).stroke();
+  doc.rect(margin + 16, 55, 54, 14).fill("#d97706");
+  doc.rect(margin + 22, 46, 12, 9).fill("#f59e0b");
+  doc.rect(margin + 40, 40, 12, 15).fill("#f59e0b");
+  doc.rect(margin + 58, 34, 12, 21).fill("#f59e0b");
+  doc.moveTo(margin + 14, 69).lineTo(margin + 72, 69).strokeColor("#b45309").lineWidth(2).stroke();
+  doc.restore();
+
   drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(17)
-    .text(BTP_REPORT_BRANDING.title, centerX, 22, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#92400e")
-    .font("Helvetica")
-    .fontSize(9.2)
-    .text(BTP_REPORT_BRANDING.agency, centerX, 42, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#d21f1f")
-    .font("Helvetica-Bold")
-    .fontSize(11)
-    .text(`"${BTP_REPORT_BRANDING.brand}"`, centerX, 55, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#78350f")
-    .font("Helvetica-Bold")
-    .fontSize(8.5)
-    .text(`${BTP_REPORT_BRANDING.fiscal}     ${BTP_REPORT_BRANDING.phone}`, centerX, 69, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#78350f")
-    .font("Helvetica-Bold")
-    .fontSize(8.8)
-    .text(BTP_REPORT_BRANDING.subtitle, centerX, 82, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .moveTo(margin, 100)
-    .lineTo(pageWidth - margin, 100)
-    .strokeColor("#d97706")
-    .lineWidth(2)
-    .stroke();
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(13)
-    .text("SUIVI DES OPERATIONS BTP PAR CHANTIER", margin, 114, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(15).text(BTP_REPORT_BRANDING.title, centerX, 22, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#92400e").font("Helvetica").fontSize(9.2).text(BTP_REPORT_BRANDING.agency, centerX, 42, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11).text(`"${BTP_REPORT_BRANDING.brand}"`, centerX, 55, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(8.5).text(`${BTP_REPORT_BRANDING.fiscal}     ${BTP_REPORT_BRANDING.phone}`, centerX, 69, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(8.2).text(BTP_REPORT_BRANDING.subtitle, centerX, 82, {
+    width: centerWidth,
+    align: "center"
+  });
+  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#d97706").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SITUATION DES CHANTIERS", margin, 114, {
+    width: pageWidth - margin * 2,
+    align: "center"
+  });
   doc.y = 140;
 }
 
@@ -4916,42 +5023,18 @@ function drawBtpMetadataStrip(
 
   doc.roundedRect(margin, y, width, 42, 4).fill("#fff7ed");
   doc.rect(margin, y, width, 42).strokeColor("#fed7aa").lineWidth(0.8).stroke();
-  doc
-    .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8.8)
-    .text("Période", margin + 10, y + 8, { width: 155 });
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(10)
-    .text(period, margin + 10, y + 21, { width: 175 });
-  doc
-    .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8.8)
-    .text("Secteur", margin + 205, y + 8, { width: 120 });
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(10)
-    .text("BTP", margin + 205, y + 21, { width: 140 });
-  doc
-    .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8.8)
-    .text("Genere le", pageWidth - margin - 150, y + 8, {
-      width: 140,
-      align: "right"
-    });
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(10)
-    .text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
-      width: 140,
-      align: "right"
-    });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Situation au", margin + 205, y + 8, { width: 120 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(report.asOfLabel, margin + 205, y + 21, { width: 140 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
+    width: 140,
+    align: "right"
+  });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(formatPdfDate(generatedAt), pageWidth - margin - 150, y + 21, {
+    width: 140,
+    align: "right"
+  });
   doc.y = y + 56;
 }
 
@@ -4962,64 +5045,41 @@ function drawBtpMetricCards(doc: PDFKit.PDFDocument, report: BtpOperationsReport
   const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
   const y = doc.y;
   const metrics = [
-    {
-      label: "Chantiers / lots",
-      value: `${formatPdfNumber(report.totals.projectsCount)} | ${formatPdfNumber(report.totals.workPackagesCount)}`
-    },
-    { label: "Recettes", value: formatPdfMoney(report.totals.cashInAmount) },
-    { label: "Dépenses", value: formatPdfMoney(report.totals.cashOutAmount) },
-    { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
+    { label: "Chantiers suivis", value: formatPdfNumber(report.totals.projectsCount) },
+    { label: "Total encaissé", value: formatPdfMoney(report.totals.cashInAmount) },
+    { label: "Total dépensé", value: formatPdfMoney(report.totals.totalCostAmount) },
+    { label: "Marge totale", value: formatPdfMoney(report.totals.netAmount) }
   ];
 
   metrics.forEach((metric, index) => {
     const x = margin + index * (cardWidth + gap);
     doc.roundedRect(x, y, cardWidth, 45, 4).fill("#fff7ed");
     doc.rect(x, y, cardWidth, 45).strokeColor("#fed7aa").lineWidth(0.8).stroke();
-    doc
-      .fillColor("#486581")
-      .font("Helvetica")
-      .fontSize(8.3)
-      .text(metric.label, x + 8, y + 8, {
-        width: cardWidth - 16
-      });
-    doc
-      .fillColor("#111827")
-      .font("Helvetica-Bold")
-      .fontSize(11.2)
-      .text(metric.value, x + 8, y + 23, {
-        width: cardWidth - 16
-      });
+    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 8, y + 8, { width: cardWidth - 16 });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, { width: cardWidth - 16 });
   });
   doc.y = y + 60;
-
-  doc
-    .fillColor("#486581")
-    .font("Helvetica")
-    .fontSize(8.8)
-    .text(
-      `Avancement moyen: ${formatPdfNumber(report.totals.progressPercent, 1)}% | matériaux ${formatPdfNumber(report.totals.materialQuantity, 2)} | main-d'oeuvre ${formatPdfNumber(report.totals.laborDays, 2)} j/h | engins ${formatPdfNumber(report.totals.equipmentHours, 2)} h | tâches ${formatPdfNumber(report.totals.doneTasksCount)} terminées, ${formatPdfNumber(report.totals.openTasksCount)} ouvertes, ${formatPdfNumber(report.totals.blockedTasksCount)} bloquées.`,
-      margin,
-      doc.y - 8,
-      {
-        width: pageWidth - margin * 2,
-        align: "center"
-      }
-    );
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
+    `Dépenses par nature: matériaux ${formatPdfMoney(report.totals.materialAmount)} | main-d'oeuvre ${formatPdfMoney(report.totals.laborAmount)} | engins ${formatPdfMoney(report.totals.equipmentAmount)} | sous-traitance ${formatPdfMoney(report.totals.subcontractingAmount)} | charges ${formatPdfMoney(report.totals.siteExpenseAmount)}.`,
+    margin,
+    doc.y - 8,
+    { width: pageWidth - margin * 2, align: "center" }
+  );
   doc.moveDown(0.8);
 }
 
 function drawBtpTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
   for (const column of BTP_PDF_COLUMNS) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
       align: "center",
       fill: "#ffedd5",
       font: "Helvetica-Bold",
-      fontSize: 5.9
+      fontSize: 11
     });
     x += column.width;
   }
-  return y + 22;
+  return y + 27;
 }
 
 function drawBtpDataRow(
@@ -5027,64 +5087,55 @@ function drawBtpDataRow(
   row: BtpOperationsReport["rows"][number],
   y: number
 ): number {
-  const clientSite = `${row.clientRef} / ${row.siteLocation}`;
   const values = [
-    { value: truncatePdfText(row.projectRef, 12), align: "left" as const },
-    { value: truncatePdfText(row.workPackage, 11), align: "left" as const },
-    { value: truncatePdfText(clientSite, 15), align: "left" as const },
-    { value: `${formatPdfNumber(row.progressPercent, 0)}%`, align: "right" as const },
-    { value: formatPdfNumber(row.materialQuantity, 1), align: "right" as const },
-    { value: formatPdfNumber(row.laborDays, 1), align: "right" as const },
-    { value: formatPdfNumber(row.equipmentHours, 1), align: "right" as const },
+    { value: truncatePdfText(row.projectRef, 30), align: "left" as const },
     { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
-    { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
+    { value: formatPdfMoney(row.totalCostAmount), align: "right" as const },
     { value: formatPdfMoney(row.netAmount), align: "right" as const },
-    { value: `${formatPdfNumber(row.executionRate, 0)}%`, align: "right" as const }
+    { value: row.lastProgressPercent !== null ? `${formatPdfNumber(row.lastProgressPercent, 0)}%` : "-", align: "center" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
     const column = BTP_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
+    drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
       align: item.align,
-      fontSize: 5.65
+      fontSize: 10.5
     });
     x += column.width;
   });
-  return y + 20;
+  return y + 24;
 }
 
 function drawBtpTotalsRow(doc: PDFKit.PDFDocument, report: BtpOperationsReport, y: number): number {
-  const firstColumnsWidth = BTP_PDF_COLUMNS.slice(0, 3).reduce((sum, item) => sum + item.width, 0);
   let x = PDF_PAGE_MARGIN;
-  drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
+  drawPdfTableCell(doc, "TOTAL", x, y, BTP_PDF_COLUMNS[0].width, 27, {
     align: "center",
     fill: "#f8fafc",
     font: "Helvetica-Bold",
-    fontSize: 7
+    fontSize: 11
   });
-  x += firstColumnsWidth;
+  x += BTP_PDF_COLUMNS[0].width;
 
   const values = [
-    `${formatPdfNumber(report.totals.progressPercent, 0)}%`,
-    formatPdfNumber(report.totals.materialQuantity, 1),
-    formatPdfNumber(report.totals.laborDays, 1),
-    formatPdfNumber(report.totals.equipmentHours, 1),
     formatPdfMoney(report.totals.cashInAmount),
-    formatPdfMoney(report.totals.cashOutAmount),
-    formatPdfMoney(report.totals.netAmount),
-    `${formatPdfNumber(report.totals.executionRate, 0)}%`
+    formatPdfMoney(report.totals.totalCostAmount),
+    formatPdfMoney(report.totals.netAmount)
   ];
   for (let index = 0; index < values.length; index += 1) {
-    const column = BTP_PDF_COLUMNS[index + 3];
-    drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
+    const column = BTP_PDF_COLUMNS[index + 1];
+    drawPdfTableCell(doc, values[index], x, y, column.width, 27, {
       align: "right",
       fill: "#fff7ed",
       font: "Helvetica-Bold",
-      fontSize: 5.7
+      fontSize: 11
     });
     x += column.width;
   }
-  return y + 22;
+
+  const lastColumn = BTP_PDF_COLUMNS[4];
+  drawPdfTableCell(doc, "", x, y, lastColumn.width, 27, { fill: "#fff7ed" });
+
+  return y + 27;
 }
 
 function drawBtpEmptyState(doc: PDFKit.PDFDocument): void {
@@ -5094,25 +5145,15 @@ function drawBtpEmptyState(doc: PDFKit.PDFDocument): void {
 
   doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 4).fill("#fff7ed");
   doc.rect(margin, y, pageWidth - margin * 2, 72).strokeColor("#fed7aa").lineWidth(0.8).stroke();
-  doc
-    .fillColor("#78350f")
-    .font("Helvetica-Bold")
-    .fontSize(11)
-    .text("Aucune opération BTP reportable", margin + 14, y + 16, {
-      width: pageWidth - margin * 2 - 28
-    });
-  doc
-    .fillColor("#92400e")
-    .font("Helvetica")
-    .fontSize(9.2)
-    .text(
-      "Le rapport reprend les transactions XOF comptabilisées et les tâches BTP de la période. Renseignez chantier, lot, client et avancement pour alimenter le suivi.",
-      margin + 14,
-      y + 34,
-      {
-        width: pageWidth - margin * 2 - 28
-      }
-    );
+  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(11).text("Aucun chantier reportable", margin + 14, y + 16, {
+    width: pageWidth - margin * 2 - 28
+  });
+  doc.fillColor("#92400e").font("Helvetica").fontSize(9.2).text(
+    "Le rapport reprend les encaissements et dépenses comptabilisés par chantier. Ajoutez un chantier et saisissez une opération pour alimenter le suivi.",
+    margin + 14,
+    y + 34,
+    { width: pageWidth - margin * 2 - 28 }
+  );
   doc.y = y + 88;
 }
 
@@ -5123,22 +5164,14 @@ function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsRe
   }
 
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (needsPdfPageBreak(doc, 78)) {
+  if (doc.y + 27 + 24 + 27 > tableBottom) {
     doc.addPage();
     drawBtpReportHeader(doc, report);
   }
-  doc
-    .fillColor("#78350f")
-    .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text("Synthèse par chantier, lot et client", PDF_PAGE_MARGIN, doc.y, {
-      width: doc.page.width - PDF_PAGE_MARGIN * 2
-    });
-  doc.moveDown(0.4);
   let y = drawBtpTableHeader(doc, doc.y);
 
   for (const row of report.rows) {
-    if (y + 20 + 22 > tableBottom) {
+    if (y + 24 + 27 > tableBottom) {
       doc.addPage();
       drawBtpReportHeader(doc, report);
       y = drawBtpTableHeader(doc, doc.y);
@@ -5146,91 +5179,12 @@ function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsRe
     y = drawBtpDataRow(doc, row, y);
   }
 
-  if (y + 22 > tableBottom) {
+  if (y + 27 > tableBottom) {
     doc.addPage();
     drawBtpReportHeader(doc, report);
     y = drawBtpTableHeader(doc, doc.y);
   }
-  doc.y = drawBtpTotalsRow(doc, report, y) + 14;
-}
-
-function drawBtpBreakdown(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
-  if (report.operationRows.length === 0) {
-    return;
-  }
-
-  if (needsPdfPageBreak(doc, 62)) {
-    doc.addPage();
-    drawBtpReportHeader(doc, report);
-  }
-
-  doc
-    .fillColor("#78350f")
-    .font("Helvetica-Bold")
-    .fontSize(12)
-    .text("Ventilation par type d'opération", PDF_PAGE_MARGIN, doc.y, {
-      width: doc.page.width - PDF_PAGE_MARGIN * 2
-    });
-  doc.moveDown(0.4);
-
-  const columns: PdfTableColumn[] = [
-    { label: "OPERATION", width: 170, align: "left" },
-    { label: "TRANS.", width: 50, align: "right" },
-    { label: "TACHES", width: 50, align: "right" },
-    { label: "RECETTES", width: 80, align: "right" },
-    { label: "DÉPENSES", width: 80, align: "right" },
-    { label: "NET", width: 85, align: "right" }
-  ];
-  let x = PDF_PAGE_MARGIN;
-  let y = doc.y;
-  for (const column of columns) {
-    drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
-      align: "center",
-      fill: "#ffedd5",
-      font: "Helvetica-Bold",
-      fontSize: 7.5
-    });
-    x += column.width;
-  }
-  y += 20;
-
-  for (const row of report.operationRows) {
-    if (y + 19 > doc.page.height - PDF_CONTENT_BOTTOM) {
-      doc.addPage();
-      drawBtpReportHeader(doc, report);
-      y = doc.y;
-      x = PDF_PAGE_MARGIN;
-      for (const column of columns) {
-        drawPdfTableCell(doc, column.label, x, y, column.width, 18, {
-          align: "center",
-          fill: "#ffedd5",
-          font: "Helvetica-Bold",
-          fontSize: 7.5
-        });
-        x += column.width;
-      }
-      y += 20;
-    }
-    x = PDF_PAGE_MARGIN;
-    const values = [
-      { value: truncatePdfText(row.operationLabel, 38), align: "left" as const },
-      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
-      { value: formatPdfNumber(row.tasksCount), align: "right" as const },
-      { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
-      { value: formatPdfMoney(row.cashOutAmount), align: "right" as const },
-      { value: formatPdfMoney(row.netAmount), align: "right" as const }
-    ];
-    values.forEach((item, index) => {
-      const column = columns[index];
-      drawPdfTableCell(doc, item.value, x, y, column.width, 19, {
-        align: item.align,
-        fontSize: 7.4
-      });
-      x += column.width;
-    });
-    y += 19;
-  }
-  doc.y = y + 10;
+  doc.y = drawBtpTotalsRow(doc, report, y) + 12;
 }
 
 function drawBtpPdfFooter(
@@ -5246,29 +5200,16 @@ function drawBtpPdfFooter(
 
   doc.save();
   doc.page.margins.bottom = 0;
-  doc
-    .moveTo(margin, pageHeight - 44)
-    .lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#fed7aa")
-    .lineWidth(1)
-    .stroke();
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`AMCCO - Rapport BTP | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 300,
-      lineBreak: false
-    });
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "right",
-      lineBreak: false
-    });
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#fed7aa").lineWidth(1).stroke();
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport BTP | ${periodLabel}`, margin, pageHeight - 32, {
+    width: 330,
+    lineBreak: false
+  });
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+    width: 80,
+    align: "right",
+    lineBreak: false
+  });
   doc.page.margins.bottom = bottomMargin;
   doc.restore();
 }
@@ -5284,8 +5225,16 @@ function renderBtpReportsPdf(
   drawBtpMetadataStrip(doc, report, filters, overview.generatedAt);
   drawBtpMetricCards(doc, report);
   drawBtpOperationsTable(doc, report);
-  drawBtpBreakdown(doc, report);
-  drawPdfReadingGuideBox(doc);
+
+  const note =
+    "Lecture: la marge correspond au total encaissé moins le total des dépenses (matériaux, main-d'oeuvre, engins, sous-traitance, charges) du chantier.";
+  const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const noteHeight = doc.heightOfString(note, { width: noteWidth });
+  if (doc.y + noteHeight <= doc.page.height - PDF_CONTENT_BOTTOM) {
+    doc.fillColor("#486581").font("Helvetica-Bold").fontSize(10).text(note, PDF_PAGE_MARGIN, doc.y, {
+      width: noteWidth
+    });
+  }
 }
 
 function buildEmptyFishFarmingOperationsReport(filters: ReportPeriodFilter): FishFarmingOperationsReport {
@@ -6486,8 +6435,8 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       category: "GeneralStoreOperationsReport",
       item: "totals",
       label: `Magasins ${overview.generalStoreOperationsReport.periodLabel}`,
-      value: overview.generalStoreOperationsReport.totals.netAmount,
-      extra: `rayons ${overview.generalStoreOperationsReport.totals.departmentsCount} | familles ${overview.generalStoreOperationsReport.totals.productFamiliesCount} | articles ${overview.generalStoreOperationsReport.totals.itemsCount} | ventes ${overview.generalStoreOperationsReport.totals.salesAmount} XOF | achats ${overview.generalStoreOperationsReport.totals.purchaseAmount} XOF | retours ${overview.generalStoreOperationsReport.totals.returnAmount} XOF | remises ${overview.generalStoreOperationsReport.totals.discountAmount} XOF | marge ${overview.generalStoreOperationsReport.totals.marginRate}% | exécution ${overview.generalStoreOperationsReport.totals.executionRate}%`
+      value: overview.generalStoreOperationsReport.totals.balanceAmount,
+      extra: `boutiques ${overview.generalStoreOperationsReport.totals.shopsCount} | achats ${overview.generalStoreOperationsReport.totals.purchaseAmount} XOF | recouvré ${overview.generalStoreOperationsReport.totals.collectedAmount} XOF | solde dû ${overview.generalStoreOperationsReport.totals.balanceAmount} XOF`
     });
   }
 
@@ -6525,9 +6474,9 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
     rows.push({
       category: "WaterOperationsReport",
       item: "totals",
-      label: `Eau potable ${overview.waterOperationsReport.periodLabel}`,
+      label: `Eau ${overview.waterOperationsReport.periodLabel}`,
       value: overview.waterOperationsReport.totals.netAmount,
-      extra: `sites ${overview.waterOperationsReport.totals.facilitiesCount} | zones ${overview.waterOperationsReport.totals.zonesCount} | produit ${overview.waterOperationsReport.totals.producedVolumeM3} m3 | facture ${overview.waterOperationsReport.totals.billedVolumeM3} m3 | recettes ${overview.waterOperationsReport.totals.cashInAmount} XOF | charges ${overview.waterOperationsReport.totals.cashOutAmount} XOF | pertes ${overview.waterOperationsReport.totals.lossRate}% | exécution ${overview.waterOperationsReport.totals.executionRate}%`
+      extra: `paquets vendus ${overview.waterOperationsReport.totals.packagesSold} | ventes ${overview.waterOperationsReport.totals.salesAmount} XOF | dépenses ${overview.waterOperationsReport.totals.expensesAmount} XOF | lignes ${overview.waterOperationsReport.totals.transactionsCount}`
     });
   }
 
@@ -6547,7 +6496,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `BTP ${overview.btpOperationsReport.periodLabel}`,
       value: overview.btpOperationsReport.totals.netAmount,
-      extra: `chantiers ${overview.btpOperationsReport.totals.projectsCount} | lots ${overview.btpOperationsReport.totals.workPackagesCount} | avancement ${overview.btpOperationsReport.totals.progressPercent}% | main-d'oeuvre ${overview.btpOperationsReport.totals.laborDays} j/h | engins ${overview.btpOperationsReport.totals.equipmentHours} h | recettes ${overview.btpOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.btpOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.btpOperationsReport.totals.executionRate}%`
+      extra: `chantiers ${overview.btpOperationsReport.totals.projectsCount} | encaissé ${overview.btpOperationsReport.totals.cashInAmount} XOF | dépensé ${overview.btpOperationsReport.totals.totalCostAmount} XOF | marge ${overview.btpOperationsReport.totals.netAmount} XOF`
     });
   }
 
@@ -6633,27 +6582,35 @@ function buildHardwareMonthlyReportRows(overview: ReportsOverview): Array<Record
   }));
 }
 
-function buildGeneralExpensesReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.generalExpensesReport?.rows ?? []).map((item) => ({
-    date: item.date,
-    ownerType: item.ownerType,
-    categoryLabel: item.categoryLabel,
-    designation: item.designation,
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    amount: item.amount,
-    currency: item.currency
-  }));
+function buildGeneralExpensesReportRows(
+  overview: ReportsOverview,
+  ownerType: "PDG" | "EMPLOYE"
+): Array<Record<string, unknown>> {
+  return (overview.generalExpensesReport?.rows ?? [])
+    .filter((item) => item.ownerType === ownerType)
+    .map((item) => ({
+      date: item.date,
+      categoryLabel: item.categoryLabel,
+      designation: item.designation,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      amount: item.amount,
+      currency: item.currency
+    }));
 }
 
-function buildGeneralExpensesBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.generalExpensesReport?.breakdownRows ?? []).map((item) => ({
-    ownerType: item.ownerType,
-    categoryLabel: item.categoryLabel,
-    transactionsCount: item.transactionsCount,
-    amount: item.amount,
-    currency: item.currency
-  }));
+function buildGeneralExpensesBreakdownRows(
+  overview: ReportsOverview,
+  ownerType: "PDG" | "EMPLOYE"
+): Array<Record<string, unknown>> {
+  return (overview.generalExpensesReport?.breakdownRows ?? [])
+    .filter((item) => item.ownerType === ownerType)
+    .map((item) => ({
+      categoryLabel: item.categoryLabel,
+      transactionsCount: item.transactionsCount,
+      amount: item.amount,
+      currency: item.currency
+    }));
 }
 
 function buildAgricultureOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
@@ -6691,44 +6648,16 @@ function buildAgricultureOperationsBreakdownRows(overview: ReportsOverview): Arr
 
 function buildGeneralStoreOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
   return (overview.generalStoreOperationsReport?.rows ?? []).map((item) => ({
-    department: item.department,
-    productFamily: item.productFamily,
-    itemName: item.itemName,
-    skuRef: item.skuRef,
-    soldQuantity: item.soldQuantity,
-    purchaseQuantity: item.purchaseQuantity,
-    returnQuantity: item.returnQuantity,
-    adjustmentQuantity: item.adjustmentQuantity,
-    transferQuantity: item.transferQuantity,
-    salesAmount: item.salesAmount,
+    shopRef: item.shopRef,
+    location: item.location,
+    lastOperationDate: item.lastOperationDate,
     purchaseAmount: item.purchaseAmount,
-    returnAmount: item.returnAmount,
-    discountAmount: item.discountAmount,
-    expenseAmount: item.expenseAmount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    grossMargin: item.grossMargin,
-    marginRate: item.marginRate,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildGeneralStoreOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.generalStoreOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
+    collectedAmount: item.collectedAmount,
+    balanceAmount: item.balanceAmount,
+    lastInventoryDate: item.lastInventoryDate,
+    remainingStockValue: item.remainingStockValue ?? "",
+    estimatedSoldAmount: item.estimatedSoldAmount ?? "",
+    varianceAmount: item.varianceAmount ?? "",
     currency: item.currency
   }));
 }
@@ -6846,48 +6775,35 @@ function buildHotelOperationsBreakdownRows(overview: ReportsOverview): Array<Rec
   }));
 }
 
-function buildWaterOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.waterOperationsReport?.rows ?? []).map((item) => ({
-    facilityRef: item.facilityRef,
-    networkZone: item.networkZone,
-    productionLine: item.productionLine,
-    producedVolumeM3: item.producedVolumeM3,
-    billedVolumeM3: item.billedVolumeM3,
-    waterRevenue: item.waterRevenue,
-    bulkSaleAmount: item.bulkSaleAmount,
-    connectionAmount: item.connectionAmount,
-    subsidyAmount: item.subsidyAmount,
-    treatmentCost: item.treatmentCost,
-    energyCost: item.energyCost,
-    maintenanceCost: item.maintenanceCost,
-    qualityCost: item.qualityCost,
-    repairCost: item.repairCost,
-    supplierPaymentAmount: item.supplierPaymentAmount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    lossRate: item.lossRate,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
+function buildWaterOperationsReportRows(
+  overview: ReportsOverview,
+  kind: "IN" | "OUT"
+): Array<Record<string, unknown>> {
+  return (overview.waterOperationsReport?.rows ?? [])
+    .filter((item) => item.kind === kind)
+    .map((item) => ({
+      date: item.date,
+      categoryLabel: item.categoryLabel,
+      designation: item.designation,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      amount: item.amount,
+      currency: item.currency
+    }));
 }
 
-function buildWaterOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.waterOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
+function buildWaterOperationsBreakdownRows(
+  overview: ReportsOverview,
+  kind: "IN" | "OUT"
+): Array<Record<string, unknown>> {
+  return (overview.waterOperationsReport?.breakdownRows ?? [])
+    .filter((item) => item.kind === kind)
+    .map((item) => ({
+      categoryLabel: item.categoryLabel,
+      transactionsCount: item.transactionsCount,
+      amount: item.amount,
+      currency: item.currency
+    }));
 }
 
 function buildAgencyOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
@@ -6941,35 +6857,20 @@ function buildAgencyOperationsBreakdownRows(overview: ReportsOverview): Array<Re
 function buildBtpOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
   return (overview.btpOperationsReport?.rows ?? []).map((item) => ({
     projectRef: item.projectRef,
-    workPackage: item.workPackage,
-    siteLocation: item.siteLocation,
     clientRef: item.clientRef,
-    progressPercent: item.progressPercent,
-    materialQuantity: item.materialQuantity,
-    laborDays: item.laborDays,
-    equipmentHours: item.equipmentHours,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
+    location: item.location,
     cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
+    materialAmount: item.materialAmount,
+    laborAmount: item.laborAmount,
+    equipmentAmount: item.equipmentAmount,
+    subcontractingAmount: item.subcontractingAmount,
+    siteExpenseAmount: item.siteExpenseAmount,
+    totalCostAmount: item.totalCostAmount,
     netAmount: item.netAmount,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildBtpOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.btpOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
+    retentionAmount: item.retentionAmount,
+    lastProgressPercent: item.lastProgressPercent ?? "",
+    lastOperationDate: item.lastOperationDate,
     transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
     currency: item.currency
   }));
 }
@@ -7822,396 +7723,165 @@ function buildAgricultureOperationsReport(
   };
 }
 
-type GeneralStoreReportBucket = {
-  department: string;
-  productFamily: string;
-  itemName: string;
-  skuRef: string;
-  soldQuantityValue: number;
-  purchaseQuantityValue: number;
-  returnQuantityValue: number;
-  adjustmentQuantityValue: number;
-  transferQuantityValue: number;
-  salesValue: number;
-  purchaseValue: number;
-  returnValue: number;
-  discountValue: number;
-  expenseValue: number;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
-};
-
-type GeneralStoreOperationBucket = {
-  operationKind: string;
-  operationLabel: string;
-  transactionsCount: number;
-  tasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
-};
-
-function getGeneralStoreMetadataLabel(
-  metadata: Record<string, string>,
-  key: string,
-  fallback: string
-): string {
-  const value = metadata[key]?.trim();
-  return value || fallback;
-}
-
-function getGeneralStoreBucketKey(input: {
-  department: string;
-  productFamily: string;
-  itemName: string;
-  skuRef: string;
-}): string {
-  return [input.department, input.productFamily, input.itemName, input.skuRef].join("|");
-}
-
-function getGeneralStoreReportBucket(
-  buckets: Map<string, GeneralStoreReportBucket>,
-  metadata: Record<string, string>
-): GeneralStoreReportBucket {
-  const input = {
-    department: getGeneralStoreMetadataLabel(metadata, "department", "Rayon non renseigné"),
-    productFamily: getGeneralStoreMetadataLabel(metadata, "productFamily", "Famille non renseignée"),
-    itemName: getGeneralStoreMetadataLabel(metadata, "itemName", "Article non renseigné"),
-    skuRef: getGeneralStoreMetadataLabel(metadata, "skuRef", "Référence non renseignée")
-  };
-  const key = getGeneralStoreBucketKey(input);
-  const existing = buckets.get(key);
-  if (existing) {
-    return existing;
-  }
-
-  const created: GeneralStoreReportBucket = {
-    ...input,
-    soldQuantityValue: 0,
-    purchaseQuantityValue: 0,
-    returnQuantityValue: 0,
-    adjustmentQuantityValue: 0,
-    transferQuantityValue: 0,
-    salesValue: 0,
-    purchaseValue: 0,
-    returnValue: 0,
-    discountValue: 0,
-    expenseValue: 0,
-    transactionsCount: 0,
-    tasksCount: 0,
-    doneTasksCount: 0,
-    openTasksCount: 0,
-    blockedTasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(key, created);
-  return created;
-}
-
-function getGeneralStoreOperationBucket(
-  buckets: Map<string, GeneralStoreOperationBucket>,
-  operationKind: string,
-  operationLabel: string
-): GeneralStoreOperationBucket {
-  const existing = buckets.get(operationKind);
-  if (existing) {
-    return existing;
-  }
-
-  const created: GeneralStoreOperationBucket = {
-    operationKind,
-    operationLabel,
-    transactionsCount: 0,
-    tasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(operationKind, created);
-  return created;
-}
-
-function getGeneralStoreTransactionOperationKind(transaction: ReportOperationalTransaction): string {
-  const configuredKind = transaction.metadata.storeOperationKind?.trim();
-  if (configuredKind) {
-    return configuredKind;
-  }
-  return transaction.type === "CASH_IN" ? "STORE_SALE" : "STORE_EXPENSE";
-}
-
-function getGeneralStoreTaskOperationKind(task: ReportOperationalTask): string {
-  const configuredKind = task.metadata.storeTaskKind?.trim();
-  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
-}
-
-function toGeneralStoreOperationLabel(operationKind: string): string {
-  if (GENERAL_STORE_OPERATION_LABELS[operationKind]) {
-    return GENERAL_STORE_OPERATION_LABELS[operationKind];
-  }
-  if (operationKind.startsWith("TASK_")) {
-    const taskKind = operationKind.slice("TASK_".length);
-    return `Tâche: ${GENERAL_STORE_TASK_LABELS[taskKind] ?? taskKind}`;
-  }
-  return operationKind;
-}
-
-function toGeneralStorePeriodLabel(
-  filters: ReportPeriodFilter,
-  _rows: GeneralStoreReportBucket[]
-): string {
-  if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes périodes";
-  }
-
-  if (!filters.dateFrom || !filters.dateTo) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  const fromDate = new Date(filters.dateFrom);
-  const toDate = new Date(filters.dateTo);
-  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  const sameMonth =
-    fromDate.getFullYear() === toDate.getFullYear() &&
-    fromDate.getMonth() === toDate.getMonth();
-  if (!sameMonth) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  return fromDate.toLocaleDateString("fr-FR", {
-    month: "long",
-    year: "numeric"
-  });
-}
-
 function isGeneralStoreReportableTransaction(transaction: ReportOperationalTransaction): boolean {
   return isSectorReportableTransaction(transaction, "GENERAL_STORE");
 }
 
+function getGeneralStoreTransactionKind(
+  transaction: ReportOperationalTransaction
+): "ACHAT" | "RECOUVREMENT" {
+  const configuredKind = transaction.metadata.storeOperationKind?.trim();
+  if (configuredKind === "RECOUVREMENT") {
+    return "RECOUVREMENT";
+  }
+  if (configuredKind === "ACHAT") {
+    return "ACHAT";
+  }
+  return transaction.type === "CASH_IN" ? "RECOUVREMENT" : "ACHAT";
+}
+
+function resolveGeneralStoreAsOfDate(filters: ReportPeriodFilter): Date {
+  if (filters.dateTo) {
+    const parsed = new Date(filters.dateTo);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return new Date();
+}
+
+type GeneralStoreShopLedger = {
+  purchaseValue: number;
+  collectedValue: number;
+  lastOperationAt: string | null;
+  transactionsCount: number;
+};
+
+type GeneralStoreInventoryCheckpoint = {
+  remainingStockValue: number;
+  recordedAt: string;
+};
+
 function buildGeneralStoreOperationsReport(
   transactions: ReportOperationalTransaction[],
-  tasks: ReportOperationalTask[],
+  shops: GeneralStoreShop[],
+  inventorySnapshots: GeneralStoreInventorySnapshot[],
   filters: ReportPeriodFilter
 ): GeneralStoreOperationsReport | null {
   if (filters.activityCode && filters.activityCode !== "GENERAL_STORE") {
     return null;
   }
 
-  const storeTransactions = transactions.filter(isGeneralStoreReportableTransaction);
-  const storeTasks = tasks.filter((task) => task.activityCode === "GENERAL_STORE");
-  if (!filters.activityCode && storeTransactions.length === 0 && storeTasks.length === 0) {
+  if (!filters.activityCode && shops.length === 0 && transactions.length === 0) {
     return null;
   }
 
-  const rowBuckets = new Map<string, GeneralStoreReportBucket>();
-  const operationBuckets = new Map<string, GeneralStoreOperationBucket>();
+  const reportableTransactions = transactions.filter(isGeneralStoreReportableTransaction);
+  const asOfDate = resolveGeneralStoreAsOfDate(filters);
+  const asOfIso = asOfDate.toISOString();
 
-  for (const transaction of storeTransactions) {
-    const operationKind = getGeneralStoreTransactionOperationKind(transaction);
-    const rowBucket = getGeneralStoreReportBucket(rowBuckets, transaction.metadata);
-    const amount = toNumberAmount(transaction.amount);
-    const quantity = getMetadataNumber(transaction.metadata, "quantity");
-    rowBucket.transactionsCount += 1;
-
-    if (operationKind === "STORE_SALE") {
-      rowBucket.soldQuantityValue += quantity;
-      rowBucket.salesValue += amount;
-      rowBucket.discountValue += getMetadataNumber(transaction.metadata, "discountAmount");
+  const ledgerByShop = new Map<string, GeneralStoreShopLedger>();
+  for (const transaction of reportableTransactions) {
+    if (transaction.occurredAt > asOfIso) {
+      continue;
     }
-    if (operationKind === "STOCK_PURCHASE") {
-      rowBucket.purchaseQuantityValue += quantity;
-      rowBucket.purchaseValue += amount;
+    const shopKey = transaction.metadata.shopRef?.trim();
+    if (!shopKey) {
+      continue;
     }
-    if (operationKind === "CUSTOMER_RETURN") {
-      rowBucket.returnQuantityValue += getMetadataNumber(transaction.metadata, "returnQuantity");
-      rowBucket.returnValue += amount;
-    }
-    if (operationKind === "DISCOUNT_ADJUSTMENT") {
-      rowBucket.discountValue += amount;
-    }
-    if (operationKind === "INVENTORY_ADJUSTMENT") {
-      rowBucket.adjustmentQuantityValue += getMetadataNumber(transaction.metadata, "adjustmentQuantity");
-      rowBucket.expenseValue += amount;
-    }
-    if (operationKind === "INTERNAL_TRANSFER") {
-      rowBucket.transferQuantityValue += quantity;
-    }
-    if (operationKind === "SUPPLIER_PAYMENT" || operationKind === "STORE_EXPENSE") {
-      rowBucket.expenseValue += amount;
-    }
-
-    if (transaction.type === "CASH_IN") {
-      rowBucket.cashInValue += amount;
-    } else {
-      rowBucket.cashOutValue += amount;
-    }
-
-    const operationBucket = getGeneralStoreOperationBucket(
-      operationBuckets,
-      operationKind,
-      toGeneralStoreOperationLabel(operationKind)
-    );
-    operationBucket.transactionsCount += 1;
-    if (transaction.type === "CASH_IN") {
-      operationBucket.cashInValue += amount;
-    } else {
-      operationBucket.cashOutValue += amount;
-    }
-  }
-
-  for (const task of storeTasks) {
-    const rowBucket = getGeneralStoreReportBucket(rowBuckets, task.metadata);
-    rowBucket.tasksCount += 1;
-    if (task.status === "DONE") {
-      rowBucket.doneTasksCount += 1;
-    } else {
-      rowBucket.openTasksCount += 1;
-    }
-    if (task.status === "BLOCKED") {
-      rowBucket.blockedTasksCount += 1;
-    }
-
-    const operationKind = getGeneralStoreTaskOperationKind(task);
-    const operationBucket = getGeneralStoreOperationBucket(
-      operationBuckets,
-      operationKind,
-      toGeneralStoreOperationLabel(operationKind)
-    );
-    operationBucket.tasksCount += 1;
-  }
-
-  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
-    return (
-      left.department.localeCompare(right.department) ||
-      left.productFamily.localeCompare(right.productFamily) ||
-      left.itemName.localeCompare(right.itemName) ||
-      left.skuRef.localeCompare(right.skuRef)
-    );
-  });
-
-  const totals = bucketRows.reduce(
-    (sum, row) => ({
-      soldQuantityValue: sum.soldQuantityValue + row.soldQuantityValue,
-      purchaseQuantityValue: sum.purchaseQuantityValue + row.purchaseQuantityValue,
-      returnQuantityValue: sum.returnQuantityValue + row.returnQuantityValue,
-      adjustmentQuantityValue: sum.adjustmentQuantityValue + row.adjustmentQuantityValue,
-      transferQuantityValue: sum.transferQuantityValue + row.transferQuantityValue,
-      salesValue: sum.salesValue + row.salesValue,
-      purchaseValue: sum.purchaseValue + row.purchaseValue,
-      returnValue: sum.returnValue + row.returnValue,
-      discountValue: sum.discountValue + row.discountValue,
-      expenseValue: sum.expenseValue + row.expenseValue,
-      transactionsCount: sum.transactionsCount + row.transactionsCount,
-      tasksCount: sum.tasksCount + row.tasksCount,
-      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
-      openTasksCount: sum.openTasksCount + row.openTasksCount,
-      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
-      cashInValue: sum.cashInValue + row.cashInValue,
-      cashOutValue: sum.cashOutValue + row.cashOutValue
-    }),
-    {
-      soldQuantityValue: 0,
-      purchaseQuantityValue: 0,
-      returnQuantityValue: 0,
-      adjustmentQuantityValue: 0,
-      transferQuantityValue: 0,
-      salesValue: 0,
+    const ledger = ledgerByShop.get(shopKey) ?? {
       purchaseValue: 0,
-      returnValue: 0,
-      discountValue: 0,
-      expenseValue: 0,
-      transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
-      cashInValue: 0,
-      cashOutValue: 0
+      collectedValue: 0,
+      lastOperationAt: null,
+      transactionsCount: 0
+    };
+    const amount = toNumberAmount(transaction.amount);
+    if (getGeneralStoreTransactionKind(transaction) === "ACHAT") {
+      ledger.purchaseValue += amount;
+    } else {
+      ledger.collectedValue += amount;
     }
+    ledger.transactionsCount += 1;
+    if (!ledger.lastOperationAt || transaction.occurredAt > ledger.lastOperationAt) {
+      ledger.lastOperationAt = transaction.occurredAt;
+    }
+    ledgerByShop.set(shopKey, ledger);
+  }
+
+  const inventoryByShop = new Map<string, GeneralStoreInventoryCheckpoint>();
+  for (const snapshot of inventorySnapshots) {
+    if (snapshot.recordedAt > asOfIso) {
+      continue;
+    }
+    const existing = inventoryByShop.get(snapshot.shopRef);
+    if (existing && existing.recordedAt >= snapshot.recordedAt) {
+      continue;
+    }
+    inventoryByShop.set(snapshot.shopRef, {
+      remainingStockValue: toNumberAmount(snapshot.remainingStockValue),
+      recordedAt: snapshot.recordedAt
+    });
+  }
+
+  function buildRow(shopKey: string, location: string, ledger: GeneralStoreShopLedger | undefined) {
+    const purchaseValue = ledger?.purchaseValue ?? 0;
+    const collectedValue = ledger?.collectedValue ?? 0;
+    const checkpoint = inventoryByShop.get(shopKey);
+    const estimatedSoldValue = checkpoint ? purchaseValue - checkpoint.remainingStockValue : null;
+    const varianceValue = estimatedSoldValue !== null ? estimatedSoldValue - collectedValue : null;
+    return {
+      shopRef: shopKey,
+      location,
+      lastOperationDate: ledger?.lastOperationAt ?? "",
+      purchaseAmount: toMoneyString(purchaseValue),
+      collectedAmount: toMoneyString(collectedValue),
+      balanceAmount: toMoneyString(purchaseValue - collectedValue),
+      lastInventoryDate: checkpoint?.recordedAt ?? "",
+      remainingStockValue: checkpoint ? toMoneyString(checkpoint.remainingStockValue) : null,
+      estimatedSoldAmount: estimatedSoldValue !== null ? toMoneyString(estimatedSoldValue) : null,
+      varianceAmount: varianceValue !== null ? toMoneyString(varianceValue) : null,
+      currency: "XOF" as const
+    };
+  }
+
+  const activeShops = [...shops].sort((left, right) => left.name.localeCompare(right.name));
+  const knownShopNames = new Set(activeShops.map((shop) => shop.name));
+
+  const rows: GeneralStoreOperationsReport["rows"] = activeShops.map((shop) =>
+    buildRow(shop.name, shop.location ?? "", ledgerByShop.get(shop.name))
   );
 
-  const departmentKeys = new Set(bucketRows.map((row) => row.department));
-  const familyKeys = new Set(bucketRows.map((row) => `${row.department}|${row.productFamily}`));
-  const itemKeys = new Set(bucketRows.map((row) => `${row.department}|${row.productFamily}|${row.itemName}|${row.skuRef}`));
-  const totalGrossMargin = totals.salesValue - totals.purchaseValue - totals.returnValue - totals.discountValue;
+  for (const [shopKey, ledger] of ledgerByShop.entries()) {
+    if (knownShopNames.has(shopKey)) {
+      continue;
+    }
+    rows.push(buildRow(shopKey, "", ledger));
+  }
+
+  rows.sort((left, right) => left.shopRef.localeCompare(right.shopRef));
+
+  const totalsAcc = rows.reduce(
+    (sum, row) => ({
+      purchaseValue: sum.purchaseValue + toNumberAmount(row.purchaseAmount),
+      collectedValue: sum.collectedValue + toNumberAmount(row.collectedAmount)
+    }),
+    { purchaseValue: 0, collectedValue: 0 }
+  );
+  const transactionsCount = Array.from(ledgerByShop.values()).reduce(
+    (sum, ledger) => sum + ledger.transactionsCount,
+    0
+  );
 
   return {
-    periodLabel: toGeneralStorePeriodLabel(filters, bucketRows),
-    rows: bucketRows.map((row) => {
-      const netAmount = row.cashInValue - row.cashOutValue;
-      const grossMargin = row.salesValue - row.purchaseValue - row.returnValue - row.discountValue;
-      return {
-        department: row.department,
-        productFamily: row.productFamily,
-        itemName: row.itemName,
-        skuRef: row.skuRef,
-        soldQuantity: row.soldQuantityValue,
-        purchaseQuantity: row.purchaseQuantityValue,
-        returnQuantity: row.returnQuantityValue,
-        adjustmentQuantity: row.adjustmentQuantityValue,
-        transferQuantity: row.transferQuantityValue,
-        salesAmount: toMoneyString(row.salesValue),
-        purchaseAmount: toMoneyString(row.purchaseValue),
-        returnAmount: toMoneyString(row.returnValue),
-        discountAmount: toMoneyString(row.discountValue),
-        expenseAmount: toMoneyString(row.expenseValue),
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        doneTasksCount: row.doneTasksCount,
-        openTasksCount: row.openTasksCount,
-        blockedTasksCount: row.blockedTasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(netAmount),
-        grossMargin: toMoneyString(grossMargin),
-        marginRate: toMarginRate(grossMargin, row.salesValue),
-        executionRate: toRate(row.doneTasksCount, row.tasksCount),
-        currency: "XOF" as const
-      };
-    }),
-    operationRows: Array.from(operationBuckets.values())
-      .map((row) => ({
-        operationKind: row.operationKind,
-        operationLabel: row.operationLabel,
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
-        currency: "XOF" as const
-      }))
-      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    periodLabel: toDisplayPeriodLabel(filters),
+    asOfLabel: formatPdfDate(asOfIso),
+    rows,
     totals: {
-      departmentsCount: departmentKeys.size,
-      productFamiliesCount: familyKeys.size,
-      itemsCount: itemKeys.size,
-      soldQuantity: totals.soldQuantityValue,
-      purchaseQuantity: totals.purchaseQuantityValue,
-      returnQuantity: totals.returnQuantityValue,
-      adjustmentQuantity: totals.adjustmentQuantityValue,
-      transferQuantity: totals.transferQuantityValue,
-      salesAmount: toMoneyString(totals.salesValue),
-      purchaseAmount: toMoneyString(totals.purchaseValue),
-      returnAmount: toMoneyString(totals.returnValue),
-      discountAmount: toMoneyString(totals.discountValue),
-      expenseAmount: toMoneyString(totals.expenseValue),
-      transactionsCount: totals.transactionsCount,
-      tasksCount: totals.tasksCount,
-      doneTasksCount: totals.doneTasksCount,
-      openTasksCount: totals.openTasksCount,
-      blockedTasksCount: totals.blockedTasksCount,
-      cashInAmount: toMoneyString(totals.cashInValue),
-      cashOutAmount: toMoneyString(totals.cashOutValue),
-      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
-      grossMargin: toMoneyString(totalGrossMargin),
-      marginRate: toMarginRate(totalGrossMargin, totals.salesValue),
-      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      shopsCount: rows.length,
+      purchaseAmount: toMoneyString(totalsAcc.purchaseValue),
+      collectedAmount: toMoneyString(totalsAcc.collectedValue),
+      balanceAmount: toMoneyString(totalsAcc.purchaseValue - totalsAcc.collectedValue),
+      transactionsCount,
       currency: "XOF" as const
     }
   };
@@ -9252,139 +8922,26 @@ function buildHotelOperationsReport(
   };
 }
 
-type WaterReportBucket = {
-  facilityRef: string;
-  networkZone: string;
-  productionLine: string;
-  producedVolumeValue: number;
-  billedVolumeValue: number;
-  waterRevenueValue: number;
-  bulkSaleValue: number;
-  connectionValue: number;
-  subsidyValue: number;
-  treatmentCostValue: number;
-  energyCostValue: number;
-  maintenanceCostValue: number;
-  qualityCostValue: number;
-  repairCostValue: number;
-  supplierPaymentValue: number;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
+const WATER_LEGACY_KIND_MAP: Record<string, string> = {
+  WATER_BILLING: "WATER_SALE",
+  BULK_WATER_SALE: "WATER_SALE",
+  CONNECTION_FEE: "WATER_OTHER_INCOME",
+  SUBSIDY_INCOME: "WATER_OTHER_INCOME",
+  CHEMICAL_PURCHASE: "WATER_EXPENSE_MAINTENANCE",
+  ENERGY_PAYMENT: "WATER_EXPENSE_ENERGY",
+  MAINTENANCE_EXPENSE: "WATER_EXPENSE_MAINTENANCE",
+  QUALITY_TEST_EXPENSE: "WATER_EXPENSE_MAINTENANCE",
+  NETWORK_REPAIR: "WATER_EXPENSE_MAINTENANCE",
+  SUPPLIER_PAYMENT: "WATER_EXPENSE_SUPPLIER"
 };
 
-type WaterOperationBucket = {
-  operationKind: string;
-  operationLabel: string;
-  transactionsCount: number;
-  tasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
-};
-
-function getWaterMetadataLabel(
-  metadata: Record<string, string>,
-  key: string,
-  fallback: string
-): string {
-  const value = metadata[key]?.trim();
-  return value ? value : fallback;
+function normalizeWaterOperationKind(operationKind: string): string {
+  return WATER_LEGACY_KIND_MAP[operationKind] ?? operationKind;
 }
 
-function getWaterBucketKey(metadata: Record<string, string>): string {
-  return [
-    getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigné"),
-    getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignée"),
-    getWaterMetadataLabel(metadata, "productionLine", "Exploitation")
-  ].join("::");
-}
-
-function getWaterReportBucket(
-  buckets: Map<string, WaterReportBucket>,
-  metadata: Record<string, string>
-): WaterReportBucket {
-  const key = getWaterBucketKey(metadata);
-  const existing = buckets.get(key);
-  if (existing) {
-    return existing;
-  }
-
-  const created: WaterReportBucket = {
-    facilityRef: getWaterMetadataLabel(metadata, "facilityRef", "Site non renseigné"),
-    networkZone: getWaterMetadataLabel(metadata, "networkZone", "Zone non renseignée"),
-    productionLine: getWaterMetadataLabel(metadata, "productionLine", "Exploitation"),
-    producedVolumeValue: 0,
-    billedVolumeValue: 0,
-    waterRevenueValue: 0,
-    bulkSaleValue: 0,
-    connectionValue: 0,
-    subsidyValue: 0,
-    treatmentCostValue: 0,
-    energyCostValue: 0,
-    maintenanceCostValue: 0,
-    qualityCostValue: 0,
-    repairCostValue: 0,
-    supplierPaymentValue: 0,
-    transactionsCount: 0,
-    tasksCount: 0,
-    doneTasksCount: 0,
-    openTasksCount: 0,
-    blockedTasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(key, created);
-  return created;
-}
-
-function getWaterOperationBucket(
-  buckets: Map<string, WaterOperationBucket>,
-  operationKind: string,
-  operationLabel: string
-): WaterOperationBucket {
-  const existing = buckets.get(operationKind);
-  if (existing) {
-    return existing;
-  }
-
-  const created: WaterOperationBucket = {
-    operationKind,
-    operationLabel,
-    transactionsCount: 0,
-    tasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(operationKind, created);
-  return created;
-}
-
-function getWaterTransactionOperationKind(transaction: ReportOperationalTransaction): string {
-  const configuredKind = transaction.metadata.waterOperationKind?.trim();
-  if (configuredKind) {
-    return configuredKind;
-  }
-  return transaction.type === "CASH_IN" ? "WATER_BILLING" : "SUPPLIER_PAYMENT";
-}
-
-function getWaterTaskOperationKind(task: ReportOperationalTask): string {
-  const configuredKind = task.metadata.waterTaskKind?.trim();
-  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
-}
-
-function toWaterOperationLabel(operationKind: string): string {
-  if (WATER_OPERATION_LABELS[operationKind]) {
-    return WATER_OPERATION_LABELS[operationKind];
-  }
-  if (operationKind.startsWith("TASK_")) {
-    const taskKind = operationKind.slice("TASK_".length);
-    return `Tâche: ${WATER_TASK_LABELS[taskKind] ?? taskKind}`;
-  }
-  return operationKind;
+function toWaterCategoryLabel(operationKind: string): string {
+  const normalized = normalizeWaterOperationKind(operationKind);
+  return WATER_OPERATION_LABELS[normalized] ?? normalized;
 }
 
 function toWaterPeriodLabel(filters: ReportPeriodFilter): string {
@@ -9415,244 +8972,111 @@ function toWaterPeriodLabel(filters: ReportPeriodFilter): string {
   });
 }
 
-function isWaterReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return isSectorReportableTransaction(transaction, "WATER");
-}
-
-function toWaterLossRate(producedVolume: number, billedVolume: number): number {
-  if (producedVolume <= 0) {
-    return 0;
-  }
-  return Number(((Math.max(producedVolume - billedVolume, 0) / producedVolume) * 100).toFixed(2));
-}
-
 function buildWaterOperationsReport(
   transactions: ReportOperationalTransaction[],
-  tasks: ReportOperationalTask[],
   filters: ReportPeriodFilter
 ): WaterOperationsReport | null {
   if (filters.activityCode && filters.activityCode !== "WATER") {
     return null;
   }
 
-  const waterTransactions = transactions.filter(isWaterReportableTransaction);
-  const waterTasks = tasks.filter((task) => task.activityCode === "WATER");
-  if (!filters.activityCode && waterTransactions.length === 0 && waterTasks.length === 0) {
+  const waterTransactions = transactions.filter((transaction) =>
+    isSectorReportableTransaction(transaction, "WATER")
+  );
+  if (!filters.activityCode && waterTransactions.length === 0) {
     return null;
   }
 
-  const rowBuckets = new Map<string, WaterReportBucket>();
-  const operationBuckets = new Map<string, WaterOperationBucket>();
-
-  for (const transaction of waterTransactions) {
-    const operationKind = getWaterTransactionOperationKind(transaction);
-    const rowBucket = getWaterReportBucket(rowBuckets, transaction.metadata);
-    const amount = toNumberAmount(transaction.amount);
-    const producedVolume = getMetadataNumber(transaction.metadata, "producedVolumeM3");
-    const volumeM3 = getMetadataNumber(transaction.metadata, "volumeM3");
-    rowBucket.transactionsCount += 1;
-    rowBucket.producedVolumeValue += producedVolume;
-
-    if (operationKind === "WATER_BILLING") {
-      rowBucket.billedVolumeValue += volumeM3;
-      rowBucket.waterRevenueValue += amount;
-    }
-    if (operationKind === "BULK_WATER_SALE") {
-      rowBucket.billedVolumeValue += volumeM3;
-      rowBucket.bulkSaleValue += amount;
-    }
-    if (operationKind === "CONNECTION_FEE") {
-      rowBucket.connectionValue += amount;
-    }
-    if (operationKind === "SUBSIDY_INCOME") {
-      rowBucket.subsidyValue += amount;
-    }
-    if (operationKind === "CHEMICAL_PURCHASE") {
-      rowBucket.treatmentCostValue += amount;
-    }
-    if (operationKind === "ENERGY_PAYMENT") {
-      rowBucket.energyCostValue += amount;
-    }
-    if (operationKind === "MAINTENANCE_EXPENSE") {
-      rowBucket.maintenanceCostValue += amount;
-    }
-    if (operationKind === "QUALITY_TEST_EXPENSE") {
-      rowBucket.qualityCostValue += amount;
-    }
-    if (operationKind === "NETWORK_REPAIR") {
-      rowBucket.repairCostValue += amount;
-    }
-    if (operationKind === "SUPPLIER_PAYMENT") {
-      rowBucket.supplierPaymentValue += amount;
-    }
-
-    if (transaction.type === "CASH_IN") {
-      rowBucket.cashInValue += amount;
-    } else {
-      rowBucket.cashOutValue += amount;
-    }
-
-    const operationBucket = getWaterOperationBucket(
-      operationBuckets,
-      operationKind,
-      toWaterOperationLabel(operationKind)
-    );
-    operationBucket.transactionsCount += 1;
-    if (transaction.type === "CASH_IN") {
-      operationBucket.cashInValue += amount;
-    } else {
-      operationBucket.cashOutValue += amount;
-    }
-  }
-
-  for (const task of waterTasks) {
-    const rowBucket = getWaterReportBucket(rowBuckets, task.metadata);
-    rowBucket.tasksCount += 1;
-    if (task.status === "DONE") {
-      rowBucket.doneTasksCount += 1;
-    } else {
-      rowBucket.openTasksCount += 1;
-    }
-    if (task.status === "BLOCKED") {
-      rowBucket.blockedTasksCount += 1;
-    }
-
-    const operationKind = getWaterTaskOperationKind(task);
-    const operationBucket = getWaterOperationBucket(
-      operationBuckets,
-      operationKind,
-      toWaterOperationLabel(operationKind)
-    );
-    operationBucket.tasksCount += 1;
-  }
-
-  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
-    return (
-      left.facilityRef.localeCompare(right.facilityRef) ||
-      left.networkZone.localeCompare(right.networkZone) ||
-      left.productionLine.localeCompare(right.productionLine)
-    );
-  });
-
-  const totals = bucketRows.reduce(
-    (sum, row) => ({
-      producedVolumeValue: sum.producedVolumeValue + row.producedVolumeValue,
-      billedVolumeValue: sum.billedVolumeValue + row.billedVolumeValue,
-      waterRevenueValue: sum.waterRevenueValue + row.waterRevenueValue,
-      bulkSaleValue: sum.bulkSaleValue + row.bulkSaleValue,
-      connectionValue: sum.connectionValue + row.connectionValue,
-      subsidyValue: sum.subsidyValue + row.subsidyValue,
-      treatmentCostValue: sum.treatmentCostValue + row.treatmentCostValue,
-      energyCostValue: sum.energyCostValue + row.energyCostValue,
-      maintenanceCostValue: sum.maintenanceCostValue + row.maintenanceCostValue,
-      qualityCostValue: sum.qualityCostValue + row.qualityCostValue,
-      repairCostValue: sum.repairCostValue + row.repairCostValue,
-      supplierPaymentValue: sum.supplierPaymentValue + row.supplierPaymentValue,
-      transactionsCount: sum.transactionsCount + row.transactionsCount,
-      tasksCount: sum.tasksCount + row.tasksCount,
-      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
-      openTasksCount: sum.openTasksCount + row.openTasksCount,
-      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
-      cashInValue: sum.cashInValue + row.cashInValue,
-      cashOutValue: sum.cashOutValue + row.cashOutValue
-    }),
-    {
-      producedVolumeValue: 0,
-      billedVolumeValue: 0,
-      waterRevenueValue: 0,
-      bulkSaleValue: 0,
-      connectionValue: 0,
-      subsidyValue: 0,
-      treatmentCostValue: 0,
-      energyCostValue: 0,
-      maintenanceCostValue: 0,
-      qualityCostValue: 0,
-      repairCostValue: 0,
-      supplierPaymentValue: 0,
-      transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
-      cashInValue: 0,
-      cashOutValue: 0
-    }
+  const sortedTransactions = [...waterTransactions].sort((left, right) =>
+    left.occurredAt.localeCompare(right.occurredAt)
   );
 
-  const facilityKeys = new Set(bucketRows.map((row) => row.facilityRef));
-  const zoneKeys = new Set(bucketRows.map((row) => `${row.facilityRef}::${row.networkZone}`));
+  const rows: WaterOperationsReport["rows"] = sortedTransactions.map((transaction) => {
+    const configuredKind = transaction.metadata.waterOperationKind?.trim();
+    const operationKind =
+      configuredKind || (transaction.type === "CASH_IN" ? "WATER_SALE" : "WATER_EXPENSE_OTHER");
+    const kind: "IN" | "OUT" = transaction.type === "CASH_IN" ? "IN" : "OUT";
+    const quantity = getMetadataNumber(transaction.metadata, "quantity");
+    const metaUnitPrice = getMetadataNumber(transaction.metadata, "unitPrice");
+    const amountValue = toNumberAmount(transaction.amount);
+    const unitPriceValue = metaUnitPrice > 0 ? metaUnitPrice : quantity > 0 ? amountValue / quantity : 0;
+
+    return {
+      date: toReportDate(transaction.occurredAt),
+      kind,
+      categoryLabel: toWaterCategoryLabel(operationKind),
+      designation: transaction.description?.trim() || "-",
+      quantity,
+      unitPrice: toMoneyString(unitPriceValue),
+      amount: toMoneyString(amountValue),
+      currency: "XOF" as const
+    };
+  });
+
+  type BreakdownBucket = { kind: "IN" | "OUT"; categoryLabel: string; count: number; amount: number };
+  const breakdownMap = new Map<string, BreakdownBucket>();
+  for (const row of rows) {
+    const key = `${row.kind}|${row.categoryLabel}`;
+    const existing: BreakdownBucket = breakdownMap.get(key) ?? {
+      kind: row.kind,
+      categoryLabel: row.categoryLabel,
+      count: 0,
+      amount: 0
+    };
+    existing.count += 1;
+    existing.amount += toNumberAmount(row.amount);
+    breakdownMap.set(key, existing);
+  }
+
+  const breakdownRows: WaterOperationsReport["breakdownRows"] = Array.from(breakdownMap.values())
+    .sort((left, right) => {
+      if (left.kind !== right.kind) {
+        return left.kind === "IN" ? -1 : 1;
+      }
+      return right.amount - left.amount;
+    })
+    .map((item) => ({
+      kind: item.kind,
+      categoryLabel: item.categoryLabel,
+      transactionsCount: item.count,
+      amount: toMoneyString(item.amount),
+      currency: "XOF" as const
+    }));
+
+  const packageSaleTransactions = sortedTransactions.filter((transaction) => {
+    const configuredKind = transaction.metadata.waterOperationKind?.trim();
+    const normalizedKind = normalizeWaterOperationKind(configuredKind || "WATER_SALE");
+    return transaction.type === "CASH_IN" && normalizedKind === "WATER_SALE";
+  });
+  const packagesSold = packageSaleTransactions.reduce(
+    (sum, transaction) => sum + getMetadataNumber(transaction.metadata, "quantity"),
+    0
+  );
+  const packagesSalesAmountValue = packageSaleTransactions.reduce(
+    (sum, transaction) => sum + toNumberAmount(transaction.amount),
+    0
+  );
+  const averagePackagePrice = packagesSold > 0 ? packagesSalesAmountValue / packagesSold : 0;
+
+  const salesAmountValue = rows
+    .filter((row) => row.kind === "IN")
+    .reduce((sum, row) => sum + toNumberAmount(row.amount), 0);
+  const expensesAmountValue = rows
+    .filter((row) => row.kind === "OUT")
+    .reduce((sum, row) => sum + toNumberAmount(row.amount), 0);
 
   return {
     periodLabel: toWaterPeriodLabel(filters),
-    rows: bucketRows.map((row) => {
-      const netAmount = row.cashInValue - row.cashOutValue;
-      return {
-        facilityRef: row.facilityRef,
-        networkZone: row.networkZone,
-        productionLine: row.productionLine,
-        producedVolumeM3: row.producedVolumeValue,
-        billedVolumeM3: row.billedVolumeValue,
-        waterRevenue: toMoneyString(row.waterRevenueValue),
-        bulkSaleAmount: toMoneyString(row.bulkSaleValue),
-        connectionAmount: toMoneyString(row.connectionValue),
-        subsidyAmount: toMoneyString(row.subsidyValue),
-        treatmentCost: toMoneyString(row.treatmentCostValue),
-        energyCost: toMoneyString(row.energyCostValue),
-        maintenanceCost: toMoneyString(row.maintenanceCostValue),
-        qualityCost: toMoneyString(row.qualityCostValue),
-        repairCost: toMoneyString(row.repairCostValue),
-        supplierPaymentAmount: toMoneyString(row.supplierPaymentValue),
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        doneTasksCount: row.doneTasksCount,
-        openTasksCount: row.openTasksCount,
-        blockedTasksCount: row.blockedTasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(netAmount),
-        lossRate: toWaterLossRate(row.producedVolumeValue, row.billedVolumeValue),
-        executionRate: toRate(row.doneTasksCount, row.tasksCount),
-        currency: "XOF" as const
-      };
-    }),
-    operationRows: Array.from(operationBuckets.values())
-      .map((row) => ({
-        operationKind: row.operationKind,
-        operationLabel: row.operationLabel,
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
-        currency: "XOF" as const
-      }))
-      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    rows,
+    breakdownRows,
     totals: {
-      facilitiesCount: facilityKeys.size,
-      zonesCount: zoneKeys.size,
-      producedVolumeM3: totals.producedVolumeValue,
-      billedVolumeM3: totals.billedVolumeValue,
-      waterRevenue: toMoneyString(totals.waterRevenueValue),
-      bulkSaleAmount: toMoneyString(totals.bulkSaleValue),
-      connectionAmount: toMoneyString(totals.connectionValue),
-      subsidyAmount: toMoneyString(totals.subsidyValue),
-      treatmentCost: toMoneyString(totals.treatmentCostValue),
-      energyCost: toMoneyString(totals.energyCostValue),
-      maintenanceCost: toMoneyString(totals.maintenanceCostValue),
-      qualityCost: toMoneyString(totals.qualityCostValue),
-      repairCost: toMoneyString(totals.repairCostValue),
-      supplierPaymentAmount: toMoneyString(totals.supplierPaymentValue),
-      transactionsCount: totals.transactionsCount,
-      tasksCount: totals.tasksCount,
-      doneTasksCount: totals.doneTasksCount,
-      openTasksCount: totals.openTasksCount,
-      blockedTasksCount: totals.blockedTasksCount,
-      cashInAmount: toMoneyString(totals.cashInValue),
-      cashOutAmount: toMoneyString(totals.cashOutValue),
-      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
-      lossRate: toWaterLossRate(totals.producedVolumeValue, totals.billedVolumeValue),
-      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
-      currency: "XOF" as const
+      transactionsCount: rows.length,
+      packagesSold,
+      averagePackagePrice: toMoneyString(averagePackagePrice),
+      salesAmount: toMoneyString(salesAmountValue),
+      expensesAmount: toMoneyString(expensesAmountValue),
+      netAmount: toMoneyString(salesAmountValue - expensesAmountValue),
+      currency: "XOF"
     }
   };
 }
@@ -10080,345 +9504,218 @@ function buildAgencyOperationsReport(
   };
 }
 
-type BtpReportBucket = {
-  projectRef: string;
-  workPackage: string;
-  siteLocation: string;
-  clientRef: string;
-  progressPercentValue: number;
-  materialQuantityValue: number;
-  laborDaysValue: number;
-  equipmentHoursValue: number;
-  transactionsCount: number;
-  tasksCount: number;
-  doneTasksCount: number;
-  openTasksCount: number;
-  blockedTasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
-};
-
-type BtpOperationBucket = {
-  operationKind: string;
-  operationLabel: string;
-  transactionsCount: number;
-  tasksCount: number;
-  cashInValue: number;
-  cashOutValue: number;
-};
-
-function getBtpMetadataLabel(
-  metadata: Record<string, string>,
-  key: string,
-  fallback: string
-): string {
-  const value = metadata[key]?.trim();
-  return value || fallback;
+function isBtpReportableTransaction(transaction: ReportOperationalTransaction): boolean {
+  return isSectorReportableTransaction(transaction, "BTP");
 }
 
-function getBtpBucketKey(input: {
-  projectRef: string;
-  workPackage: string;
-  siteLocation: string;
-  clientRef: string;
-}): string {
-  return [input.projectRef, input.workPackage, input.siteLocation, input.clientRef].join("|");
-}
+type BtpTransactionKind =
+  | "CLIENT_PAYMENT"
+  | "MATERIAL_PURCHASE"
+  | "LABOR_PAYMENT"
+  | "EQUIPMENT_RENTAL"
+  | "SUBCONTRACTING"
+  | "SITE_EXPENSE";
 
-function getBtpReportBucket(
-  buckets: Map<string, BtpReportBucket>,
-  metadata: Record<string, string>
-): BtpReportBucket {
-  const input = {
-    projectRef: getBtpMetadataLabel(metadata, "projectRef", "Chantier non renseigné"),
-    workPackage: getBtpMetadataLabel(metadata, "workPackage", "Lot non renseigné"),
-    siteLocation: getBtpMetadataLabel(metadata, "siteLocation", "Localisation non renseignée"),
-    clientRef: getBtpMetadataLabel(metadata, "clientRef", "Client non renseigné")
-  };
-  const key = getBtpBucketKey(input);
-  const existing = buckets.get(key);
-  if (existing) {
-    return existing;
-  }
-
-  const created: BtpReportBucket = {
-    ...input,
-    progressPercentValue: 0,
-    materialQuantityValue: 0,
-    laborDaysValue: 0,
-    equipmentHoursValue: 0,
-    transactionsCount: 0,
-    tasksCount: 0,
-    doneTasksCount: 0,
-    openTasksCount: 0,
-    blockedTasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(key, created);
-  return created;
-}
-
-function getBtpOperationBucket(
-  buckets: Map<string, BtpOperationBucket>,
-  operationKind: string,
-  operationLabel: string
-): BtpOperationBucket {
-  const existing = buckets.get(operationKind);
-  if (existing) {
-    return existing;
-  }
-
-  const created: BtpOperationBucket = {
-    operationKind,
-    operationLabel,
-    transactionsCount: 0,
-    tasksCount: 0,
-    cashInValue: 0,
-    cashOutValue: 0
-  };
-  buckets.set(operationKind, created);
-  return created;
-}
-
-function getBtpTransactionOperationKind(transaction: ReportOperationalTransaction): string {
+function getBtpTransactionKind(transaction: ReportOperationalTransaction): BtpTransactionKind {
   const configuredKind = transaction.metadata.btpOperationKind?.trim();
-  if (configuredKind) {
+  if (
+    configuredKind === "CLIENT_PAYMENT" ||
+    configuredKind === "MATERIAL_PURCHASE" ||
+    configuredKind === "LABOR_PAYMENT" ||
+    configuredKind === "EQUIPMENT_RENTAL" ||
+    configuredKind === "SUBCONTRACTING" ||
+    configuredKind === "SITE_EXPENSE"
+  ) {
     return configuredKind;
   }
   return transaction.type === "CASH_IN" ? "CLIENT_PAYMENT" : "SITE_EXPENSE";
 }
 
-function getBtpTaskOperationKind(task: ReportOperationalTask): string {
-  const configuredKind = task.metadata.btpTaskKind?.trim();
-  return configuredKind ? `TASK_${configuredKind}` : "TASK_FOLLOW_UP";
+function resolveBtpAsOfDate(filters: ReportPeriodFilter): Date {
+  if (filters.dateTo) {
+    const parsed = new Date(filters.dateTo);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return new Date();
 }
 
-function toBtpOperationLabel(operationKind: string): string {
-  if (BTP_OPERATION_LABELS[operationKind]) {
-    return BTP_OPERATION_LABELS[operationKind];
-  }
-  if (operationKind.startsWith("TASK_")) {
-    const taskKind = operationKind.slice("TASK_".length);
-    return `Tâche: ${BTP_TASK_LABELS[taskKind] ?? taskKind}`;
-  }
-  return operationKind;
-}
-
-function toBtpPeriodLabel(
-  filters: ReportPeriodFilter,
-  _rows: BtpReportBucket[]
-): string {
-  if (!filters.dateFrom && !filters.dateTo) {
-    return "Toutes périodes";
-  }
-
-  if (!filters.dateFrom || !filters.dateTo) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  const fromDate = new Date(filters.dateFrom);
-  const toDate = new Date(filters.dateTo);
-  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  const sameMonth =
-    fromDate.getFullYear() === toDate.getFullYear() &&
-    fromDate.getMonth() === toDate.getMonth();
-  if (!sameMonth) {
-    return toDisplayPeriodLabel(filters);
-  }
-
-  return fromDate.toLocaleDateString("fr-FR", {
-    month: "long",
-    year: "numeric"
-  });
-}
-
-function isBtpReportableTransaction(transaction: ReportOperationalTransaction): boolean {
-  return isSectorReportableTransaction(transaction, "BTP");
-}
+type BtpProjectLedger = {
+  cashInValue: number;
+  materialValue: number;
+  laborValue: number;
+  equipmentValue: number;
+  subcontractingValue: number;
+  siteExpenseValue: number;
+  retentionValue: number;
+  lastProgressPercent: number | null;
+  lastProgressAt: string | null;
+  lastOperationAt: string | null;
+  transactionsCount: number;
+};
 
 function buildBtpOperationsReport(
   transactions: ReportOperationalTransaction[],
-  tasks: ReportOperationalTask[],
+  projects: BtpProject[],
   filters: ReportPeriodFilter
 ): BtpOperationsReport | null {
   if (filters.activityCode && filters.activityCode !== "BTP") {
     return null;
   }
 
-  const btpTransactions = transactions.filter(isBtpReportableTransaction);
-  const btpTasks = tasks.filter((task) => task.activityCode === "BTP");
-  if (!filters.activityCode && btpTransactions.length === 0 && btpTasks.length === 0) {
+  if (!filters.activityCode && projects.length === 0 && transactions.length === 0) {
     return null;
   }
 
-  const rowBuckets = new Map<string, BtpReportBucket>();
-  const operationBuckets = new Map<string, BtpOperationBucket>();
+  const reportableTransactions = transactions.filter(isBtpReportableTransaction);
+  const asOfDate = resolveBtpAsOfDate(filters);
+  const asOfIso = asOfDate.toISOString();
 
-  for (const transaction of btpTransactions) {
-    const operationKind = getBtpTransactionOperationKind(transaction);
-    const rowBucket = getBtpReportBucket(rowBuckets, transaction.metadata);
-    const amount = toNumberAmount(transaction.amount);
-    rowBucket.transactionsCount += 1;
-    rowBucket.progressPercentValue = Math.max(
-      rowBucket.progressPercentValue,
-      getMetadataNumber(transaction.metadata, "progressPercent")
-    );
-    if (operationKind === "MATERIAL_PURCHASE") {
-      rowBucket.materialQuantityValue += getMetadataNumber(transaction.metadata, "quantity");
+  const ledgerByProject = new Map<string, BtpProjectLedger>();
+  for (const transaction of reportableTransactions) {
+    if (transaction.occurredAt > asOfIso) {
+      continue;
     }
-    if (operationKind === "LABOR_PAYMENT") {
-      const workerCount = getMetadataNumber(transaction.metadata, "workerCount");
-      const workDays = getMetadataNumber(transaction.metadata, "workDays");
-      rowBucket.laborDaysValue += workerCount > 0 && workDays > 0 ? workerCount * workDays : workDays;
+    const projectKey = transaction.metadata.projectRef?.trim();
+    if (!projectKey) {
+      continue;
     }
-    if (operationKind === "EQUIPMENT_RENTAL") {
-      rowBucket.equipmentHoursValue += getMetadataNumber(transaction.metadata, "equipmentHours");
-    }
-    if (transaction.type === "CASH_IN") {
-      rowBucket.cashInValue += amount;
-    } else {
-      rowBucket.cashOutValue += amount;
-    }
-
-    const operationBucket = getBtpOperationBucket(
-      operationBuckets,
-      operationKind,
-      toBtpOperationLabel(operationKind)
-    );
-    operationBucket.transactionsCount += 1;
-    if (transaction.type === "CASH_IN") {
-      operationBucket.cashInValue += amount;
-    } else {
-      operationBucket.cashOutValue += amount;
-    }
-  }
-
-  for (const task of btpTasks) {
-    const rowBucket = getBtpReportBucket(rowBuckets, task.metadata);
-    rowBucket.tasksCount += 1;
-    rowBucket.progressPercentValue = Math.max(
-      rowBucket.progressPercentValue,
-      getMetadataNumber(task.metadata, "progressPercent")
-    );
-    if (task.status === "DONE") {
-      rowBucket.doneTasksCount += 1;
-    } else {
-      rowBucket.openTasksCount += 1;
-    }
-    if (task.status === "BLOCKED") {
-      rowBucket.blockedTasksCount += 1;
-    }
-
-    const operationKind = getBtpTaskOperationKind(task);
-    const operationBucket = getBtpOperationBucket(
-      operationBuckets,
-      operationKind,
-      toBtpOperationLabel(operationKind)
-    );
-    operationBucket.tasksCount += 1;
-  }
-
-  const bucketRows = Array.from(rowBuckets.values()).sort((left, right) => {
-    return (
-      left.projectRef.localeCompare(right.projectRef) ||
-      left.workPackage.localeCompare(right.workPackage) ||
-      left.siteLocation.localeCompare(right.siteLocation) ||
-      left.clientRef.localeCompare(right.clientRef)
-    );
-  });
-
-  const totals = bucketRows.reduce(
-    (sum, row) => ({
-      progressPercentValue: sum.progressPercentValue + row.progressPercentValue,
-      materialQuantityValue: sum.materialQuantityValue + row.materialQuantityValue,
-      laborDaysValue: sum.laborDaysValue + row.laborDaysValue,
-      equipmentHoursValue: sum.equipmentHoursValue + row.equipmentHoursValue,
-      transactionsCount: sum.transactionsCount + row.transactionsCount,
-      tasksCount: sum.tasksCount + row.tasksCount,
-      doneTasksCount: sum.doneTasksCount + row.doneTasksCount,
-      openTasksCount: sum.openTasksCount + row.openTasksCount,
-      blockedTasksCount: sum.blockedTasksCount + row.blockedTasksCount,
-      cashInValue: sum.cashInValue + row.cashInValue,
-      cashOutValue: sum.cashOutValue + row.cashOutValue
-    }),
-    {
-      progressPercentValue: 0,
-      materialQuantityValue: 0,
-      laborDaysValue: 0,
-      equipmentHoursValue: 0,
-      transactionsCount: 0,
-      tasksCount: 0,
-      doneTasksCount: 0,
-      openTasksCount: 0,
-      blockedTasksCount: 0,
+    const ledger = ledgerByProject.get(projectKey) ?? {
       cashInValue: 0,
-      cashOutValue: 0
+      materialValue: 0,
+      laborValue: 0,
+      equipmentValue: 0,
+      subcontractingValue: 0,
+      siteExpenseValue: 0,
+      retentionValue: 0,
+      lastProgressPercent: null,
+      lastProgressAt: null,
+      lastOperationAt: null,
+      transactionsCount: 0
+    };
+    const amount = toNumberAmount(transaction.amount);
+    const kind = getBtpTransactionKind(transaction);
+    if (kind === "CLIENT_PAYMENT") {
+      ledger.cashInValue += amount;
+    } else if (kind === "MATERIAL_PURCHASE") {
+      ledger.materialValue += amount;
+    } else if (kind === "LABOR_PAYMENT") {
+      ledger.laborValue += amount;
+    } else if (kind === "EQUIPMENT_RENTAL") {
+      ledger.equipmentValue += amount;
+    } else if (kind === "SUBCONTRACTING") {
+      ledger.subcontractingValue += amount;
+    } else {
+      ledger.siteExpenseValue += amount;
     }
+    ledger.retentionValue += getMetadataNumber(transaction.metadata, "retentionAmount");
+    const progress = getMetadataNumber(transaction.metadata, "progressPercent");
+    if (progress > 0 && (!ledger.lastProgressAt || transaction.occurredAt >= ledger.lastProgressAt)) {
+      ledger.lastProgressPercent = progress;
+      ledger.lastProgressAt = transaction.occurredAt;
+    }
+    ledger.transactionsCount += 1;
+    if (!ledger.lastOperationAt || transaction.occurredAt > ledger.lastOperationAt) {
+      ledger.lastOperationAt = transaction.occurredAt;
+    }
+    ledgerByProject.set(projectKey, ledger);
+  }
+
+  const activeProjects = [...projects].sort((left, right) => left.name.localeCompare(right.name));
+  const knownProjectNames = new Set(activeProjects.map((project) => project.name));
+
+  function buildRow(
+    projectKey: string,
+    clientRef: string,
+    location: string,
+    ledger: BtpProjectLedger | undefined
+  ): BtpOperationsReport["rows"][number] {
+    const cashInValue = ledger?.cashInValue ?? 0;
+    const materialValue = ledger?.materialValue ?? 0;
+    const laborValue = ledger?.laborValue ?? 0;
+    const equipmentValue = ledger?.equipmentValue ?? 0;
+    const subcontractingValue = ledger?.subcontractingValue ?? 0;
+    const siteExpenseValue = ledger?.siteExpenseValue ?? 0;
+    const totalCostValue =
+      materialValue + laborValue + equipmentValue + subcontractingValue + siteExpenseValue;
+    return {
+      projectRef: projectKey,
+      clientRef,
+      location,
+      cashInAmount: toMoneyString(cashInValue),
+      materialAmount: toMoneyString(materialValue),
+      laborAmount: toMoneyString(laborValue),
+      equipmentAmount: toMoneyString(equipmentValue),
+      subcontractingAmount: toMoneyString(subcontractingValue),
+      siteExpenseAmount: toMoneyString(siteExpenseValue),
+      totalCostAmount: toMoneyString(totalCostValue),
+      netAmount: toMoneyString(cashInValue - totalCostValue),
+      retentionAmount: toMoneyString(ledger?.retentionValue ?? 0),
+      lastProgressPercent: ledger?.lastProgressPercent ?? null,
+      lastOperationDate: ledger?.lastOperationAt ?? "",
+      transactionsCount: ledger?.transactionsCount ?? 0,
+      currency: "XOF" as const
+    };
+  }
+
+  const rows: BtpOperationsReport["rows"] = activeProjects.map((project) =>
+    buildRow(project.name, project.clientRef ?? "", project.location ?? "", ledgerByProject.get(project.name))
   );
 
-  const projectKeys = new Set(bucketRows.map((row) => row.projectRef));
-  const workPackageKeys = new Set(bucketRows.map((row) => `${row.projectRef}|${row.workPackage}`));
-  const averageProgress = bucketRows.length > 0
-    ? Number((totals.progressPercentValue / bucketRows.length).toFixed(2))
-    : 0;
+  for (const [projectKey, ledger] of ledgerByProject.entries()) {
+    if (knownProjectNames.has(projectKey)) {
+      continue;
+    }
+    rows.push(buildRow(projectKey, "", "", ledger));
+  }
+
+  rows.sort((left, right) => left.projectRef.localeCompare(right.projectRef));
+
+  const totalsAcc = rows.reduce(
+    (sum, row) => ({
+      cashInValue: sum.cashInValue + toNumberAmount(row.cashInAmount),
+      materialValue: sum.materialValue + toNumberAmount(row.materialAmount),
+      laborValue: sum.laborValue + toNumberAmount(row.laborAmount),
+      equipmentValue: sum.equipmentValue + toNumberAmount(row.equipmentAmount),
+      subcontractingValue: sum.subcontractingValue + toNumberAmount(row.subcontractingAmount),
+      siteExpenseValue: sum.siteExpenseValue + toNumberAmount(row.siteExpenseAmount)
+    }),
+    {
+      cashInValue: 0,
+      materialValue: 0,
+      laborValue: 0,
+      equipmentValue: 0,
+      subcontractingValue: 0,
+      siteExpenseValue: 0
+    }
+  );
+  const totalCostValue =
+    totalsAcc.materialValue +
+    totalsAcc.laborValue +
+    totalsAcc.equipmentValue +
+    totalsAcc.subcontractingValue +
+    totalsAcc.siteExpenseValue;
+  const transactionsCount = Array.from(ledgerByProject.values()).reduce(
+    (sum, ledger) => sum + ledger.transactionsCount,
+    0
+  );
 
   return {
-    periodLabel: toBtpPeriodLabel(filters, bucketRows),
-    rows: bucketRows.map((row) => {
-      const netAmount = row.cashInValue - row.cashOutValue;
-      return {
-        projectRef: row.projectRef,
-        workPackage: row.workPackage,
-        siteLocation: row.siteLocation,
-        clientRef: row.clientRef,
-        progressPercent: row.progressPercentValue,
-        materialQuantity: row.materialQuantityValue,
-        laborDays: row.laborDaysValue,
-        equipmentHours: row.equipmentHoursValue,
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        doneTasksCount: row.doneTasksCount,
-        openTasksCount: row.openTasksCount,
-        blockedTasksCount: row.blockedTasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(netAmount),
-        executionRate: toRate(row.doneTasksCount, row.tasksCount),
-        currency: "XOF" as const
-      };
-    }),
-    operationRows: Array.from(operationBuckets.values())
-      .map((row) => ({
-        operationKind: row.operationKind,
-        operationLabel: row.operationLabel,
-        transactionsCount: row.transactionsCount,
-        tasksCount: row.tasksCount,
-        cashInAmount: toMoneyString(row.cashInValue),
-        cashOutAmount: toMoneyString(row.cashOutValue),
-        netAmount: toMoneyString(row.cashInValue - row.cashOutValue),
-        currency: "XOF" as const
-      }))
-      .sort((left, right) => left.operationLabel.localeCompare(right.operationLabel)),
+    periodLabel: toDisplayPeriodLabel(filters),
+    asOfLabel: formatPdfDate(asOfIso),
+    rows,
     totals: {
-      projectsCount: projectKeys.size,
-      workPackagesCount: workPackageKeys.size,
-      progressPercent: averageProgress,
-      materialQuantity: totals.materialQuantityValue,
-      laborDays: totals.laborDaysValue,
-      equipmentHours: totals.equipmentHoursValue,
-      transactionsCount: totals.transactionsCount,
-      tasksCount: totals.tasksCount,
-      doneTasksCount: totals.doneTasksCount,
-      openTasksCount: totals.openTasksCount,
-      blockedTasksCount: totals.blockedTasksCount,
-      cashInAmount: toMoneyString(totals.cashInValue),
-      cashOutAmount: toMoneyString(totals.cashOutValue),
-      netAmount: toMoneyString(totals.cashInValue - totals.cashOutValue),
-      executionRate: toRate(totals.doneTasksCount, totals.tasksCount),
+      projectsCount: rows.length,
+      cashInAmount: toMoneyString(totalsAcc.cashInValue),
+      materialAmount: toMoneyString(totalsAcc.materialValue),
+      laborAmount: toMoneyString(totalsAcc.laborValue),
+      equipmentAmount: toMoneyString(totalsAcc.equipmentValue),
+      subcontractingAmount: toMoneyString(totalsAcc.subcontractingValue),
+      siteExpenseAmount: toMoneyString(totalsAcc.siteExpenseValue),
+      totalCostAmount: toMoneyString(totalCostValue),
+      netAmount: toMoneyString(totalsAcc.cashInValue - totalCostValue),
+      transactionsCount,
       currency: "XOF" as const
     }
   };
@@ -11416,6 +10713,8 @@ export async function getCompanyReportsOverview(
   ensureSectorReportFilter(filters);
 
   const shouldLoadRentalData = !filters.activityCode || filters.activityCode === "RENTAL";
+  const shouldLoadGeneralStoreData = !filters.activityCode || filters.activityCode === "GENERAL_STORE";
+  const shouldLoadBtpData = !filters.activityCode || filters.activityCode === "BTP";
 
   const [
     financeByStatus,
@@ -11427,7 +10726,12 @@ export async function getCompanyReportsOverview(
     operationalTransactions,
     operationalTasks,
     rentalTransactions,
-    rentalTenants
+    rentalTenants,
+    generalStoreTransactions,
+    generalStoreShops,
+    generalStoreInventorySnapshots,
+    btpTransactions,
+    btpProjects
   ] =
     await Promise.all([
       listReportFinanceByStatus(actor.companyId, filters),
@@ -11443,7 +10747,22 @@ export async function getCompanyReportsOverview(
         : Promise.resolve([] as ReportOperationalTransaction[]),
       shouldLoadRentalData
         ? listRentalTenants({ companyId: actor.companyId, activeOnly: true })
-        : Promise.resolve([] as RentalTenant[])
+        : Promise.resolve([] as RentalTenant[]),
+      shouldLoadGeneralStoreData
+        ? listReportGeneralStoreTransactions(actor.companyId)
+        : Promise.resolve([] as ReportOperationalTransaction[]),
+      shouldLoadGeneralStoreData
+        ? listGeneralStoreShops({ companyId: actor.companyId, activeOnly: true })
+        : Promise.resolve([] as GeneralStoreShop[]),
+      shouldLoadGeneralStoreData
+        ? listReportGeneralStoreInventorySnapshots(actor.companyId)
+        : Promise.resolve([] as GeneralStoreInventorySnapshot[]),
+      shouldLoadBtpData
+        ? listReportBtpTransactions(actor.companyId)
+        : Promise.resolve([] as ReportOperationalTransaction[]),
+      shouldLoadBtpData
+        ? listBtpProjects({ companyId: actor.companyId, activeOnly: true })
+        : Promise.resolve([] as BtpProject[])
     ]);
 
   const financeByActivitySummary = buildReportFinanceByActivitySummary(financeByActivity)
@@ -11496,14 +10815,19 @@ export async function getCompanyReportsOverview(
     operationalPerformance: buildOperationalPerformance(operationalTransactions, operationalTasks),
     hardwareMonthlyReport: buildHardwareMonthlyReport(operationalTransactions, filters),
     agricultureOperationsReport: buildAgricultureOperationsReport(operationalTransactions, operationalTasks, filters),
-    generalStoreOperationsReport: buildGeneralStoreOperationsReport(operationalTransactions, operationalTasks, filters),
+    generalStoreOperationsReport: buildGeneralStoreOperationsReport(
+      generalStoreTransactions,
+      generalStoreShops,
+      generalStoreInventorySnapshots,
+      filters
+    ),
     foodOperationsReport: buildFoodOperationsReport(operationalTransactions, operationalTasks, filters),
     rentalOperationsReport: buildRentalOperationsReport(rentalTransactions, rentalTenants, filters),
-    btpOperationsReport: buildBtpOperationsReport(operationalTransactions, operationalTasks, filters),
+    btpOperationsReport: buildBtpOperationsReport(btpTransactions, btpProjects, filters),
     fishFarmingOperationsReport: buildFishFarmingOperationsReport(operationalTransactions, operationalTasks, filters),
     livestockOperationsReport: buildLivestockOperationsReport(operationalTransactions, operationalTasks, filters),
     hotelOperationsReport: buildHotelOperationsReport(operationalTransactions, operationalTasks, filters),
-    waterOperationsReport: buildWaterOperationsReport(operationalTransactions, operationalTasks, filters),
+    waterOperationsReport: buildWaterOperationsReport(operationalTransactions, filters),
     agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
     generalExpensesReport: buildGeneralExpensesReport(operationalTransactions, filters),
     roleDistribution: [],
@@ -11676,23 +11000,24 @@ export async function exportCompanyTransactionsExcel(
       ]
     },
     {
-      name: "DepensesGenerales",
-      rows: buildGeneralExpensesReportRows(overview),
-      columns: [
-        "date",
-        "ownerType",
-        "categoryLabel",
-        "designation",
-        "quantity",
-        "unitPrice",
-        "amount",
-        "currency"
-      ]
+      name: "DepensesGeneralesPDG",
+      rows: buildGeneralExpensesReportRows(overview, "PDG"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
     },
     {
-      name: "DepensesGeneralesRepartition",
-      rows: buildGeneralExpensesBreakdownRows(overview),
-      columns: ["ownerType", "categoryLabel", "transactionsCount", "amount", "currency"]
+      name: "DepensesGeneralesEmployes",
+      rows: buildGeneralExpensesReportRows(overview, "EMPLOYE"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
+    },
+    {
+      name: "DepGeneralesRepartitionPDG",
+      rows: buildGeneralExpensesBreakdownRows(overview, "PDG"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
+    },
+    {
+      name: "DepGeneralesRepartitionEmployes",
+      rows: buildGeneralExpensesBreakdownRows(overview, "EMPLOYE"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
     },
     {
       name: "Agriculture",
@@ -11733,45 +11058,16 @@ export async function exportCompanyTransactionsExcel(
       name: "Magasins",
       rows: buildGeneralStoreOperationsReportRows(overview),
       columns: [
-        "department",
-        "productFamily",
-        "itemName",
-        "skuRef",
-        "soldQuantity",
-        "purchaseQuantity",
-        "returnQuantity",
-        "adjustmentQuantity",
-        "transferQuantity",
-        "salesAmount",
+        "shopRef",
+        "location",
+        "lastOperationDate",
         "purchaseAmount",
-        "returnAmount",
-        "discountAmount",
-        "expenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "grossMargin",
-        "marginRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "MagasinOps",
-      rows: buildGeneralStoreOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
+        "collectedAmount",
+        "balanceAmount",
+        "lastInventoryDate",
+        "remainingStockValue",
+        "estimatedSoldAmount",
+        "varianceAmount",
         "currency"
       ]
     },
@@ -11895,50 +11191,24 @@ export async function exportCompanyTransactionsExcel(
       ]
     },
     {
-      name: "EauPotable",
-      rows: buildWaterOperationsReportRows(overview),
-      columns: [
-        "facilityRef",
-        "networkZone",
-        "productionLine",
-        "producedVolumeM3",
-        "billedVolumeM3",
-        "waterRevenue",
-        "bulkSaleAmount",
-        "connectionAmount",
-        "subsidyAmount",
-        "treatmentCost",
-        "energyCost",
-        "maintenanceCost",
-        "qualityCost",
-        "repairCost",
-        "supplierPaymentAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "lossRate",
-        "executionRate",
-        "currency"
-      ]
+      name: "EauVentes",
+      rows: buildWaterOperationsReportRows(overview, "IN"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
     },
     {
-      name: "EauOperations",
-      rows: buildWaterOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
+      name: "EauDepenses",
+      rows: buildWaterOperationsReportRows(overview, "OUT"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
+    },
+    {
+      name: "EauRepartitionVentes",
+      rows: buildWaterOperationsBreakdownRows(overview, "IN"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
+    },
+    {
+      name: "EauRepartitionDepenses",
+      rows: buildWaterOperationsBreakdownRows(overview, "OUT"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
     },
     {
       name: "AgenceImmo",
@@ -11995,36 +11265,20 @@ export async function exportCompanyTransactionsExcel(
       rows: buildBtpOperationsReportRows(overview),
       columns: [
         "projectRef",
-        "workPackage",
-        "siteLocation",
         "clientRef",
-        "progressPercent",
-        "materialQuantity",
-        "laborDays",
-        "equipmentHours",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
+        "location",
         "cashInAmount",
-        "cashOutAmount",
+        "materialAmount",
+        "laborAmount",
+        "equipmentAmount",
+        "subcontractingAmount",
+        "siteExpenseAmount",
+        "totalCostAmount",
         "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "BTPOperations",
-      rows: buildBtpOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
+        "retentionAmount",
+        "lastProgressPercent",
+        "lastOperationDate",
         "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
         "currency"
       ]
     },
@@ -12218,23 +11472,24 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
-      name: "DepensesGenerales",
-      rows: buildGeneralExpensesReportRows(overview),
-      columns: [
-        "date",
-        "ownerType",
-        "categoryLabel",
-        "designation",
-        "quantity",
-        "unitPrice",
-        "amount",
-        "currency"
-      ]
+      name: "DepensesGeneralesPDG",
+      rows: buildGeneralExpensesReportRows(overview, "PDG"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
     },
     {
-      name: "DepensesGeneralesRepartition",
-      rows: buildGeneralExpensesBreakdownRows(overview),
-      columns: ["ownerType", "categoryLabel", "transactionsCount", "amount", "currency"]
+      name: "DepensesGeneralesEmployes",
+      rows: buildGeneralExpensesReportRows(overview, "EMPLOYE"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
+    },
+    {
+      name: "DepGeneralesRepartitionPDG",
+      rows: buildGeneralExpensesBreakdownRows(overview, "PDG"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
+    },
+    {
+      name: "DepGeneralesRepartitionEmployes",
+      rows: buildGeneralExpensesBreakdownRows(overview, "EMPLOYE"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
     },
     {
       name: "Agriculture",
@@ -12275,45 +11530,16 @@ export async function exportCompanyTasksExcel(
       name: "Magasins",
       rows: buildGeneralStoreOperationsReportRows(overview),
       columns: [
-        "department",
-        "productFamily",
-        "itemName",
-        "skuRef",
-        "soldQuantity",
-        "purchaseQuantity",
-        "returnQuantity",
-        "adjustmentQuantity",
-        "transferQuantity",
-        "salesAmount",
+        "shopRef",
+        "location",
+        "lastOperationDate",
         "purchaseAmount",
-        "returnAmount",
-        "discountAmount",
-        "expenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "grossMargin",
-        "marginRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "MagasinOps",
-      rows: buildGeneralStoreOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
+        "collectedAmount",
+        "balanceAmount",
+        "lastInventoryDate",
+        "remainingStockValue",
+        "estimatedSoldAmount",
+        "varianceAmount",
         "currency"
       ]
     },
@@ -12441,36 +11667,20 @@ export async function exportCompanyTasksExcel(
       rows: buildBtpOperationsReportRows(overview),
       columns: [
         "projectRef",
-        "workPackage",
-        "siteLocation",
         "clientRef",
-        "progressPercent",
-        "materialQuantity",
-        "laborDays",
-        "equipmentHours",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
+        "location",
         "cashInAmount",
-        "cashOutAmount",
+        "materialAmount",
+        "laborAmount",
+        "equipmentAmount",
+        "subcontractingAmount",
+        "siteExpenseAmount",
+        "totalCostAmount",
         "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "BTPOperations",
-      rows: buildBtpOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
+        "retentionAmount",
+        "lastProgressPercent",
+        "lastOperationDate",
         "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
         "currency"
       ]
     },
@@ -12550,50 +11760,24 @@ export async function exportCompanyTasksExcel(
       ]
     },
     {
-      name: "EauPotable",
-      rows: buildWaterOperationsReportRows(overview),
-      columns: [
-        "facilityRef",
-        "networkZone",
-        "productionLine",
-        "producedVolumeM3",
-        "billedVolumeM3",
-        "waterRevenue",
-        "bulkSaleAmount",
-        "connectionAmount",
-        "subsidyAmount",
-        "treatmentCost",
-        "energyCost",
-        "maintenanceCost",
-        "qualityCost",
-        "repairCost",
-        "supplierPaymentAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "lossRate",
-        "executionRate",
-        "currency"
-      ]
+      name: "EauVentes",
+      rows: buildWaterOperationsReportRows(overview, "IN"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
     },
     {
-      name: "EauOperations",
-      rows: buildWaterOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
+      name: "EauDepenses",
+      rows: buildWaterOperationsReportRows(overview, "OUT"),
+      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
+    },
+    {
+      name: "EauRepartitionVentes",
+      rows: buildWaterOperationsBreakdownRows(overview, "IN"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
+    },
+    {
+      name: "EauRepartitionDepenses",
+      rows: buildWaterOperationsBreakdownRows(overview, "OUT"),
+      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
     },
     {
       name: "AgenceImmo",
@@ -12733,7 +11917,7 @@ export async function exportCompanyReportsPdf(
         totalPages,
         overview.generalStoreOperationsReport?.periodLabel ?? periodLabel
       );
-    });
+    }, { layout: "landscape" });
   }
 
   if (filters.activityCode === "FOOD") {
@@ -12785,7 +11969,7 @@ export async function exportCompanyReportsPdf(
         totalPages,
         overview.waterOperationsReport?.periodLabel ?? periodLabel
       );
-    });
+    }, { layout: "landscape" });
   }
 
   if (filters.activityCode === "REAL_ESTATE_AGENCY") {
@@ -12811,7 +11995,7 @@ export async function exportCompanyReportsPdf(
         totalPages,
         overview.btpOperationsReport?.periodLabel ?? periodLabel
       );
-    });
+    }, { layout: "landscape" });
   }
 
   if (filters.activityCode === "FISH_FARMING") {
@@ -12909,9 +12093,9 @@ export async function exportCompanyReportsPdf(
         limitPdfRows([
           ...btpReport.rows.map(
             (item) =>
-              `${item.projectRef} | ${item.workPackage} | ${item.siteLocation} | client ${item.clientRef} | avancement ${item.progressPercent}% | main-d'oeuvre ${item.laborDays} j/h | engins ${item.equipmentHours} h | recettes ${item.cashInAmount} XOF | dépenses ${item.cashOutAmount} XOF | net ${item.netAmount} XOF | exécution ${item.executionRate}% | blocages ${item.blockedTasksCount}`
+              `${item.projectRef} | client ${item.clientRef} | encaissé ${item.cashInAmount} XOF | dépensé ${item.totalCostAmount} XOF (matériaux ${item.materialAmount}, main-d'oeuvre ${item.laborAmount}, engins ${item.equipmentAmount}, sous-traitance ${item.subcontractingAmount}, charges ${item.siteExpenseAmount}) | marge ${item.netAmount} XOF | avancement ${item.lastProgressPercent ?? "-"}%`
           ),
-          `TOTAL | chantiers ${btpReport.totals.projectsCount} | lots ${btpReport.totals.workPackagesCount} | avancement ${btpReport.totals.progressPercent}% | main-d'oeuvre ${btpReport.totals.laborDays} j/h | engins ${btpReport.totals.equipmentHours} h | recettes ${btpReport.totals.cashInAmount} XOF | dépenses ${btpReport.totals.cashOutAmount} XOF | net ${btpReport.totals.netAmount} XOF`
+          `TOTAL | chantiers ${btpReport.totals.projectsCount} | encaissé ${btpReport.totals.cashInAmount} XOF | dépensé ${btpReport.totals.totalCostAmount} XOF | marge ${btpReport.totals.netAmount} XOF`
         ]),
         "Aucune opération BTP sur cette période."
       );

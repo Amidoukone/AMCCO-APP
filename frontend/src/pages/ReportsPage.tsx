@@ -1233,163 +1233,138 @@ export function ReportsPage(): JSX.Element {
                 <div>
                   <h3>Rapport magasins</h3>
                   <p className="hint">
-                    {overview.generalStoreOperationsReport.periodLabel} | suivi par rayon,
-                    famille, article, ventes caisse, achats, retours, remises et inventaire.
+                    {overview.generalStoreOperationsReport.periodLabel} | situation des boutiques
+                    au {overview.generalStoreOperationsReport.asOfLabel}.
                   </p>
                 </div>
               </div>
 
               <div className="reports-summary-grid">
                 <article className="reports-kpi-card">
-                  <span>Articles suivis</span>
-                  <strong>{formatCount(overview.generalStoreOperationsReport.totals.itemsCount)}</strong>
-                  <small>
-                    {formatCount(overview.generalStoreOperationsReport.totals.departmentsCount)} rayon(s),{" "}
-                    {formatCount(overview.generalStoreOperationsReport.totals.productFamiliesCount)} famille(s)
-                  </small>
+                  <span>Boutiques suivies</span>
+                  <strong>{formatCount(overview.generalStoreOperationsReport.totals.shopsCount)}</strong>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Solde magasin</span>
+                  <span>Total achats</span>
                   <strong>
                     {formatAmount(
-                      overview.generalStoreOperationsReport.totals.netAmount,
+                      overview.generalStoreOperationsReport.totals.purchaseAmount,
                       overview.generalStoreOperationsReport.totals.currency
                     )}
                   </strong>
-                  <small>
-                    Ventes moins achats, retours, remises et charges.
-                  </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Marge magasin</span>
-                  <strong>{formatRate(overview.generalStoreOperationsReport.totals.marginRate)}</strong>
-                  <small>
+                  <span>Total recouvré</span>
+                  <strong>
                     {formatAmount(
-                      overview.generalStoreOperationsReport.totals.grossMargin,
+                      overview.generalStoreOperationsReport.totals.collectedAmount,
                       overview.generalStoreOperationsReport.totals.currency
-                    )} de marge brute
-                  </small>
+                    )}
+                  </strong>
                 </article>
-              </div>
-
-              <div className="reports-data-grid">
-                <article className="reports-table-panel">
-                  <div className="reports-table-header">
-                    <h4>Types d'opérations</h4>
-                    <span>{formatCount(overview.generalStoreOperationsReport.operationRows.length)} type(s)</span>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Opération</th>
-                          <th>Transactions</th>
-                          <th>Tâches</th>
-                          <th>Recettes</th>
-                          <th>Dépenses</th>
-                          <th>Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overview.generalStoreOperationsReport.operationRows.length === 0 ? (
-                          <tr>
-                            <td colSpan={6}>Aucune opération magasin sur la période filtrée.</td>
-                          </tr>
-                        ) : (
-                          overview.generalStoreOperationsReport.operationRows.map((row) => (
-                            <tr key={row.operationKind}>
-                              <td>{row.operationLabel}</td>
-                              <td>{formatCount(row.transactionsCount)}</td>
-                              <td>{formatCount(row.tasksCount)}</td>
-                              <td>{formatAmount(row.cashInAmount, row.currency)}</td>
-                              <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
-                              <td>{formatAmount(row.netAmount, row.currency)}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                <article className="reports-kpi-card">
+                  <span>Solde total dû</span>
+                  <strong>
+                    {formatAmount(
+                      overview.generalStoreOperationsReport.totals.balanceAmount,
+                      overview.generalStoreOperationsReport.totals.currency
+                    )}
+                  </strong>
+                  <small>Achats livrés moins montants déjà recouvrés.</small>
                 </article>
               </div>
 
               <div className="table-wrap">
-                <table className="admin-table">
+                <table className="admin-table reports-hardware-table">
                   <thead>
                     <tr>
-                      <th>Rayon</th>
-                      <th>Famille</th>
-                      <th>Article</th>
-                      <th>Référence</th>
-                      <th>Ventes qte</th>
-                      <th>Achats qte</th>
-                      <th>Retours qte</th>
-                      <th>Ajust.</th>
-                      <th>Transferts</th>
-                      <th>Ventes</th>
-                      <th>Achats</th>
-                      <th>Retours</th>
-                      <th>Remises</th>
-                      <th>Charges</th>
-                      <th>Net</th>
-                      <th>Marge</th>
-                      <th>Exécution</th>
-                      <th>Blocages</th>
+                      <th>Boutique</th>
+                      <th>Total achats</th>
+                      <th>Total recouvré</th>
+                      <th>Solde dû</th>
+                      <th>Stock restant</th>
+                      <th>Vendu estimé</th>
+                      <th>Écart</th>
+                      <th>Dernier inventaire</th>
+                      <th>Dernière opération</th>
                     </tr>
                   </thead>
                   <tbody>
                     {overview.generalStoreOperationsReport.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={18}>
-                          Aucun article magasin alimenté sur la période filtrée.
+                        <td colSpan={9}>
+                          Aucune boutique alimentée sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
                       overview.generalStoreOperationsReport.rows.map((row) => (
-                        <tr key={`${row.department}-${row.productFamily}-${row.itemName}-${row.skuRef}`}>
-                          <td>{row.department}</td>
-                          <td>{row.productFamily}</td>
-                          <td>{row.itemName}</td>
-                          <td>{row.skuRef}</td>
-                          <td>{formatAmount(row.soldQuantity)}</td>
-                          <td>{formatAmount(row.purchaseQuantity)}</td>
-                          <td>{formatAmount(row.returnQuantity)}</td>
-                          <td>{formatAmount(row.adjustmentQuantity)}</td>
-                          <td>{formatAmount(row.transferQuantity)}</td>
-                          <td>{formatAmount(row.salesAmount, row.currency)}</td>
+                        <tr key={row.shopRef}>
+                          <td>{row.shopRef}</td>
                           <td>{formatAmount(row.purchaseAmount, row.currency)}</td>
-                          <td>{formatAmount(row.returnAmount, row.currency)}</td>
-                          <td>{formatAmount(row.discountAmount, row.currency)}</td>
-                          <td>{formatAmount(row.expenseAmount, row.currency)}</td>
-                          <td>{formatAmount(row.netAmount, row.currency)}</td>
-                          <td>{formatRate(row.marginRate)}</td>
-                          <td>{formatRate(row.executionRate)}</td>
-                          <td>{formatCount(row.blockedTasksCount)}</td>
+                          <td>{formatAmount(row.collectedAmount, row.currency)}</td>
+                          <td>{formatAmount(row.balanceAmount, row.currency)}</td>
+                          <td>
+                            {row.remainingStockValue
+                              ? formatAmount(row.remainingStockValue, row.currency)
+                              : "-"}
+                          </td>
+                          <td>
+                            {row.estimatedSoldAmount
+                              ? formatAmount(row.estimatedSoldAmount, row.currency)
+                              : "-"}
+                          </td>
+                          <td>
+                            {row.varianceAmount ? formatAmount(row.varianceAmount, row.currency) : "-"}
+                          </td>
+                          <td>
+                            {row.lastInventoryDate
+                              ? new Date(row.lastInventoryDate).toLocaleDateString("fr-FR")
+                              : "-"}
+                          </td>
+                          <td>
+                            {row.lastOperationDate
+                              ? new Date(row.lastOperationDate).toLocaleDateString("fr-FR")
+                              : "-"}
+                          </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <th colSpan={4}>TOTAL</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.soldQuantity)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.purchaseQuantity)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.returnQuantity)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.adjustmentQuantity)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.transferQuantity)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.salesAmount, overview.generalStoreOperationsReport.totals.currency)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.purchaseAmount, overview.generalStoreOperationsReport.totals.currency)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.returnAmount, overview.generalStoreOperationsReport.totals.currency)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.discountAmount, overview.generalStoreOperationsReport.totals.currency)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.expenseAmount, overview.generalStoreOperationsReport.totals.currency)}</th>
-                      <th>{formatAmount(overview.generalStoreOperationsReport.totals.netAmount, overview.generalStoreOperationsReport.totals.currency)}</th>
-                      <th>{formatRate(overview.generalStoreOperationsReport.totals.marginRate)}</th>
-                      <th>{formatRate(overview.generalStoreOperationsReport.totals.executionRate)}</th>
-                      <th>{formatCount(overview.generalStoreOperationsReport.totals.blockedTasksCount)}</th>
+                      <th>TOTAL</th>
+                      <th>
+                        {formatAmount(
+                          overview.generalStoreOperationsReport.totals.purchaseAmount,
+                          overview.generalStoreOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.generalStoreOperationsReport.totals.collectedAmount,
+                          overview.generalStoreOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.generalStoreOperationsReport.totals.balanceAmount,
+                          overview.generalStoreOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th />
+                      <th />
+                      <th />
+                      <th />
+                      <th />
                     </tr>
                   </tfoot>
                 </table>
               </div>
+              <p className="hint">
+                Vendu estimé = achats livrés moins stock restant déclaré au dernier inventaire. Écart
+                = vendu estimé moins total recouvré : un écart positif signale un montant encore
+                attendu ou une perte de stock.
+              </p>
             </section>
           ) : null}
 
@@ -1980,242 +1955,136 @@ export function ReportsPage(): JSX.Element {
             </section>
           ) : null}
 
-          {overview.waterOperationsReport ? (
-            <section className="panel">
-              <div className="dashboard-panel-header">
-                <div>
-                  <h3>Rapport production d'eau potable</h3>
-                  <p className="hint">
-                    {overview.waterOperationsReport.periodLabel} | suivi par site, zone réseau,
-                    ligne d'exploitation, volumes, facturation, qualité, maintenance et blocages.
-                  </p>
+          {overview.waterOperationsReport ? (() => {
+            const report = overview.waterOperationsReport;
+            const kindSections: Array<{ kind: "IN" | "OUT"; label: string; amount: string }> = [
+              { kind: "IN", label: "Ventes", amount: report.totals.salesAmount },
+              { kind: "OUT", label: "Dépenses", amount: report.totals.expensesAmount }
+            ];
+            return (
+              <section className="panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h3>Rapport production d'eau</h3>
+                    <p className="hint">
+                      {report.periodLabel} | ventes de paquets d'eau et dépenses courantes de
+                      l'équipe de production, présentées séparément.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="reports-summary-grid">
-                <article className="reports-kpi-card">
-                  <span>Sites suivis</span>
-                  <strong>{formatCount(overview.waterOperationsReport.totals.facilitiesCount)}</strong>
-                  <small>
-                    {formatCount(overview.waterOperationsReport.totals.zonesCount)} zone(s) réseau
-                  </small>
-                </article>
-                <article className="reports-kpi-card">
-                  <span>Volume facture</span>
-                  <strong>{formatAmount(overview.waterOperationsReport.totals.billedVolumeM3)} m3</strong>
-                  <small>
-                    Production: {formatAmount(overview.waterOperationsReport.totals.producedVolumeM3)} m3
-                  </small>
-                </article>
-                <article className="reports-kpi-card">
-                  <span>Solde exploitation</span>
-                  <strong>
-                    {formatAmount(
-                      overview.waterOperationsReport.totals.netAmount,
-                      overview.waterOperationsReport.totals.currency
-                    )}
-                  </strong>
-                  <small>
-                    Pertes apparentes {formatRate(overview.waterOperationsReport.totals.lossRate)}
-                  </small>
-                </article>
-              </div>
+                <div className="reports-summary-grid">
+                  <article className="reports-kpi-card">
+                    <span>Paquets vendus</span>
+                    <strong>{formatCount(report.totals.packagesSold)}</strong>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Prix moyen / paquet</span>
+                    <strong>{formatAmount(report.totals.averagePackagePrice, report.totals.currency)}</strong>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Ventes</span>
+                    <strong>{formatAmount(report.totals.salesAmount, report.totals.currency)}</strong>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Dépenses</span>
+                    <strong>{formatAmount(report.totals.expensesAmount, report.totals.currency)}</strong>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Solde net</span>
+                    <strong>{formatAmount(report.totals.netAmount, report.totals.currency)}</strong>
+                    <small>{formatCount(report.totals.transactionsCount)} ligne(s)</small>
+                  </article>
+                </div>
 
-              <div className="reports-data-grid">
-                <article className="reports-table-panel">
-                  <div className="reports-table-header">
-                    <h4>Types d'opérations</h4>
-                    <span>{formatCount(overview.waterOperationsReport.operationRows.length)} type(s)</span>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Opération</th>
-                          <th>Transactions</th>
-                          <th>Tâches</th>
-                          <th>Recettes</th>
-                          <th>Dépenses</th>
-                          <th>Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overview.waterOperationsReport.operationRows.length === 0 ? (
-                          <tr>
-                            <td colSpan={6}>Aucune opération eau potable sur la période filtrée.</td>
-                          </tr>
-                        ) : (
-                          overview.waterOperationsReport.operationRows.map((row) => (
-                            <tr key={row.operationKind}>
-                              <td>{row.operationLabel}</td>
-                              <td>{formatCount(row.transactionsCount)}</td>
-                              <td>{formatCount(row.tasksCount)}</td>
-                              <td>{formatAmount(row.cashInAmount, row.currency)}</td>
-                              <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
-                              <td>{formatAmount(row.netAmount, row.currency)}</td>
+                {kindSections.map((section) => {
+                  const breakdownRows = report.breakdownRows.filter((row) => row.kind === section.kind);
+                  const detailRows = report.rows.filter((row) => row.kind === section.kind);
+                  const emptyLabel = section.kind === "IN" ? "de vente" : "de dépense";
+
+                  return (
+                    <div key={section.kind} className="reports-owner-section">
+                      <h4 className="reports-owner-section-title">{section.label}</h4>
+
+                      <div className="reports-data-grid">
+                        <article className="reports-table-panel">
+                          <div className="reports-table-header">
+                            <h4>Répartition par catégorie — {section.label}</h4>
+                            <span>{formatCount(breakdownRows.length)} catégorie(s)</span>
+                          </div>
+                          <div className="table-wrap">
+                            <table className="admin-table">
+                              <thead>
+                                <tr>
+                                  <th>Catégorie</th>
+                                  <th>Lignes</th>
+                                  <th>Montant</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {breakdownRows.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={3}>Aucune ligne {emptyLabel} sur la période filtrée.</td>
+                                  </tr>
+                                ) : (
+                                  breakdownRows.map((row) => (
+                                    <tr key={row.categoryLabel}>
+                                      <td>{row.categoryLabel}</td>
+                                      <td>{formatCount(row.transactionsCount)}</td>
+                                      <td>{formatAmount(row.amount, row.currency)}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </article>
+                      </div>
+
+                      <div className="table-wrap">
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Catégorie</th>
+                              <th>Désignation</th>
+                              <th>Paquets</th>
+                              <th>Prix / paquet</th>
+                              <th>Montant</th>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </article>
-              </div>
-
-              <div className="table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Site</th>
-                      <th>Zone</th>
-                      <th>Ligne</th>
-                      <th>Produit m3</th>
-                      <th>Facture m3</th>
-                      <th>Factures eau</th>
-                      <th>Vente gros</th>
-                      <th>Branchements</th>
-                      <th>Subventions</th>
-                      <th>Traitement</th>
-                      <th>Énergie</th>
-                      <th>Maintenance</th>
-                      <th>Qualité</th>
-                      <th>Réparations</th>
-                      <th>Fournisseurs</th>
-                      <th>Recettes</th>
-                      <th>Dépenses</th>
-                      <th>Net</th>
-                      <th>Pertes</th>
-                      <th>Exécution</th>
-                      <th>Blocages</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {overview.waterOperationsReport.rows.length === 0 ? (
-                      <tr>
-                        <td colSpan={21}>
-                          Aucune activité eau potable alimentée sur la période filtrée.
-                        </td>
-                      </tr>
-                    ) : (
-                      overview.waterOperationsReport.rows.map((row) => (
-                        <tr key={`${row.facilityRef}-${row.networkZone}-${row.productionLine}`}>
-                          <td>{row.facilityRef}</td>
-                          <td>{row.networkZone}</td>
-                          <td>{row.productionLine}</td>
-                          <td>{formatAmount(row.producedVolumeM3)}</td>
-                          <td>{formatAmount(row.billedVolumeM3)}</td>
-                          <td>{formatAmount(row.waterRevenue, row.currency)}</td>
-                          <td>{formatAmount(row.bulkSaleAmount, row.currency)}</td>
-                          <td>{formatAmount(row.connectionAmount, row.currency)}</td>
-                          <td>{formatAmount(row.subsidyAmount, row.currency)}</td>
-                          <td>{formatAmount(row.treatmentCost, row.currency)}</td>
-                          <td>{formatAmount(row.energyCost, row.currency)}</td>
-                          <td>{formatAmount(row.maintenanceCost, row.currency)}</td>
-                          <td>{formatAmount(row.qualityCost, row.currency)}</td>
-                          <td>{formatAmount(row.repairCost, row.currency)}</td>
-                          <td>{formatAmount(row.supplierPaymentAmount, row.currency)}</td>
-                          <td>{formatAmount(row.cashInAmount, row.currency)}</td>
-                          <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
-                          <td>{formatAmount(row.netAmount, row.currency)}</td>
-                          <td>{formatRate(row.lossRate)}</td>
-                          <td>{formatRate(row.executionRate)}</td>
-                          <td>{formatCount(row.blockedTasksCount)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th colSpan={3}>TOTAL</th>
-                      <th>{formatAmount(overview.waterOperationsReport.totals.producedVolumeM3)}</th>
-                      <th>{formatAmount(overview.waterOperationsReport.totals.billedVolumeM3)}</th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.waterRevenue,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.bulkSaleAmount,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.connectionAmount,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.subsidyAmount,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.treatmentCost,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.energyCost,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.maintenanceCost,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.qualityCost,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.repairCost,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.supplierPaymentAmount,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.cashInAmount,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.cashOutAmount,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>
-                        {formatAmount(
-                          overview.waterOperationsReport.totals.netAmount,
-                          overview.waterOperationsReport.totals.currency
-                        )}
-                      </th>
-                      <th>{formatRate(overview.waterOperationsReport.totals.lossRate)}</th>
-                      <th>{formatRate(overview.waterOperationsReport.totals.executionRate)}</th>
-                      <th>{formatCount(overview.waterOperationsReport.totals.blockedTasksCount)}</th>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </section>
-          ) : null}
+                          </thead>
+                          <tbody>
+                            {detailRows.length === 0 ? (
+                              <tr>
+                                <td colSpan={6}>Aucune ligne {emptyLabel} enregistrée sur la période filtrée.</td>
+                              </tr>
+                            ) : (
+                              detailRows.map((row, index) => (
+                                <tr key={`${row.date}-${row.categoryLabel}-${index}`}>
+                                  <td>{row.date}</td>
+                                  <td>{row.categoryLabel}</td>
+                                  <td>{row.designation}</td>
+                                  <td>{row.quantity > 0 ? formatCount(row.quantity) : "-"}</td>
+                                  <td>{row.quantity > 0 ? formatAmount(row.unitPrice, row.currency) : "-"}</td>
+                                  <td>{formatAmount(row.amount, row.currency)}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <th colSpan={5}>TOTAL {section.label.toUpperCase()}</th>
+                              <th>{formatAmount(section.amount, report.totals.currency)}</th>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            );
+          })() : null}
 
           {overview.agencyOperationsReport ? (
             <section className="panel">
@@ -2403,136 +2272,130 @@ export function ReportsPage(): JSX.Element {
             </section>
           ) : null}
 
-          {overview.generalExpensesReport ? (
-            <section className="panel">
-              <div className="dashboard-panel-header">
-                <div>
-                  <h3>Rapport dépenses générales</h3>
-                  <p className="hint">
-                    {overview.generalExpensesReport.periodLabel} | dépenses de fonctionnement du
-                    PDG et des employés, hors secteurs d'activité.
-                  </p>
+          {overview.generalExpensesReport ? (() => {
+            const report = overview.generalExpensesReport;
+            const ownerSections: Array<{ ownerType: "PDG" | "EMPLOYE"; label: string; amount: string }> = [
+              { ownerType: "PDG", label: "PDG", amount: report.totals.pdgAmount },
+              { ownerType: "EMPLOYE", label: "Employés", amount: report.totals.employeeAmount }
+            ];
+            return (
+              <section className="panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h3>Rapport dépenses générales</h3>
+                    <p className="hint">
+                      {report.periodLabel} | dépenses de fonctionnement du PDG et des employés,
+                      hors secteurs d'activité, présentées séparément.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="reports-summary-grid">
-                <article className="reports-kpi-card">
-                  <span>Dépenses PDG</span>
-                  <strong>
-                    {formatAmount(
-                      overview.generalExpensesReport.totals.pdgAmount,
-                      overview.generalExpensesReport.totals.currency
-                    )}
-                  </strong>
-                </article>
-                <article className="reports-kpi-card">
-                  <span>Dépenses employés</span>
-                  <strong>
-                    {formatAmount(
-                      overview.generalExpensesReport.totals.employeeAmount,
-                      overview.generalExpensesReport.totals.currency
-                    )}
-                  </strong>
-                </article>
-                <article className="reports-kpi-card">
-                  <span>Total dépenses</span>
-                  <strong>
-                    {formatAmount(
-                      overview.generalExpensesReport.totals.totalAmount,
-                      overview.generalExpensesReport.totals.currency
-                    )}
-                  </strong>
-                  <small>
-                    {formatCount(overview.generalExpensesReport.totals.transactionsCount)} ligne(s)
-                    de dépense
-                  </small>
-                </article>
-              </div>
+                <div className="reports-summary-grid">
+                  <article className="reports-kpi-card">
+                    <span>Dépenses PDG</span>
+                    <strong>{formatAmount(report.totals.pdgAmount, report.totals.currency)}</strong>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Dépenses employés</span>
+                    <strong>{formatAmount(report.totals.employeeAmount, report.totals.currency)}</strong>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Total dépenses</span>
+                    <strong>{formatAmount(report.totals.totalAmount, report.totals.currency)}</strong>
+                    <small>{formatCount(report.totals.transactionsCount)} ligne(s) de dépense</small>
+                  </article>
+                </div>
 
-              <div className="reports-data-grid">
-                <article className="reports-table-panel">
-                  <div className="reports-table-header">
-                    <h4>Répartition par catégorie</h4>
-                    <span>{formatCount(overview.generalExpensesReport.breakdownRows.length)} catégorie(s)</span>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Qui</th>
-                          <th>Catégorie</th>
-                          <th>Lignes</th>
-                          <th>Montant</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overview.generalExpensesReport.breakdownRows.length === 0 ? (
-                          <tr>
-                            <td colSpan={4}>Aucune dépense générale sur la période filtrée.</td>
-                          </tr>
-                        ) : (
-                          overview.generalExpensesReport.breakdownRows.map((row) => (
-                            <tr key={`${row.ownerType}-${row.categoryLabel}`}>
-                              <td>{row.ownerType === "PDG" ? "PDG" : "Employé"}</td>
-                              <td>{row.categoryLabel}</td>
-                              <td>{formatCount(row.transactionsCount)}</td>
-                              <td>{formatAmount(row.amount, row.currency)}</td>
+                {ownerSections.map((section) => {
+                  const breakdownRows = report.breakdownRows.filter(
+                    (row) => row.ownerType === section.ownerType
+                  );
+                  const detailRows = report.rows.filter((row) => row.ownerType === section.ownerType);
+                  const emptyLabel = section.label === "PDG" ? "du PDG" : "des employés";
+
+                  return (
+                    <div key={section.ownerType} className="reports-owner-section">
+                      <h4 className="reports-owner-section-title">Dépenses {section.label}</h4>
+
+                      <div className="reports-data-grid">
+                        <article className="reports-table-panel">
+                          <div className="reports-table-header">
+                            <h4>Répartition par catégorie — {section.label}</h4>
+                            <span>{formatCount(breakdownRows.length)} catégorie(s)</span>
+                          </div>
+                          <div className="table-wrap">
+                            <table className="admin-table">
+                              <thead>
+                                <tr>
+                                  <th>Catégorie</th>
+                                  <th>Lignes</th>
+                                  <th>Montant</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {breakdownRows.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={3}>Aucune dépense {emptyLabel} sur la période filtrée.</td>
+                                  </tr>
+                                ) : (
+                                  breakdownRows.map((row) => (
+                                    <tr key={row.categoryLabel}>
+                                      <td>{row.categoryLabel}</td>
+                                      <td>{formatCount(row.transactionsCount)}</td>
+                                      <td>{formatAmount(row.amount, row.currency)}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </article>
+                      </div>
+
+                      <div className="table-wrap">
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Catégorie</th>
+                              <th>Désignation</th>
+                              <th>Quantité</th>
+                              <th>Prix unitaire</th>
+                              <th>Montant</th>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </article>
-              </div>
-
-              <div className="table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Qui</th>
-                      <th>Catégorie</th>
-                      <th>Désignation</th>
-                      <th>Quantité</th>
-                      <th>Prix unitaire</th>
-                      <th>Montant</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {overview.generalExpensesReport.rows.length === 0 ? (
-                      <tr>
-                        <td colSpan={7}>Aucune dépense générale enregistrée sur la période filtrée.</td>
-                      </tr>
-                    ) : (
-                      overview.generalExpensesReport.rows.map((row, index) => (
-                        <tr key={`${row.date}-${row.ownerType}-${row.categoryLabel}-${index}`}>
-                          <td>{row.date}</td>
-                          <td>{row.ownerType === "PDG" ? "PDG" : "Employé"}</td>
-                          <td>{row.categoryLabel}</td>
-                          <td>{row.designation}</td>
-                          <td>{row.quantity > 0 ? formatCount(row.quantity) : "-"}</td>
-                          <td>{row.quantity > 0 ? formatAmount(row.unitPrice, row.currency) : "-"}</td>
-                          <td>{formatAmount(row.amount, row.currency)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th colSpan={6}>TOTAL</th>
-                      <th>
-                        {formatAmount(
-                          overview.generalExpensesReport.totals.totalAmount,
-                          overview.generalExpensesReport.totals.currency
-                        )}
-                      </th>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </section>
-          ) : null}
+                          </thead>
+                          <tbody>
+                            {detailRows.length === 0 ? (
+                              <tr>
+                                <td colSpan={6}>Aucune dépense {emptyLabel} enregistrée sur la période filtrée.</td>
+                              </tr>
+                            ) : (
+                              detailRows.map((row, index) => (
+                                <tr key={`${row.date}-${row.categoryLabel}-${index}`}>
+                                  <td>{row.date}</td>
+                                  <td>{row.categoryLabel}</td>
+                                  <td>{row.designation}</td>
+                                  <td>{row.quantity > 0 ? formatCount(row.quantity) : "-"}</td>
+                                  <td>{row.quantity > 0 ? formatAmount(row.unitPrice, row.currency) : "-"}</td>
+                                  <td>{formatAmount(row.amount, row.currency)}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <th colSpan={5}>TOTAL {section.label.toUpperCase()}</th>
+                              <th>{formatAmount(section.amount, report.totals.currency)}</th>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            );
+          })() : null}
 
           {overview.btpOperationsReport ? (
             <section className="panel">
@@ -2540,8 +2403,8 @@ export function ReportsPage(): JSX.Element {
                 <div>
                   <h3>Rapport BTP</h3>
                   <p className="hint">
-                    {overview.btpOperationsReport.periodLabel} | suivi par chantier, lot,
-                    localisation, client, avancement, main-d'oeuvre et engins.
+                    {overview.btpOperationsReport.periodLabel} | situation des chantiers au{" "}
+                    {overview.btpOperationsReport.asOfLabel}.
                   </p>
                 </div>
               </div>
@@ -2550,126 +2413,86 @@ export function ReportsPage(): JSX.Element {
                 <article className="reports-kpi-card">
                   <span>Chantiers suivis</span>
                   <strong>{formatCount(overview.btpOperationsReport.totals.projectsCount)}</strong>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Total encaissé</span>
+                  <strong>
+                    {formatAmount(
+                      overview.btpOperationsReport.totals.cashInAmount,
+                      overview.btpOperationsReport.totals.currency
+                    )}
+                  </strong>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Total dépensé</span>
+                  <strong>
+                    {formatAmount(
+                      overview.btpOperationsReport.totals.totalCostAmount,
+                      overview.btpOperationsReport.totals.currency
+                    )}
+                  </strong>
                   <small>
-                    {formatCount(overview.btpOperationsReport.totals.workPackagesCount)} lot(s) actif(s)
+                    Matériaux, main-d'oeuvre, engins, sous-traitance et charges.
                   </small>
                 </article>
                 <article className="reports-kpi-card">
-                  <span>Solde chantier</span>
+                  <span>Marge totale</span>
                   <strong>
                     {formatAmount(
                       overview.btpOperationsReport.totals.netAmount,
                       overview.btpOperationsReport.totals.currency
                     )}
                   </strong>
-                  <small>
-                    Recettes - dépenses sur les chantiers BTP.
-                  </small>
-                </article>
-                <article className="reports-kpi-card">
-                  <span>Exécution chantier</span>
-                  <strong>{formatRate(overview.btpOperationsReport.totals.executionRate)}</strong>
-                  <small>
-                    {formatCount(overview.btpOperationsReport.totals.doneTasksCount)} terminées,{" "}
-                    {formatCount(overview.btpOperationsReport.totals.openTasksCount)} ouvertes
-                  </small>
-                </article>
-              </div>
-
-              <div className="reports-data-grid">
-                <article className="reports-table-panel">
-                  <div className="reports-table-header">
-                    <h4>Types d'opérations</h4>
-                    <span>{formatCount(overview.btpOperationsReport.operationRows.length)} type(s)</span>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Opération</th>
-                          <th>Transactions</th>
-                          <th>Tâches</th>
-                          <th>Recettes</th>
-                          <th>Dépenses</th>
-                          <th>Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overview.btpOperationsReport.operationRows.length === 0 ? (
-                          <tr>
-                            <td colSpan={6}>Aucune opération BTP sur la période filtrée.</td>
-                          </tr>
-                        ) : (
-                          overview.btpOperationsReport.operationRows.map((row) => (
-                            <tr key={row.operationKind}>
-                              <td>{row.operationLabel}</td>
-                              <td>{formatCount(row.transactionsCount)}</td>
-                              <td>{formatCount(row.tasksCount)}</td>
-                              <td>{formatAmount(row.cashInAmount, row.currency)}</td>
-                              <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
-                              <td>{formatAmount(row.netAmount, row.currency)}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <small>Total encaissé moins total dépensé.</small>
                 </article>
               </div>
 
               <div className="table-wrap">
-                <table className="admin-table">
+                <table className="admin-table reports-hardware-table">
                   <thead>
                     <tr>
                       <th>Chantier</th>
-                      <th>Lot</th>
-                      <th>Localisation</th>
                       <th>Client</th>
-                      <th>Avancement</th>
+                      <th>Encaissé</th>
                       <th>Matériaux</th>
                       <th>Main-d'oeuvre</th>
                       <th>Engins</th>
-                      <th>Recettes</th>
-                      <th>Dépenses</th>
-                      <th>Net</th>
-                      <th>Exécution</th>
-                      <th>Blocages</th>
+                      <th>Sous-traitance</th>
+                      <th>Charges</th>
+                      <th>Total dépensé</th>
+                      <th>Marge</th>
+                      <th>Avancement</th>
                     </tr>
                   </thead>
                   <tbody>
                     {overview.btpOperationsReport.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={13}>
-                          Aucun chantier BTP alimenté sur la période filtrée.
+                        <td colSpan={11}>
+                          Aucun chantier alimenté sur la période filtrée.
                         </td>
                       </tr>
                     ) : (
                       overview.btpOperationsReport.rows.map((row) => (
-                        <tr key={`${row.projectRef}-${row.workPackage}-${row.siteLocation}-${row.clientRef}`}>
+                        <tr key={row.projectRef}>
                           <td>{row.projectRef}</td>
-                          <td>{row.workPackage}</td>
-                          <td>{row.siteLocation}</td>
-                          <td>{row.clientRef}</td>
-                          <td>{formatRate(row.progressPercent)}</td>
-                          <td>{formatAmount(row.materialQuantity)}</td>
-                          <td>{formatAmount(row.laborDays)}</td>
-                          <td>{formatAmount(row.equipmentHours)}</td>
+                          <td>{row.clientRef || "-"}</td>
                           <td>{formatAmount(row.cashInAmount, row.currency)}</td>
-                          <td>{formatAmount(row.cashOutAmount, row.currency)}</td>
+                          <td>{formatAmount(row.materialAmount, row.currency)}</td>
+                          <td>{formatAmount(row.laborAmount, row.currency)}</td>
+                          <td>{formatAmount(row.equipmentAmount, row.currency)}</td>
+                          <td>{formatAmount(row.subcontractingAmount, row.currency)}</td>
+                          <td>{formatAmount(row.siteExpenseAmount, row.currency)}</td>
+                          <td>{formatAmount(row.totalCostAmount, row.currency)}</td>
                           <td>{formatAmount(row.netAmount, row.currency)}</td>
-                          <td>{formatRate(row.executionRate)}</td>
-                          <td>{formatCount(row.blockedTasksCount)}</td>
+                          <td>{row.lastProgressPercent !== null ? formatRate(row.lastProgressPercent) : "-"}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <th colSpan={4}>TOTAL</th>
-                      <th>{formatRate(overview.btpOperationsReport.totals.progressPercent)}</th>
-                      <th>{formatAmount(overview.btpOperationsReport.totals.materialQuantity)}</th>
-                      <th>{formatAmount(overview.btpOperationsReport.totals.laborDays)}</th>
-                      <th>{formatAmount(overview.btpOperationsReport.totals.equipmentHours)}</th>
+                      <th>TOTAL</th>
+                      <th />
                       <th>
                         {formatAmount(
                           overview.btpOperationsReport.totals.cashInAmount,
@@ -2678,7 +2501,37 @@ export function ReportsPage(): JSX.Element {
                       </th>
                       <th>
                         {formatAmount(
-                          overview.btpOperationsReport.totals.cashOutAmount,
+                          overview.btpOperationsReport.totals.materialAmount,
+                          overview.btpOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.btpOperationsReport.totals.laborAmount,
+                          overview.btpOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.btpOperationsReport.totals.equipmentAmount,
+                          overview.btpOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.btpOperationsReport.totals.subcontractingAmount,
+                          overview.btpOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.btpOperationsReport.totals.siteExpenseAmount,
+                          overview.btpOperationsReport.totals.currency
+                        )}
+                      </th>
+                      <th>
+                        {formatAmount(
+                          overview.btpOperationsReport.totals.totalCostAmount,
                           overview.btpOperationsReport.totals.currency
                         )}
                       </th>
@@ -2688,8 +2541,7 @@ export function ReportsPage(): JSX.Element {
                           overview.btpOperationsReport.totals.currency
                         )}
                       </th>
-                      <th>{formatRate(overview.btpOperationsReport.totals.executionRate)}</th>
-                      <th>{formatCount(overview.btpOperationsReport.totals.blockedTasksCount)}</th>
+                      <th />
                     </tr>
                   </tfoot>
                 </table>

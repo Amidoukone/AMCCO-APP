@@ -26,22 +26,30 @@ import {
   addFinanceTransactionProofRequest,
   ApiError,
   createActivityArticleRequest,
+  createBtpProjectRequest,
   createFinanceAccountRequest,
   createFinanceTransactionRequest,
+  createGeneralStoreShopRequest,
   createRentalTenantRequest,
   deleteActivityArticleRequest,
+  deleteBtpProjectRequest,
   deleteFinanceAccountRequest,
   deleteFinanceTransactionRequest,
+  deleteGeneralStoreShopRequest,
   deleteRentalTenantRequest,
   getFinanceProofUploadAuthRequest,
   listActivityArticlesRequest,
+  listBtpProjectsRequest,
   listFinanceAccountsRequest,
   listFinanceTransactionProofsRequest,
   listFinanceTransactionsRequest,
+  listGeneralStoreShopsRequest,
   listRentalTenantsRequest,
   updateActivityArticleRequest,
+  updateBtpProjectRequest,
   updateFinanceAccountRequest,
   updateFinanceTransactionRequest,
+  updateGeneralStoreShopRequest,
   updateRentalTenantRequest
 } from "../lib/api";
 import {
@@ -55,6 +63,8 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { ActivityFieldDefinition } from "../types/activities";
 import type { ActivityArticle } from "../types/articles";
 import type { RentalTenant } from "../types/tenants";
+import type { GeneralStoreShop } from "../types/shops";
+import type { BtpProject } from "../types/projects";
 import type {
   FinancialAccount,
   FinancialAccountScopeType,
@@ -73,153 +83,14 @@ const TRANSACTIONS_PAGE_SIZE = 100;
 const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 25;
 const STORE_OPERATION_KIND_KEY = "storeOperationKind";
-type StoreOperationKind =
-  | "STORE_SALE"
-  | "STOCK_PURCHASE"
-  | "SUPPLIER_PAYMENT"
-  | "CUSTOMER_RETURN"
-  | "DISCOUNT_ADJUSTMENT"
-  | "INVENTORY_ADJUSTMENT"
-  | "INTERNAL_TRANSFER"
-  | "STORE_EXPENSE";
+type StoreOperationKind = "ACHAT" | "RECOUVREMENT";
 const STORE_OPERATION_LABELS: Record<StoreOperationKind, string> = {
-  STORE_SALE: "Vente caisse",
-  STOCK_PURCHASE: "Achat stock",
-  SUPPLIER_PAYMENT: "Paiement fournisseur",
-  CUSTOMER_RETURN: "Retour client",
-  DISCOUNT_ADJUSTMENT: "Remise / écart",
-  INVENTORY_ADJUSTMENT: "Ajustement inventaire",
-  INTERNAL_TRANSFER: "Transfert interne",
-  STORE_EXPENSE: "Charge magasin"
+  ACHAT: "Achat boutique",
+  RECOUVREMENT: "Recouvrement"
 };
-const STORE_NUMERIC_METADATA_FIELDS = new Set([
-  "quantity",
-  "returnQuantity",
-  "adjustmentQuantity",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "discountAmount",
-  "returnAmount",
-  "invoiceAmount"
-]);
-const STORE_AMOUNT_METADATA_FIELDS = new Set([
-  "quantity",
-  "returnQuantity",
-  "adjustmentQuantity",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "discountAmount",
-  "returnAmount",
-  "invoiceAmount"
-]);
-const STORE_COMMON_METADATA_FIELDS = new Set([
-  "department",
-  "productFamily",
-  "itemName",
-  "skuRef",
-  "barcode",
-  "shelfRef"
-]);
-const STORE_SALE_METADATA_FIELDS = new Set([
-  ...STORE_COMMON_METADATA_FIELDS,
-  "registerRef",
-  "cashierRef",
-  "quantity",
-  "unit",
-  "saleUnitPrice",
-  "discountAmount",
-  "customerRef",
-  "receiptRef",
-  "paymentRef"
-]);
-const STORE_PURCHASE_METADATA_FIELDS = new Set([
-  ...STORE_COMMON_METADATA_FIELDS,
-  "quantity",
-  "unit",
-  "purchaseUnitPrice",
-  "supplierRef",
-  "invoiceRef"
-]);
-const STORE_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
-  "department",
-  "productFamily",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "paymentRef"
-]);
-const STORE_CUSTOMER_RETURN_METADATA_FIELDS = new Set([
-  ...STORE_COMMON_METADATA_FIELDS,
-  "registerRef",
-  "cashierRef",
-  "returnQuantity",
-  "unit",
-  "saleUnitPrice",
-  "returnAmount",
-  "customerRef",
-  "receiptRef",
-  "paymentRef"
-]);
-const STORE_DISCOUNT_ADJUSTMENT_METADATA_FIELDS = new Set([
-  ...STORE_COMMON_METADATA_FIELDS,
-  "registerRef",
-  "cashierRef",
-  "discountAmount",
-  "customerRef",
-  "receiptRef"
-]);
-const STORE_INVENTORY_ADJUSTMENT_METADATA_FIELDS = new Set([
-  ...STORE_COMMON_METADATA_FIELDS,
-  "adjustmentQuantity",
-  "unit",
-  "purchaseUnitPrice",
-  "expenseLabel"
-]);
-const STORE_INTERNAL_TRANSFER_METADATA_FIELDS = new Set([
-  ...STORE_COMMON_METADATA_FIELDS,
-  "quantity",
-  "unit",
-  "transferRef",
-  "sourceStoreRef",
-  "destinationStoreRef"
-]);
-const STORE_EXPENSE_METADATA_FIELDS = new Set([
-  "department",
-  "expenseLabel",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "paymentRef"
-]);
-const STORE_METADATA_FIELDS = new Set([
-  STORE_OPERATION_KIND_KEY,
-  "department",
-  "productFamily",
-  "itemName",
-  "skuRef",
-  "barcode",
-  "shelfRef",
-  "registerRef",
-  "cashierRef",
-  "quantity",
-  "returnQuantity",
-  "adjustmentQuantity",
-  "unit",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "discountAmount",
-  "returnAmount",
-  "invoiceAmount",
-  "supplierRef",
-  "customerRef",
-  "invoiceRef",
-  "receiptRef",
-  "transferRef",
-  "sourceStoreRef",
-  "destinationStoreRef",
-  "expenseLabel",
-  "paymentRef"
-]);
+const STORE_ACHAT_METADATA_FIELDS = new Set(["shopRef"]);
+const STORE_RECOUVREMENT_METADATA_FIELDS = new Set(["shopRef"]);
+const STORE_METADATA_FIELDS = new Set([STORE_OPERATION_KIND_KEY, "shopRef"]);
 const HARDWARE_OPERATION_KIND_KEY = "hardwareOperationKind";
 type HardwareOperationKind = "GLOBAL" | "ITEM_ENTRY" | "ITEM_EXIT";
 const HARDWARE_OPERATION_LABELS: Record<HardwareOperationKind, string> = {
@@ -554,163 +425,50 @@ const HOTEL_METADATA_FIELDS = new Set([
 ]);
 const WATER_OPERATION_KIND_KEY = "waterOperationKind";
 type WaterOperationKind =
-  | "WATER_BILLING"
-  | "BULK_WATER_SALE"
-  | "CONNECTION_FEE"
-  | "SUBSIDY_INCOME"
-  | "CHEMICAL_PURCHASE"
-  | "ENERGY_PAYMENT"
-  | "MAINTENANCE_EXPENSE"
-  | "QUALITY_TEST_EXPENSE"
-  | "NETWORK_REPAIR"
-  | "SUPPLIER_PAYMENT";
+  | "WATER_SALE"
+  | "WATER_OTHER_INCOME"
+  | "WATER_EXPENSE_MEALS"
+  | "WATER_EXPENSE_FUEL"
+  | "WATER_EXPENSE_VEHICLE_UPKEEP"
+  | "WATER_EXPENSE_PACKAGING_LOSS"
+  | "WATER_EXPENSE_SUPPLIES"
+  | "WATER_EXPENSE_ENERGY"
+  | "WATER_EXPENSE_CLEANING"
+  | "WATER_EXPENSE_MAINTENANCE"
+  | "WATER_EXPENSE_SUPPLIER"
+  | "WATER_EXPENSE_OTHER";
 const WATER_OPERATION_LABELS: Record<WaterOperationKind, string> = {
-  WATER_BILLING: "Facture eau",
-  BULK_WATER_SALE: "Vente eau en gros",
-  CONNECTION_FEE: "Frais branchement",
-  SUBSIDY_INCOME: "Subvention / appui",
-  CHEMICAL_PURCHASE: "Produit traitement",
-  ENERGY_PAYMENT: "Énergie",
-  MAINTENANCE_EXPENSE: "Maintenance",
-  QUALITY_TEST_EXPENSE: "Analyse qualité",
-  NETWORK_REPAIR: "Réparation réseau",
-  SUPPLIER_PAYMENT: "Paiement fournisseur"
+  WATER_SALE: "Vente de paquets d'eau",
+  WATER_OTHER_INCOME: "Autre recette",
+  WATER_EXPENSE_MEALS: "Repas",
+  WATER_EXPENSE_FUEL: "Carburant (essence / gazoil)",
+  WATER_EXPENSE_VEHICLE_UPKEEP: "Entretien moto / véhicule",
+  WATER_EXPENSE_PACKAGING_LOSS: "Emballage / paquet perdu",
+  WATER_EXPENSE_SUPPLIES: "Fournitures (lait, sucre, etc.)",
+  WATER_EXPENSE_ENERGY: "Énergie / combustible",
+  WATER_EXPENSE_CLEANING: "Nettoyage / balayage",
+  WATER_EXPENSE_MAINTENANCE: "Entretien équipement / réparation",
+  WATER_EXPENSE_SUPPLIER: "Paiement fournisseur",
+  WATER_EXPENSE_OTHER: "Autre dépense"
 };
-const WATER_NUMERIC_METADATA_FIELDS = new Set([
-  "meterStart",
-  "meterEnd",
-  "producedVolumeM3",
-  "volumeM3",
-  "unitPrice",
-  "connectionFee",
-  "chemicalQuantity",
-  "energyQuantity",
-  "invoiceAmount"
-]);
-const WATER_AMOUNT_METADATA_FIELDS = new Set([
-  "volumeM3",
-  "unitPrice",
-  "connectionFee",
-  "chemicalQuantity",
-  "energyQuantity",
-  "invoiceAmount"
-]);
-const WATER_COMMON_METADATA_FIELDS = new Set([
-  "facilityRef",
-  "networkZone",
-  "productionLine"
-]);
-const WATER_BILLING_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "meterRef",
-  "customerRef",
-  "billingPeriod",
-  "meterStart",
-  "meterEnd",
-  "producedVolumeM3",
-  "volumeM3",
-  "unitPrice",
-  "invoiceRef",
-  "paymentRef"
-]);
-const WATER_BULK_SALE_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "customerRef",
-  "producedVolumeM3",
-  "volumeM3",
-  "unitPrice",
-  "invoiceRef",
-  "paymentRef"
-]);
-const WATER_CONNECTION_FEE_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "customerRef",
-  "connectionRef",
-  "connectionFee",
-  "paymentRef"
-]);
-const WATER_SUBSIDY_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "customerRef",
-  "invoiceAmount",
-  "paymentRef"
-]);
-const WATER_CHEMICAL_PURCHASE_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "treatmentProduct",
-  "chemicalQuantity",
-  "unitPrice",
-  "supplierRef",
-  "invoiceRef"
-]);
-const WATER_ENERGY_PAYMENT_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "energySource",
-  "energyQuantity",
-  "unitPrice",
-  "supplierRef",
-  "invoiceRef"
-]);
-const WATER_MAINTENANCE_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "equipmentRef",
-  "maintenanceType",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const WATER_QUALITY_TEST_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "testRef",
-  "waterQuality",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const WATER_NETWORK_REPAIR_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "equipmentRef",
-  "issueRef",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const WATER_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
-  ...WATER_COMMON_METADATA_FIELDS,
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "paymentRef"
-]);
-const WATER_METADATA_FIELDS = new Set([
-  WATER_OPERATION_KIND_KEY,
-  "facilityRef",
-  "networkZone",
-  "productionLine",
-  "meterRef",
-  "customerRef",
-  "billingPeriod",
-  "meterStart",
-  "meterEnd",
-  "producedVolumeM3",
-  "volumeM3",
-  "unitPrice",
-  "connectionRef",
-  "connectionFee",
-  "treatmentProduct",
-  "chemicalQuantity",
-  "energySource",
-  "energyQuantity",
-  "equipmentRef",
-  "maintenanceType",
-  "testRef",
-  "waterQuality",
-  "issueRef",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "paymentRef"
-]);
+const WATER_INCOME_KINDS: WaterOperationKind[] = ["WATER_SALE", "WATER_OTHER_INCOME"];
+const WATER_EXPENSE_KINDS: WaterOperationKind[] = [
+  "WATER_EXPENSE_MEALS",
+  "WATER_EXPENSE_FUEL",
+  "WATER_EXPENSE_VEHICLE_UPKEEP",
+  "WATER_EXPENSE_PACKAGING_LOSS",
+  "WATER_EXPENSE_SUPPLIES",
+  "WATER_EXPENSE_ENERGY",
+  "WATER_EXPENSE_CLEANING",
+  "WATER_EXPENSE_MAINTENANCE",
+  "WATER_EXPENSE_SUPPLIER",
+  "WATER_EXPENSE_OTHER"
+];
+const WATER_NUMERIC_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
+const WATER_AMOUNT_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
+const WATER_SALE_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
+const WATER_NO_EXTRA_METADATA_FIELDS = new Set<string>();
+const WATER_METADATA_FIELDS = new Set([WATER_OPERATION_KIND_KEY, "quantity", "unitPrice"]);
 const AGENCY_OPERATION_KIND_KEY = "agencyOperationKind";
 type AgencyOperationKind =
   | "SALE_COMMISSION"
@@ -941,6 +699,14 @@ const AGRICULTURE_METADATA_FIELDS = new Set([
   "buyerRef",
   "sourceRef"
 ]);
+const BTP_WORK_PACKAGE_OPTIONS = [
+  "Terrassement",
+  "Fondation",
+  "Gros oeuvre",
+  "Second oeuvre",
+  "Finition",
+  "Autre"
+];
 const BTP_OPERATION_KIND_KEY = "btpOperationKind";
 type BtpOperationKind =
   | "CLIENT_PAYMENT"
@@ -979,10 +745,7 @@ const BTP_AMOUNT_METADATA_FIELDS = new Set([
 ]);
 const BTP_COMMON_METADATA_FIELDS = new Set([
   "projectRef",
-  "contractRef",
-  "clientRef",
-  "workPackage",
-  "siteLocation"
+  "workPackage"
 ]);
 const BTP_CLIENT_PAYMENT_METADATA_FIELDS = new Set([
   ...BTP_COMMON_METADATA_FIELDS,
@@ -1037,10 +800,7 @@ const BTP_SITE_EXPENSE_METADATA_FIELDS = new Set([
 const BTP_METADATA_FIELDS = new Set([
   BTP_OPERATION_KIND_KEY,
   "projectRef",
-  "contractRef",
-  "clientRef",
   "workPackage",
-  "siteLocation",
   "materialName",
   "quantity",
   "unit",
@@ -1253,26 +1013,26 @@ type GeneralExpenseKind =
   | "PDG_TRANSPORT"
   | "PDG_SUPPLIER_PAYMENT"
   | "PDG_TRANSFER_ADVANCE"
-  | "PDG_PAYROLL"
+  | "PDG_INVESTMENT"
+  | "PDG_LOAN"
   | "PDG_OVERHEAD"
   | "EMPLOYEE_MEALS"
   | "EMPLOYEE_FUEL"
   | "EMPLOYEE_VEHICLE_UPKEEP"
   | "EMPLOYEE_SUPPLIES"
-  | "EMPLOYEE_PAYROLL"
   | "EMPLOYEE_OTHER";
 const GENERAL_EXPENSE_KIND_LABELS: Record<GeneralExpenseKind, string> = {
   PDG_SUPPLIES: "Achat matériel / fournitures",
   PDG_TRANSPORT: "Carburant / transport",
   PDG_SUPPLIER_PAYMENT: "Paiement fournisseur / prestataire",
   PDG_TRANSFER_ADVANCE: "Virement / avance / transfert",
-  PDG_PAYROLL: "Salaire / cotisation",
+  PDG_INVESTMENT: "Investissement",
+  PDG_LOAN: "Prêt",
   PDG_OVERHEAD: "Frais généraux / divers",
   EMPLOYEE_MEALS: "Repas",
   EMPLOYEE_FUEL: "Carburant",
   EMPLOYEE_VEHICLE_UPKEEP: "Entretien véhicule",
   EMPLOYEE_SUPPLIES: "Fournitures / consommables",
-  EMPLOYEE_PAYROLL: "Salaire",
   EMPLOYEE_OTHER: "Autre dépense"
 };
 const GENERAL_EXPENSE_PDG_KINDS: GeneralExpenseKind[] = [
@@ -1280,7 +1040,8 @@ const GENERAL_EXPENSE_PDG_KINDS: GeneralExpenseKind[] = [
   "PDG_TRANSPORT",
   "PDG_SUPPLIER_PAYMENT",
   "PDG_TRANSFER_ADVANCE",
-  "PDG_PAYROLL",
+  "PDG_INVESTMENT",
+  "PDG_LOAN",
   "PDG_OVERHEAD"
 ];
 const GENERAL_EXPENSE_EMPLOYEE_KINDS: GeneralExpenseKind[] = [
@@ -1288,7 +1049,6 @@ const GENERAL_EXPENSE_EMPLOYEE_KINDS: GeneralExpenseKind[] = [
   "EMPLOYEE_FUEL",
   "EMPLOYEE_VEHICLE_UPKEEP",
   "EMPLOYEE_SUPPLIES",
-  "EMPLOYEE_PAYROLL",
   "EMPLOYEE_OTHER"
 ];
 const GENERAL_EXPENSES_NUMERIC_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
@@ -1379,6 +1139,27 @@ function deriveHardwareAmount(
   return (quantity * unitPrice).toFixed(2);
 }
 
+function deriveHardwareArticleUnitPricePatch(
+  operationKind: HardwareOperationKind,
+  article: ActivityArticle | undefined
+): Partial<Record<"purchaseUnitPrice" | "saleUnitPrice", string>> {
+  if (!article) {
+    return {};
+  }
+  const purchasePrice = article.defaultPurchaseUnitPrice
+    ? toAmountNumber(article.defaultPurchaseUnitPrice)
+    : 0;
+  if (operationKind === "ITEM_ENTRY") {
+    return purchasePrice > 0 ? { purchaseUnitPrice: purchasePrice.toFixed(2) } : {};
+  }
+  if (operationKind === "ITEM_EXIT") {
+    const margin = article.defaultMargin ? toAmountNumber(article.defaultMargin) : 0;
+    const salePrice = purchasePrice + margin;
+    return salePrice > 0 ? { saleUnitPrice: salePrice.toFixed(2) } : {};
+  }
+  return {};
+}
+
 function deriveHardwareMarginAmount(
   operationKind: HardwareOperationKind,
   metadata: Record<string, string>,
@@ -1409,64 +1190,6 @@ function deriveAgricultureAmount(
     return null;
   }
   return (quantity * unitPrice).toFixed(2);
-}
-
-function deriveStoreAmount(
-  operationKind: StoreOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind === "STORE_SALE") {
-    const quantity = toAmountNumber(metadata.quantity ?? "");
-    const saleUnitPrice = toAmountNumber(metadata.saleUnitPrice ?? "");
-    const discountAmount = toAmountNumber(metadata.discountAmount ?? "");
-    if (quantity <= 0 || saleUnitPrice <= 0) {
-      return discountAmount > 0 ? discountAmount.toFixed(2) : null;
-    }
-    return Math.max(quantity * saleUnitPrice - discountAmount, 0).toFixed(2);
-  }
-
-  if (operationKind === "STOCK_PURCHASE") {
-    const quantity = toAmountNumber(metadata.quantity ?? "");
-    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
-    if (quantity <= 0 || purchaseUnitPrice <= 0) {
-      return null;
-    }
-    return (quantity * purchaseUnitPrice).toFixed(2);
-  }
-
-  if (operationKind === "CUSTOMER_RETURN") {
-    const returnAmount = toAmountNumber(metadata.returnAmount ?? "");
-    if (returnAmount > 0) {
-      return returnAmount.toFixed(2);
-    }
-    const returnQuantity = toAmountNumber(metadata.returnQuantity ?? "");
-    const saleUnitPrice = toAmountNumber(metadata.saleUnitPrice ?? "");
-    if (returnQuantity <= 0 || saleUnitPrice <= 0) {
-      return null;
-    }
-    return (returnQuantity * saleUnitPrice).toFixed(2);
-  }
-
-  if (operationKind === "DISCOUNT_ADJUSTMENT") {
-    const discountAmount = toAmountNumber(metadata.discountAmount ?? "");
-    return discountAmount > 0 ? discountAmount.toFixed(2) : null;
-  }
-
-  if (operationKind === "INVENTORY_ADJUSTMENT") {
-    const adjustmentQuantity = Math.abs(toAmountNumber(metadata.adjustmentQuantity ?? ""));
-    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
-    if (adjustmentQuantity <= 0 || purchaseUnitPrice <= 0) {
-      return null;
-    }
-    return (adjustmentQuantity * purchaseUnitPrice).toFixed(2);
-  }
-
-  if (operationKind === "INTERNAL_TRANSFER") {
-    return null;
-  }
-
-  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
-  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
 }
 
 function deriveFoodAmount(
@@ -1604,37 +1327,15 @@ function deriveWaterAmount(
   operationKind: WaterOperationKind,
   metadata: Record<string, string>
 ): string | null {
-  if (operationKind === "WATER_BILLING" || operationKind === "BULK_WATER_SALE") {
-    const volumeM3 = toAmountNumber(metadata.volumeM3 ?? "");
-    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-    if (volumeM3 > 0 && unitPrice > 0) {
-      return (volumeM3 * unitPrice).toFixed(2);
-    }
+  if (operationKind !== "WATER_SALE") {
+    return null;
   }
-
-  if (operationKind === "CONNECTION_FEE") {
-    const connectionFee = toAmountNumber(metadata.connectionFee ?? "");
-    return connectionFee > 0 ? connectionFee.toFixed(2) : null;
+  const quantity = toAmountNumber(metadata.quantity ?? "");
+  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
+  if (quantity <= 0 || unitPrice <= 0) {
+    return null;
   }
-
-  if (operationKind === "CHEMICAL_PURCHASE") {
-    const chemicalQuantity = toAmountNumber(metadata.chemicalQuantity ?? "");
-    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-    if (chemicalQuantity > 0 && unitPrice > 0) {
-      return (chemicalQuantity * unitPrice).toFixed(2);
-    }
-  }
-
-  if (operationKind === "ENERGY_PAYMENT") {
-    const energyQuantity = toAmountNumber(metadata.energyQuantity ?? "");
-    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-    if (energyQuantity > 0 && unitPrice > 0) {
-      return (energyQuantity * unitPrice).toFixed(2);
-    }
-  }
-
-  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
-  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
+  return (quantity * unitPrice).toFixed(2);
 }
 
 function deriveAgencyAmount(
@@ -1732,16 +1433,24 @@ function getGeneralExpenseOwner(kind: GeneralExpenseKind): GeneralExpenseOwner {
   return kind.startsWith("PDG_") ? "PDG" : "EMPLOYE";
 }
 
+// Maps categories used before salaries moved to the dedicated Salaires
+// module, so editing an older expense shows a sensible category (and keeps
+// the right owner) instead of silently falling back to "Autre dépense".
+const GENERAL_EXPENSE_LEGACY_KIND_MAP: Partial<Record<string, GeneralExpenseKind>> = {
+  PDG_PAYROLL: "PDG_OVERHEAD",
+  EMPLOYEE_PAYROLL: "EMPLOYEE_OTHER"
+};
+
 function getGeneralExpenseKind(metadata: Record<string, string>): GeneralExpenseKind {
   const configuredKind = metadata[GENERAL_EXPENSE_KIND_KEY]?.trim();
   if (isGeneralExpenseKind(configuredKind)) {
     return configuredKind;
   }
+  const legacyKind = configuredKind ? GENERAL_EXPENSE_LEGACY_KIND_MAP[configuredKind] : undefined;
+  if (legacyKind) {
+    return legacyKind;
+  }
   return "EMPLOYEE_OTHER";
-}
-
-function getGeneralExpenseKindsForOwner(owner: GeneralExpenseOwner): GeneralExpenseKind[] {
-  return owner === "PDG" ? GENERAL_EXPENSE_PDG_KINDS : GENERAL_EXPENSE_EMPLOYEE_KINDS;
 }
 
 function deriveGeneralExpensesAmount(metadata: Record<string, string>): string | null {
@@ -1760,8 +1469,7 @@ function getGeneralExpensesFormModeLabel(owner: GeneralExpenseOwner): string {
 }
 
 function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
-  return STORE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    HARDWARE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+  return HARDWARE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     FOOD_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     RENTAL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     HOTEL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
@@ -1778,10 +1486,6 @@ function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
 
 function shouldDeriveHardwareAmount(fieldKey: string): boolean {
   return HARDWARE_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveStoreAmount(fieldKey: string): boolean {
-  return STORE_AMOUNT_METADATA_FIELDS.has(fieldKey);
 }
 
 function shouldDeriveFoodAmount(fieldKey: string): boolean {
@@ -1827,8 +1531,7 @@ function shouldDeriveGeneralExpensesAmount(fieldKey: string): boolean {
 function getDefaultTransactionType(
   activityCode: BusinessActivityCode | null
 ): "CASH_IN" | "CASH_OUT" {
-  return activityCode === "GENERAL_STORE" ||
-    activityCode === "FOOD" ||
+  return activityCode === "FOOD" ||
     activityCode === "RENTAL" ||
     activityCode === "HOTEL_LODGING" ||
     activityCode === "WATER" ||
@@ -1877,46 +1580,7 @@ function getHardwareOperationType(kind: HardwareOperationKind): "CASH_IN" | "CAS
 }
 
 function isStoreOperationKind(value: string | undefined): value is StoreOperationKind {
-  return (
-    value === "STORE_SALE" ||
-    value === "STOCK_PURCHASE" ||
-    value === "SUPPLIER_PAYMENT" ||
-    value === "CUSTOMER_RETURN" ||
-    value === "DISCOUNT_ADJUSTMENT" ||
-    value === "INVENTORY_ADJUSTMENT" ||
-    value === "INTERNAL_TRANSFER" ||
-    value === "STORE_EXPENSE"
-  );
-}
-
-function hasStoreMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "department",
-    "productFamily",
-    "itemName",
-    "skuRef",
-    "barcode",
-    "shelfRef",
-    "registerRef",
-    "cashierRef",
-    "quantity",
-    "returnQuantity",
-    "adjustmentQuantity",
-    "purchaseUnitPrice",
-    "saleUnitPrice",
-    "discountAmount",
-    "returnAmount",
-    "invoiceAmount",
-    "supplierRef",
-    "customerRef",
-    "invoiceRef",
-    "receiptRef",
-    "transferRef",
-    "sourceStoreRef",
-    "destinationStoreRef",
-    "expenseLabel",
-    "paymentRef"
-  ].some((key) => metadata[key]?.trim());
+  return value === "ACHAT" || value === "RECOUVREMENT";
 }
 
 function getStoreOperationKind(
@@ -1927,39 +1591,15 @@ function getStoreOperationKind(
   if (isStoreOperationKind(configuredKind)) {
     return configuredKind;
   }
-  if (!hasStoreMetadata(metadata)) {
-    return type === "CASH_IN" ? "STORE_SALE" : "STOCK_PURCHASE";
-  }
-  return type === "CASH_IN" ? "STORE_SALE" : "STORE_EXPENSE";
+  return type === "CASH_IN" ? "RECOUVREMENT" : "ACHAT";
 }
 
 function getStoreOperationType(kind: StoreOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "STORE_SALE" ? "CASH_IN" : "CASH_OUT";
+  return kind === "RECOUVREMENT" ? "CASH_IN" : "CASH_OUT";
 }
 
 function getStoreVisibleKeys(kind: StoreOperationKind): Set<string> {
-  if (kind === "STORE_SALE") {
-    return STORE_SALE_METADATA_FIELDS;
-  }
-  if (kind === "STOCK_PURCHASE") {
-    return STORE_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "SUPPLIER_PAYMENT") {
-    return STORE_SUPPLIER_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "CUSTOMER_RETURN") {
-    return STORE_CUSTOMER_RETURN_METADATA_FIELDS;
-  }
-  if (kind === "DISCOUNT_ADJUSTMENT") {
-    return STORE_DISCOUNT_ADJUSTMENT_METADATA_FIELDS;
-  }
-  if (kind === "INVENTORY_ADJUSTMENT") {
-    return STORE_INVENTORY_ADJUSTMENT_METADATA_FIELDS;
-  }
-  if (kind === "INTERNAL_TRANSFER") {
-    return STORE_INTERNAL_TRANSFER_METADATA_FIELDS;
-  }
-  return STORE_EXPENSE_METADATA_FIELDS;
+  return kind === "RECOUVREMENT" ? STORE_RECOUVREMENT_METADATA_FIELDS : STORE_ACHAT_METADATA_FIELDS;
 }
 
 function isFoodOperationKind(value: string | undefined): value is FoodOperationKind {
@@ -2172,50 +1812,24 @@ function getHotelVisibleKeys(kind: HotelOperationKind): Set<string> {
 }
 
 function isWaterOperationKind(value: string | undefined): value is WaterOperationKind {
-  return (
-    value === "WATER_BILLING" ||
-    value === "BULK_WATER_SALE" ||
-    value === "CONNECTION_FEE" ||
-    value === "SUBSIDY_INCOME" ||
-    value === "CHEMICAL_PURCHASE" ||
-    value === "ENERGY_PAYMENT" ||
-    value === "MAINTENANCE_EXPENSE" ||
-    value === "QUALITY_TEST_EXPENSE" ||
-    value === "NETWORK_REPAIR" ||
-    value === "SUPPLIER_PAYMENT"
-  );
+  return Boolean(value) && Object.prototype.hasOwnProperty.call(WATER_OPERATION_LABELS, value as string);
 }
 
-function hasWaterMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "facilityRef",
-    "networkZone",
-    "productionLine",
-    "meterRef",
-    "customerRef",
-    "billingPeriod",
-    "meterStart",
-    "meterEnd",
-    "producedVolumeM3",
-    "volumeM3",
-    "unitPrice",
-    "connectionRef",
-    "connectionFee",
-    "treatmentProduct",
-    "chemicalQuantity",
-    "energySource",
-    "energyQuantity",
-    "equipmentRef",
-    "maintenanceType",
-    "testRef",
-    "waterQuality",
-    "issueRef",
-    "supplierRef",
-    "invoiceRef",
-    "invoiceAmount",
-    "paymentRef"
-  ].some((key) => metadata[key]?.trim());
-}
+// Maps categories used before the sector was simplified to their closest
+// modern equivalent, so editing an older transaction shows the right
+// category instead of silently falling back to "Autre".
+const WATER_LEGACY_KIND_MAP: Partial<Record<string, WaterOperationKind>> = {
+  WATER_BILLING: "WATER_SALE",
+  BULK_WATER_SALE: "WATER_SALE",
+  CONNECTION_FEE: "WATER_OTHER_INCOME",
+  SUBSIDY_INCOME: "WATER_OTHER_INCOME",
+  CHEMICAL_PURCHASE: "WATER_EXPENSE_MAINTENANCE",
+  ENERGY_PAYMENT: "WATER_EXPENSE_ENERGY",
+  MAINTENANCE_EXPENSE: "WATER_EXPENSE_MAINTENANCE",
+  QUALITY_TEST_EXPENSE: "WATER_EXPENSE_MAINTENANCE",
+  NETWORK_REPAIR: "WATER_EXPENSE_MAINTENANCE",
+  SUPPLIER_PAYMENT: "WATER_EXPENSE_SUPPLIER"
+};
 
 function getWaterOperationKind(
   type: "CASH_IN" | "CASH_OUT",
@@ -2225,52 +1839,19 @@ function getWaterOperationKind(
   if (isWaterOperationKind(configuredKind)) {
     return configuredKind;
   }
-  if (!hasWaterMetadata(metadata)) {
-    return type === "CASH_IN" ? "WATER_BILLING" : "MAINTENANCE_EXPENSE";
+  const legacyKind = configuredKind ? WATER_LEGACY_KIND_MAP[configuredKind] : undefined;
+  if (legacyKind) {
+    return legacyKind;
   }
-  return type === "CASH_IN" ? "WATER_BILLING" : "SUPPLIER_PAYMENT";
+  return type === "CASH_IN" ? "WATER_SALE" : "WATER_EXPENSE_OTHER";
 }
 
 function getWaterOperationType(kind: WaterOperationKind): "CASH_IN" | "CASH_OUT" {
-  return (
-    kind === "WATER_BILLING" ||
-    kind === "BULK_WATER_SALE" ||
-    kind === "CONNECTION_FEE" ||
-    kind === "SUBSIDY_INCOME"
-  )
-    ? "CASH_IN"
-    : "CASH_OUT";
+  return WATER_INCOME_KINDS.includes(kind) ? "CASH_IN" : "CASH_OUT";
 }
 
 function getWaterVisibleKeys(kind: WaterOperationKind): Set<string> {
-  if (kind === "WATER_BILLING") {
-    return WATER_BILLING_METADATA_FIELDS;
-  }
-  if (kind === "BULK_WATER_SALE") {
-    return WATER_BULK_SALE_METADATA_FIELDS;
-  }
-  if (kind === "CONNECTION_FEE") {
-    return WATER_CONNECTION_FEE_METADATA_FIELDS;
-  }
-  if (kind === "SUBSIDY_INCOME") {
-    return WATER_SUBSIDY_METADATA_FIELDS;
-  }
-  if (kind === "CHEMICAL_PURCHASE") {
-    return WATER_CHEMICAL_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "ENERGY_PAYMENT") {
-    return WATER_ENERGY_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "MAINTENANCE_EXPENSE") {
-    return WATER_MAINTENANCE_METADATA_FIELDS;
-  }
-  if (kind === "QUALITY_TEST_EXPENSE") {
-    return WATER_QUALITY_TEST_METADATA_FIELDS;
-  }
-  if (kind === "NETWORK_REPAIR") {
-    return WATER_NETWORK_REPAIR_METADATA_FIELDS;
-  }
-  return WATER_SUPPLIER_PAYMENT_METADATA_FIELDS;
+  return kind === "WATER_SALE" ? WATER_SALE_METADATA_FIELDS : WATER_NO_EXTRA_METADATA_FIELDS;
 }
 
 function isAgencyOperationKind(value: string | undefined): value is AgencyOperationKind {
@@ -2449,10 +2030,7 @@ function isBtpOperationKind(value: string | undefined): value is BtpOperationKin
 function hasBtpMetadata(metadata: Record<string, string>): boolean {
   return [
     "projectRef",
-    "contractRef",
-    "clientRef",
     "workPackage",
-    "siteLocation",
     "materialName",
     "quantity",
     "unitPrice",
@@ -2971,9 +2549,6 @@ function deriveSectorAmount(
   if (activityCode === "BTP") {
     return deriveBtpAmount(getBtpOperationKind(type, metadata), metadata);
   }
-  if (activityCode === "GENERAL_STORE") {
-    return deriveStoreAmount(getStoreOperationKind(type, metadata), metadata);
-  }
   if (activityCode === "FOOD") {
     return deriveFoodAmount(getFoodOperationKind(type, metadata), metadata);
   }
@@ -3010,28 +2585,9 @@ function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
 }
 
 function getStoreFormModeLabel(kind: StoreOperationKind): string {
-  if (kind === "STORE_SALE") {
-    return "Vente caisse: rayon, article, référence, caisse, caissier, quantité, prix de vente, remise et ticket.";
-  }
-  if (kind === "STOCK_PURCHASE") {
-    return "Achat stock: rayon, article, quantité, prix d'achat, fournisseur et facture.";
-  }
-  if (kind === "SUPPLIER_PAYMENT") {
-    return "Paiement fournisseur: fournisseur, facture, montant et référence de paiement.";
-  }
-  if (kind === "CUSTOMER_RETURN") {
-    return "Retour client: article, ticket, quantité retour, montant et client concerné.";
-  }
-  if (kind === "DISCOUNT_ADJUSTMENT") {
-    return "Remise / écart: caisse, caissier, article ou ticket et montant de la remise.";
-  }
-  if (kind === "INVENTORY_ADJUSTMENT") {
-    return "Ajustement inventaire: article, emplacement, écart de quantité, coût unitaire et motif.";
-  }
-  if (kind === "INTERNAL_TRANSFER") {
-    return "Transfert interne: article, quantité, référence transfert, origine et destination.";
-  }
-  return "Charge magasin: nature de charge, fournisseur, facture, montant et référence de paiement.";
+  return kind === "RECOUVREMENT"
+    ? "Recouvrement: choisissez la boutique et indiquez le montant encaissé."
+    : "Achat: choisissez la boutique, indiquez le montant de la facture et joignez la photo du reçu si possible.";
 }
 
 function getFoodFormModeLabel(kind: FoodOperationKind): string {
@@ -3130,34 +2686,13 @@ function getHotelFormModeLabel(kind: HotelOperationKind): string {
 }
 
 function getWaterFormModeLabel(kind: WaterOperationKind): string {
-  if (kind === "WATER_BILLING") {
-    return "Facture eau: site, zone, compteur, abonne, période, index, volume m3, prix du m3 et paiement.";
+  if (kind === "WATER_SALE") {
+    return "Vente d'eau: indiquez le nombre de paquets vendus et le prix unitaire, ou saisissez le montant directement.";
   }
-  if (kind === "BULK_WATER_SALE") {
-    return "Vente en gros: site, zone, client, volume m3, prix unitaire, facture et paiement.";
+  if (kind === "WATER_OTHER_INCOME") {
+    return "Autre recette: précisez l'origine dans la description et saisissez le montant.";
   }
-  if (kind === "CONNECTION_FEE") {
-    return "Branchement: site, zone, abonne, dossier de raccordement, frais et référence paiement.";
-  }
-  if (kind === "SUBSIDY_INCOME") {
-    return "Subvention / appui: site, zone, source, montant et référence de paiement.";
-  }
-  if (kind === "CHEMICAL_PURCHASE") {
-    return "Produit de traitement: site, produit, quantité, prix unitaire, fournisseur et facture.";
-  }
-  if (kind === "ENERGY_PAYMENT") {
-    return "Énergie: site, source énergie, quantité, prix unitaire, fournisseur et facture.";
-  }
-  if (kind === "MAINTENANCE_EXPENSE") {
-    return "Maintenance: site, équipement, type de maintenance, prestataire, facture et montant.";
-  }
-  if (kind === "QUALITY_TEST_EXPENSE") {
-    return "Analyse qualité: site, référence analyse, résultat qualité, laboratoire et montant.";
-  }
-  if (kind === "NETWORK_REPAIR") {
-    return "Réparation réseau: zone, équipement ou conduite, incident, prestataire, facture et montant.";
-  }
-  return "Paiement fournisseur: site, zone, fournisseur, facture, montant et référence paiement.";
+  return "Dépense courante: choisissez la catégorie, précisez si besoin, puis saisissez le montant.";
 }
 
 function getAgencyFormModeLabel(kind: AgencyOperationKind): string {
@@ -3383,10 +2918,12 @@ function buildDefaultAccountForm(
 function buildDefaultArticleForm(): {
   name: string;
   defaultMargin: string;
+  defaultPurchaseUnitPrice: string;
 } {
   return {
     name: "",
-    defaultMargin: ""
+    defaultMargin: "",
+    defaultPurchaseUnitPrice: ""
   };
 }
 
@@ -3420,6 +2957,32 @@ function buildDefaultTenantForm(): {
     monthlyRent: "",
     phone: "",
     tenancyStart: currentMonthInputValue()
+  };
+}
+
+function buildDefaultShopForm(): {
+  name: string;
+  location: string;
+  phone: string;
+} {
+  return {
+    name: "",
+    location: "",
+    phone: ""
+  };
+}
+
+function buildDefaultProjectForm(): {
+  name: string;
+  clientRef: string;
+  contractRef: string;
+  location: string;
+} {
+  return {
+    name: "",
+    clientRef: "",
+    contractRef: "",
+    location: ""
   };
 }
 
@@ -3479,6 +3042,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [articles, setArticles] = useState<ActivityArticle[]>([]);
   const [hardwareCustomArticleMode, setHardwareCustomArticleMode] = useState(false);
+  const [showGeneralExpenseCalculator, setShowGeneralExpenseCalculator] = useState(false);
   const [articleForm, setArticleForm] = useState(buildDefaultArticleForm());
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
@@ -3488,6 +3052,16 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
   const [busyTenantId, setBusyTenantId] = useState<string | null>(null);
   const [tenantPendingDelete, setTenantPendingDelete] = useState<RentalTenant | null>(null);
+  const [shops, setShops] = useState<GeneralStoreShop[]>([]);
+  const [shopForm, setShopForm] = useState(buildDefaultShopForm());
+  const [editingShopId, setEditingShopId] = useState<string | null>(null);
+  const [busyShopId, setBusyShopId] = useState<string | null>(null);
+  const [shopPendingDelete, setShopPendingDelete] = useState<GeneralStoreShop | null>(null);
+  const [projects, setProjects] = useState<BtpProject[]>([]);
+  const [projectForm, setProjectForm] = useState(buildDefaultProjectForm());
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
+  const [projectPendingDelete, setProjectPendingDelete] = useState<BtpProject | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
@@ -3520,6 +3094,18 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [user?.role]);
 
   const canManageTenants = useMemo(() => {
+    return (
+      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
+    );
+  }, [user?.role]);
+
+  const canManageShops = useMemo(() => {
+    return (
+      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
+    );
+  }, [user?.role]);
+
+  const canManageProjects = useMemo(() => {
     return (
       user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
     );
@@ -3617,7 +3203,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     : "GLOBAL";
   const storeOperationKind = selectedActivityCode === "GENERAL_STORE"
     ? getStoreOperationKind(transactionForm.type, transactionForm.metadata)
-    : "STORE_SALE";
+    : "ACHAT";
   const foodOperationKind = selectedActivityCode === "FOOD"
     ? getFoodOperationKind(transactionForm.type, transactionForm.metadata)
     : "PRODUCT_SALE";
@@ -3635,7 +3221,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     : "ROOM_PAYMENT";
   const waterOperationKind = selectedActivityCode === "WATER"
     ? getWaterOperationKind(transactionForm.type, transactionForm.metadata)
-    : "WATER_BILLING";
+    : "WATER_SALE";
   const agencyOperationKind = selectedActivityCode === "REAL_ESTATE_AGENCY"
     ? getAgencyOperationKind(transactionForm.type, transactionForm.metadata)
     : "SALE_COMMISSION";
@@ -3730,22 +3316,38 @@ export function FinanceTransactionsPage(): JSX.Element {
     setTenantForm(buildDefaultTenantForm());
   }, []);
 
+  const resetShopForm = useCallback(() => {
+    setEditingShopId(null);
+    setShopForm(buildDefaultShopForm());
+  }, []);
+
+  const resetProjectForm = useCallback(() => {
+    setEditingProjectId(null);
+    setProjectForm(buildDefaultProjectForm());
+  }, []);
+
   const resetTransactionForm = useCallback(() => {
     setEditingTransactionId(null);
     setTransactionProofFile(null);
     const defaultMetadata = syncMetadataState({}, financeMetadataFields);
-    setTransactionForm({
-      accountId: accounts[0]?.id ?? "",
+    setTransactionForm((prev) => ({
+      accountId: accounts.some((account) => account.id === prev.accountId)
+        ? prev.accountId
+        : accounts[0]?.id ?? "",
       type: getDefaultTransactionType(selectedActivityCode),
       amount: "",
-      currency: allowedCurrencies[0] ?? "XOF",
+      currency: allowedCurrencies.includes(prev.currency)
+        ? prev.currency
+        : allowedCurrencies[0] ?? "XOF",
       description: "",
       metadata:
         selectedActivityCode === "HARDWARE"
           ? { ...defaultMetadata, [HARDWARE_OPERATION_KIND_KEY]: "ITEM_ENTRY" }
           : defaultMetadata,
-      occurredAt: ""
-    });
+      // Kept from the previous entry so entering many lines from the same paper
+      // ledger (same day, same account) doesn't require reselecting them each time.
+      occurredAt: prev.occurredAt
+    }));
   }, [accounts, allowedCurrencies, financeMetadataFields, selectedActivityCode]);
 
   const canManageAccount = useCallback(
@@ -3964,6 +3566,44 @@ export function FinanceTransactionsPage(): JSX.Element {
   useEffect(() => {
     void loadTenants();
   }, [loadTenants]);
+
+  const loadShops = useCallback(async () => {
+    if (selectedActivityCode !== "GENERAL_STORE") {
+      setShops([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        listGeneralStoreShopsRequest(accessToken)
+      );
+      setShops(payload.items);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadShops();
+  }, [loadShops]);
+
+  const loadProjects = useCallback(async () => {
+    if (selectedActivityCode !== "BTP") {
+      setProjects([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        listBtpProjectsRequest(accessToken)
+      );
+      setProjects(payload.items);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
 
   async function handleLoadMoreTransactions(): Promise<void> {
     if (isLoading || isLoadingMoreTransactions || !hasMoreTransactions) {
@@ -4195,6 +3835,9 @@ export function FinanceTransactionsPage(): JSX.Element {
         name: articleForm.name.trim(),
         defaultMargin: articleForm.defaultMargin.trim()
           ? normalizeAmountForApi(articleForm.defaultMargin)
+          : undefined,
+        defaultPurchaseUnitPrice: articleForm.defaultPurchaseUnitPrice.trim()
+          ? normalizeAmountForApi(articleForm.defaultPurchaseUnitPrice)
           : undefined
       };
 
@@ -4217,7 +3860,10 @@ export function FinanceTransactionsPage(): JSX.Element {
     setEditingArticleId(article.id);
     setArticleForm({
       name: article.name,
-      defaultMargin: article.defaultMargin ? formatAmountForInput(article.defaultMargin) : ""
+      defaultMargin: article.defaultMargin ? formatAmountForInput(article.defaultMargin) : "",
+      defaultPurchaseUnitPrice: article.defaultPurchaseUnitPrice
+        ? formatAmountForInput(article.defaultPurchaseUnitPrice)
+        : ""
     });
   }
 
@@ -4328,6 +3974,148 @@ export function FinanceTransactionsPage(): JSX.Element {
       setErrorMessage(toErrorMessage(error));
     } finally {
       setBusyTenantId(null);
+    }
+  }
+
+  async function handleSaveShop(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload = {
+        name: shopForm.name.trim(),
+        location: shopForm.location.trim() ? shopForm.location.trim() : undefined,
+        phone: shopForm.phone.trim() ? shopForm.phone.trim() : undefined
+      };
+
+      await withAuthorizedToken((accessToken) =>
+        editingShopId
+          ? updateGeneralStoreShopRequest(accessToken, editingShopId, payload)
+          : createGeneralStoreShopRequest(accessToken, payload)
+      );
+      setSuccessMessage(editingShopId ? "Boutique modifiée." : "Boutique ajoutée.");
+      resetShopForm();
+      await loadShops();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  function handleStartEditShop(shop: GeneralStoreShop): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingShopId(shop.id);
+    setShopForm({
+      name: shop.name,
+      location: shop.location ?? "",
+      phone: shop.phone ?? ""
+    });
+  }
+
+  function handleCancelEditShop(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    resetShopForm();
+  }
+
+  function handleDeleteShop(shop: GeneralStoreShop): void {
+    setShopPendingDelete(shop);
+  }
+
+  async function handleConfirmDeleteShop(): Promise<void> {
+    if (!shopPendingDelete) {
+      return;
+    }
+
+    const shop = shopPendingDelete;
+    setBusyShopId(shop.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteGeneralStoreShopRequest(accessToken, shop.id));
+      if (editingShopId === shop.id) {
+        resetShopForm();
+      }
+      setSuccessMessage("Boutique supprimée.");
+      setShopPendingDelete(null);
+      await loadShops();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyShopId(null);
+    }
+  }
+
+  async function handleSaveProject(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload = {
+        name: projectForm.name.trim(),
+        clientRef: projectForm.clientRef.trim() ? projectForm.clientRef.trim() : undefined,
+        contractRef: projectForm.contractRef.trim() ? projectForm.contractRef.trim() : undefined,
+        location: projectForm.location.trim() ? projectForm.location.trim() : undefined
+      };
+
+      await withAuthorizedToken((accessToken) =>
+        editingProjectId
+          ? updateBtpProjectRequest(accessToken, editingProjectId, payload)
+          : createBtpProjectRequest(accessToken, payload)
+      );
+      setSuccessMessage(editingProjectId ? "Chantier modifié." : "Chantier ajouté.");
+      resetProjectForm();
+      await loadProjects();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }
+
+  function handleStartEditProject(project: BtpProject): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingProjectId(project.id);
+    setProjectForm({
+      name: project.name,
+      clientRef: project.clientRef ?? "",
+      contractRef: project.contractRef ?? "",
+      location: project.location ?? ""
+    });
+  }
+
+  function handleCancelEditProject(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    resetProjectForm();
+  }
+
+  function handleDeleteProject(project: BtpProject): void {
+    setProjectPendingDelete(project);
+  }
+
+  async function handleConfirmDeleteProject(): Promise<void> {
+    if (!projectPendingDelete) {
+      return;
+    }
+
+    const project = projectPendingDelete;
+    setBusyProjectId(project.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteBtpProjectRequest(accessToken, project.id));
+      if (editingProjectId === project.id) {
+        resetProjectForm();
+      }
+      setSuccessMessage("Chantier supprimé.");
+      setProjectPendingDelete(null);
+      await loadProjects();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyProjectId(null);
     }
   }
 
@@ -4880,6 +4668,30 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
               <label className="operations-inline-group">
+                <span>Prix d'achat de référence</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Optionnel, ex: 5000"
+                  value={articleForm.defaultPurchaseUnitPrice}
+                  onChange={(event) =>
+                    setArticleForm((prev) => ({
+                      ...prev,
+                      defaultPurchaseUnitPrice: formatAmountForInput(event.target.value)
+                    }))
+                  }
+                  onBlur={() =>
+                    setArticleForm((prev) => ({
+                      ...prev,
+                      defaultPurchaseUnitPrice: formatAmountForInput(prev.defaultPurchaseUnitPrice)
+                    }))
+                  }
+                />
+                <small className="hint">
+                  Pré-remplit le prix d'achat quand cet article est choisi dans une opération.
+                </small>
+              </label>
+              <label className="operations-inline-group">
                 <span>Bénéfice de référence</span>
                 <input
                   type="text"
@@ -4918,6 +4730,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                   return (
                     <article key={article.id} className="operations-member-card">
                       <h4>{article.name}</h4>
+                      <p className="hint">
+                        Prix d'achat de référence:{" "}
+                        {article.defaultPurchaseUnitPrice
+                          ? formatAmountForDisplay(article.defaultPurchaseUnitPrice)
+                          : "Non défini"}
+                      </p>
                       <p className="hint">
                         Bénéfice de référence:{" "}
                         {article.defaultMargin ? formatAmountForDisplay(article.defaultMargin) : "Non défini"}
@@ -5098,6 +4916,229 @@ export function FinanceTransactionsPage(): JSX.Element {
         </section>
       ) : null}
 
+      {selectedActivityCode === "GENERAL_STORE" && canManageShops ? (
+        <section className="panel finance-page-panel">
+          <details className="finance-section-toggle">
+            <summary className="finance-section-summary">
+              <span>{editingShopId ? "Modifier une boutique" : "Gérer mes boutiques"}</span>
+              <small>
+                {editingShopId
+                  ? "Modification d'une boutique enregistrée."
+                  : "Ajoutez les boutiques ou magasins livrés pour les retrouver en sélection lors des achats et recouvrements."}
+              </small>
+            </summary>
+            <form className="finance-account-form" onSubmit={handleSaveShop}>
+              <label className="operations-inline-group">
+                <span>Nom de la boutique</span>
+                <input
+                  type="text"
+                  placeholder="Ex: Boutique Nord"
+                  value={shopForm.name}
+                  onChange={(event) =>
+                    setShopForm((prev) => ({
+                      ...prev,
+                      name: event.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Emplacement</span>
+                <input
+                  type="text"
+                  placeholder="Optionnel, ex: Marché central"
+                  value={shopForm.location}
+                  onChange={(event) =>
+                    setShopForm((prev) => ({
+                      ...prev,
+                      location: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Téléphone</span>
+                <input
+                  type="text"
+                  placeholder="Optionnel"
+                  value={shopForm.phone}
+                  onChange={(event) =>
+                    setShopForm((prev) => ({
+                      ...prev,
+                      phone: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <div className="mobile-sticky-form-actions">
+                <button type="submit">
+                  {editingShopId ? "Enregistrer les modifications" : "Ajouter la boutique"}
+                </button>
+                {editingShopId ? (
+                  <button type="button" className="secondary-btn" onClick={handleCancelEditShop}>
+                    Annuler la modification
+                  </button>
+                ) : null}
+              </div>
+            </form>
+            {shops.length > 0 ? (
+              <div className="operations-member-grid">
+                {shops.map((shop) => {
+                  const isBusy = busyShopId === shop.id;
+                  return (
+                    <article key={shop.id} className="operations-member-card">
+                      <h4>{shop.name}</h4>
+                      {shop.location ? <p className="hint">{shop.location}</p> : null}
+                      {shop.phone ? <p className="hint">Tél: {shop.phone}</p> : null}
+                      <div className="actions-inline">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => handleStartEditShop(shop)}
+                          disabled={isBusy}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          onClick={() => handleDeleteShop(shop)}
+                          disabled={isBusy}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="hint">Aucune boutique enregistrée pour le moment.</p>
+            )}
+          </details>
+        </section>
+      ) : null}
+
+      {selectedActivityCode === "BTP" && canManageProjects ? (
+        <section className="panel finance-page-panel">
+          <details className="finance-section-toggle">
+            <summary className="finance-section-summary">
+              <span>{editingProjectId ? "Modifier un chantier" : "Gérer mes chantiers"}</span>
+              <small>
+                {editingProjectId
+                  ? "Modification d'un chantier enregistré."
+                  : "Ajoutez vos chantiers (client, marché, lieu) pour les retrouver en sélection lors des opérations."}
+              </small>
+            </summary>
+            <form className="finance-account-form" onSubmit={handleSaveProject}>
+              <label className="operations-inline-group">
+                <span>Nom du chantier</span>
+                <input
+                  type="text"
+                  placeholder="Ex: Chantier Kalaban"
+                  value={projectForm.name}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      name: event.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Client / maitre d'ouvrage</span>
+                <input
+                  type="text"
+                  placeholder="Optionnel"
+                  value={projectForm.clientRef}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      clientRef: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Marché / devis</span>
+                <input
+                  type="text"
+                  placeholder="Optionnel, ex: DEV-2026-10"
+                  value={projectForm.contractRef}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      contractRef: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label className="operations-inline-group">
+                <span>Localisation</span>
+                <input
+                  type="text"
+                  placeholder="Optionnel, ex: Kalaban"
+                  value={projectForm.location}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      location: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <div className="mobile-sticky-form-actions">
+                <button type="submit">
+                  {editingProjectId ? "Enregistrer les modifications" : "Ajouter le chantier"}
+                </button>
+                {editingProjectId ? (
+                  <button type="button" className="secondary-btn" onClick={handleCancelEditProject}>
+                    Annuler la modification
+                  </button>
+                ) : null}
+              </div>
+            </form>
+            {projects.length > 0 ? (
+              <div className="operations-member-grid">
+                {projects.map((project) => {
+                  const isBusy = busyProjectId === project.id;
+                  return (
+                    <article key={project.id} className="operations-member-card">
+                      <h4>{project.name}</h4>
+                      {project.clientRef ? <p className="hint">Client: {project.clientRef}</p> : null}
+                      {project.contractRef ? <p className="hint">Marché: {project.contractRef}</p> : null}
+                      {project.location ? <p className="hint">{project.location}</p> : null}
+                      <div className="actions-inline">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => handleStartEditProject(project)}
+                          disabled={isBusy}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          onClick={() => handleDeleteProject(project)}
+                          disabled={isBusy}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="hint">Aucun chantier enregistré pour le moment.</p>
+            )}
+          </details>
+        </section>
+      ) : null}
+
       {canManageSalaries ? (
         <section className="panel finance-page-panel">
           <div className="dashboard-panel-header">
@@ -5205,7 +5246,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                   <select
                     value={storeOperationKind}
                     onChange={(event) => {
-                      const nextKind = event.target.value as StoreOperationKind;
+                      const nextValue = event.target.value;
+                      if (nextValue === "INVENTAIRE") {
+                        navigate("/operations/tasks");
+                        return;
+                      }
+                      const nextKind = nextValue as StoreOperationKind;
                       setTransactionForm((prev) => {
                         const nextType = getStoreOperationType(nextKind);
                         const nextMetadata = cleanSectorFinanceMetadata(
@@ -5216,25 +5262,22 @@ export function FinanceTransactionsPage(): JSX.Element {
                             [STORE_OPERATION_KIND_KEY]: nextKind
                           }
                         );
-                        const derivedAmount = deriveStoreAmount(nextKind, nextMetadata);
                         return {
                           ...prev,
                           type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
                           metadata: nextMetadata
                         };
                       });
                     }}
                   >
-                    <option value="STORE_SALE">{STORE_OPERATION_LABELS.STORE_SALE}</option>
-                    <option value="STOCK_PURCHASE">{STORE_OPERATION_LABELS.STOCK_PURCHASE}</option>
-                    <option value="SUPPLIER_PAYMENT">{STORE_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
-                    <option value="CUSTOMER_RETURN">{STORE_OPERATION_LABELS.CUSTOMER_RETURN}</option>
-                    <option value="DISCOUNT_ADJUSTMENT">{STORE_OPERATION_LABELS.DISCOUNT_ADJUSTMENT}</option>
-                    <option value="INVENTORY_ADJUSTMENT">{STORE_OPERATION_LABELS.INVENTORY_ADJUSTMENT}</option>
-                    <option value="INTERNAL_TRANSFER">{STORE_OPERATION_LABELS.INTERNAL_TRANSFER}</option>
-                    <option value="STORE_EXPENSE">{STORE_OPERATION_LABELS.STORE_EXPENSE}</option>
+                    <option value="ACHAT">{STORE_OPERATION_LABELS.ACHAT}</option>
+                    <option value="RECOUVREMENT">{STORE_OPERATION_LABELS.RECOUVREMENT}</option>
+                    <option value="INVENTAIRE">Inventaire (vers Tâches)</option>
                   </select>
+                  <small className="hint">
+                    L'inventaire n'est pas un mouvement de caisse: le choisir ouvre la page Tâches
+                    pour déclarer le stock restant d'une boutique.
+                  </small>
                 </label>
 
                 <div className="operations-inline-group">
@@ -5566,7 +5609,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             ) : selectedActivityCode === "WATER" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Opération eau potable</span>
+                  <span>Catégorie</span>
                   <select
                     value={waterOperationKind}
                     onChange={(event) => {
@@ -5591,23 +5634,27 @@ export function FinanceTransactionsPage(): JSX.Element {
                       });
                     }}
                   >
-                    <option value="WATER_BILLING">{WATER_OPERATION_LABELS.WATER_BILLING}</option>
-                    <option value="BULK_WATER_SALE">{WATER_OPERATION_LABELS.BULK_WATER_SALE}</option>
-                    <option value="CONNECTION_FEE">{WATER_OPERATION_LABELS.CONNECTION_FEE}</option>
-                    <option value="SUBSIDY_INCOME">{WATER_OPERATION_LABELS.SUBSIDY_INCOME}</option>
-                    <option value="CHEMICAL_PURCHASE">{WATER_OPERATION_LABELS.CHEMICAL_PURCHASE}</option>
-                    <option value="ENERGY_PAYMENT">{WATER_OPERATION_LABELS.ENERGY_PAYMENT}</option>
-                    <option value="MAINTENANCE_EXPENSE">{WATER_OPERATION_LABELS.MAINTENANCE_EXPENSE}</option>
-                    <option value="QUALITY_TEST_EXPENSE">{WATER_OPERATION_LABELS.QUALITY_TEST_EXPENSE}</option>
-                    <option value="NETWORK_REPAIR">{WATER_OPERATION_LABELS.NETWORK_REPAIR}</option>
-                    <option value="SUPPLIER_PAYMENT">{WATER_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
+                    <optgroup label="Ventes">
+                      {WATER_INCOME_KINDS.map((kind) => (
+                        <option key={kind} value={kind}>
+                          {WATER_OPERATION_LABELS[kind]}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Dépenses">
+                      {WATER_EXPENSE_KINDS.map((kind) => (
+                        <option key={kind} value={kind}>
+                          {WATER_OPERATION_LABELS[kind]}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </label>
 
                 <div className="operations-inline-group">
                   <span>Flux financier</span>
                   <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette eau" : "Dépense exploitation eau"}
+                    {transactionForm.type === "CASH_IN" ? "Recette eau" : "Dépense eau"}
                   </strong>
                 </div>
               </>
@@ -5751,36 +5798,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             ) : selectedActivityCode === "GENERAL_EXPENSES" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Dépense de</span>
-                  <select
-                    value={generalExpenseOwner}
-                    onChange={(event) => {
-                      const nextOwner = event.target.value as GeneralExpenseOwner;
-                      const nextKind = getGeneralExpenseKindsForOwner(nextOwner)[0];
-                      setTransactionForm((prev) => {
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          "CASH_OUT",
-                          {
-                            ...prev.metadata,
-                            [GENERAL_EXPENSE_KIND_KEY]: nextKind
-                          }
-                        );
-                        return {
-                          ...prev,
-                          type: "CASH_OUT",
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="EMPLOYE">Employé</option>
-                    <option value="PDG">PDG</option>
-                  </select>
-                </label>
-
-                <label className="operations-inline-group">
-                  <span>Catégorie</span>
+                  <span>Catégorie de dépense</span>
                   <select
                     value={generalExpenseKind}
                     onChange={(event) => {
@@ -5802,18 +5820,22 @@ export function FinanceTransactionsPage(): JSX.Element {
                       });
                     }}
                   >
-                    {getGeneralExpenseKindsForOwner(generalExpenseOwner).map((kind) => (
-                      <option key={kind} value={kind}>
-                        {GENERAL_EXPENSE_KIND_LABELS[kind]}
-                      </option>
-                    ))}
+                    <optgroup label="PDG">
+                      {GENERAL_EXPENSE_PDG_KINDS.map((kind) => (
+                        <option key={kind} value={kind}>
+                          {GENERAL_EXPENSE_KIND_LABELS[kind]}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Employé">
+                      {GENERAL_EXPENSE_EMPLOYEE_KINDS.map((kind) => (
+                        <option key={kind} value={kind}>
+                          {GENERAL_EXPENSE_KIND_LABELS[kind]}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>Dépense</strong>
-                </div>
               </>
             ) : (
               <label className="operations-inline-group">
@@ -5886,29 +5908,33 @@ export function FinanceTransactionsPage(): JSX.Element {
             </span>
           </div>
 
-          <fieldset className="finance-transaction-form-section finance-proof-callout">
-            <legend>Justificatif</legend>
-            <div className="finance-proof-callout-copy">
-              <strong>Ajouter la preuve maintenant</strong>
-              <p className="hint">
-                Le fichier sera envoyé automatiquement après l'enregistrement de la transaction.
-                Formats acceptés: PDF, JPG ou PNG.
-              </p>
-            </div>
-            <label className="finance-proof-upload" htmlFor="transaction-proof-file">
-              <span>Fichier de preuve</span>
-              <input
-                key={`${transactionProofFile?.name ?? "empty"}-${transactionProofFile?.size ?? 0}`}
-                id="transaction-proof-file"
-                type="file"
-                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                onChange={(event) => setTransactionProofFile(event.target.files?.[0] ?? null)}
-                disabled={isSavingTransaction}
-              />
-            </label>
-            <div className="finance-proof-selected">
+          <details
+            className="finance-transaction-form-options finance-proof-callout"
+            open={Boolean(transactionProofFile)}
+          >
+            <summary>
+              {transactionProofFile ? `Justificatif · ${transactionProofFile.name}` : "Justificatif (optionnel)"}
+            </summary>
+            <div className="finance-transaction-form-options-body">
+              <div className="finance-proof-callout-copy">
+                <p className="hint">
+                  Le fichier sera envoyé automatiquement après l'enregistrement de la transaction.
+                  Formats acceptés: PDF, JPG ou PNG.
+                </p>
+              </div>
+              <label className="finance-proof-upload" htmlFor="transaction-proof-file">
+                <span>Fichier de preuve</span>
+                <input
+                  key={`${transactionProofFile?.name ?? "empty"}-${transactionProofFile?.size ?? 0}`}
+                  id="transaction-proof-file"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                  onChange={(event) => setTransactionProofFile(event.target.files?.[0] ?? null)}
+                  disabled={isSavingTransaction}
+                />
+              </label>
               {transactionProofFile ? (
-                <>
+                <div className="finance-proof-selected">
                   <strong>{transactionProofFile.name}</strong>
                   <span>{formatFileSize(transactionProofFile.size)}</span>
                   <button
@@ -5919,12 +5945,10 @@ export function FinanceTransactionsPage(): JSX.Element {
                   >
                     Retirer
                   </button>
-                </>
-              ) : (
-                <span>Aucun fichier sélectionné.</span>
-              )}
+                </div>
+              ) : null}
             </div>
-          </fieldset>
+          </details>
 
           <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails}>
             <summary>Informations complémentaires</summary>
@@ -6022,7 +6046,27 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
 
+              {selectedActivityCode === "GENERAL_EXPENSES" ? (
+                <button
+                  type="button"
+                  className="secondary-btn general-expense-calculator-toggle"
+                  onClick={() => setShowGeneralExpenseCalculator((prev) => !prev)}
+                >
+                  {showGeneralExpenseCalculator
+                    ? "Saisir le montant directement"
+                    : "Calculer le montant (quantité × prix unitaire)"}
+                </button>
+              ) : null}
+
               {visibleFinanceMetadataFields.map((field) => {
+                if (
+                  selectedActivityCode === "GENERAL_EXPENSES" &&
+                  !showGeneralExpenseCalculator &&
+                  (field.key === "quantity" || field.key === "unitPrice")
+                ) {
+                  return null;
+                }
+
                 if (selectedActivityCode === "RENTAL" && field.key === "tenantRef") {
                   const tenantNameValue = transactionForm.metadata.tenantRef ?? "";
                   const selectedTenantId =
@@ -6075,6 +6119,121 @@ export function FinanceTransactionsPage(): JSX.Element {
                   );
                 }
 
+                if (selectedActivityCode === "GENERAL_STORE" && field.key === "shopRef") {
+                  const shopNameValue = transactionForm.metadata.shopRef ?? "";
+                  const selectedShopId = shops.find((shop) => shop.name === shopNameValue)?.id ?? "";
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select
+                        value={selectedShopId}
+                        onChange={(event) => {
+                          const nextShopId = event.target.value;
+                          const selectedShop = shops.find((shop) => shop.id === nextShopId);
+                          setTransactionForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              shopRef: selectedShop?.name ?? ""
+                            }
+                          }));
+                        }}
+                        required={field.required}
+                      >
+                        <option value="">-- Choisir une boutique --</option>
+                        {shops.map((shop) => (
+                          <option key={shop.id} value={shop.id}>
+                            {shop.name}
+                            {shop.location ? ` — ${shop.location}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {shops.length === 0 ? (
+                        <small className="hint">
+                          Aucune boutique enregistrée. Ajoutez-en une dans "Gérer mes boutiques"
+                          ci-dessus.
+                        </small>
+                      ) : null}
+                    </label>
+                  );
+                }
+
+                if (selectedActivityCode === "BTP" && field.key === "projectRef") {
+                  const projectNameValue = transactionForm.metadata.projectRef ?? "";
+                  const selectedProjectId =
+                    projects.find((project) => project.name === projectNameValue)?.id ?? "";
+                  const selectedProject = projects.find((project) => project.name === projectNameValue);
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select
+                        value={selectedProjectId}
+                        onChange={(event) => {
+                          const nextProjectId = event.target.value;
+                          const selectedProjectOption = projects.find(
+                            (project) => project.id === nextProjectId
+                          );
+                          setTransactionForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              projectRef: selectedProjectOption?.name ?? ""
+                            }
+                          }));
+                        }}
+                        required={field.required}
+                      >
+                        <option value="">-- Choisir un chantier --</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                      {projects.length === 0 ? (
+                        <small className="hint">
+                          Aucun chantier enregistré. Ajoutez-en un dans "Gérer mes chantiers"
+                          ci-dessus.
+                        </small>
+                      ) : selectedProject ? (
+                        <small className="hint">
+                          {selectedProject.clientRef ? `Client: ${selectedProject.clientRef}` : ""}
+                          {selectedProject.contractRef ? ` | Marché: ${selectedProject.contractRef}` : ""}
+                          {selectedProject.location ? ` | Lieu: ${selectedProject.location}` : ""}
+                        </small>
+                      ) : null}
+                    </label>
+                  );
+                }
+
+                if (selectedActivityCode === "BTP" && field.key === "workPackage") {
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select
+                        value={transactionForm.metadata.workPackage ?? ""}
+                        onChange={(event) =>
+                          setTransactionForm((prev) => ({
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata,
+                              workPackage: event.target.value
+                            }
+                          }))
+                        }
+                        required={field.required}
+                      >
+                        <option value="">-- Choisir un lot --</option>
+                        {BTP_WORK_PACKAGE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                }
+
                 if (selectedActivityCode === "RENTAL" && field.key === "unitLabel") {
                   return (
                     <label key={field.key} className="operations-inline-group">
@@ -6115,20 +6274,40 @@ export function FinanceTransactionsPage(): JSX.Element {
                           }
                           setHardwareCustomArticleMode(false);
                           setTransactionForm((prev) => {
+                            const selectedArticle = articles.find(
+                              (article) => article.name === nextValue
+                            );
+                            const unitPricePatch = deriveHardwareArticleUnitPricePatch(
+                              hardwareOperationKind,
+                              selectedArticle
+                            );
                             const nextMetadata = {
                               ...prev.metadata,
-                              itemName: nextValue
+                              itemName: nextValue,
+                              ...(unitPricePatch.purchaseUnitPrice
+                                ? { purchaseUnitPrice: formatAmountForInput(unitPricePatch.purchaseUnitPrice) }
+                                : {}),
+                              ...(unitPricePatch.saleUnitPrice
+                                ? { saleUnitPrice: formatAmountForInput(unitPricePatch.saleUnitPrice) }
+                                : {})
                             };
                             const derivedMargin = deriveHardwareMarginAmount(
                               hardwareOperationKind,
                               nextMetadata,
                               articles
                             );
+                            const metadataWithMargin = derivedMargin
+                              ? { ...nextMetadata, marginAmount: formatAmountForInput(derivedMargin) }
+                              : nextMetadata;
+                            const derivedAmount = deriveSectorAmount(
+                              "HARDWARE",
+                              prev.type,
+                              metadataWithMargin
+                            );
                             return {
                               ...prev,
-                              metadata: derivedMargin
-                                ? { ...nextMetadata, marginAmount: formatAmountForInput(derivedMargin) }
-                                : nextMetadata
+                              amount: derivedAmount ? formatAmountForInput(derivedAmount) : prev.amount,
+                              metadata: metadataWithMargin
                             };
                           });
                         }}
@@ -6183,7 +6362,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                         };
                         const shouldDeriveAmount =
                           (selectedActivityCode === "HARDWARE" && shouldDeriveHardwareAmount(field.key)) ||
-                          (selectedActivityCode === "GENERAL_STORE" && shouldDeriveStoreAmount(field.key)) ||
                           (selectedActivityCode === "FOOD" && shouldDeriveFoodAmount(field.key)) ||
                           (selectedActivityCode === "AGRICULTURE" && shouldDeriveAgricultureAmount(field.key)) ||
                           (selectedActivityCode === "BTP" && shouldDeriveBtpAmount(field.key)) ||
@@ -6796,6 +6974,40 @@ export function FinanceTransactionsPage(): JSX.Element {
           setTenantPendingDelete(null);
         }}
         onConfirm={() => void handleConfirmDeleteTenant()}
+      />
+
+      <ConfirmDialog
+        open={shopPendingDelete !== null}
+        title="Confirmer la suppression de la boutique"
+        description="Cette action retire la boutique de la liste de sélection du formulaire."
+        objectLabel="Boutique concernée"
+        objectName={shopPendingDelete?.name ?? ""}
+        impactText="Les opérations déjà enregistrées pour cette boutique ne sont pas modifiées."
+        isConfirming={busyShopId === shopPendingDelete?.id}
+        onCancel={() => {
+          if (busyShopId) {
+            return;
+          }
+          setShopPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteShop()}
+      />
+
+      <ConfirmDialog
+        open={projectPendingDelete !== null}
+        title="Confirmer la suppression du chantier"
+        description="Cette action retire le chantier de la liste de sélection du formulaire."
+        objectLabel="Chantier concerné"
+        objectName={projectPendingDelete?.name ?? ""}
+        impactText="Les opérations déjà enregistrées pour ce chantier ne sont pas modifiées."
+        isConfirming={busyProjectId === projectPendingDelete?.id}
+        onCancel={() => {
+          if (busyProjectId) {
+            return;
+          }
+          setProjectPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteProject()}
       />
 
       <ConfirmDialog

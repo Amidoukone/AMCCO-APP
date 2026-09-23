@@ -6,6 +6,7 @@ export type ActivityArticle = {
   activityCode: BusinessActivityCode;
   name: string;
   defaultMargin: string | null;
+  defaultPurchaseUnitPrice: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -215,7 +215,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   GENERAL_STORE: makeProfile("GENERAL_STORE", {
-    operationsModel: "Pilotage multi-rayons avec ventes caisse, achats stock, retours clients, remises, inventaires, transferts internes, fournisseurs et charges magasin.",
+    operationsModel: "Achat d'articles livrés à une boutique, recouvrement périodique auprès de cette boutique, et inventaire régulier du stock en boutique.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -223,43 +223,17 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       requiresProof: false,
       fields: [
         field("accountId", "Compte d'exploitation", true, "Caisse ou compte utilisé."),
-        field("amount", "Montant", true, "Montant de l'opération."),
-        field("description", "Contexte", false, "Rayon, famille produit ou fournisseur.")
+        field("amount", "Montant", true, "Montant de la facture d'achat ou du recouvrement."),
+        field("description", "Note", false, "Précision utile sur l'opération.")
       ],
       metadataFields: [
-        field("storeOperationKind", "Type d'opération magasin", false, "Vente, achat stock, paiement fournisseur, retour client, remise, inventaire, transfert ou charge."),
-        field("department", "Rayon", false, "Rayon ou département commercial."),
-        field("productFamily", "Famille produit", false, "Famille de produits ou catégorie vendue."),
-        field("itemName", "Article", false, "Désignation de l'article ou produit."),
-        field("skuRef", "Référence article", false, "SKU, code article ou référence interne."),
-        field("barcode", "Code-barres", false, "Code-barres ou référence de caisse."),
-        field("shelfRef", "Rayon / emplacement", false, "Rayon physique, étagère, gondole ou réserve."),
-        field("registerRef", "Caisse", false, "Caisse ou point d'encaissement."),
-        field("cashierRef", "Caissier", false, "Caissier, vendeur ou agent de vente."),
-        field("quantity", "Quantité", false, "Quantité vendue, achetée ou transférée."),
-        field("returnQuantity", "Quantité retour", false, "Quantité retournée par le client."),
-        field("adjustmentQuantity", "Écart inventaire", false, "Quantité ajustée après inventaire."),
-        field("unit", "Unité", false, "Pièce, carton, paquet, mètre, litre ou autre unité."),
-        field("purchaseUnitPrice", "Prix achat unitaire", false, "Coût unitaire d'achat de l'article."),
-        field("saleUnitPrice", "Prix vente unitaire", false, "Prix unitaire de vente."),
-        field("discountAmount", "Montant remise", false, "Remise, geste commercial ou écart de caisse."),
-        field("returnAmount", "Montant retour", false, "Montant rembourse ou deduit au client."),
-        field("invoiceAmount", "Montant facture", false, "Montant facture ou charge magasin."),
-        field("supplierRef", "Fournisseur", false, "Fournisseur ou grossiste."),
-        field("customerRef", "Client", false, "Client, commande ou dossier retour."),
-        field("invoiceRef", "Référence facture", false, "Facture, bon de livraison ou reçu fournisseur."),
-        field("receiptRef", "Référence ticket", false, "Ticket de caisse, reçu ou référence vente."),
-        field("transferRef", "Référence transfert", false, "Référence de transfert interne ou mouvement stock."),
-        field("sourceStoreRef", "Magasin source", false, "Magasin, dépôt ou rayon d'origine."),
-        field("destinationStoreRef", "Magasin destination", false, "Magasin, dépôt ou rayon destination."),
-        field("expenseLabel", "Nature charge", false, "Loyer, nettoyage, transport, manutention, emballage ou autre charge."),
-        field("paymentRef", "Référence paiement", false, "Référence caisse, virement ou mobile money.")
+        field("storeOperationKind", "Type d'opération magasin", false, "Achat pour la boutique ou recouvrement auprès de la boutique."),
+        field("shopRef", "Boutique", true, "Boutique ou magasin concerné par l'opération.")
       ],
       workflow: [
-        workflow("CREATE", "Saisie magasin", "Chaque flux précise le rayon, l'article, la référence et le type d'opération."),
-        workflow("TRACE", "Traçabilité caisse et stock", "Tickets, factures, fournisseurs, clients, caisses et emplacements restent rattachés au flux."),
-        workflow("CONTROL", "Contrôle stock", "Les retours, remises, écarts inventaire et transferts sont isolés pour le suivi."),
-        workflow("REPORTING", "Rapport magasin", "Les ventes, achats, marges, charges et tâches consolident le rapport par rayon et article.")
+        workflow("CREATE", "Saisie magasin", "Le point de vente saisit l'achat livré à la boutique ou le recouvrement encaissé."),
+        workflow("PROOF_OPTIONAL", "Justificatif", "La photo du reçu ou de la facture peut être jointe quand elle est disponible."),
+        workflow("REPORTING", "Rapport magasin", "Les achats et recouvrements consolident la situation de chaque boutique.")
       ]
     },
     tasks: {
@@ -270,58 +244,52 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       blockedRequiresAssignee: false,
       blockedAlertSeverity: "WARNING",
       fields: [
-        field("title", "Action commerce", true, "Exemple: implantation, contrôle ou relance."),
-        field("description", "Périmètre", false, "Rayon, fournisseur ou opération concernée."),
-        field("assignedToId", "Responsable", false, "Responsable de rayon ou employé.")
+        field("title", "Action boutique", true, "Exemple: inventaire boutique."),
+        field("description", "Constat", false, "Écarts ou observations relevés à l'inventaire."),
+        field("dueDate", "Échéance", false, "Date prévue pour l'inventaire.")
       ],
       metadataFields: [
-        field("storeTaskKind", "Type d'action magasin", true, "Ouverture caisse, clôture caisse, inventaire, réassort, prix, fournisseur ou sécurité."),
-        field("department", "Rayon", false, "Rayon ou département commercial."),
-        field("productFamily", "Famille produit", false, "Famille de produits ou catégorie vendue."),
-        field("itemName", "Article", false, "Article ou produit concerné."),
-        field("skuRef", "Référence article", false, "SKU, code article ou référence interne."),
-        field("shelfRef", "Rayon / emplacement", false, "Rayon physique, étagère, gondole ou réserve."),
-        field("registerRef", "Caisse", false, "Caisse ou point d'encaissement."),
-        field("supplierRef", "Fournisseur", false, "Fournisseur ou grossiste concerné."),
-        field("issueRef", "Incident / anomalie", false, "Rupture, écart caisse, retour, casse, sécurité ou inventaire.")
+        field("shopRef", "Boutique", true, "Boutique ou magasin concerné par l'inventaire."),
+        field(
+          "remainingStockValue",
+          "Valeur du stock restant",
+          true,
+          "Valeur estimée des articles encore en boutique au moment du contrôle."
+        )
       ],
       workflow: [
-        workflow("PLAN", "Planification rayon", "Le superviseur affecte les actions par rayon, caisse ou article."),
-        workflow("EXECUTE", "Exécution magasin", "Réassort, inventaire, contrôle prix, caisse, fournisseur ou sécurité."),
-        workflow("BLOCK", "Blocage", "Un blocage signale rupture, écart caisse, anomalie stock ou validation en attente."),
-        workflow("CLOSE", "Clôture", "La tâche est fermée après vérification du rayon, de la caisse ou du stock.")
+        workflow("PLAN", "Planification", "Le superviseur planifie l'inventaire par boutique."),
+        workflow("EXECUTE", "Exécution", "L'employé compte le stock restant sur place et le déclare."),
+        workflow("CLOSE", "Clôture", "L'inventaire est clôturé une fois le stock restant déclaré.")
       ]
     },
     reporting: {
-      focusArea: "Performance multi-rayons, marge article, caisse et rotation stock",
-      exportSections: ["ventes caisse", "achats stock", "retours", "remises", "inventaire", "transferts", "fournisseurs", "charges magasin"],
+      focusArea: "Situation des boutiques: achats livrés, recouvrements et inventaires par boutique",
+      exportSections: ["achats boutique", "recouvrements", "inventaires", "situation boutiques"],
       operationalDimensions: [
-        dimension("department", "Rayon", "Compare rentabilité, suivi et exécution par rayon."),
-        dimension("productFamily", "Famille produit", "Analyse les volumes et blocages par famille de produits."),
-        dimension("itemName", "Article", "Suit ventes, achats, retours et marges par article."),
-        dimension("skuRef", "Référence article", "Contrôle les mouvements stock par référence.")
+        dimension("shopRef", "Boutique", "Suit les achats livrés, les recouvrements et le stock restant par boutique.")
       ],
       highlights: [
         {
           code: "store-volume",
-          label: "Flux consolidés",
-          description: "Nombre d'opérations financières consolidées sur le commerce général.",
+          label: "Flux de boutique tracés",
+          description: "Nombre de flux financiers rattachés aux boutiques.",
           metric: "transactionsCount",
           thresholds: { warningAt: 10 }
         },
         {
-          code: "pending-finance",
-          label: "Flux suivis",
-          description: "Opérations remontées dans le suivi financier du commerce général.",
-          metric: "submittedTransactionsCount",
-          thresholds: { warningAt: 2, criticalAt: 6 }
+          code: "open-store-actions",
+          label: "Inventaires ouverts",
+          description: "Inventaires boutique encore en cours.",
+          metric: "openTasksCount",
+          thresholds: { warningAt: 5, criticalAt: 10 }
         },
         {
-          code: "open-store-actions",
-          label: "Actions terrain ouvertes",
-          description: "Opérations magasin encore en cours ou à faire.",
-          metric: "openTasksCount",
-          thresholds: { warningAt: 6, criticalAt: 12 }
+          code: "blocked-store-actions",
+          label: "Inventaires bloqués",
+          description: "Anomalies d'inventaire non résolues.",
+          metric: "blockedTasksCount",
+          thresholds: { warningAt: 1, criticalAt: 3 }
         }
       ]
     }
@@ -607,24 +575,21 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   BTP: makeProfile("BTP", {
-    operationsModel: "Gestion de chantiers BTP avec suivi par chantier, contrat, client, lot de travaux, achats, main-d'oeuvre, engins, sous-traitance, avancement et réserves.",
+    operationsModel: "Gestion de chantiers BTP: chaque chantier est créé une fois (client, marché, lieu) puis sélectionné pour ses encaissements, achats, main-d'oeuvre, engins, sous-traitance et charges.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
-      requiresDescription: true,
+      requiresDescription: false,
       requiresProof: false,
       fields: [
         field("accountId", "Compte chantier", true, "Compte ou caisse du chantier."),
         field("amount", "Montant", true, "Montant de l'encaissement ou de la charge."),
-        field("description", "Chantier ou lot", true, "Chantier, devis, fournisseur, lot technique ou client concerné.")
+        field("description", "Note", false, "Précision utile sur l'opération.")
       ],
       metadataFields: [
         field("btpOperationKind", "Opération BTP", false, "CLIENT_PAYMENT, MATERIAL_PURCHASE, LABOR_PAYMENT, EQUIPMENT_RENTAL, SUBCONTRACTING ou SITE_EXPENSE."),
-        field("projectRef", "Référence chantier", true, "Nom, code ou référence du chantier."),
-        field("contractRef", "Référence marché/devis", false, "Numéro de devis, marché, bon de commande ou contrat."),
-        field("clientRef", "Client / maitre d'ouvrage", false, "Client, promoteur, maitre d'ouvrage ou beneficiaire."),
-        field("workPackage", "Lot de travaux", true, "Gros oeuvre, second oeuvre, terrassement, finition ou autre lot."),
-        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier."),
+        field("projectRef", "Chantier", true, "Chantier concerné, choisi dans la liste des chantiers."),
+        field("workPackage", "Lot de travaux", false, "Terrassement, fondation, gros oeuvre, second oeuvre, finition ou autre lot."),
         field("materialName", "Matériau / fourniture", false, "Ciment, fer, sable, gravier, plomberie, electricite ou autre fourniture."),
         field("quantity", "Quantité", false, "Quantité achetée, posee ou facturée."),
         field("unit", "Unité", false, "Sac, tonne, m3, m2, jour, heure, lot ou autre unité."),
@@ -643,7 +608,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("retentionAmount", "Retenue / garantie", false, "Retenue de garantie, réserve ou montant conservé.")
       ],
       workflow: [
-        workflow("CREATE", "Saisie chantier", "Le flux est saisi avec référence chantier et lot de travaux."),
+        workflow("CREATE", "Saisie chantier", "Le flux est saisi en choisissant le chantier dans la liste."),
         workflow("TRACE", "Suivi coûts", "Les recettes, achats, main-d'oeuvre, engins et sous-traitants restent reliés au chantier."),
         workflow("OVERVIEW", "Suivi global", "Les flux alimentent le tableau de bord et les rapports BTP.")
       ]
@@ -657,17 +622,14 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       blockedAlertSeverity: "WARNING",
       fields: [
         field("title", "Action chantier", true, "Exemple: coulage dalle, achat ciment ou contrôle qualité."),
-        field("description", "Détails chantier", true, "Chantier, lot, fournisseur ou équipe concernée."),
+        field("description", "Détails chantier", true, "Précision utile sur l'action à mener."),
         field("assignedToId", "Responsable chantier", true, "Conducteur de travaux ou responsable terrain."),
         field("dueDate", "Échéance", true, "Les actions chantier doivent être planifiées.")
       ],
       metadataFields: [
         field("btpTaskKind", "Type d'action BTP", true, "Préparation, terrassement, fondation, structure, second oeuvre, finition, contrôle, réserve ou réception."),
-        field("projectRef", "Référence chantier", true, "Nom, code ou référence du chantier."),
-        field("contractRef", "Référence marché/devis", false, "Numéro de devis, marché, bon de commande ou contrat."),
-        field("clientRef", "Client / maitre d'ouvrage", false, "Client, promoteur, maitre d'ouvrage ou beneficiaire."),
-        field("workPackage", "Lot de travaux", true, "Gros oeuvre, second oeuvre, terrassement, finition ou autre lot."),
-        field("siteLocation", "Localisation", false, "Quartier, ville ou zone du chantier."),
+        field("projectRef", "Chantier", true, "Chantier concerné, choisi dans la liste des chantiers."),
+        field("workPackage", "Lot de travaux", false, "Terrassement, fondation, gros oeuvre, second oeuvre, finition ou autre lot."),
         field("teamRef", "Equipe / corps de métier", false, "Equipe interne ou corps de métier responsable."),
         field("materialName", "Matériau / fourniture", false, "Matériau ou fourniture à contrôler, poser ou réceptionner."),
         field("progressPercent", "Avancement (%)", false, "Avancement constate pour l'action ou le lot."),
@@ -682,10 +644,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ]
     },
     reporting: {
-      focusArea: "Coûts, recettes, avancement, main-d'oeuvre, engins, sous-traitance et blocages par chantier",
-      exportSections: ["flux chantier", "lots de travaux", "achats matériaux", "main-d'oeuvre", "engins", "sous-traitance", "actions chantier", "blocages"],
+      focusArea: "Encaissements, coûts par nature et marge par chantier",
+      exportSections: ["situation chantiers", "achats matériaux", "main-d'oeuvre", "engins", "sous-traitance", "actions chantier"],
       operationalDimensions: [
-        dimension("projectRef", "Chantier", "Mesure rentabilité, avancement et alertes par chantier."),
+        dimension("projectRef", "Chantier", "Mesure encaissements, coûts et marge par chantier."),
         dimension("workPackage", "Lot de travaux", "Compare les coûts et l'exécution par lot de travaux."),
         dimension("teamRef", "Equipe / corps de métier", "Suit l'exécution et les blocages par équipe ou corps de métier."),
         dimension("supplierRef", "Fournisseur", "Suit les achats et dépenses par fournisseur chantier.")
@@ -1357,117 +1319,59 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   WATER: makeProfile("WATER", {
-    operationsModel: "Production d'eau potable avec suivi détaillé des stations, forages, zones réseau, volumes produits, volumes facturés, branchements, analyses qualité, énergie, produits de traitement, maintenance et réparations.",
+    operationsModel: "Vente de paquets d'eau au détail avec suivi des quantités vendues et des dépenses courantes de l'équipe de production, un site par entreprise.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF"],
-      requiresDescription: true,
+      requiresDescription: false,
       requiresProof: false,
       fields: [
-        field("accountId", "Compte exploitation eau", true, "Compte ou caisse du service d'eau."),
+        field("accountId", "Compte", true, "Caisse ou compte utilisé pour la vente ou la dépense."),
         field("amount", "Montant", true, "Montant de l'opération."),
-        field("description", "Site, réseau ou équipement", true, "Station, réseau, intervention ou équipement.")
+        field("description", "Précision", false, "Client, fournisseur ou précision utile.")
       ],
       metadataFields: [
-        field("waterOperationKind", "Type d'opération eau", false, "Facture eau, vente en gros, branchement, subvention, produits de traitement, énergie, maintenance, analyse qualité, réparation réseau ou fournisseur."),
-        field("facilityRef", "Référence site", true, "Station, forage ou réseau concerné."),
-        field("networkZone", "Zone réseau", false, "Secteur ou zone de distribution."),
-        field("productionLine", "Ligne exploitation", false, "Production, traitement, distribution, branchement, qualité ou maintenance."),
-        field("meterRef", "Compteur / point de comptage", false, "Compteur client, compteur production ou point de mesure."),
-        field("customerRef", "Abonne / client", false, "Abonne, client institutionnel ou acheteur en gros."),
-        field("billingPeriod", "Période facture", false, "Mois, cycle ou période de facturation."),
-        field("meterStart", "Index depart", false, "Index compteur en début de période."),
-        field("meterEnd", "Index fin", false, "Index compteur en fin de période."),
-        field("producedVolumeM3", "Volume produit m3", false, "Volume produit ou pompe sur la période."),
-        field("volumeM3", "Volume facture m3", false, "Volume facture, vendu ou distribue."),
-        field("unitPrice", "Prix unitaire", false, "Prix du m3, prix unitaire produit ou tarif applicable."),
-        field("connectionRef", "Référence branchement", false, "Dossier de nouveau branchement, extension ou raccordement."),
-        field("connectionFee", "Frais branchement", false, "Montant encaissé pour le raccordement."),
-        field("treatmentProduct", "Produit traitement", false, "Chlore, réactif, filtre, sel ou autre intrant de traitement."),
-        field("chemicalQuantity", "Quantité traitement", false, "Quantité de produit de traitement utilisée ou achetée."),
-        field("energySource", "Source énergie", false, "Électricité, carburant, solaire, groupe ou autre source."),
-        field("energyQuantity", "Quantité énergie", false, "KWh, litres ou unité consommée."),
-        field("equipmentRef", "Équipement", false, "Pompe, groupe, réservoir, conduite, vanne ou compteur."),
-        field("maintenanceType", "Type maintenance", false, "Préventif, curatif, pompe, réseau, compteur ou réservoir."),
-        field("testRef", "Référence analyse", false, "Référence analyse laboratoire ou contrôle terrain."),
-        field("waterQuality", "Qualité eau", false, "pH, chlore résiduel, turbidité, bactériologie ou observation."),
-        field("issueRef", "Incident / fuite", false, "Fuite, rupture, baisse pression, panne ou réclamation."),
-        field("supplierRef", "Fournisseur / prestataire", false, "Fournisseur, laboratoire, technicien ou prestataire."),
-        field("invoiceRef", "Référence facture", false, "Facture fournisseur, facture client ou pièce justificative."),
-        field("invoiceAmount", "Montant facture", false, "Montant facture fournisseur ou charge rattachée."),
-        field("paymentRef", "Référence paiement", false, "Référence encaissement, quittance ou paiement.")
+        field("waterOperationKind", "Catégorie", true, "Vente de paquets d'eau, autre recette ou catégorie de dépense courante."),
+        field("quantity", "Quantité", false, "Nombre de paquets vendus, si applicable."),
+        field("unitPrice", "Prix unitaire", false, "Prix par paquet, repris pour calculer le montant.")
       ],
       workflow: [
-        workflow("CREATE", "Saisie exploitation eau", "Le flux est rattaché au site, à la zone réseau, au compteur ou à l'équipement concerné."),
-        workflow("TRACE", "Traçabilité technique", "Volumes, compteurs, factures, analyses et interventions documentent les flux."),
-        workflow("CONTROL", "Contrôle exploitation", "Les charges critiques, pertes apparentes et blocages réseau sont suivis."),
-        workflow("REPORTING", "Rapport eau", "Les volumes, recettes, charges et interventions alimentent le rapport sectoriel.")
+        workflow("SELECT", "Sélection de la catégorie", "L'agent choisit une vente de paquets d'eau ou une catégorie de dépense courante."),
+        workflow("AMOUNT", "Montant", "Le montant peut être calculé depuis la quantité et le prix unitaire, ou saisi directement."),
+        workflow("REPORTING", "Suivi global", "Chaque vente et dépense alimente le rapport du site.")
       ]
     },
     tasks: {
-      requiresDescription: true,
-      requiresDueDate: true,
-      requiresAssignee: true,
-      completionRequiresAssignee: true,
-      blockedRequiresAssignee: true,
-      blockedAlertSeverity: "CRITICAL",
+      requiresDescription: false,
+      requiresDueDate: false,
+      requiresAssignee: false,
+      completionRequiresAssignee: false,
+      blockedRequiresAssignee: false,
+      blockedAlertSeverity: "WARNING",
       fields: [
-        field("title", "Intervention eau", true, "Exemple: maintenance pompe ou inspection réseau."),
-        field("description", "Site ou réseau", true, "Station, réseau, secteur ou équipement."),
-        field("assignedToId", "Responsable intervention", true, "Toute intervention eau doit être affectée."),
-        field("dueDate", "Échéance", true, "Les interventions d'exploitation doivent être datées.")
+        field("title", "Action", true, "Exemple: relance fournisseur ou vérification stock d'emballages."),
+        field("description", "Détail", false, "Précision sur l'action à mener.")
       ],
-      metadataFields: [
-        field("waterTaskKind", "Type d'action eau", true, "Relevé production, contrôle qualité, maintenance pompe, inspection réseau, fuite, relevé compteur, branchement, dosage, recouvrement ou remise en service."),
-        field("facilityRef", "Référence site", true, "Station, réseau ou forage concerné."),
-        field("networkZone", "Zone réseau", false, "Secteur ou zone de distribution."),
-        field("productionLine", "Ligne exploitation", false, "Production, traitement, distribution, branchement, qualité ou maintenance."),
-        field("meterRef", "Compteur / point de comptage", false, "Compteur client, compteur production ou point de mesure."),
-        field("customerRef", "Abonné / client", false, "Abonné, dossier client ou acheteur concerné."),
-        field("equipmentRef", "Équipement", false, "Pompe, réservoir, conduite, compteur, vanne ou groupe."),
-        field("testRef", "Référence analyse", false, "Contrôle terrain ou analyse laboratoire."),
-        field("waterQuality", "Qualité eau", false, "pH, chlore résiduel, turbidité, bactériologie ou observation."),
-        field("issueRef", "Incident / fuite", false, "Fuite, panne, rupture, baisse pression ou réclamation."),
-        field("connectionRef", "Référence branchement", false, "Dossier de branchement, extension ou raccordement."),
-        field("supplierRef", "Fournisseur / prestataire", false, "Technicien, laboratoire, fournisseur ou prestataire.")
-      ],
+      metadataFields: [],
       workflow: [
-        workflow("PLAN", "Planification exploitation", "Intervention planifiée et affectée."),
-        workflow("EXECUTE", "Intervention", "Exécution sur site ou réseau."),
-        workflow("ESCALATE", "Escalade continuité", "Blocage remonte en priorité pour continuité de service."),
-        workflow("CLOSE", "Remise en service", "Clôture après vérification de remise en service.")
+        workflow("PLAN", "Planification", "L'action est planifiée si nécessaire."),
+        workflow("EXECUTE", "Traitement", "Traitement de l'action."),
+        workflow("CLOSE", "Clôture", "Clôture de l'action.")
       ]
     },
     reporting: {
-      focusArea: "Production, distribution, facturation, qualité et continuité de service",
-      exportSections: ["volumes produits", "volumes facturés", "recettes eau", "charges exploitation", "qualité", "maintenance", "réparations réseau", "blocages critiques"],
+      focusArea: "Ventes de paquets d'eau et dépenses courantes de l'équipe de production",
+      exportSections: ["ventes de paquets", "dépenses courantes"],
       operationalDimensions: [
-        dimension("facilityRef", "Site eau", "Mesure coûts, interventions et continuité par station ou forage."),
-        dimension("networkZone", "Zone réseau", "Suit les blocages et interventions par zone de distribution."),
-        dimension("productionLine", "Ligne exploitation", "Compare production, traitement, distribution, qualité et maintenance."),
-        dimension("meterRef", "Compteur", "Isole les volumes facturés et relevés par compteur.")
+        dimension("waterOperationKind", "Catégorie", "Compare les montants de vente et de dépense par catégorie.")
       ],
       highlights: [
         {
           code: "water-pending-review",
-          label: "Flux exploitation suivis",
-          description: "Flux financiers eau visibles dans le suivi global.",
+          label: "Flux suivis",
+          description: "Ventes et dépenses eau visibles dans le suivi global.",
           metric: "submittedTransactionsCount",
           thresholds: { warningAt: 1, criticalAt: 3 }
-        },
-        {
-          code: "water-open-interventions",
-          label: "Interventions ouvertes",
-          description: "Interventions réseau ou station encore en cours.",
-          metric: "openTasksCount",
-          thresholds: { warningAt: 2, criticalAt: 5 }
-        },
-        {
-          code: "water-critical-blockers",
-          label: "Blocages de continuité",
-          description: "Blocages techniques menacant la continuité du service.",
-          metric: "blockedTasksCount",
-          thresholds: { warningAt: 1, criticalAt: 2 }
         }
       ]
     }
