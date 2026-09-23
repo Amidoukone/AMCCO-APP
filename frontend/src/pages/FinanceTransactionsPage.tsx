@@ -4175,12 +4175,18 @@ export function FinanceTransactionsPage(): JSX.Element {
           setBusyTransactionId(null);
         }
       }
+      setTransactions((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       handleOpenTransactionDetails(response.item.id, response.item.activityCode);
       setSuccessMessage(
         editingTransactionId ? "Transaction modifiée." : "Transaction enregistrée."
       );
       resetTransactionForm();
-      await loadData();
+      void loadData();
       if (proofUploadError) {
         setErrorMessage(
           `${transactionSavedLabel}, mais la preuve n'a pas pu être ajoutée. ${proofUploadError}`
@@ -5274,10 +5280,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                     <option value="RECOUVREMENT">{STORE_OPERATION_LABELS.RECOUVREMENT}</option>
                     <option value="INVENTAIRE">Inventaire (vers Tâches)</option>
                   </select>
-                  <small className="hint">
-                    L'inventaire n'est pas un mouvement de caisse: le choisir ouvre la page Tâches
-                    pour déclarer le stock restant d'une boutique.
-                  </small>
                 </label>
 
                 <div className="operations-inline-group">

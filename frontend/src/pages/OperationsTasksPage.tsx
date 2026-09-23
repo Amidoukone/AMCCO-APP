@@ -999,8 +999,11 @@ export function OperationsTasksPage(): JSX.Element {
       });
       setTaskAttachmentFile(null);
       setSuccessMessage(editingTaskId ? "Tâche modifiée." : "Tâche créée.");
-      await loadData();
-      if (!wasEditingTask) {
+      if (wasEditingTask) {
+        setTasks((prev) =>
+          prev.map((task) => (task.id === response.item.id ? response.item : task))
+        );
+      } else {
         const createdTaskIsVisible =
           response.item.activityCode === selectedActivityCode &&
           (filters.status === "ALL" || filters.status === response.item.status) &&
@@ -1021,6 +1024,7 @@ export function OperationsTasksPage(): JSX.Element {
           }));
         }
       }
+      void loadData();
       if (attachmentUploadError) {
         setErrorMessage(
           `Tâche créée, mais la pièce jointe n'a pas pu être ajoutée. ${attachmentUploadError}`
@@ -1125,9 +1129,10 @@ export function OperationsTasksPage(): JSX.Element {
       if (editingTaskId === task.id) {
         handleCancelEditTask();
       }
+      setTasks((prev) => prev.filter((item) => item.id !== task.id));
       setSuccessMessage("Tâche supprimée.");
       setTaskPendingDelete(null);
-      await loadData();
+      void loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -1153,7 +1158,7 @@ export function OperationsTasksPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         assignOperationsTaskRequest(
           accessToken,
           taskId,
@@ -1161,8 +1166,11 @@ export function OperationsTasksPage(): JSX.Element {
           assignmentNotes[taskId]?.trim() || undefined
         )
       );
+      setTasks((prev) =>
+        prev.map((item) => (item.id === response.item.id ? response.item : item))
+      );
       setSuccessMessage("Assignation mise à jour.");
-      await loadData();
+      void loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -1179,11 +1187,14 @@ export function OperationsTasksPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         updateOperationsTaskStatusRequest(accessToken, taskId, status)
       );
+      setTasks((prev) =>
+        prev.map((item) => (item.id === response.item.id ? response.item : item))
+      );
       setSuccessMessage("Statut mis à jour.");
-      await loadData();
+      void loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
