@@ -1710,12 +1710,43 @@ describe("reporting.service", () => {
       totalArrearsAmount: "60000.00",
       collectedAmount: "20000.00",
       depositAmount: "60000.00",
+      depositPaidTenantsCount: 1,
       cashInAmount: "80000.00",
       cashOutAmount: "15000.00",
       netAmount: "65000.00",
       executionRate: 66.7,
       currency: "XOF"
     });
+
+    // Cautions form a ledger fully separate from the loyer arrears above: Dramane Manta
+    // is "EN_RETARD" on rent but never paid a caution, and that must not be conflated
+    // with, nor blocked by, their rent lateness — it simply shows as "NON_PAYEE".
+    expect(result.rentalOperationsReport?.depositRows).toEqual([
+      expect.objectContaining({
+        tenantRef: "Dramane Manta",
+        unitRef: "Chambre salon",
+        depositPaidAmount: "0.00",
+        paymentsCount: 0,
+        lastPaymentLabel: null,
+        status: "NON_PAYEE"
+      }),
+      expect.objectContaining({
+        tenantRef: "Issa Guido",
+        unitRef: "Appartement 2 pièces salon",
+        depositPaidAmount: "60000.00",
+        paymentsCount: 1,
+        lastPaymentLabel: "02/11/2026",
+        status: "PAYEE"
+      }),
+      expect.objectContaining({
+        tenantRef: "Mahamadou Cisse",
+        unitRef: "Boutique",
+        depositPaidAmount: "0.00",
+        paymentsCount: 0,
+        lastPaymentLabel: null,
+        status: "NON_PAYEE"
+      })
+    ]);
 
     const pdf = await exportCompanyReportsPdf(actor, {
       activityCode: "RENTAL",

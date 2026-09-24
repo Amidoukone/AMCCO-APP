@@ -1594,16 +1594,6 @@ export function ReportsPage(): JSX.Element {
                   </strong>
                   <small>Sur la période {overview.rentalOperationsReport.periodLabel}</small>
                 </article>
-                <article className="reports-kpi-card">
-                  <span>Cautions perçues</span>
-                  <strong>
-                    {formatAmount(
-                      overview.rentalOperationsReport.totals.depositAmount,
-                      overview.rentalOperationsReport.totals.currency
-                    )}
-                  </strong>
-                  <small>Sur la période {overview.rentalOperationsReport.periodLabel}</small>
-                </article>
               </div>
 
               {overview.rentalOperationsReport.operationRows.length > 0 ? (
@@ -1705,6 +1695,83 @@ export function ReportsPage(): JSX.Element {
                       <th />
                     </tr>
                   </tfoot>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {overview.rentalOperationsReport ? (
+            <section className="panel">
+              <div className="dashboard-panel-header">
+                <div>
+                  <h3>Cautions locataires</h3>
+                  <p className="hint">
+                    Suivi indépendant des loyers : un locataire garde sa caution "Payée" même
+                    en cas de retard de loyer.
+                  </p>
+                </div>
+              </div>
+
+              <div className="reports-summary-grid">
+                <article className="reports-kpi-card">
+                  <span>Cautions payées</span>
+                  <strong>
+                    {formatCount(overview.rentalOperationsReport.totals.depositPaidTenantsCount)} /{" "}
+                    {formatCount(overview.rentalOperationsReport.totals.tenantsCount)}
+                  </strong>
+                  <small>Locataires ayant versé leur caution</small>
+                </article>
+                <article className="reports-kpi-card">
+                  <span>Cautions perçues (période)</span>
+                  <strong>
+                    {formatAmount(
+                      overview.rentalOperationsReport.totals.depositAmount,
+                      overview.rentalOperationsReport.totals.currency
+                    )}
+                  </strong>
+                  <small>Sur la période {overview.rentalOperationsReport.periodLabel}</small>
+                </article>
+              </div>
+
+              <div className="table-wrap">
+                <table className="admin-table reports-hardware-table">
+                  <thead>
+                    <tr>
+                      <th>Locataire</th>
+                      <th>Logement occupé</th>
+                      <th>Statut caution</th>
+                      <th>Montant versé</th>
+                      <th>Dernier versement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.rentalOperationsReport.depositRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={5}>
+                          Aucun locataire enregistré. Ajoutez vos locataires depuis les
+                          transactions financières.
+                        </td>
+                      </tr>
+                    ) : (
+                      overview.rentalOperationsReport.depositRows.map((row) => (
+                        <tr key={`${row.tenantRef}-${row.unitRef}-caution`}>
+                          <td>{row.tenantRef}</td>
+                          <td>{row.unitRef}</td>
+                          <td>
+                            <span
+                              className={`task-status-chip ${
+                                row.status === "PAYEE" ? "status-in_progress" : "status-blocked"
+                              }`}
+                            >
+                              {row.status === "PAYEE" ? "Payée" : "Non payée"}
+                            </span>
+                          </td>
+                          <td>{formatAmount(row.depositPaidAmount, row.currency)}</td>
+                          <td>{row.lastPaymentLabel ?? "-"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
                 </table>
               </div>
             </section>

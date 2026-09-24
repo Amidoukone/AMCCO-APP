@@ -301,11 +301,22 @@ export type RentalOperationsReportOperationRow = {
   currency: "XOF";
 };
 
+export type RentalOperationsReportDepositRow = {
+  tenantRef: string;
+  unitRef: string;
+  depositPaidAmount: string;
+  paymentsCount: number;
+  lastPaymentLabel: string | null;
+  status: "PAYEE" | "NON_PAYEE";
+  currency: "XOF";
+};
+
 export type RentalOperationsReport = {
   periodLabel: string;
   asOfLabel: string;
   rows: RentalOperationsReportRow[];
   operationRows: RentalOperationsReportOperationRow[];
+  depositRows: RentalOperationsReportDepositRow[];
   totals: {
     tenantsCount: number;
     upToDateTenantsCount: number;
@@ -313,6 +324,7 @@ export type RentalOperationsReport = {
     totalArrearsAmount: string;
     collectedAmount: string;
     depositAmount: string;
+    depositPaidTenantsCount: number;
     cashInAmount: string;
     cashOutAmount: string;
     netAmount: string;

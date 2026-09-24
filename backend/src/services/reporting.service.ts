@@ -3205,6 +3205,7 @@ function buildEmptyRentalOperationsReport(filters: ReportPeriodFilter): RentalOp
     asOfLabel: formatPdfDate(resolveRentalAsOfDate(filters).toISOString()),
     rows: [],
     operationRows: [],
+    depositRows: [],
     totals: {
       tenantsCount: 0,
       upToDateTenantsCount: 0,
@@ -3212,6 +3213,7 @@ function buildEmptyRentalOperationsReport(filters: ReportPeriodFilter): RentalOp
       totalArrearsAmount: "0.00",
       collectedAmount: "0.00",
       depositAmount: "0.00",
+      depositPaidTenantsCount: 0,
       cashInAmount: "0.00",
       cashOutAmount: "0.00",
       netAmount: "0.00",
@@ -3664,6 +3666,93 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
   doc.y = y + 10;
 }
 
+const RENTAL_DEPOSIT_PDF_COLUMNS: PdfTableColumn[] = [
+  { label: "LOCATAIRE", width: 190, align: "left" },
+  { label: "LOGEMENT OCCUPE", width: 190, align: "left" },
+  { label: "STATUT CAUTION", width: 130, align: "center" },
+  { label: "MONTANT VERSE", width: 100, align: "right" },
+  { label: "DERNIER VERSEMENT", width: 152, align: "center" }
+];
+
+function toRentalDepositStatusLabel(status: RentalOperationsReport["depositRows"][number]["status"]): string {
+  return status === "PAYEE" ? "Payée" : "Non payée";
+}
+
+function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
+  if (report.depositRows.length === 0) {
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (needsPdfPageBreak(doc, 90)) {
+    doc.addPage();
+    drawRentalReportHeader(doc, report);
+  }
+
+  doc
+    .fillColor("#115e59")
+    .font("Helvetica-Bold")
+    .fontSize(12)
+    .text("Cautions locataires (indépendant du suivi des loyers)", PDF_PAGE_MARGIN, doc.y, {
+      width: doc.page.width - PDF_PAGE_MARGIN * 2
+    });
+  doc.moveDown(0.4);
+
+  let y = doc.y;
+  let x = PDF_PAGE_MARGIN;
+  for (const column of RENTAL_DEPOSIT_PDF_COLUMNS) {
+    drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
+      align: "center",
+      fill: "#ccfbf1",
+      font: "Helvetica-Bold",
+      fontSize: 11
+    });
+    x += column.width;
+  }
+  y += 27;
+
+  for (const row of report.depositRows) {
+    if (y + 26 > tableBottom) {
+      doc.addPage();
+      drawRentalReportHeader(doc, report);
+      y = doc.y;
+      x = PDF_PAGE_MARGIN;
+      for (const column of RENTAL_DEPOSIT_PDF_COLUMNS) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
+          align: "center",
+          fill: "#ccfbf1",
+          font: "Helvetica-Bold",
+          fontSize: 11
+        });
+        x += column.width;
+      }
+      y += 27;
+    }
+
+    const values = [
+      { value: truncatePdfText(row.tenantRef, 30), align: "left" as const },
+      { value: truncatePdfText(row.unitRef, 30), align: "left" as const },
+      { value: toRentalDepositStatusLabel(row.status), align: "center" as const },
+      { value: formatPdfMoney(row.depositPaidAmount), align: "right" as const },
+      { value: row.lastPaymentLabel ?? "-", align: "center" as const }
+    ];
+    const fillColor = row.status === "NON_PAYEE" ? "#fef2f2" : undefined;
+    x = PDF_PAGE_MARGIN;
+    values.forEach((item, index) => {
+      const column = RENTAL_DEPOSIT_PDF_COLUMNS[index];
+      drawPdfTableCell(doc, item.value, x, y, column.width, 26, {
+        align: item.align,
+        fontSize: 10.5,
+        fill: fillColor
+      });
+      x += column.width;
+    });
+    y += 26;
+  }
+
+  doc.y = y + 10;
+}
+
 function drawRentalPdfFooter(
   doc: PDFKit.PDFDocument,
   pageNumber: number,
@@ -3716,6 +3805,7 @@ function renderRentalReportsPdf(
   drawRentalMetricCards(doc, report);
   drawRentalOperationsTable(doc, report);
   drawRentalBreakdown(doc, report);
+  drawRentalDepositTable(doc, report);
 }
 
 function buildEmptyHotelOperationsReport(filters: ReportPeriodFilter): HotelOperationsReport {
@@ -6730,6 +6820,18 @@ function buildRentalOperationsBreakdownRows(overview: ReportsOverview): Array<Re
   }));
 }
 
+function buildRentalDepositReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.rentalOperationsReport?.depositRows ?? []).map((item) => ({
+    tenantRef: item.tenantRef,
+    unitRef: item.unitRef,
+    status: item.status,
+    depositPaidAmount: item.depositPaidAmount,
+    paymentsCount: item.paymentsCount,
+    lastPaymentLabel: item.lastPaymentLabel ?? "-",
+    currency: item.currency
+  }));
+}
+
 function buildHotelOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
   return (overview.hotelOperationsReport?.rows ?? []).map((item) => ({
     serviceLine: item.serviceLine,
@@ -8383,10 +8485,11 @@ function buildRentalOperationsReport(
   const asOfIso = asOfDate.toISOString();
 
   const totalPaidByTenant = new Map<string, number>();
+  // Deposits (cautions) are tracked in a fully separate ledger: they must never
+  // feed the rent arrears calculation below, and a tenant's caution stays "paid"
+  // regardless of how late their rent is.
+  const depositByTenant = new Map<string, { amount: number; count: number; lastPaidAt: string }>();
   for (const transaction of reportableTransactions) {
-    if (getRentalTransactionKind(transaction) !== "LOYER") {
-      continue;
-    }
     if (transaction.occurredAt > asOfIso) {
       continue;
     }
@@ -8394,8 +8497,23 @@ function buildRentalOperationsReport(
     if (!tenantKey) {
       continue;
     }
+    const kind = getRentalTransactionKind(transaction);
     const amount = toNumberAmount(transaction.amount);
-    totalPaidByTenant.set(tenantKey, (totalPaidByTenant.get(tenantKey) ?? 0) + amount);
+
+    if (kind === "LOYER") {
+      totalPaidByTenant.set(tenantKey, (totalPaidByTenant.get(tenantKey) ?? 0) + amount);
+      continue;
+    }
+
+    if (kind === "CAUTION") {
+      const existing = depositByTenant.get(tenantKey) ?? { amount: 0, count: 0, lastPaidAt: transaction.occurredAt };
+      existing.amount += amount;
+      existing.count += 1;
+      if (transaction.occurredAt > existing.lastPaidAt) {
+        existing.lastPaidAt = transaction.occurredAt;
+      }
+      depositByTenant.set(tenantKey, existing);
+    }
   }
 
   const activeTenants = [...tenants].sort((left, right) => left.name.localeCompare(right.name));
@@ -8419,6 +8537,21 @@ function buildRentalOperationsReport(
       balanceAmount: toMoneyString(ledger.balanceValue),
       status: ledger.status,
       statusDetail: ledger.statusDetail,
+      currency: "XOF" as const
+    };
+  });
+
+  // Caution status per tenant, kept fully independent from the rent ledger above:
+  // a tenant who paid their deposit stays "Payée" here even while "En retard" on rent.
+  const depositRows: RentalOperationsReport["depositRows"] = activeTenants.map((tenant) => {
+    const deposit = depositByTenant.get(tenant.name);
+    return {
+      tenantRef: tenant.name,
+      unitRef: tenant.unitLabel,
+      depositPaidAmount: toMoneyString(deposit?.amount ?? 0),
+      paymentsCount: deposit?.count ?? 0,
+      lastPaymentLabel: deposit ? formatPdfDate(deposit.lastPaidAt) : null,
+      status: deposit && deposit.amount > 0 ? ("PAYEE" as const) : ("NON_PAYEE" as const),
       currency: "XOF" as const
     };
   });
@@ -8490,12 +8623,14 @@ function buildRentalOperationsReport(
   );
   const cashInAmountValue = collectedAmountValue + depositAmountValue + otherCashIn;
   const cashOutAmountValue = otherCashOut;
+  const depositPaidTenantsCount = depositRows.filter((row) => row.status === "PAYEE").length;
 
   return {
     periodLabel: toDisplayPeriodLabel(filters),
     asOfLabel: formatPdfDate(asOfIso),
     rows,
     operationRows,
+    depositRows,
     totals: {
       tenantsCount,
       upToDateTenantsCount,
@@ -8503,6 +8638,7 @@ function buildRentalOperationsReport(
       totalArrearsAmount: toMoneyString(totalArrearsAmountValue),
       collectedAmount: toMoneyString(collectedAmountValue),
       depositAmount: toMoneyString(depositAmountValue),
+      depositPaidTenantsCount,
       cashInAmount: toMoneyString(cashInAmountValue),
       cashOutAmount: toMoneyString(cashOutAmountValue),
       netAmount: toMoneyString(cashInAmountValue - cashOutAmountValue),
@@ -11144,6 +11280,19 @@ export async function exportCompanyTransactionsExcel(
       ]
     },
     {
+      name: "LocationCautions",
+      rows: buildRentalDepositReportRows(overview),
+      columns: [
+        "tenantRef",
+        "unitRef",
+        "status",
+        "depositPaidAmount",
+        "paymentsCount",
+        "lastPaymentLabel",
+        "currency"
+      ]
+    },
+    {
       name: "Hôtellerie",
       rows: buildHotelOperationsReportRows(overview),
       columns: [
@@ -11612,6 +11761,19 @@ export async function exportCompanyTasksExcel(
         "cashInAmount",
         "cashOutAmount",
         "netAmount",
+        "currency"
+      ]
+    },
+    {
+      name: "LocationCautions",
+      rows: buildRentalDepositReportRows(overview),
+      columns: [
+        "tenantRef",
+        "unitRef",
+        "status",
+        "depositPaidAmount",
+        "paymentsCount",
+        "lastPaymentLabel",
         "currency"
       ]
     },
