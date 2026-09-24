@@ -12,6 +12,7 @@ import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
 import { PageGuide } from "../components/PageGuide";
+import { ButtonSpinner } from "../components/ButtonSpinner";
 import {
   buildPersistedViewStorageKey,
   usePersistedViewState
@@ -1862,11 +1863,16 @@ export function OperationsTasksPage(): JSX.Element {
                 type="submit"
                 disabled={!selectedActivityCode || isLoadingActivities || isSavingTaskForm}
               >
-                {isSavingTaskForm
-                  ? "Enregistrement..."
-                  : editingTaskId
-                    ? "Enregistrer les modifications"
-                    : "Enregistrer la tâche"}
+                {isSavingTaskForm ? (
+                  <>
+                    <ButtonSpinner />
+                    Enregistrement...
+                  </>
+                ) : editingTaskId ? (
+                  "Enregistrer les modifications"
+                ) : (
+                  "Enregistrer la tâche"
+                )}
               </button>
               {editingTaskId ? (
                 <button

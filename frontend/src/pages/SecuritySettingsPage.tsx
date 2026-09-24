@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { ButtonSpinner } from "../components/ButtonSpinner";
 import { ApiError, changeOwnPasswordRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 
@@ -131,7 +132,14 @@ export function SecuritySettingsPage(): JSX.Element {
             required
           />
           <button type="submit" disabled={isChangingPassword}>
-            {isChangingPassword ? PASSWORD_UPDATE_PENDING : CHANGE_PASSWORD_LABEL}
+            {isChangingPassword ? (
+              <>
+                <ButtonSpinner />
+                {PASSWORD_UPDATE_PENDING}
+              </>
+            ) : (
+              CHANGE_PASSWORD_LABEL
+            )}
           </button>
         </form>
         <div className="security-session-actions">

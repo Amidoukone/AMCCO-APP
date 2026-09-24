@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { PageGuide } from "../components/PageGuide";
+import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   formatAmountForDisplay as formatLocalizedAmountForDisplay,
@@ -146,6 +147,7 @@ export function FinanceSalariesPage(): JSX.Element {
   const [salarySummary, setSalarySummary] = useState<SalarySummary | null>(null);
   const [selectedSalaryId, setSelectedSalaryId] = useState<string | null>(null);
   const [editingSalaryId, setEditingSalaryId] = useState<string | null>(null);
+  const [isSavingSalary, setIsSavingSalary] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
   const [busySalaryExport, setBusySalaryExport] = useState<"csv" | "xlsx" | null>(null);
@@ -531,6 +533,7 @@ export function FinanceSalariesPage(): JSX.Element {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingSalary(true);
 
     try {
       const response = (await withAuthorizedToken(async (accessToken) => {
@@ -565,6 +568,8 @@ export function FinanceSalariesPage(): JSX.Element {
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingSalary(false);
     }
   }
 
@@ -1038,15 +1043,25 @@ export function FinanceSalariesPage(): JSX.Element {
             <div className="mobile-sticky-form-actions">
               <button
                 type="submit"
-                disabled={salaryAccounts.length === 0 || salaryMembers.length === 0}
+                disabled={salaryAccounts.length === 0 || salaryMembers.length === 0 || isSavingSalary}
               >
-                {editingSalaryId ? "Enregistrer les modifications" : "Enregistrer le salaire"}
+                {isSavingSalary ? (
+                  <>
+                    <ButtonSpinner />
+                    Enregistrement...
+                  </>
+                ) : editingSalaryId ? (
+                  "Enregistrer les modifications"
+                ) : (
+                  "Enregistrer le salaire"
+                )}
               </button>
               {editingSalaryId ? (
                 <button
                   type="button"
                   className="secondary-btn"
                   onClick={handleCancelEditSalary}
+                  disabled={isSavingSalary}
                 >
                   Annuler la modification
                 </button>

@@ -13,6 +13,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { PageGuide } from "../components/PageGuide";
+import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { repairMojibakeText } from "../utils/textEncoding";
 
@@ -561,14 +562,24 @@ export function AdminCompaniesPage(): JSX.Element {
               onClick={() => void handleCreateCompany()}
               disabled={isSubmitting || !form.name?.trim()}
             >
-              {isSubmitting
-                ? "Enregistrement..."
-                : isEditingCompany
-                  ? "Enregistrer les modifications"
-                  : "Enregistrer l'entreprise"}
+              {isSubmitting ? (
+                <>
+                  <ButtonSpinner />
+                  Enregistrement...
+                </>
+              ) : isEditingCompany ? (
+                "Enregistrer les modifications"
+              ) : (
+                "Enregistrer l'entreprise"
+              )}
             </button>
             {isEditingCompany ? (
-              <button type="button" className="secondary-btn" onClick={handleCancelEditCompany}>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={handleCancelEditCompany}
+                disabled={isSubmitting}
+              >
                 Annuler
               </button>
             ) : null}

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { ButtonSpinner } from "./ButtonSpinner";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -102,7 +103,14 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={isConfirming}
           >
-            {isConfirming ? "Traitement..." : confirmLabel}
+            {isConfirming ? (
+              <>
+                <ButtonSpinner />
+                Traitement...
+              </>
+            ) : (
+              confirmLabel
+            )}
           </button>
         </div>
       </section>

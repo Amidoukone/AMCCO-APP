@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
 import { PageGuide } from "../components/PageGuide";
+import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   formatAmountForDisplay as formatLocalizedAmountForDisplay,
@@ -2999,21 +3000,25 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [articleForm, setArticleForm] = useState(buildDefaultArticleForm());
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
+  const [isSavingArticle, setIsSavingArticle] = useState(false);
   const [articlePendingDelete, setArticlePendingDelete] = useState<ActivityArticle | null>(null);
   const [tenants, setTenants] = useState<RentalTenant[]>([]);
   const [tenantForm, setTenantForm] = useState(buildDefaultTenantForm());
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
   const [busyTenantId, setBusyTenantId] = useState<string | null>(null);
+  const [isSavingTenant, setIsSavingTenant] = useState(false);
   const [tenantPendingDelete, setTenantPendingDelete] = useState<RentalTenant | null>(null);
   const [shops, setShops] = useState<GeneralStoreShop[]>([]);
   const [shopForm, setShopForm] = useState(buildDefaultShopForm());
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
   const [busyShopId, setBusyShopId] = useState<string | null>(null);
+  const [isSavingShop, setIsSavingShop] = useState(false);
   const [shopPendingDelete, setShopPendingDelete] = useState<GeneralStoreShop | null>(null);
   const [projects, setProjects] = useState<BtpProject[]>([]);
   const [projectForm, setProjectForm] = useState(buildDefaultProjectForm());
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
+  const [isSavingProject, setIsSavingProject] = useState(false);
   const [projectPendingDelete, setProjectPendingDelete] = useState<BtpProject | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
@@ -3021,6 +3026,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busyAccountId, setBusyAccountId] = useState<string | null>(null);
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
   const [isLoadingMoreTransactions, setIsLoadingMoreTransactions] = useState(false);
   const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
@@ -3689,6 +3695,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingAccount(true);
 
     try {
       const response = await withAuthorizedToken((accessToken) => {
@@ -3713,6 +3720,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       }));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingAccount(false);
     }
   }
 
@@ -3782,6 +3791,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingArticle(true);
 
     try {
       const payload = {
@@ -3804,6 +3814,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       await loadArticles();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingArticle(false);
     }
   }
 
@@ -3860,6 +3872,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingTenant(true);
 
     try {
       const payload = {
@@ -3880,6 +3893,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       await loadTenants();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingTenant(false);
     }
   }
 
@@ -3934,6 +3949,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingShop(true);
 
     try {
       const payload = {
@@ -3952,6 +3968,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       await loadShops();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingShop(false);
     }
   }
 
@@ -4004,6 +4022,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setIsSavingProject(true);
 
     try {
       const payload = {
@@ -4023,6 +4042,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       await loadProjects();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingProject(false);
     }
   }
 
@@ -4581,14 +4602,24 @@ export function FinanceTransactionsPage(): JSX.Element {
               </div>
             ) : null}
             <div className="mobile-sticky-form-actions">
-              <button type="submit">
-                {editingAccountId ? "Enregistrer les modifications" : "Créer le compte"}
+              <button type="submit" disabled={isSavingAccount}>
+                {isSavingAccount ? (
+                  <>
+                    <ButtonSpinner />
+                    Enregistrement...
+                  </>
+                ) : editingAccountId ? (
+                  "Enregistrer les modifications"
+                ) : (
+                  "Créer le compte"
+                )}
               </button>
               {editingAccountId ? (
                 <button
                   type="button"
                   className="secondary-btn"
                   onClick={handleCancelEditAccount}
+                  disabled={isSavingAccount}
                 >
                   Annuler la modification
                 </button>
@@ -4672,11 +4703,25 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
               <div className="mobile-sticky-form-actions">
-                <button type="submit">
-                  {editingArticleId ? "Enregistrer les modifications" : "Ajouter l'article"}
+                <button type="submit" disabled={isSavingArticle}>
+                  {isSavingArticle ? (
+                    <>
+                      <ButtonSpinner />
+                      Enregistrement...
+                    </>
+                  ) : editingArticleId ? (
+                    "Enregistrer les modifications"
+                  ) : (
+                    "Ajouter l'article"
+                  )}
                 </button>
                 {editingArticleId ? (
-                  <button type="button" className="secondary-btn" onClick={handleCancelEditArticle}>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={handleCancelEditArticle}
+                    disabled={isSavingArticle}
+                  >
                     Annuler la modification
                   </button>
                 ) : null}
@@ -4825,11 +4870,25 @@ export function FinanceTransactionsPage(): JSX.Element {
                 </small>
               </label>
               <div className="mobile-sticky-form-actions">
-                <button type="submit">
-                  {editingTenantId ? "Enregistrer les modifications" : "Ajouter le locataire"}
+                <button type="submit" disabled={isSavingTenant}>
+                  {isSavingTenant ? (
+                    <>
+                      <ButtonSpinner />
+                      Enregistrement...
+                    </>
+                  ) : editingTenantId ? (
+                    "Enregistrer les modifications"
+                  ) : (
+                    "Ajouter le locataire"
+                  )}
                 </button>
                 {editingTenantId ? (
-                  <button type="button" className="secondary-btn" onClick={handleCancelEditTenant}>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={handleCancelEditTenant}
+                    disabled={isSavingTenant}
+                  >
                     Annuler la modification
                   </button>
                 ) : null}
@@ -4931,11 +4990,25 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
               <div className="mobile-sticky-form-actions">
-                <button type="submit">
-                  {editingShopId ? "Enregistrer les modifications" : "Ajouter la boutique"}
+                <button type="submit" disabled={isSavingShop}>
+                  {isSavingShop ? (
+                    <>
+                      <ButtonSpinner />
+                      Enregistrement...
+                    </>
+                  ) : editingShopId ? (
+                    "Enregistrer les modifications"
+                  ) : (
+                    "Ajouter la boutique"
+                  )}
                 </button>
                 {editingShopId ? (
-                  <button type="button" className="secondary-btn" onClick={handleCancelEditShop}>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={handleCancelEditShop}
+                    disabled={isSavingShop}
+                  >
                     Annuler la modification
                   </button>
                 ) : null}
@@ -5049,11 +5122,25 @@ export function FinanceTransactionsPage(): JSX.Element {
                 />
               </label>
               <div className="mobile-sticky-form-actions">
-                <button type="submit">
-                  {editingProjectId ? "Enregistrer les modifications" : "Ajouter le chantier"}
+                <button type="submit" disabled={isSavingProject}>
+                  {isSavingProject ? (
+                    <>
+                      <ButtonSpinner />
+                      Enregistrement...
+                    </>
+                  ) : editingProjectId ? (
+                    "Enregistrer les modifications"
+                  ) : (
+                    "Ajouter le chantier"
+                  )}
                 </button>
                 {editingProjectId ? (
-                  <button type="button" className="secondary-btn" onClick={handleCancelEditProject}>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={handleCancelEditProject}
+                    disabled={isSavingProject}
+                  >
                     Annuler la modification
                   </button>
                 ) : null}
@@ -6347,13 +6434,18 @@ export function FinanceTransactionsPage(): JSX.Element {
                 isSavingTransaction
               }
             >
-              {isSavingTransaction
-                ? transactionProofFile
-                  ? "Enregistrement et envoi de la preuve..."
-                  : "Enregistrement..."
-                : editingTransactionId
-                  ? "Enregistrer les modifications"
-                  : "Enregistrer la transaction"}
+              {isSavingTransaction ? (
+                <>
+                  <ButtonSpinner />
+                  {transactionProofFile
+                    ? "Enregistrement et envoi de la preuve..."
+                    : "Enregistrement..."}
+                </>
+              ) : editingTransactionId ? (
+                "Enregistrer les modifications"
+              ) : (
+                "Enregistrer la transaction"
+              )}
             </button>
             {editingTransactionId ? (
               <button

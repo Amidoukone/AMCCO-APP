@@ -12,6 +12,7 @@ import { useAuth } from "../context/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { PageGuide } from "../components/PageGuide";
+import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   buildPersistedViewStorageKey,
@@ -349,7 +350,14 @@ export function AdminUsersPage(): JSX.Element {
           </select>
           <div className="mobile-sticky-form-actions">
             <button type="submit" disabled={isSubmittingCreate}>
-              {isSubmittingCreate ? "Enregistrement..." : "Ajouter l'utilisateur"}
+              {isSubmittingCreate ? (
+                <>
+                  <ButtonSpinner />
+                  Enregistrement...
+                </>
+              ) : (
+                "Ajouter l'utilisateur"
+              )}
             </button>
           </div>
         </form>

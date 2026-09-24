@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import type { LoginClientDiagnostics } from "../types/auth";
+import { ButtonSpinner } from "../components/ButtonSpinner";
 
 const LOGIN_BACKEND_ERROR = "Connexion impossible. Vérifiez le backend.";
 
@@ -150,7 +151,14 @@ export function LoginPage(): JSX.Element {
           </div>
           {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
           <button className="login-submit" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Connexion..." : "Se connecter"}
+            {isSubmitting ? (
+              <>
+                <ButtonSpinner />
+                Connexion...
+              </>
+            ) : (
+              "Se connecter"
+            )}
           </button>
         </form>
       </section>
