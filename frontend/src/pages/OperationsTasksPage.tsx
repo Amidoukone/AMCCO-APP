@@ -42,7 +42,9 @@ import {
 } from "../lib/api";
 import {
   formatAmountForDisplay,
-  formatAmountForInput
+  formatAmountForInput,
+  formatEditableAmountForInput,
+  normalizeAmountForApi
 } from "../lib/amountFormatting";
 import {
   getBusinessActivityLabel,
@@ -953,12 +955,18 @@ export function OperationsTasksPage(): JSX.Element {
     setSuccessMessage(null);
     setIsSavingTaskForm(true);
     try {
+      const taskMetadata = createForm.metadata.remainingStockValue
+        ? {
+            ...createForm.metadata,
+            remainingStockValue: normalizeAmountForApi(createForm.metadata.remainingStockValue)
+          }
+        : createForm.metadata;
       const response = await withAuthorizedToken((accessToken) =>
         editingTaskId
           ? updateOperationsTaskRequest(accessToken, editingTaskId, {
               title: createForm.title.trim(),
               description: createForm.description.trim() || undefined,
-              metadata: createForm.metadata,
+              metadata: taskMetadata,
               dueDate: createForm.dueDate
                 ? new Date(createForm.dueDate).toISOString()
                 : undefined
@@ -968,7 +976,7 @@ export function OperationsTasksPage(): JSX.Element {
               description: createForm.description.trim() || undefined,
               activityCode: selectedActivityCode as BusinessActivityCode,
               assignedToId: canAssignTasks ? createForm.assignedToId || undefined : undefined,
-              metadata: createForm.metadata,
+              metadata: taskMetadata,
               dueDate: createForm.dueDate
                 ? new Date(createForm.dueDate).toISOString()
                 : undefined
@@ -1529,7 +1537,7 @@ export function OperationsTasksPage(): JSX.Element {
                             <span>{field.label}</span>
                             <input
                               type="text"
-                              inputMode="decimal"
+                              inputMode="numeric"
                               placeholder="Ex: 30000"
                               value={createForm.metadata.remainingStockValue ?? ""}
                               onChange={(event) =>
@@ -1537,7 +1545,7 @@ export function OperationsTasksPage(): JSX.Element {
                                   ...prev,
                                   metadata: {
                                     ...prev.metadata,
-                                    remainingStockValue: formatAmountForInput(event.target.value)
+                                    remainingStockValue: formatEditableAmountForInput(event.target.value)
                                   }
                                 }))
                               }

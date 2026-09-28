@@ -124,11 +124,30 @@ export type HardwareMonthlyReportRow = {
 export type HardwareMonthlyReport = {
   periodLabel: string;
   rows: HardwareMonthlyReportRow[];
+  recipientRows: Array<{
+    recipientRef: string;
+    purchaseAmount: string;
+    grossProfit: string;
+    expectedReturnAmount: string;
+    collectedAmount: string;
+    purchaseVarianceAmount: string;
+    balanceAmount: string;
+    transactionsCount: number;
+    currency: "XOF";
+  }>;
   totals: {
     quantity: number;
     purchaseUnitPrice: string;
     purchaseAmount: string;
     grossProfit: string;
+    assignedPurchaseAmount: string;
+    assignedGrossProfit: string;
+    expectedReturnAmount: string;
+    collectedAmount: string;
+    purchaseVarianceAmount: string;
+    balanceAmount: string;
+    unassignedPurchasesCount: number;
+    unassignedCollectionsCount: number;
     transactionsCount: number;
     currency: "XOF";
   };

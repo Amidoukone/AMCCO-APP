@@ -143,13 +143,13 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Objet", false, "Référence achat, dépôt fournisseur ou opération diverse.")
       ],
       metadataFields: [
-        field("hardwareOperationKind", "Nature quincaillerie", false, "GLOBAL ou ITEM_ENTRY selon la nature de l'opération."),
+        field("hardwareOperationKind", "Nature quincaillerie", false, "Achat, vente / recouvrement ou opération globale."),
         field("itemName", "Article", false, "Article acheté, choisi dans le catalogue de la quincaillerie."),
         field("quantity", "Quantité", false, "Nombre d'articles, sacs, barres, tonnes ou unités."),
         field("purchaseUnitPrice", "Prix d'achat unitaire", false, "Coût d'achat unitaire en XOF, saisi à chaque achat."),
         field("marginAmount", "Bénéfice", false, "Bénéfice fixe prévu sur cette ligne, pré-rempli selon l'article choisi et modifiable."),
         field("supplierRef", "Fournisseur", false, "Fournisseur ou source d'approvisionnement."),
-        field("recipientRef", "Remis à", false, "Quincaillerie ou client à qui l'article a été remis.")
+        field("recipientRef", "Remis à / quincaillerie", false, "Même nom sur l'achat remis et sur chaque vente / recouvrement, pour suivre les écarts.")
       ],
       workflow: [
         workflow("CREATE", "Saisie terrain", "Le point de vente saisit le flux financier."),
@@ -187,7 +187,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       operationalDimensions: [
         dimension("itemName", "Article", "Suit les achats, coûts et bénéfices par article."),
         dimension("supplierRef", "Fournisseur", "Suit les flux et blocages par fournisseur."),
-        dimension("recipientRef", "Remis à", "Suit les achats remis à chaque quincaillerie ou client.")
+        dimension("recipientRef", "Remis à", "Suit les achats remis, les recouvrements et les écarts par quincaillerie ou client.")
       ],
       highlights: [
         {
@@ -1610,6 +1610,18 @@ export function assertTransactionInputMatchesActivityProfile(
     profile.finance.metadataFields,
     input.metadata
   );
+  if (activityCode === "HARDWARE") {
+    const operationKind = input.metadata?.hardwareOperationKind?.trim();
+    if (operationKind === "ITEM_ENTRY" || operationKind === "RECOUVREMENT") {
+      if (!input.metadata?.recipientRef?.trim()) {
+        throw new Error("La quincaillerie ou la personne destinataire est requise pour cet achat ou recouvrement.");
+      }
+      if ((operationKind === "ITEM_ENTRY" && input.type !== "CASH_OUT") ||
+          (operationKind === "RECOUVREMENT" && input.type !== "CASH_IN")) {
+        throw new Error("Le type de flux ne correspond pas à l'opération de quincaillerie.");
+      }
+    }
+  }
 }
 
 export function assertTaskInputMatchesActivityProfile(

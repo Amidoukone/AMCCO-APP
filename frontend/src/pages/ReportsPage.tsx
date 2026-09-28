@@ -6,6 +6,7 @@ import {
   getReportsOverviewRequest
 } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
+import { formatAmountForDisplay } from "../lib/amountFormatting";
 import {
   getBusinessActivityLabel,
   type BusinessActivityCode
@@ -143,12 +144,14 @@ function formatCount(value: number): string {
 }
 
 function formatAmount(value: string | number, currency?: string): string {
+  if (currency) {
+    return `${formatAmountForDisplay(value)} ${currency}`;
+  }
   const amount = typeof value === "number" ? value : parseAmount(value);
-  const formatted = new Intl.NumberFormat("fr-FR", {
+  return new Intl.NumberFormat("fr-FR", {
     maximumFractionDigits: 2,
     minimumFractionDigits: Number.isInteger(amount) ? 0 : 2
   }).format(amount);
-  return currency ? `${formatted} ${currency}` : formatted;
 }
 
 function accountScopeLabel(account: ReportsOverview["financeAccounts"][number]): string {
@@ -1066,6 +1069,62 @@ export function ReportsPage(): JSX.Element {
                         )}
                       </th>
                       <th />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <h4>Situation des remises et recouvrements par destinataire</h4>
+              <p className="hint">
+                Situation cumulée jusqu'à la fin de la période. Écart achats = achats remis − recouvrements ;
+                reste attendu = achats + bénéfice prévu − recouvrements.
+              </p>
+              {overview.hardwareMonthlyReport.totals.unassignedPurchasesCount > 0 ? (
+                <p className="hint">
+                  {overview.hardwareMonthlyReport.totals.unassignedPurchasesCount} achat(s) sans destinataire ne figurent pas dans cette situation.
+                </p>
+              ) : null}
+              {overview.hardwareMonthlyReport.totals.unassignedCollectionsCount > 0 ? (
+                <p className="hint">
+                  {overview.hardwareMonthlyReport.totals.unassignedCollectionsCount} recouvrement(s) sans destinataire ne figurent pas dans cette situation.
+                </p>
+              ) : null}
+              <div className="table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Personne / quincaillerie</th>
+                      <th>Achats remis</th>
+                      <th>Bénéfice prévu</th>
+                      <th>Montant attendu</th>
+                      <th>Recouvré</th>
+                      <th>Écart achats</th>
+                      <th>Reste attendu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.hardwareMonthlyReport.recipientRows.length === 0 ? (
+                      <tr><td colSpan={7}>Aucune remise ou recouvrement associé à un destinataire.</td></tr>
+                    ) : overview.hardwareMonthlyReport.recipientRows.map((row) => (
+                      <tr key={row.recipientRef}>
+                        <td>{row.recipientRef}</td>
+                        <td>{formatAmount(row.purchaseAmount, row.currency)}</td>
+                        <td>{formatAmount(row.grossProfit, row.currency)}</td>
+                        <td>{formatAmount(row.expectedReturnAmount, row.currency)}</td>
+                        <td>{formatAmount(row.collectedAmount, row.currency)}</td>
+                        <td>{formatAmount(row.purchaseVarianceAmount, row.currency)}</td>
+                        <td>{formatAmount(row.balanceAmount, row.currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th>TOTAL</th>
+                      <th>{formatAmount(overview.hardwareMonthlyReport.totals.assignedPurchaseAmount, "XOF")}</th>
+                      <th>{formatAmount(overview.hardwareMonthlyReport.totals.assignedGrossProfit, "XOF")}</th>
+                      <th>{formatAmount(overview.hardwareMonthlyReport.totals.expectedReturnAmount, "XOF")}</th>
+                      <th>{formatAmount(overview.hardwareMonthlyReport.totals.collectedAmount, "XOF")}</th>
+                      <th>{formatAmount(overview.hardwareMonthlyReport.totals.purchaseVarianceAmount, "XOF")}</th>
+                      <th>{formatAmount(overview.hardwareMonthlyReport.totals.balanceAmount, "XOF")}</th>
                     </tr>
                   </tfoot>
                 </table>
@@ -3106,7 +3165,7 @@ export function ReportsPage(): JSX.Element {
                         <td>{account.name}</td>
                         <td>{account.accountRef ?? "-"}</td>
                         <td>{accountScopeLabel(account)}</td>
-                        <td>{formatAmount(account.balance)}</td>
+                        <td>{formatAmountForDisplay(account.balance)}</td>
                       </tr>
                     ))
                   )}

@@ -1,4 +1,5 @@
 import type { DashboardSummary } from "../types/reporting";
+import { formatAmountForDisplay } from "../lib/amountFormatting";
 
 export type FinanceStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
@@ -29,7 +30,7 @@ export function formatDateTime(value: string | null): string {
 }
 
 export function formatAmount(value: string, currency: string): string {
-  return `${value} ${currency}`;
+  return `${formatAmountForDisplay(value)} ${currency}`;
 }
 
 export function financeStatusLabel(status: FinanceStatus): string {

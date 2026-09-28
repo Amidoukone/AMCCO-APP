@@ -9,6 +9,7 @@ import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   formatAmountForDisplay as formatLocalizedAmountForDisplay,
   formatAmountForInput as formatLocalizedAmountForInput,
+  formatEditableAmountForInput as formatLocalizedEditableAmountForInput,
   normalizeAmountForApi as normalizeLocalizedAmountForApi,
   toAmountNumber as toLocalizedAmountNumber
 } from "../lib/amountFormatting";
@@ -93,11 +94,12 @@ const STORE_ACHAT_METADATA_FIELDS = new Set(["shopRef"]);
 const STORE_RECOUVREMENT_METADATA_FIELDS = new Set(["shopRef"]);
 const STORE_METADATA_FIELDS = new Set([STORE_OPERATION_KIND_KEY, "shopRef"]);
 const HARDWARE_OPERATION_KIND_KEY = "hardwareOperationKind";
-type HardwareOperationKind = "GLOBAL" | "ITEM_ENTRY" | "ITEM_EXIT";
+type HardwareOperationKind = "GLOBAL" | "ITEM_ENTRY" | "ITEM_EXIT" | "RECOUVREMENT";
 const HARDWARE_OPERATION_LABELS: Record<HardwareOperationKind, string> = {
   GLOBAL: "Transaction globale",
   ITEM_ENTRY: "Achat",
-  ITEM_EXIT: "Vente"
+  ITEM_EXIT: "Vente d'article",
+  RECOUVREMENT: "Vente / recouvrement"
 };
 const HARDWARE_NUMERIC_METADATA_FIELDS = new Set([
   "quantity",
@@ -117,8 +119,10 @@ const HARDWARE_COMMON_METADATA_FIELDS = new Set([
 ]);
 const HARDWARE_CASH_IN_METADATA_FIELDS = new Set([
   ...HARDWARE_COMMON_METADATA_FIELDS,
-  "saleUnitPrice"
+  "saleUnitPrice",
+  "recipientRef"
 ]);
+const HARDWARE_COLLECTION_METADATA_FIELDS = new Set(["recipientRef"]);
 const HARDWARE_CASH_OUT_METADATA_FIELDS = new Set([
   ...HARDWARE_COMMON_METADATA_FIELDS,
   "purchaseUnitPrice",
@@ -1053,6 +1057,10 @@ function formatAmountForInput(input: string): string {
   return formatLocalizedAmountForInput(input);
 }
 
+function formatEditableAmountForInput(input: string): string {
+  return formatLocalizedEditableAmountForInput(input);
+}
+
 function isMoneyMetadataField(key: string): boolean {
   return (
     key === "purchaseUnitPrice" ||
@@ -1500,7 +1508,7 @@ function getDefaultTransactionType(
 }
 
 function isHardwareOperationKind(value: string | undefined): value is HardwareOperationKind {
-  return value === "GLOBAL" || value === "ITEM_ENTRY" || value === "ITEM_EXIT";
+  return value === "GLOBAL" || value === "ITEM_ENTRY" || value === "ITEM_EXIT" || value === "RECOUVREMENT";
 }
 
 function hasHardwareItemMetadata(metadata: Record<string, string>): boolean {
@@ -1532,7 +1540,7 @@ function getHardwareOperationType(kind: HardwareOperationKind): "CASH_IN" | "CAS
   if (kind === "ITEM_ENTRY") {
     return "CASH_OUT";
   }
-  if (kind === "ITEM_EXIT") {
+  if (kind === "ITEM_EXIT" || kind === "RECOUVREMENT") {
     return "CASH_IN";
   }
   return null;
@@ -2252,7 +2260,9 @@ function getVisibleFinanceMetadataFields(
 
   const operationKind = getHardwareOperationKind(type, metadata);
   const visibleKeys =
-    operationKind === "ITEM_EXIT"
+    operationKind === "RECOUVREMENT"
+      ? HARDWARE_COLLECTION_METADATA_FIELDS
+      : operationKind === "ITEM_EXIT"
       ? HARDWARE_CASH_IN_METADATA_FIELDS
       : operationKind === "ITEM_ENTRY"
         ? HARDWARE_CASH_OUT_METADATA_FIELDS
@@ -2468,7 +2478,9 @@ function cleanSectorFinanceMetadata(
 
   const operationKind = getHardwareOperationKind(type, metadata);
   const visibleKeys =
-    operationKind === "ITEM_EXIT"
+    operationKind === "RECOUVREMENT"
+      ? HARDWARE_COLLECTION_METADATA_FIELDS
+      : operationKind === "ITEM_EXIT"
       ? HARDWARE_CASH_IN_METADATA_FIELDS
       : operationKind === "ITEM_ENTRY"
         ? HARDWARE_CASH_OUT_METADATA_FIELDS
@@ -2531,6 +2543,9 @@ function deriveSectorAmount(
 }
 
 function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
+  if (kind === "RECOUVREMENT") {
+    return "Vente / recouvrement: indiquez la quincaillerie ou la personne qui a reçu les articles, puis le montant encaissé. Le recouvrement peut être partiel.";
+  }
   return kind === "ITEM_EXIT"
     ? "Vente: renseignez la quantité, le prix de vente et le versement."
     : kind === "ITEM_ENTRY"
@@ -2735,7 +2750,10 @@ function syncMetadataState(
   previous: Record<string, string>,
   fields: ActivityFieldDefinition[]
 ): Record<string, string> {
-  return Object.fromEntries(fields.map((field) => [field.key, previous[field.key] ?? ""]));
+  return Object.fromEntries(fields.map((field) => {
+    const value = previous[field.key] ?? "";
+    return [field.key, isMoneyMetadataField(field.key) ? formatAmountForInput(value) : value];
+  }));
 }
 
 function sameStringRecord(
@@ -3021,6 +3039,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [projectPendingDelete, setProjectPendingDelete] = useState<BtpProject | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [waterSuggestionHistory, setWaterSuggestionHistory] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
@@ -3160,6 +3179,12 @@ export function FinanceTransactionsPage(): JSX.Element {
   const hardwareOperationKind = selectedActivityCode === "HARDWARE"
     ? getHardwareOperationKind(transactionForm.type, transactionForm.metadata)
     : "GLOBAL";
+  const hardwareRecipients = useMemo(() => Array.from(new Set(
+    transactions
+      .filter((item) => item.activityCode === "HARDWARE")
+      .map((item) => item.metadata.recipientRef?.trim())
+      .filter((value): value is string => Boolean(value))
+  )).sort((left, right) => left.localeCompare(right, "fr")), [transactions]);
   const storeOperationKind = selectedActivityCode === "GENERAL_STORE"
     ? getStoreOperationKind(transactionForm.type, transactionForm.metadata)
     : "ACHAT";
@@ -3178,9 +3203,35 @@ export function FinanceTransactionsPage(): JSX.Element {
   const hotelOperationKind = selectedActivityCode === "HOTEL_LODGING"
     ? getHotelOperationKind(transactionForm.type, transactionForm.metadata)
     : "ROOM_PAYMENT";
+  const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
   const waterOperationKind = selectedActivityCode === "WATER"
     ? getWaterOperationKind(transactionForm.type, transactionForm.metadata)
     : "WATER_SALE";
+  const waterSuggestions = useMemo(() => {
+    if (selectedActivityCode !== "WATER" || editingTransactionId) {
+      return [];
+    }
+    const seen = new Set<string>();
+    return [...waterSuggestionHistory]
+      .filter((item) =>
+        item.companyId === activeCompany?.id &&
+        item.activityCode === "WATER" &&
+        (item.status === "SUBMITTED" || item.status === "APPROVED") &&
+        allowedCurrencies.includes(item.currency) &&
+        getWaterOperationKind(item.type, item.metadata) === waterOperationKind &&
+        (!transactionForm.description.trim() ||
+          (item.description ?? "").toLocaleLowerCase("fr").includes(transactionForm.description.trim().toLocaleLowerCase("fr")))
+      )
+      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+      .filter((item) => {
+        const key = [item.description?.trim().toLocaleLowerCase("fr") ?? "", item.amount,
+          item.metadata.quantity ?? "", item.metadata.unitPrice ?? ""].join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5);
+  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, selectedActivityCode, transactionForm.description, waterOperationKind, waterSuggestionHistory]);
   const agencyOperationKind = selectedActivityCode === "REAL_ESTATE_AGENCY"
     ? getAgencyOperationKind(transactionForm.type, transactionForm.metadata)
     : "SALE_COMMISSION";
@@ -3210,7 +3261,6 @@ export function FinanceTransactionsPage(): JSX.Element {
       selectedActivityCode === "LIVESTOCK" ||
       selectedActivityCode === "GENERAL_EXPENSES"
   );
-  const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
   const enabledActivityCodes = useMemo(
     () => enabledActivities.map((item) => item.code),
     [enabledActivities]
@@ -3412,7 +3462,8 @@ export function FinanceTransactionsPage(): JSX.Element {
         if (!selectedActivityCode) {
           return {
             accounts: [] as FinancialAccount[],
-            transactions: [] as FinancialTransaction[]
+            transactions: [] as FinancialTransaction[],
+            waterHistory: [] as FinancialTransaction[]
           };
         }
 
@@ -3425,14 +3476,26 @@ export function FinanceTransactionsPage(): JSX.Element {
             offset,
             type: filters.type === "ALL" ? undefined : filters.type,
             activityCode: selectedActivityCode
-          })
-        ]).then(([accountsResp, transactionsResp]) => ({
+          }),
+          selectedActivityCode === "WATER" && filters.type !== "ALL" && !append
+            ? listFinanceTransactionsRequest(accessToken, {
+                limit: TRANSACTIONS_PAGE_SIZE,
+                activityCode: "WATER"
+              }).catch(() => null)
+            : Promise.resolve(null)
+        ]).then(([accountsResp, transactionsResp, waterHistoryResp]) => ({
           accounts: accountsResp.items,
-          transactions: transactionsResp.items
+          transactions: transactionsResp.items,
+          waterHistory: selectedActivityCode === "WATER"
+            ? (waterHistoryResp?.items ?? (append ? [] : transactionsResp.items))
+            : []
         }));
       });
       setHasMoreTransactions(payload.transactions.length === TRANSACTIONS_PAGE_SIZE);
       setAccounts(payload.accounts);
+      if (!append) {
+        setWaterSuggestionHistory(payload.waterHistory);
+      }
       setTransactions((prev) => {
         if (!append) {
           return payload.transactions;
@@ -4108,10 +4171,16 @@ export function FinanceTransactionsPage(): JSX.Element {
 
     try {
       const response = await withAuthorizedToken((accessToken) => {
-        const metadata = cleanSectorFinanceMetadata(
+        const cleanedMetadata = cleanSectorFinanceMetadata(
           selectedActivityCode,
           transactionForm.type,
           transactionForm.metadata
+        );
+        const metadata = Object.fromEntries(
+          Object.entries(cleanedMetadata).map(([key, value]) => [
+            key,
+            isMoneyMetadataField(key) && value ? normalizeAmountForApi(value) : value
+          ])
         );
         const payload = {
           accountId: transactionForm.accountId,
@@ -4208,6 +4277,29 @@ export function FinanceTransactionsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     resetTransactionForm();
+  }
+
+  function applyWaterSuggestion(suggestion: FinancialTransaction): void {
+    const kind = getWaterOperationKind(suggestion.type, suggestion.metadata);
+    setTransactionForm((prev) => {
+      const metadata = cleanSectorFinanceMetadata("WATER", suggestion.type, {
+        ...prev.metadata,
+        [WATER_OPERATION_KIND_KEY]: kind,
+        quantity: suggestion.metadata.quantity ?? "",
+        unitPrice: suggestion.metadata.unitPrice ?? ""
+      });
+      return {
+        ...prev,
+        accountId: accounts.some((account) => account.id === suggestion.accountId)
+          ? suggestion.accountId
+          : prev.accountId,
+        type: suggestion.type,
+        amount: formatAmountForInput(deriveWaterAmount(kind, metadata) ?? suggestion.amount),
+        currency: suggestion.currency,
+        description: suggestion.description ?? "",
+        metadata
+      };
+    });
   }
 
   async function handleDeleteTransaction(transaction: FinancialTransaction): Promise<void> {
@@ -4528,13 +4620,13 @@ export function FinanceTransactionsPage(): JSX.Element {
               <span>Solde initial</span>
               <input
                 type="text"
-                inputMode="decimal"
-                placeholder="Ex: 100000.00"
+                inputMode="numeric"
+                placeholder="Ex: 100000"
                 value={accountForm.openingBalance}
                 onChange={(event) =>
                   setAccountForm((prev) => ({
                     ...prev,
-                    openingBalance: formatAmountForInput(event.target.value)
+                    openingBalance: formatEditableAmountForInput(event.target.value)
                   }))
                 }
                 onBlur={() =>
@@ -4661,13 +4753,13 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <span>Prix d'achat de référence</span>
                 <input
                   type="text"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   placeholder="Optionnel, ex: 5000"
                   value={articleForm.defaultPurchaseUnitPrice}
                   onChange={(event) =>
                     setArticleForm((prev) => ({
                       ...prev,
-                      defaultPurchaseUnitPrice: formatAmountForInput(event.target.value)
+                      defaultPurchaseUnitPrice: formatEditableAmountForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
@@ -4685,13 +4777,13 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <span>Bénéfice de référence</span>
                 <input
                   type="text"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   placeholder="Optionnel, ex: 1500"
                   value={articleForm.defaultMargin}
                   onChange={(event) =>
                     setArticleForm((prev) => ({
                       ...prev,
-                      defaultMargin: formatAmountForInput(event.target.value)
+                      defaultMargin: formatEditableAmountForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
@@ -4819,13 +4911,13 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <span>Loyer mensuel</span>
                 <input
                   type="text"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   placeholder="Ex: 30000"
                   value={tenantForm.monthlyRent}
                   onChange={(event) =>
                     setTenantForm((prev) => ({
                       ...prev,
-                      monthlyRent: formatAmountForInput(event.target.value)
+                      monthlyRent: formatEditableAmountForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
@@ -5347,13 +5439,15 @@ export function FinanceTransactionsPage(): JSX.Element {
                             [HARDWARE_OPERATION_KIND_KEY]: nextKind
                           }
                         );
-                        const derivedAmount = nextKind === "GLOBAL"
+                        const derivedAmount = nextKind === "GLOBAL" || nextKind === "RECOUVREMENT"
                           ? null
                           : deriveSectorAmount(selectedActivityCode, nextType, nextMetadata);
                         return {
                           ...prev,
                           type: nextType,
-                          amount: nextKind === "GLOBAL" ? "" : formatAmountForInput(derivedAmount ?? ""),
+                          amount: nextKind === "GLOBAL" || nextKind === "RECOUVREMENT"
+                            ? ""
+                            : formatAmountForInput(derivedAmount ?? ""),
                           metadata: nextMetadata
                         };
                       });
@@ -5361,6 +5455,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   >
                     <option value="GLOBAL">{HARDWARE_OPERATION_LABELS.GLOBAL}</option>
                     <option value="ITEM_ENTRY">{HARDWARE_OPERATION_LABELS.ITEM_ENTRY}</option>
+                    <option value="RECOUVREMENT">{HARDWARE_OPERATION_LABELS.RECOUVREMENT}</option>
                     {hardwareOperationKind === "ITEM_EXIT" ? (
                       <option value="ITEM_EXIT">{HARDWARE_OPERATION_LABELS.ITEM_EXIT}</option>
                     ) : null}
@@ -5397,7 +5492,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                     <span>Flux financier</span>
                     <strong>
                       {transactionForm.type === "CASH_IN"
-                        ? "Vente"
+                        ? HARDWARE_OPERATION_LABELS[hardwareOperationKind]
                         : "Achat"}
                     </strong>
                   </div>
@@ -5902,13 +5997,13 @@ export function FinanceTransactionsPage(): JSX.Element {
               <span>Montant</span>
               <input
                 type="text"
-                inputMode="decimal"
+                inputMode="numeric"
                 placeholder="Montant"
                 value={transactionForm.amount}
                 onChange={(event) =>
                   setTransactionForm((prev) => ({
                     ...prev,
-                    amount: formatAmountForInput(event.target.value)
+                    amount: formatEditableAmountForInput(event.target.value)
                   }))
                 }
                 onBlur={() =>
@@ -6034,6 +6129,28 @@ export function FinanceTransactionsPage(): JSX.Element {
                 <p className="hint finance-form-mode-hint">
                   {getWaterFormModeLabel(waterOperationKind)}
                 </p>
+              ) : null}
+              {selectedActivityCode === "WATER" && waterSuggestions.length > 0 ? (
+                <div className="water-transaction-suggestions">
+                  <strong>Suggestions récentes pour cette catégorie</strong>
+                  <span className="hint">Sélectionnez une transaction pour préremplir la saisie, puis vérifiez les valeurs.</span>
+                  <div className="water-transaction-suggestions-list">
+                    {waterSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        className="water-transaction-suggestion"
+                        onClick={() => applyWaterSuggestion(suggestion)}
+                      >
+                        <span>{suggestion.description?.trim() || WATER_OPERATION_LABELS[waterOperationKind]}</span>
+                        <strong>{formatAmountForDisplay(suggestion.amount)} {suggestion.currency}</strong>
+                        {waterOperationKind === "WATER_SALE" && suggestion.metadata.quantity && suggestion.metadata.unitPrice ? (
+                          <small>{suggestion.metadata.quantity} paquets × {formatAmountForDisplay(suggestion.metadata.unitPrice)} {suggestion.currency}</small>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : null}
               {selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
                 <p className="hint finance-form-mode-hint">
@@ -6262,6 +6379,29 @@ export function FinanceTransactionsPage(): JSX.Element {
                   );
                 }
 
+                if (selectedActivityCode === "HARDWARE" && field.key === "recipientRef") {
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>Remis à / quincaillerie</span>
+                      <input
+                        type="text"
+                        list="hardware-recipients"
+                        placeholder="Nom de la personne ou de la quincaillerie"
+                        value={transactionForm.metadata.recipientRef ?? ""}
+                        onChange={(event) => setTransactionForm((prev) => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, recipientRef: event.target.value }
+                        }))}
+                        required={hardwareOperationKind === "ITEM_ENTRY" || hardwareOperationKind === "RECOUVREMENT"}
+                      />
+                      <datalist id="hardware-recipients">
+                        {hardwareRecipients.map((recipient) => <option key={recipient} value={recipient} />)}
+                      </datalist>
+                      <small className="hint">Utilisez le même nom pour les achats remis et les recouvrements.</small>
+                    </label>
+                  );
+                }
+
                 if (selectedActivityCode === "HARDWARE" && field.key === "itemName") {
                   const itemNameValue = transactionForm.metadata.itemName ?? "";
                   const matchesCatalogArticle = articles.some(
@@ -6362,12 +6502,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                   <span>{field.label}</span>
                   <input
                     type="text"
-                    inputMode={getMetadataInputMode(field.key)}
+                    inputMode={isMoneyMetadataField(field.key) ? "numeric" : getMetadataInputMode(field.key)}
                     placeholder={field.helpText || field.label}
                     value={transactionForm.metadata[field.key] ?? ""}
                     onChange={(event) => {
                       const nextValue = isMoneyMetadataField(field.key)
-                        ? formatAmountForInput(event.target.value)
+                        ? formatEditableAmountForInput(event.target.value)
                         : event.target.value;
                       setTransactionForm((prev) => {
                         const nextMetadata = {

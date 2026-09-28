@@ -8,6 +8,7 @@ import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   formatAmountForDisplay as formatLocalizedAmountForDisplay,
   formatAmountForInput as formatLocalizedAmountForInput,
+  formatEditableAmountForInput as formatLocalizedEditableAmountForInput,
   normalizeAmountForApi as normalizeLocalizedAmountForApi,
   toAmountNumber as toLocalizedAmountNumber
 } from "../lib/amountFormatting";
@@ -105,6 +106,10 @@ function formatMoneyForDisplay(input: string | number): string {
 
 function formatMoneyForInput(input: string): string {
   return formatLocalizedAmountForInput(input);
+}
+
+function formatEditableMoneyForInput(input: string): string {
+  return formatLocalizedEditableAmountForInput(input);
 }
 
 function formatNetSalary(gross: string, bonus: string, deduction: string): string {
@@ -940,12 +945,13 @@ export function FinanceSalariesPage(): JSX.Element {
                 <span className="salary-amount-label">Brut</span>
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Salaire brut"
                   value={salaryForm.grossAmount}
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
                       ...prev,
-                      grossAmount: formatMoneyForInput(event.target.value)
+                      grossAmount: formatEditableMoneyForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
@@ -961,12 +967,13 @@ export function FinanceSalariesPage(): JSX.Element {
                 <span className="salary-amount-label is-positive">+ Prime</span>
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Montant ajouté"
                   value={salaryForm.bonusAmount}
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
                       ...prev,
-                      bonusAmount: formatMoneyForInput(event.target.value)
+                      bonusAmount: formatEditableMoneyForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>
@@ -981,12 +988,13 @@ export function FinanceSalariesPage(): JSX.Element {
                 <span className="salary-amount-label is-negative">- Retenue</span>
                 <input
                   type="text"
+                  inputMode="numeric"
                   placeholder="Montant déduit"
                   value={salaryForm.deductionAmount}
                   onChange={(event) =>
                     setSalaryForm((prev) => ({
                       ...prev,
-                      deductionAmount: formatMoneyForInput(event.target.value)
+                      deductionAmount: formatEditableMoneyForInput(event.target.value)
                     }))
                   }
                   onBlur={() =>

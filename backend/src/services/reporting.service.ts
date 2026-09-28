@@ -24,6 +24,7 @@ import {
   listReportBtpTransactions,
   listReportGeneralStoreInventorySnapshots,
   listReportGeneralStoreTransactions,
+  listReportHardwareTransactions,
   listReportOperationalTasks,
   listReportOperationalTransactions,
   listReportRentalTransactions,
@@ -215,7 +216,7 @@ const GENERAL_STORE_OPERATION_LABELS: Record<string, string> = {
   RECOUVREMENT: "Recouvrement"
 };
 const GENERAL_STORE_REPORT_BRANDING = {
-  title: "SITUATION DES BOUTIQUES",
+  title: "MAGASIN (COMMERCE GENERAL)",
   subtitle: "Suivi des achats livrés et des recouvrements par boutique",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
@@ -254,7 +255,7 @@ const FOOD_REPORT_BRANDING = {
   phone: "TEL: 79 07 24 40"
 };
 const RENTAL_REPORT_BRANDING = {
-  title: "SITUATION LOYER",
+  title: "LOCATION IMMOBILIERE",
   subtitle: "Suivi mensuel des paiements de loyer par locataire",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
@@ -360,7 +361,7 @@ const BTP_OPERATION_LABELS: Record<string, string> = {
   SITE_EXPENSE: "Charge chantier"
 };
 const BTP_REPORT_BRANDING = {
-  title: "SITUATION DES CHANTIERS",
+  title: "BATIMENT ET TRAVAUX PUBLICS",
   subtitle: "Encaissements, coûts par nature et marge par chantier",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
@@ -1110,6 +1111,10 @@ function drawHardwareReportHeader(doc: PDFKit.PDFDocument, report: HardwareMonth
 }
 
 function drawHardwareContinuationHeader(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport): void {
+  drawSectorContinuationHeader(doc, toHardwarePdfTitle(report), report.periodLabel);
+}
+
+function drawSectorContinuationHeader(doc: PDFKit.PDFDocument, title: string, periodLabel: string): void {
   const pageWidth = doc.page.width;
   const margin = PDF_PAGE_MARGIN;
 
@@ -1118,14 +1123,14 @@ function drawHardwareContinuationHeader(doc: PDFKit.PDFDocument, report: Hardwar
     .fillColor("#111827")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text(`${toHardwarePdfTitle(report)} - suite`, margin + 44, 28, {
+    .text(`${title} - suite`, margin + 44, 28, {
       width: pageWidth - margin * 2 - 88
     });
   doc
     .fillColor("#486581")
     .font("Helvetica-Bold")
     .fontSize(9)
-    .text(`Période: ${report.periodLabel}`, margin + 44, 43, {
+    .text(`Période: ${periodLabel}`, margin + 44, 43, {
       width: pageWidth - margin * 2 - 88
     });
   doc
@@ -1229,9 +1234,9 @@ function drawHardwareMetricCards(doc: PDFKit.PDFDocument, report: HardwareMonthl
 function toHardwarePdfTitle(report: HardwareMonthlyReport): string {
   const designations = Array.from(new Set(report.rows.map((item) => item.designation.trim()).filter(Boolean)));
   if (designations.length === 1) {
-    return `ACHAT DE ${truncatePdfText(designations[0].toUpperCase(), 38)} - QUINCAILLERIE`;
+    return `QUINCAILLERIE - ${truncatePdfText(designations[0].toUpperCase(), 38)}`;
   }
-  return "RAPPORT DES ACHATS QUINCAILLERIE";
+  return "RAPPORT QUINCAILLERIE";
 }
 
 function drawHardwareTableHeader(doc: PDFKit.PDFDocument, y: number): number {
@@ -1369,15 +1374,81 @@ function drawHardwareMonthlyTable(doc: PDFKit.PDFDocument, report: HardwareMonth
   doc.y = drawHardwareTotalsRow(doc, report, y) + 12;
 }
 
+function drawHardwareRecipientTable(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  const widths = [0.19, 0.135, 0.135, 0.135, 0.135, 0.135, 0.135]
+    .map((part) => (doc.page.width - margin * 2) * part);
+  const headers = ["DESTINATAIRE", "ACHATS", "BENEFICE", "ATTENDU", "RECOUVRE", "ECART ACHATS", "RESTE"];
+  const drawHeader = (startY: number): number => {
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11)
+      .text("SITUATION DES REMISES ET RECOUVREMENTS", margin, startY, { width: doc.page.width - margin * 2 });
+    let x = margin;
+    const y = startY + 20;
+    headers.forEach((header, index) => {
+      drawPdfTableCell(doc, header, x, y, widths[index], 28, {
+        align: index === 0 ? "left" : "center", fill: "#e7f1dc", font: "Helvetica-Bold", fontSize: 8
+      });
+      x += widths[index];
+    });
+    return y + 28;
+  };
+  if (doc.y + 80 > tableBottom) {
+    doc.addPage();
+    drawHardwareContinuationHeader(doc, report);
+  }
+  let y = drawHeader(doc.y);
+  for (const row of report.recipientRows) {
+    if (y + 25 + 30 > tableBottom) {
+      doc.addPage();
+      drawHardwareContinuationHeader(doc, report);
+      y = drawHeader(doc.y);
+    }
+    const values = [row.recipientRef, row.purchaseAmount, row.grossProfit,
+      row.expectedReturnAmount, row.collectedAmount, row.purchaseVarianceAmount, row.balanceAmount];
+    let x = margin;
+    values.forEach((value, index) => {
+      drawPdfTableCell(doc, index === 0 ? truncatePdfText(value, 22) : formatPdfMoney(value),
+        x, y, widths[index], 25, { align: index === 0 ? "left" : "right", fontSize: 8 });
+      x += widths[index];
+    });
+    y += 25;
+  }
+  if (y + 30 > tableBottom) {
+    doc.addPage();
+    drawHardwareContinuationHeader(doc, report);
+    y = drawHeader(doc.y);
+  }
+  const totals = report.totals;
+  const totalValues = ["TOTAL", totals.assignedPurchaseAmount, totals.assignedGrossProfit,
+    totals.expectedReturnAmount, totals.collectedAmount, totals.purchaseVarianceAmount, totals.balanceAmount];
+  let x = margin;
+  totalValues.forEach((value, index) => {
+    drawPdfTableCell(doc, index === 0 ? value : formatPdfMoney(value), x, y, widths[index], 30,
+      { align: index === 0 ? "left" : "right", fill: "#f7fbf4", font: "Helvetica-Bold", fontSize: 8 });
+    x += widths[index];
+  });
+  doc.y = y + 40;
+}
+
 function buildEmptyHardwareMonthlyReport(filters: ReportPeriodFilter): HardwareMonthlyReport {
   return {
     periodLabel: toHardwarePeriodLabel(filters),
     rows: [],
+    recipientRows: [],
     totals: {
       quantity: 0,
       purchaseUnitPrice: "0.00",
       purchaseAmount: "0.00",
       grossProfit: "0.00",
+      assignedPurchaseAmount: "0.00",
+      assignedGrossProfit: "0.00",
+      expectedReturnAmount: "0.00",
+      collectedAmount: "0.00",
+      purchaseVarianceAmount: "0.00",
+      balanceAmount: "0.00",
+      unassignedPurchasesCount: 0,
+      unassignedCollectionsCount: 0,
       transactionsCount: 0,
       currency: "XOF"
     }
@@ -1435,9 +1506,10 @@ function renderHardwareReportsPdf(
   drawHardwareMetadataStrip(doc, report, filters, overview.generatedAt);
   drawHardwareMetricCards(doc, report);
   drawHardwareMonthlyTable(doc, report);
+  drawHardwareRecipientTable(doc, report);
 
   const note =
-    "Lecture: les montants sont consolidés en F CFA. Le bénéfice correspond au bénéfice de référence renseigné sur chaque achat.";
+    `Lecture: écart achats = achats remis - recouvré ; reste attendu = achats + bénéfice prévu - recouvré. Sans destinataire: ${report.totals.unassignedPurchasesCount} achat(s), ${report.totals.unassignedCollectionsCount} recouvrement(s) exclus.`;
   const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
   const noteHeight = doc.heightOfString(note, {
     width: noteWidth
@@ -1542,31 +1614,7 @@ function drawGeneralExpensesReportHeader(doc: PDFKit.PDFDocument, report: Genera
 }
 
 function drawGeneralExpensesContinuationHeader(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-
-  drawAmccoPdfLogo(doc, margin, 22, 34);
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(11)
-    .text(`DEPENSES GENERALES - suite`, margin + 44, 28, {
-      width: pageWidth - margin * 2 - 88
-    });
-  doc
-    .fillColor("#486581")
-    .font("Helvetica-Bold")
-    .fontSize(9)
-    .text(`Période: ${report.periodLabel}`, margin + 44, 43, {
-      width: pageWidth - margin * 2 - 88
-    });
-  doc
-    .moveTo(margin, 62)
-    .lineTo(pageWidth - margin, 62)
-    .strokeColor("#d7e3f1")
-    .lineWidth(1)
-    .stroke();
-  doc.y = 76;
+  drawSectorContinuationHeader(doc, GENERAL_EXPENSES_REPORT_BRANDING.title, report.periodLabel);
 }
 
 function drawGeneralExpensesMetadataStrip(
@@ -2554,11 +2602,15 @@ function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralSt
     align: "center"
   });
   doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#4f46e5").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SITUATION DES BOUTIQUES", margin, 114, {
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION DES BOUTIQUES - ${report.periodLabel.toUpperCase()}`, margin, 114, {
     width: pageWidth - margin * 2,
     align: "center"
   });
-  doc.y = 140;
+  doc.y = 144;
+}
+
+function drawGeneralStoreContinuationHeader(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
+  drawSectorContinuationHeader(doc, "SITUATION DES BOUTIQUES", report.periodLabel);
 }
 
 function drawGeneralStoreMetadataStrip(
@@ -2718,14 +2770,14 @@ function drawGeneralStoreOperationsTable(doc: PDFKit.PDFDocument, report: Genera
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
   if (doc.y + 27 + 24 + 27 > tableBottom) {
     doc.addPage();
-    drawGeneralStoreReportHeader(doc, report);
+    drawGeneralStoreContinuationHeader(doc, report);
   }
   let y = drawGeneralStoreTableHeader(doc, doc.y);
 
   for (const row of report.rows) {
     if (y + 24 + 27 > tableBottom) {
       doc.addPage();
-      drawGeneralStoreReportHeader(doc, report);
+      drawGeneralStoreContinuationHeader(doc, report);
       y = drawGeneralStoreTableHeader(doc, doc.y);
     }
     y = drawGeneralStoreDataRow(doc, row, y);
@@ -2733,7 +2785,7 @@ function drawGeneralStoreOperationsTable(doc: PDFKit.PDFDocument, report: Genera
 
   if (y + 27 > tableBottom) {
     doc.addPage();
-    drawGeneralStoreReportHeader(doc, report);
+    drawGeneralStoreContinuationHeader(doc, report);
     y = drawGeneralStoreTableHeader(doc, doc.y);
   }
   doc.y = drawGeneralStoreTotalsRow(doc, report, y) + 12;
@@ -3333,6 +3385,10 @@ function drawRentalReportHeader(doc: PDFKit.PDFDocument, report: RentalOperation
   doc.y = 144;
 }
 
+function drawRentalContinuationHeader(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
+  drawSectorContinuationHeader(doc, toRentalPdfTitle(report), report.periodLabel);
+}
+
 function drawRentalMetadataStrip(
   doc: PDFKit.PDFDocument,
   report: RentalOperationsReport,
@@ -3563,7 +3619,7 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
   if (needsPdfPageBreak(doc, 78)) {
     doc.addPage();
-    drawRentalReportHeader(doc, report);
+    drawRentalContinuationHeader(doc, report);
   }
   doc
     .fillColor("#115e59")
@@ -3578,7 +3634,7 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
   for (const row of report.rows) {
     if (y + 26 + 28 > tableBottom) {
       doc.addPage();
-      drawRentalReportHeader(doc, report);
+      drawRentalContinuationHeader(doc, report);
       y = drawRentalTableHeader(doc, doc.y);
     }
     y = drawRentalDataRow(doc, row, y);
@@ -3586,7 +3642,7 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
 
   if (y + 28 > tableBottom) {
     doc.addPage();
-    drawRentalReportHeader(doc, report);
+    drawRentalContinuationHeader(doc, report);
     y = drawRentalTableHeader(doc, doc.y);
   }
   doc.y = drawRentalTotalsRow(doc, report, y) + 6;
@@ -3600,7 +3656,7 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
   const breakdownHeight = 34 + 24 + report.operationRows.length * 24;
   if (needsPdfPageBreak(doc, breakdownHeight)) {
     doc.addPage();
-    drawRentalReportHeader(doc, report);
+    drawRentalContinuationHeader(doc, report);
   }
 
   doc
@@ -3633,7 +3689,7 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
   for (const row of report.operationRows) {
     if (y + 24 > doc.page.height - PDF_CONTENT_BOTTOM) {
       doc.addPage();
-      drawRentalReportHeader(doc, report);
+      drawRentalContinuationHeader(doc, report);
       y = doc.y;
       x = PDF_PAGE_MARGIN;
       for (const column of columns) {
@@ -3686,7 +3742,7 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
   if (needsPdfPageBreak(doc, 90)) {
     doc.addPage();
-    drawRentalReportHeader(doc, report);
+    drawRentalContinuationHeader(doc, report);
   }
 
   doc
@@ -3714,7 +3770,7 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
   for (const row of report.depositRows) {
     if (y + 26 > tableBottom) {
       doc.addPage();
-      drawRentalReportHeader(doc, report);
+      drawRentalContinuationHeader(doc, report);
       y = doc.y;
       x = PDF_PAGE_MARGIN;
       for (const column of RENTAL_DEPOSIT_PDF_COLUMNS) {
@@ -4318,31 +4374,7 @@ function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsR
 }
 
 function drawWaterContinuationHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-
-  drawAmccoPdfLogo(doc, margin, 22, 34);
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(11)
-    .text("PRODUCTION D'EAU - suite", margin + 44, 28, {
-      width: pageWidth - margin * 2 - 88
-    });
-  doc
-    .fillColor("#486581")
-    .font("Helvetica-Bold")
-    .fontSize(9)
-    .text(`Période: ${report.periodLabel}`, margin + 44, 43, {
-      width: pageWidth - margin * 2 - 88
-    });
-  doc
-    .moveTo(margin, 62)
-    .lineTo(pageWidth - margin, 62)
-    .strokeColor("#d7e3f1")
-    .lineWidth(1)
-    .stroke();
-  doc.y = 76;
+  drawSectorContinuationHeader(doc, "PRODUCTION D'EAU", report.periodLabel);
 }
 
 function drawWaterMetadataStrip(
@@ -5090,11 +5122,15 @@ function drawBtpReportHeader(doc: PDFKit.PDFDocument, report: BtpOperationsRepor
     align: "center"
   });
   doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#d97706").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text("SITUATION DES CHANTIERS", margin, 114, {
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION DES CHANTIERS - ${report.periodLabel.toUpperCase()}`, margin, 114, {
     width: pageWidth - margin * 2,
     align: "center"
   });
-  doc.y = 140;
+  doc.y = 144;
+}
+
+function drawBtpContinuationHeader(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
+  drawSectorContinuationHeader(doc, "SITUATION DES CHANTIERS", report.periodLabel);
 }
 
 function drawBtpMetadataStrip(
@@ -5256,14 +5292,14 @@ function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsRe
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
   if (doc.y + 27 + 24 + 27 > tableBottom) {
     doc.addPage();
-    drawBtpReportHeader(doc, report);
+    drawBtpContinuationHeader(doc, report);
   }
   let y = drawBtpTableHeader(doc, doc.y);
 
   for (const row of report.rows) {
     if (y + 24 + 27 > tableBottom) {
       doc.addPage();
-      drawBtpReportHeader(doc, report);
+      drawBtpContinuationHeader(doc, report);
       y = drawBtpTableHeader(doc, doc.y);
     }
     y = drawBtpDataRow(doc, row, y);
@@ -5271,7 +5307,7 @@ function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsRe
 
   if (y + 27 > tableBottom) {
     doc.addPage();
-    drawBtpReportHeader(doc, report);
+    drawBtpContinuationHeader(doc, report);
     y = drawBtpTableHeader(doc, doc.y);
   }
   doc.y = drawBtpTotalsRow(doc, report, y) + 12;
@@ -6496,7 +6532,7 @@ function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<strin
       item: "totals",
       label: `Quincaillerie ${overview.hardwareMonthlyReport.periodLabel}`,
       value: overview.hardwareMonthlyReport.totals.purchaseAmount,
-      extra: `quantité ${overview.hardwareMonthlyReport.totals.quantity} | montant achats ${overview.hardwareMonthlyReport.totals.purchaseAmount} XOF | bénéfice ${overview.hardwareMonthlyReport.totals.grossProfit} XOF | lignes ${overview.hardwareMonthlyReport.totals.transactionsCount}`
+      extra: `quantité ${overview.hardwareMonthlyReport.totals.quantity} | achats ${overview.hardwareMonthlyReport.totals.purchaseAmount} XOF | bénéfice ${overview.hardwareMonthlyReport.totals.grossProfit} XOF | recouvré ${overview.hardwareMonthlyReport.totals.collectedAmount} XOF | écart achats ${overview.hardwareMonthlyReport.totals.purchaseVarianceAmount} XOF | reste attendu ${overview.hardwareMonthlyReport.totals.balanceAmount} XOF | lignes ${overview.hardwareMonthlyReport.totals.transactionsCount}`
     });
   }
 
@@ -6667,6 +6703,20 @@ function buildHardwareMonthlyReportRows(overview: ReportsOverview): Array<Record
     purchaseUnitPrice: item.purchaseUnitPrice,
     purchaseAmount: item.purchaseAmount,
     grossProfit: item.grossProfit,
+    transactionsCount: item.transactionsCount,
+    currency: item.currency
+  }));
+}
+
+function buildHardwareRecipientReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.hardwareMonthlyReport?.recipientRows ?? []).map((item) => ({
+    recipientRef: item.recipientRef,
+    purchaseAmount: item.purchaseAmount,
+    grossProfit: item.grossProfit,
+    expectedReturnAmount: item.expectedReturnAmount,
+    collectedAmount: item.collectedAmount,
+    purchaseVarianceAmount: item.purchaseVarianceAmount,
+    balanceAmount: item.balanceAmount,
     transactionsCount: item.transactionsCount,
     currency: item.currency
   }));
@@ -7339,6 +7389,7 @@ function isHardwareReportablePurchase(transaction: ReportOperationalTransaction)
 
 function buildHardwareMonthlyReport(
   transactions: ReportOperationalTransaction[],
+  allHardwareTransactions: ReportOperationalTransaction[],
   filters: ReportPeriodFilter
 ): HardwareMonthlyReport | null {
   if (filters.activityCode && filters.activityCode !== "HARDWARE") {
@@ -7349,7 +7400,67 @@ function buildHardwareMonthlyReport(
     (transaction) => transaction.activityCode === "HARDWARE"
   );
   const reportableTransactions = hardwareTransactions.filter(isHardwareReportablePurchase);
-  if (!filters.activityCode && reportableTransactions.length === 0) {
+  const asOfIso = filters.dateTo ?? new Date().toISOString();
+  const recipientLedger = new Map<string, {
+    recipientRef: string;
+    purchaseAmount: number;
+    grossProfit: number;
+    collectedAmount: number;
+    transactionsCount: number;
+  }>();
+  let unassignedPurchasesCount = 0;
+  let unassignedCollectionsCount = 0;
+
+  for (const transaction of allHardwareTransactions) {
+    if (!isSectorReportableTransaction(transaction, "HARDWARE") || transaction.occurredAt > asOfIso) {
+      continue;
+    }
+    const operationKind = transaction.metadata.hardwareOperationKind?.trim();
+    const isPurchase = operationKind !== "GLOBAL" && isHardwareReportablePurchase(transaction);
+    const isCollection = transaction.type === "CASH_IN" &&
+      (operationKind === "RECOUVREMENT" || operationKind === "ITEM_EXIT");
+    if (!isPurchase && !isCollection) {
+      continue;
+    }
+    const recipientRef = transaction.metadata.recipientRef?.trim().replace(/\s+/g, " ");
+    if (!recipientRef) {
+      if (isPurchase) unassignedPurchasesCount += 1;
+      if (isCollection) unassignedCollectionsCount += 1;
+      continue;
+    }
+    const key = recipientRef.normalize("NFKC").toLocaleLowerCase("fr");
+    const ledger = recipientLedger.get(key) ?? {
+      recipientRef,
+      purchaseAmount: 0,
+      grossProfit: 0,
+      collectedAmount: 0,
+      transactionsCount: 0
+    };
+    if (isPurchase) {
+      ledger.purchaseAmount += toNumberAmount(transaction.amount);
+      ledger.grossProfit += getMetadataNumber(transaction.metadata, "marginAmount");
+    } else {
+      ledger.collectedAmount += toNumberAmount(transaction.amount);
+    }
+    ledger.transactionsCount += 1;
+    recipientLedger.set(key, ledger);
+  }
+
+  const recipientRows = [...recipientLedger.values()]
+    .map((ledger) => ({
+      recipientRef: ledger.recipientRef,
+      purchaseAmount: toMoneyString(ledger.purchaseAmount),
+      grossProfit: toMoneyString(ledger.grossProfit),
+      expectedReturnAmount: toMoneyString(ledger.purchaseAmount + ledger.grossProfit),
+      collectedAmount: toMoneyString(ledger.collectedAmount),
+      purchaseVarianceAmount: toMoneyString(ledger.purchaseAmount - ledger.collectedAmount),
+      balanceAmount: toMoneyString(ledger.purchaseAmount + ledger.grossProfit - ledger.collectedAmount),
+      transactionsCount: ledger.transactionsCount,
+      currency: "XOF" as const
+    }))
+    .sort((left, right) => left.recipientRef.localeCompare(right.recipientRef, "fr"));
+  if (!filters.activityCode && reportableTransactions.length === 0 && recipientRows.length === 0 &&
+      unassignedPurchasesCount === 0 && unassignedCollectionsCount === 0) {
     return null;
   }
 
@@ -7398,11 +7509,20 @@ function buildHardwareMonthlyReport(
   return {
     periodLabel: toHardwarePeriodLabel(filters),
     rows,
+    recipientRows,
     totals: {
       quantity: totals.quantity,
       purchaseUnitPrice: toMoneyString(totals.purchaseUnitPriceValue),
       purchaseAmount: toMoneyString(totals.purchaseAmountValue),
       grossProfit: toMoneyString(totals.grossProfitValue),
+      assignedPurchaseAmount: toMoneyString(recipientRows.reduce((sum, row) => sum + toNumberAmount(row.purchaseAmount), 0)),
+      assignedGrossProfit: toMoneyString(recipientRows.reduce((sum, row) => sum + toNumberAmount(row.grossProfit), 0)),
+      expectedReturnAmount: toMoneyString(recipientRows.reduce((sum, row) => sum + toNumberAmount(row.expectedReturnAmount), 0)),
+      collectedAmount: toMoneyString(recipientRows.reduce((sum, row) => sum + toNumberAmount(row.collectedAmount), 0)),
+      purchaseVarianceAmount: toMoneyString(recipientRows.reduce((sum, row) => sum + toNumberAmount(row.purchaseVarianceAmount), 0)),
+      balanceAmount: toMoneyString(recipientRows.reduce((sum, row) => sum + toNumberAmount(row.balanceAmount), 0)),
+      unassignedPurchasesCount,
+      unassignedCollectionsCount,
       transactionsCount: totals.transactionsCount,
       currency: "XOF" as const
     }
@@ -10850,6 +10970,7 @@ export async function getCompanyReportsOverview(
 
   const shouldLoadRentalData = !filters.activityCode || filters.activityCode === "RENTAL";
   const shouldLoadGeneralStoreData = !filters.activityCode || filters.activityCode === "GENERAL_STORE";
+  const shouldLoadHardwareData = !filters.activityCode || filters.activityCode === "HARDWARE";
   const shouldLoadBtpData = !filters.activityCode || filters.activityCode === "BTP";
 
   const [
@@ -10866,6 +10987,7 @@ export async function getCompanyReportsOverview(
     generalStoreTransactions,
     generalStoreShops,
     generalStoreInventorySnapshots,
+    hardwareTransactions,
     btpTransactions,
     btpProjects
   ] =
@@ -10893,6 +11015,9 @@ export async function getCompanyReportsOverview(
       shouldLoadGeneralStoreData
         ? listReportGeneralStoreInventorySnapshots(actor.companyId)
         : Promise.resolve([] as GeneralStoreInventorySnapshot[]),
+      shouldLoadHardwareData
+        ? listReportHardwareTransactions(actor.companyId)
+        : Promise.resolve([] as ReportOperationalTransaction[]),
       shouldLoadBtpData
         ? listReportBtpTransactions(actor.companyId)
         : Promise.resolve([] as ReportOperationalTransaction[]),
@@ -10949,7 +11074,7 @@ export async function getCompanyReportsOverview(
     taskByStatus,
     taskByActivity: taskByActivitySummary,
     operationalPerformance: buildOperationalPerformance(operationalTransactions, operationalTasks),
-    hardwareMonthlyReport: buildHardwareMonthlyReport(operationalTransactions, filters),
+    hardwareMonthlyReport: buildHardwareMonthlyReport(operationalTransactions, hardwareTransactions, filters),
     agricultureOperationsReport: buildAgricultureOperationsReport(operationalTransactions, operationalTasks, filters),
     generalStoreOperationsReport: buildGeneralStoreOperationsReport(
       generalStoreTransactions,
@@ -11134,6 +11259,11 @@ export async function exportCompanyTransactionsExcel(
         "transactionsCount",
         "currency"
       ]
+    },
+    {
+      name: "RecouvrementQuincaillerie",
+      rows: buildHardwareRecipientReportRows(overview),
+      columns: ["recipientRef", "purchaseAmount", "grossProfit", "expectedReturnAmount", "collectedAmount", "purchaseVarianceAmount", "balanceAmount", "transactionsCount", "currency"]
     },
     {
       name: "DepensesGeneralesPDG",
@@ -11619,6 +11749,11 @@ export async function exportCompanyTasksExcel(
         "transactionsCount",
         "currency"
       ]
+    },
+    {
+      name: "RecouvrementQuincaillerie",
+      rows: buildHardwareRecipientReportRows(overview),
+      columns: ["recipientRef", "purchaseAmount", "grossProfit", "expectedReturnAmount", "collectedAmount", "purchaseVarianceAmount", "balanceAmount", "transactionsCount", "currency"]
     },
     {
       name: "DepensesGeneralesPDG",
@@ -12244,6 +12379,17 @@ export async function exportCompanyReportsPdf(
           `TOTAL | quantité ${hardwareReport.totals.quantity} | montant ${hardwareReport.totals.purchaseAmount} XOF | bénéfice ${hardwareReport.totals.grossProfit} XOF`
         ]),
         "Aucun achat quincaillerie comptabilisé sur cette période."
+      );
+      writePdfSectionTitle(doc, "Quincaillerie - écarts par destinataire");
+      writePdfList(
+        doc,
+        limitPdfRows([
+          ...hardwareReport.recipientRows.map((item) =>
+            `${item.recipientRef} | achats ${formatPdfMoney(item.purchaseAmount)} | recouvré ${formatPdfMoney(item.collectedAmount)} | écart achats ${formatPdfMoney(item.purchaseVarianceAmount)} | reste attendu ${formatPdfMoney(item.balanceAmount)}`
+          ),
+          `TOTAL | écart achats ${formatPdfMoney(hardwareReport.totals.purchaseVarianceAmount)} | reste attendu ${formatPdfMoney(hardwareReport.totals.balanceAmount)}`
+        ]),
+        "Aucun destinataire suivi."
       );
     }
 

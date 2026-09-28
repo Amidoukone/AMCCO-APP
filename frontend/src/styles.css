@@ -1862,6 +1862,41 @@ a {
   gap: 10px;
 }
 
+.water-transaction-suggestions {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid #b6d4fe;
+  border-radius: 10px;
+  background: #f7fbff;
+}
+
+.water-transaction-suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.finance-transaction-form .water-transaction-suggestion {
+  display: grid;
+  gap: 3px;
+  max-width: 100%;
+  text-align: left;
+  background: #ffffff;
+  color: #102a43;
+  border: 1px solid #b6d4fe;
+}
+
+.finance-transaction-form .water-transaction-suggestion:hover,
+.finance-transaction-form .water-transaction-suggestion:focus-visible {
+  border-color: #0b5ed7;
+  background: #eaf3ff;
+}
+
+.water-transaction-suggestion small {
+  color: #486581;
+}
+
 .finance-proof-callout {
   border-color: #b6d4fe;
   background: linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);

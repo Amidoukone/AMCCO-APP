@@ -20,6 +20,7 @@ import {
   listReportBtpTransactions,
   listReportGeneralStoreInventorySnapshots,
   listReportGeneralStoreTransactions,
+  listReportHardwareTransactions,
   listReportOperationalTasks,
   listReportOperationalTransactions,
   listReportRentalTransactions,
@@ -49,6 +50,7 @@ vi.mock("../repositories/reporting.repository.js", () => ({
   listReportBtpTransactions: vi.fn(),
   listReportGeneralStoreInventorySnapshots: vi.fn(),
   listReportGeneralStoreTransactions: vi.fn(),
+  listReportHardwareTransactions: vi.fn(),
   listReportOperationalTasks: vi.fn(),
   listReportOperationalTransactions: vi.fn(),
   listReportRentalTransactions: vi.fn(),
@@ -92,6 +94,7 @@ describe("reporting.service", () => {
     vi.mocked(listReportRentalTransactions).mockResolvedValue([]);
     vi.mocked(listRentalTenants).mockResolvedValue([]);
     vi.mocked(listReportGeneralStoreTransactions).mockResolvedValue([]);
+    vi.mocked(listReportHardwareTransactions).mockResolvedValue([]);
     vi.mocked(listGeneralStoreShops).mockResolvedValue([]);
     vi.mocked(listReportGeneralStoreInventorySnapshots).mockResolvedValue([]);
     vi.mocked(listReportBtpTransactions).mockResolvedValue([]);
@@ -464,6 +467,69 @@ describe("reporting.service", () => {
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("tracks hardware purchase and recovery variances by recipient as of the report date", async () => {
+    vi.mocked(listReportHardwareTransactions).mockResolvedValue([
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_OUT", amount: "10000.00", currency: "XOF",
+        occurredAt: "2026-04-15T09:00:00.000Z", metadata: { hardwareOperationKind: "ITEM_ENTRY", recipientRef: "Quincaillerie A", marginAmount: "2000" } },
+      { activityCode: "HARDWARE", status: "SUBMITTED", type: "CASH_OUT", amount: "5000.00", currency: "XOF",
+        occurredAt: "2026-05-02T09:00:00.000Z", metadata: { hardwareOperationKind: "ITEM_ENTRY", recipientRef: "  quincaillerie  a ", marginAmount: "1000" } },
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_IN", amount: "8000.00", currency: "XOF",
+        occurredAt: "2026-05-10T09:00:00.000Z", metadata: { hardwareOperationKind: "RECOUVREMENT", recipientRef: "Quincaillerie A" } },
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_IN", amount: "5000.00", currency: "XOF",
+        occurredAt: "2026-06-01T09:00:00.000Z", metadata: { hardwareOperationKind: "RECOUVREMENT", recipientRef: "Quincaillerie A" } },
+      { activityCode: "HARDWARE", status: "DRAFT", type: "CASH_IN", amount: "1000.00", currency: "XOF",
+        occurredAt: "2026-05-11T09:00:00.000Z", metadata: { hardwareOperationKind: "RECOUVREMENT", recipientRef: "Quincaillerie A" } },
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_OUT", amount: "3000.00", currency: "XOF",
+        occurredAt: "2026-05-12T09:00:00.000Z", metadata: { hardwareOperationKind: "ITEM_ENTRY", itemName: "Clous" } },
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_OUT", amount: "4000.00", currency: "XOF",
+        occurredAt: "2026-05-13T09:00:00.000Z", metadata: { hardwareOperationKind: "ITEM_ENTRY", recipientRef: "Quincaillerie B" } },
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_IN", amount: "5000.00", currency: "XOF",
+        occurredAt: "2026-05-14T09:00:00.000Z", metadata: { hardwareOperationKind: "RECOUVREMENT", recipientRef: "Quincaillerie B" } },
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_IN", amount: "500.00", currency: "XOF",
+        occurredAt: "2026-05-15T09:00:00.000Z", metadata: { hardwareOperationKind: "ITEM_EXIT" } },
+      { activityCode: "HARDWARE", status: "APPROVED", type: "CASH_OUT", amount: "2000.00", currency: "XOF",
+        description: "Charge globale", occurredAt: "2026-05-16T09:00:00.000Z", metadata: { hardwareOperationKind: "GLOBAL" } }
+    ]);
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "HARDWARE",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    });
+    expect(result.hardwareMonthlyReport?.recipientRows).toEqual([
+      expect.objectContaining({
+        recipientRef: "Quincaillerie A",
+        purchaseAmount: "15000.00",
+        grossProfit: "3000.00",
+        expectedReturnAmount: "18000.00",
+        collectedAmount: "8000.00",
+        purchaseVarianceAmount: "7000.00",
+        balanceAmount: "10000.00",
+        transactionsCount: 3
+      }),
+      expect.objectContaining({
+        recipientRef: "Quincaillerie B",
+        purchaseAmount: "4000.00",
+        collectedAmount: "5000.00",
+        purchaseVarianceAmount: "-1000.00",
+        balanceAmount: "-1000.00"
+      })
+    ]);
+    expect(result.hardwareMonthlyReport?.totals).toMatchObject({
+      assignedPurchaseAmount: "19000.00",
+      collectedAmount: "13000.00",
+      purchaseVarianceAmount: "6000.00",
+      balanceAmount: "9000.00",
+      unassignedPurchasesCount: 1,
+      unassignedCollectionsCount: 1
+    });
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "HARDWARE",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    });
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 
   it("builds the general expenses report split between PDG and employees", async () => {
@@ -1107,6 +1173,19 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
+    vi.mocked(listGeneralStoreShops).mockResolvedValue(
+      Array.from({ length: 35 }, (_, index) => ({
+        id: `shop-page-${index}`,
+        companyId: actor.companyId,
+        name: `Boutique ${index + 1}`,
+        location: null,
+        phone: null,
+        isActive: true,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z")
+      }))
+    );
+
     const pdf = await exportCompanyReportsPdf(actor, {
       activityCode: "GENERAL_STORE",
       dateFrom: "2026-09-01T00:00:00.000Z",
@@ -1115,6 +1194,7 @@ describe("reporting.service", () => {
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
   });
 
   it("builds the food opérations report from product and batch metadata", async () => {
@@ -1526,6 +1606,20 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
+    vi.mocked(listBtpProjects).mockResolvedValue(
+      Array.from({ length: 35 }, (_, index) => ({
+        id: `project-page-${index}`,
+        companyId: actor.companyId,
+        name: `Chantier ${index + 1}`,
+        clientRef: null,
+        contractRef: null,
+        location: null,
+        isActive: true,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z")
+      }))
+    );
+
     const pdf = await exportCompanyReportsPdf(actor, {
       activityCode: "BTP",
       dateFrom: "2026-10-01T00:00:00.000Z",
@@ -1534,6 +1628,7 @@ describe("reporting.service", () => {
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
   });
 
   it("builds the rental arrears ledger from the tenant roster and cumulative loyer payments", async () => {
@@ -1748,6 +1843,21 @@ describe("reporting.service", () => {
       })
     ]);
 
+    vi.mocked(listRentalTenants).mockResolvedValue(
+      Array.from({ length: 35 }, (_, index) => ({
+        id: `tenant-page-${index}`,
+        companyId: actor.companyId,
+        name: `Locataire ${index + 1}`,
+        unitLabel: `Logement ${index + 1}`,
+        monthlyRent: "30000.00",
+        phone: null,
+        tenancyStart: "2026-01",
+        isActive: true,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z")
+      }))
+    );
+
     const pdf = await exportCompanyReportsPdf(actor, {
       activityCode: "RENTAL",
       dateFrom: "2026-11-01T00:00:00.000Z",
@@ -1756,6 +1866,7 @@ describe("reporting.service", () => {
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
   });
 
   it("builds the hotel opérations report from booking and stay metadata", async () => {

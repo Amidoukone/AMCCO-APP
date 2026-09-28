@@ -184,11 +184,30 @@ export type HardwareMonthlyReportRow = {
 export type HardwareMonthlyReport = {
   periodLabel: string;
   rows: HardwareMonthlyReportRow[];
+  recipientRows: Array<{
+    recipientRef: string;
+    purchaseAmount: string;
+    grossProfit: string;
+    expectedReturnAmount: string;
+    collectedAmount: string;
+    purchaseVarianceAmount: string;
+    balanceAmount: string;
+    transactionsCount: number;
+    currency: "XOF";
+  }>;
   totals: {
     quantity: number;
     purchaseUnitPrice: string;
     purchaseAmount: string;
     grossProfit: string;
+    assignedPurchaseAmount: string;
+    assignedGrossProfit: string;
+    expectedReturnAmount: string;
+    collectedAmount: string;
+    purchaseVarianceAmount: string;
+    balanceAmount: string;
+    unassignedPurchasesCount: number;
+    unassignedCollectionsCount: number;
     transactionsCount: number;
     currency: "XOF";
   };
@@ -1677,6 +1696,40 @@ export async function listReportGeneralStoreTransactions(
       FROM transactions
       WHERE company_id = ?
         AND activity_code = 'GENERAL_STORE'
+    `,
+    [companyId]
+  );
+
+  return rows.map((row) => ({
+    activityCode: row.activityCode,
+    status: row.status,
+    type: row.type,
+    amount: row.amount,
+    currency: row.currency,
+    description: row.description,
+    occurredAt: new Date(row.occurredAt).toISOString(),
+    metadata: toMetadataStringMap(row.metadataJson)
+  }));
+}
+
+export async function listReportHardwareTransactions(
+  companyId: string
+): Promise<ReportOperationalTransaction[]> {
+  const rows = await queryRows<ReportOperationalTransactionRow[]>(
+    `
+      SELECT
+        activity_code AS activityCode,
+        status AS status,
+        type AS type,
+        CAST(amount AS CHAR) AS amount,
+        currency AS currency,
+        description AS description,
+        occurred_at AS occurredAt,
+        metadata_json AS metadataJson
+      FROM transactions
+      WHERE company_id = ?
+        AND activity_code = 'HARDWARE'
+      ORDER BY occurred_at ASC, created_at ASC
     `,
     [companyId]
   );
