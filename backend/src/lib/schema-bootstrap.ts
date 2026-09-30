@@ -420,6 +420,24 @@ async function ensureBtpProjectsTable(): Promise<void> {
   );
 }
 
+async function ensureDailyActivityCategoriesTable(): Promise<void> {
+  await getDbPool().execute(
+    `
+      CREATE TABLE IF NOT EXISTS daily_activity_categories (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_daily_activity_category_name (company_id, name),
+        KEY idx_daily_activity_category_company (company_id, is_active),
+        CONSTRAINT fk_daily_activity_category_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `
+  );
+}
+
 async function ensureCompanyActivitiesSeeded(): Promise<void> {
   const companies = await queryRows<CompanyIdRow[]>(`SELECT id FROM companies`);
   if (companies.length === 0) {
@@ -463,6 +481,7 @@ export async function ensureBusinessActivitySchemaReady(): Promise<void> {
     await ensureRentalTenantsTable();
     await ensureGeneralStoreShopsTable();
     await ensureBtpProjectsTable();
+    await ensureDailyActivityCategoriesTable();
     await ensureCompanyActivitiesSeeded();
     logger.info("Business activity schema ready");
   } catch (error) {

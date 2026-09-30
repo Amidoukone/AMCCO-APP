@@ -2542,6 +2542,98 @@ function deriveSectorAmount(
   return null;
 }
 
+// Secteurs pour lesquels la saisie propose un remplissage rapide (suggestions
+// cliquables + autocomplétion de la description) à partir des opérations déjà
+// enregistrées pour la même catégorie.
+const QUICK_FILL_SECTOR_ACTIVITIES = new Set<BusinessActivityCode>([
+  "HARDWARE",
+  "GENERAL_STORE",
+  "BTP",
+  "RENTAL",
+  "WATER"
+]);
+
+function isQuickFillSectorActivity(
+  activityCode: BusinessActivityCode | null
+): activityCode is "HARDWARE" | "GENERAL_STORE" | "BTP" | "RENTAL" | "WATER" {
+  return Boolean(activityCode) && QUICK_FILL_SECTOR_ACTIVITIES.has(activityCode as BusinessActivityCode);
+}
+
+function getSectorOperationKindValue(
+  activityCode: BusinessActivityCode | null,
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): string {
+  if (activityCode === "HARDWARE") {
+    return getHardwareOperationKind(type, metadata);
+  }
+  if (activityCode === "GENERAL_STORE") {
+    return getStoreOperationKind(type, metadata);
+  }
+  if (activityCode === "BTP") {
+    return getBtpOperationKind(type, metadata);
+  }
+  if (activityCode === "RENTAL") {
+    return getRentalOperationKind(type, metadata);
+  }
+  if (activityCode === "WATER") {
+    return getWaterOperationKind(type, metadata);
+  }
+  return "";
+}
+
+function getSectorOperationLabel(
+  activityCode: BusinessActivityCode | null,
+  kind: string
+): string {
+  if (activityCode === "HARDWARE") {
+    return HARDWARE_OPERATION_LABELS[kind as HardwareOperationKind] ?? "";
+  }
+  if (activityCode === "GENERAL_STORE") {
+    return STORE_OPERATION_LABELS[kind as StoreOperationKind] ?? "";
+  }
+  if (activityCode === "BTP") {
+    return BTP_OPERATION_LABELS[kind as BtpOperationKind] ?? "";
+  }
+  if (activityCode === "RENTAL") {
+    return RENTAL_OPERATION_LABELS[kind as RentalOperationKind] ?? "";
+  }
+  if (activityCode === "WATER") {
+    return WATER_OPERATION_LABELS[kind as WaterOperationKind] ?? "";
+  }
+  return "";
+}
+
+function getSectorSuggestionDetail(
+  activityCode: BusinessActivityCode | null,
+  kind: string,
+  metadata: Record<string, string>,
+  currency: string
+): string | null {
+  if (activityCode === "HARDWARE" && (kind === "ITEM_ENTRY" || kind === "ITEM_EXIT")) {
+    const quantity = metadata.quantity;
+    const unitPrice = kind === "ITEM_EXIT" ? metadata.saleUnitPrice : metadata.purchaseUnitPrice;
+    return quantity && unitPrice
+      ? `${quantity} × ${formatAmountForDisplay(unitPrice)} ${currency}`
+      : null;
+  }
+  if (activityCode === "WATER" && kind === "WATER_SALE" && metadata.quantity && metadata.unitPrice) {
+    return `${metadata.quantity} paquets × ${formatAmountForDisplay(metadata.unitPrice)} ${currency}`;
+  }
+  if (activityCode === "BTP") {
+    if (kind === "MATERIAL_PURCHASE" && metadata.quantity && metadata.unitPrice) {
+      return `${metadata.quantity} × ${formatAmountForDisplay(metadata.unitPrice)} ${currency}`;
+    }
+    if (kind === "LABOR_PAYMENT" && metadata.workerCount && metadata.workDays && metadata.dailyRate) {
+      return `${metadata.workerCount} ouvrier(s) × ${metadata.workDays} j × ${formatAmountForDisplay(metadata.dailyRate)} ${currency}`;
+    }
+    if (kind === "EQUIPMENT_RENTAL" && metadata.equipmentHours && metadata.hourlyRate) {
+      return `${metadata.equipmentHours} h × ${formatAmountForDisplay(metadata.hourlyRate)} ${currency}`;
+    }
+  }
+  return null;
+}
+
 function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
   if (kind === "RECOUVREMENT") {
     return "Vente / recouvrement: indiquez la quincaillerie ou la personne qui a reçu les articles, puis le montant encaissé. Le recouvrement peut être partiel.";
@@ -3011,6 +3103,10 @@ export function FinanceTransactionsPage(): JSX.Element {
     selectedProfile,
     setSelectedActivityCode
   } = useBusinessActivity();
+  const financeEnabledActivities = useMemo(
+    () => enabledActivities.filter((activity) => activity.code !== "DAILY_ACTIVITIES"),
+    [enabledActivities]
+  );
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [articles, setArticles] = useState<ActivityArticle[]>([]);
   const [hardwareCustomArticleMode, setHardwareCustomArticleMode] = useState(false);
@@ -3039,7 +3135,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [projectPendingDelete, setProjectPendingDelete] = useState<BtpProject | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
-  const [waterSuggestionHistory, setWaterSuggestionHistory] = useState<FinancialTransaction[]>([]);
+  const [sectorSuggestionHistory, setSectorSuggestionHistory] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
@@ -3207,31 +3303,6 @@ export function FinanceTransactionsPage(): JSX.Element {
   const waterOperationKind = selectedActivityCode === "WATER"
     ? getWaterOperationKind(transactionForm.type, transactionForm.metadata)
     : "WATER_SALE";
-  const waterSuggestions = useMemo(() => {
-    if (selectedActivityCode !== "WATER" || editingTransactionId) {
-      return [];
-    }
-    const seen = new Set<string>();
-    return [...waterSuggestionHistory]
-      .filter((item) =>
-        item.companyId === activeCompany?.id &&
-        item.activityCode === "WATER" &&
-        (item.status === "SUBMITTED" || item.status === "APPROVED") &&
-        allowedCurrencies.includes(item.currency) &&
-        getWaterOperationKind(item.type, item.metadata) === waterOperationKind &&
-        (!transactionForm.description.trim() ||
-          (item.description ?? "").toLocaleLowerCase("fr").includes(transactionForm.description.trim().toLocaleLowerCase("fr")))
-      )
-      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
-      .filter((item) => {
-        const key = [item.description?.trim().toLocaleLowerCase("fr") ?? "", item.amount,
-          item.metadata.quantity ?? "", item.metadata.unitPrice ?? ""].join("|");
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, 5);
-  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, selectedActivityCode, transactionForm.description, waterOperationKind, waterSuggestionHistory]);
   const agencyOperationKind = selectedActivityCode === "REAL_ESTATE_AGENCY"
     ? getAgencyOperationKind(transactionForm.type, transactionForm.metadata)
     : "SALE_COMMISSION";
@@ -3245,6 +3316,120 @@ export function FinanceTransactionsPage(): JSX.Element {
     ? getGeneralExpenseKind(transactionForm.metadata)
     : "EMPLOYEE_OTHER";
   const generalExpenseOwner = getGeneralExpenseOwner(generalExpenseKind);
+  const generalExpenseSuggestions = useMemo(() => {
+    if (selectedActivityCode !== "GENERAL_EXPENSES" || editingTransactionId) {
+      return [];
+    }
+    const seen = new Set<string>();
+    return [...transactions]
+      .filter((item) =>
+        item.companyId === activeCompany?.id &&
+        item.activityCode === "GENERAL_EXPENSES" &&
+        (item.status === "SUBMITTED" || item.status === "APPROVED") &&
+        allowedCurrencies.includes(item.currency) &&
+        getGeneralExpenseKind(item.metadata) === generalExpenseKind &&
+        (!transactionForm.description.trim() ||
+          (item.description ?? "").toLocaleLowerCase("fr").includes(transactionForm.description.trim().toLocaleLowerCase("fr")))
+      )
+      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+      .filter((item) => {
+        const key = [item.description?.trim().toLocaleLowerCase("fr") ?? "", item.amount,
+          item.metadata.quantity ?? "", item.metadata.unitPrice ?? ""].join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5);
+  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, generalExpenseKind, selectedActivityCode, transactionForm.description, transactions]);
+  const generalExpenseDescriptionSuggestions = useMemo(() => {
+    if (selectedActivityCode !== "GENERAL_EXPENSES") {
+      return [];
+    }
+    const seen = new Set<string>();
+    const values: string[] = [];
+    for (const item of [...transactions].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))) {
+      if (item.activityCode !== "GENERAL_EXPENSES" || getGeneralExpenseKind(item.metadata) !== generalExpenseKind) {
+        continue;
+      }
+      const value = item.description?.trim();
+      if (!value) {
+        continue;
+      }
+      const key = value.toLocaleLowerCase("fr");
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      values.push(value);
+      if (values.length >= 12) {
+        break;
+      }
+    }
+    return values;
+  }, [generalExpenseKind, selectedActivityCode, transactions]);
+  const currentSectorOperationKind = isQuickFillSectorActivity(selectedActivityCode)
+    ? getSectorOperationKindValue(selectedActivityCode, transactionForm.type, transactionForm.metadata)
+    : "";
+  const sectorTransactionSuggestions = useMemo(() => {
+    if (!isQuickFillSectorActivity(selectedActivityCode) || editingTransactionId) {
+      return [];
+    }
+    const seen = new Set<string>();
+    return [...sectorSuggestionHistory]
+      .filter((item) =>
+        item.companyId === activeCompany?.id &&
+        item.activityCode === selectedActivityCode &&
+        (item.status === "SUBMITTED" || item.status === "APPROVED") &&
+        allowedCurrencies.includes(item.currency) &&
+        getSectorOperationKindValue(selectedActivityCode, item.type, item.metadata) === currentSectorOperationKind &&
+        (!transactionForm.description.trim() ||
+          (item.description ?? "").toLocaleLowerCase("fr").includes(transactionForm.description.trim().toLocaleLowerCase("fr")))
+      )
+      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+      .filter((item) => {
+        const key = [
+          item.description?.trim().toLocaleLowerCase("fr") ?? "",
+          item.amount,
+          Object.entries(item.metadata)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([key, value]) => `${key}=${value}`)
+            .join(",")
+        ].join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5);
+  }, [activeCompany?.id, allowedCurrencies, currentSectorOperationKind, editingTransactionId, selectedActivityCode, sectorSuggestionHistory, transactionForm.description]);
+  const sectorDescriptionSuggestions = useMemo(() => {
+    if (!isQuickFillSectorActivity(selectedActivityCode)) {
+      return [];
+    }
+    const seen = new Set<string>();
+    const values: string[] = [];
+    for (const item of [...sectorSuggestionHistory].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))) {
+      if (
+        item.activityCode !== selectedActivityCode ||
+        getSectorOperationKindValue(selectedActivityCode, item.type, item.metadata) !== currentSectorOperationKind
+      ) {
+        continue;
+      }
+      const value = item.description?.trim();
+      if (!value) {
+        continue;
+      }
+      const key = value.toLocaleLowerCase("fr");
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      values.push(value);
+      if (values.length >= 12) {
+        break;
+      }
+    }
+    return values;
+  }, [currentSectorOperationKind, selectedActivityCode, sectorSuggestionHistory]);
   const hasRequiredFinanceDetails = Boolean(
     selectedProfile?.finance.requiresDescription ||
       visibleFinanceMetadataFields.some((field) => field.required) ||
@@ -3262,8 +3447,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       selectedActivityCode === "GENERAL_EXPENSES"
   );
   const enabledActivityCodes = useMemo(
-    () => enabledActivities.map((item) => item.code),
-    [enabledActivities]
+    () => financeEnabledActivities.map((item) => item.code),
+    [financeEnabledActivities]
   );
   const requestedTransactionId = searchParams.get("transactionId");
   const requestedActivityCode = useMemo(() => {
@@ -3463,7 +3648,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           return {
             accounts: [] as FinancialAccount[],
             transactions: [] as FinancialTransaction[],
-            waterHistory: [] as FinancialTransaction[]
+            sectorHistory: [] as FinancialTransaction[]
           };
         }
 
@@ -3477,24 +3662,24 @@ export function FinanceTransactionsPage(): JSX.Element {
             type: filters.type === "ALL" ? undefined : filters.type,
             activityCode: selectedActivityCode
           }),
-          selectedActivityCode === "WATER" && filters.type !== "ALL" && !append
+          isQuickFillSectorActivity(selectedActivityCode) && filters.type !== "ALL" && !append
             ? listFinanceTransactionsRequest(accessToken, {
                 limit: TRANSACTIONS_PAGE_SIZE,
-                activityCode: "WATER"
+                activityCode: selectedActivityCode
               }).catch(() => null)
             : Promise.resolve(null)
-        ]).then(([accountsResp, transactionsResp, waterHistoryResp]) => ({
+        ]).then(([accountsResp, transactionsResp, sectorHistoryResp]) => ({
           accounts: accountsResp.items,
           transactions: transactionsResp.items,
-          waterHistory: selectedActivityCode === "WATER"
-            ? (waterHistoryResp?.items ?? (append ? [] : transactionsResp.items))
+          sectorHistory: isQuickFillSectorActivity(selectedActivityCode)
+            ? (sectorHistoryResp?.items ?? (append ? [] : transactionsResp.items))
             : []
         }));
       });
       setHasMoreTransactions(payload.transactions.length === TRANSACTIONS_PAGE_SIZE);
       setAccounts(payload.accounts);
       if (!append) {
-        setWaterSuggestionHistory(payload.waterHistory);
+        setSectorSuggestionHistory(payload.sectorHistory);
       }
       setTransactions((prev) => {
         if (!append) {
@@ -4279,12 +4464,12 @@ export function FinanceTransactionsPage(): JSX.Element {
     resetTransactionForm();
   }
 
-  function applyWaterSuggestion(suggestion: FinancialTransaction): void {
-    const kind = getWaterOperationKind(suggestion.type, suggestion.metadata);
+  function applyGeneralExpenseSuggestion(suggestion: FinancialTransaction): void {
+    const kind = getGeneralExpenseKind(suggestion.metadata);
     setTransactionForm((prev) => {
-      const metadata = cleanSectorFinanceMetadata("WATER", suggestion.type, {
+      const metadata = cleanSectorFinanceMetadata("GENERAL_EXPENSES", "CASH_OUT", {
         ...prev.metadata,
-        [WATER_OPERATION_KIND_KEY]: kind,
+        [GENERAL_EXPENSE_KIND_KEY]: kind,
         quantity: suggestion.metadata.quantity ?? "",
         unitPrice: suggestion.metadata.unitPrice ?? ""
       });
@@ -4293,8 +4478,32 @@ export function FinanceTransactionsPage(): JSX.Element {
         accountId: accounts.some((account) => account.id === suggestion.accountId)
           ? suggestion.accountId
           : prev.accountId,
+        type: "CASH_OUT",
+        amount: formatAmountForInput(deriveGeneralExpensesAmount(metadata) ?? suggestion.amount),
+        currency: suggestion.currency,
+        description: suggestion.description ?? "",
+        metadata
+      };
+    });
+  }
+
+  function applySectorTransactionSuggestion(suggestion: FinancialTransaction): void {
+    if (!isQuickFillSectorActivity(selectedActivityCode)) {
+      return;
+    }
+    const activityCode = selectedActivityCode;
+    setTransactionForm((prev) => {
+      const metadata = cleanSectorFinanceMetadata(activityCode, suggestion.type, {
+        ...suggestion.metadata
+      });
+      const derivedAmount = deriveSectorAmount(activityCode, suggestion.type, metadata);
+      return {
+        ...prev,
+        accountId: accounts.some((account) => account.id === suggestion.accountId)
+          ? suggestion.accountId
+          : prev.accountId,
         type: suggestion.type,
-        amount: formatAmountForInput(deriveWaterAmount(kind, metadata) ?? suggestion.amount),
+        amount: formatAmountForInput(derivedAmount ?? suggestion.amount),
         currency: suggestion.currency,
         description: suggestion.description ?? "",
         metadata
@@ -4542,6 +4751,15 @@ export function FinanceTransactionsPage(): JSX.Element {
         </p>
       ) : null}
 
+      {selectedActivityCode === "DAILY_ACTIVITIES" ? (
+        <EmptyState
+          title="Pas de transactions pour ce secteur"
+          description="Les activités quotidiennes (rendez-vous, demandes, documents, décisions, partenaires, actualités) se gèrent entièrement depuis les Tâches, avec un montant optionnel si une dépense y est liée."
+          actionLabel="Aller aux tâches"
+          onAction={() => navigate("/operations/tasks")}
+        />
+      ) : (
+        <>
       <PageGuide
         title="Guide des transactions"
         description={`Les écritures affichées sont filtrées par secteur: ${selectedActivity?.label ?? "aucun secteur actif"}.`}
@@ -4659,7 +4877,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   <option value="" disabled>
                     Sélectionner le secteur dédié
                   </option>
-                  {enabledActivities.map((activity) => (
+                  {financeEnabledActivities.map((activity) => (
                     <option key={activity.code} value={activity.code}>
                       {activity.label}
                     </option>
@@ -4669,7 +4887,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             ) : null}
             {accountForm.scopeType === "RESTRICTED" ? (
               <div className="metadata-field-list">
-                {enabledActivities.map((activity) => {
+                {financeEnabledActivities.map((activity) => {
                   const checked = accountForm.allowedActivityCodes.includes(activity.code);
                   return (
                     <label key={activity.code} className="inline-checkbox">
@@ -6130,22 +6348,67 @@ export function FinanceTransactionsPage(): JSX.Element {
                   {getWaterFormModeLabel(waterOperationKind)}
                 </p>
               ) : null}
-              {selectedActivityCode === "WATER" && waterSuggestions.length > 0 ? (
-                <div className="water-transaction-suggestions">
-                  <strong>Suggestions récentes pour cette catégorie</strong>
-                  <span className="hint">Sélectionnez une transaction pour préremplir la saisie, puis vérifiez les valeurs.</span>
-                  <div className="water-transaction-suggestions-list">
-                    {waterSuggestions.map((suggestion) => (
+              {isQuickFillSectorActivity(selectedActivityCode) && sectorTransactionSuggestions.length > 0 ? (
+                <div className="finance-transaction-suggestions">
+                  <strong>Remplissage rapide</strong>
+                  <span className="hint">Cliquez sur une opération déjà enregistrée pour remplir les mêmes champs, puis vérifiez avant d'enregistrer.</span>
+                  <div className="finance-transaction-suggestions-list">
+                    {sectorTransactionSuggestions.map((suggestion) => {
+                      const suggestionKind = getSectorOperationKindValue(
+                        selectedActivityCode,
+                        suggestion.type,
+                        suggestion.metadata
+                      );
+                      const detail = getSectorSuggestionDetail(
+                        selectedActivityCode,
+                        suggestionKind,
+                        suggestion.metadata,
+                        suggestion.currency
+                      );
+                      return (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          className="finance-transaction-suggestion"
+                          onClick={() => applySectorTransactionSuggestion(suggestion)}
+                        >
+                          <span className="finance-transaction-suggestion-head">
+                            <span className="finance-transaction-suggestion-title">
+                              {suggestion.description?.trim() || getSectorOperationLabel(selectedActivityCode, suggestionKind)}
+                            </span>
+                            <span className="finance-transaction-suggestion-amount">
+                              {formatAmountForDisplay(suggestion.amount)} {suggestion.currency}
+                            </span>
+                          </span>
+                          {detail ? <small>{detail}</small> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              {selectedActivityCode === "GENERAL_EXPENSES" && generalExpenseSuggestions.length > 0 ? (
+                <div className="finance-transaction-suggestions">
+                  <strong>Remplissage rapide</strong>
+                  <span className="hint">Cliquez sur une dépense déjà enregistrée pour remplir les mêmes champs, puis vérifiez avant d'enregistrer.</span>
+                  <div className="finance-transaction-suggestions-list">
+                    {generalExpenseSuggestions.map((suggestion) => (
                       <button
                         key={suggestion.id}
                         type="button"
-                        className="water-transaction-suggestion"
-                        onClick={() => applyWaterSuggestion(suggestion)}
+                        className="finance-transaction-suggestion"
+                        onClick={() => applyGeneralExpenseSuggestion(suggestion)}
                       >
-                        <span>{suggestion.description?.trim() || WATER_OPERATION_LABELS[waterOperationKind]}</span>
-                        <strong>{formatAmountForDisplay(suggestion.amount)} {suggestion.currency}</strong>
-                        {waterOperationKind === "WATER_SALE" && suggestion.metadata.quantity && suggestion.metadata.unitPrice ? (
-                          <small>{suggestion.metadata.quantity} paquets × {formatAmountForDisplay(suggestion.metadata.unitPrice)} {suggestion.currency}</small>
+                        <span className="finance-transaction-suggestion-head">
+                          <span className="finance-transaction-suggestion-title">
+                            {suggestion.description?.trim() || GENERAL_EXPENSE_KIND_LABELS[generalExpenseKind]}
+                          </span>
+                          <span className="finance-transaction-suggestion-amount">
+                            {formatAmountForDisplay(suggestion.amount)} {suggestion.currency}
+                          </span>
+                        </span>
+                        {suggestion.metadata.quantity && suggestion.metadata.unitPrice ? (
+                          <small>{suggestion.metadata.quantity} × {formatAmountForDisplay(suggestion.metadata.unitPrice)} {suggestion.currency}</small>
                         ) : null}
                       </button>
                     ))}
@@ -6202,7 +6465,32 @@ export function FinanceTransactionsPage(): JSX.Element {
                     }))
                   }
                   required={selectedProfile?.finance.requiresDescription ?? false}
+                  list={
+                    selectedActivityCode === "GENERAL_EXPENSES"
+                      ? "general-expense-description-options"
+                      : isQuickFillSectorActivity(selectedActivityCode)
+                        ? "sector-transaction-description-options"
+                        : undefined
+                  }
                 />
+                {selectedActivityCode === "GENERAL_EXPENSES" ? (
+                  <datalist id="general-expense-description-options">
+                    {generalExpenseDescriptionSuggestions.map((value) => (
+                      <option key={value} value={value} />
+                    ))}
+                  </datalist>
+                ) : null}
+                {isQuickFillSectorActivity(selectedActivityCode) ? (
+                  <datalist id="sector-transaction-description-options">
+                    {sectorDescriptionSuggestions.map((value) => (
+                      <option key={value} value={value} />
+                    ))}
+                  </datalist>
+                ) : null}
+                {(selectedActivityCode === "GENERAL_EXPENSES" && generalExpenseDescriptionSuggestions.length > 0) ||
+                (isQuickFillSectorActivity(selectedActivityCode) && sectorDescriptionSuggestions.length > 0) ? (
+                  <span className="hint">Les libellés déjà utilisés pour cette catégorie s'affichent pendant la saisie.</span>
+                ) : null}
               </label>
 
               {selectedActivityCode === "GENERAL_EXPENSES" ? (
@@ -7185,6 +7473,8 @@ export function FinanceTransactionsPage(): JSX.Element {
         }}
         onConfirm={() => void handleConfirmDeleteTransaction()}
       />
+        </>
+      )}
     </>
   );
 }

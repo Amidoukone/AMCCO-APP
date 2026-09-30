@@ -1537,6 +1537,65 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         }
       ]
     }
+  }),
+  DAILY_ACTIVITIES: makeProfile("DAILY_ACTIVITIES", {
+    operationsModel: "Suivi des activités de bureau qui ne relèvent d'aucun secteur d'activité: rendez-vous, demandes pour le PDG, récupération de documents, décisions prises, nouveaux partenaires et actualités.",
+    finance: {
+      allowedTransactionTypes: ["CASH_OUT"],
+      allowedCurrencies: ["XOF", "EUR", "USD"],
+      requiresDescription: false,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte", true, "Caisse ou compte utilisé pour la dépense."),
+        field("amount", "Montant", true, "Montant de la dépense liée à l'activité."),
+        field("description", "Précision", false, "Personne, partenaire, document ou précision utile.")
+      ],
+      metadataFields: [
+        field("dailyActivityKind", "Type d'activité", true, "Nature de l'activité concernée par la dépense.")
+      ],
+      workflow: [
+        workflow("SELECT", "Sélection du type", "L'agent choisit le type d'activité concerné, puis précise si une dépense y est liée."),
+        workflow("AMOUNT", "Montant", "Le montant est saisi directement s'il y a une dépense liée à l'activité."),
+        workflow("REPORTING", "Suivi global", "Chaque activité alimente le suivi global, indépendamment des secteurs.")
+      ]
+    },
+    tasks: {
+      requiresDescription: false,
+      requiresDueDate: false,
+      requiresAssignee: false,
+      completionRequiresAssignee: false,
+      blockedRequiresAssignee: false,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Activité", true, "Exemple: rendez-vous, demande, document, décision, partenaire ou actualité."),
+        field("description", "Détail", false, "Précision utile sur l'activité.")
+      ],
+      metadataFields: [
+        field("dailyActivityKind", "Type d'activité", true, "Catégorie d'activité, définie et gérée par l'entreprise."),
+        field("amount", "Montant (optionnel)", false, "Montant d'une dépense éventuelle liée à l'activité, à titre indicatif.")
+      ],
+      workflow: [
+        workflow("PLAN", "Planification", "L'activité est enregistrée, avec échéance si nécessaire."),
+        workflow("EXECUTE", "Traitement", "L'activité est suivie jusqu'à sa réalisation."),
+        workflow("CLOSE", "Clôture", "Clôture de l'activité.")
+      ]
+    },
+    reporting: {
+      focusArea: "Suivi des activités quotidiennes de bureau, indépendantes des secteurs d'activité",
+      exportSections: ["rendez-vous", "demandes PDG", "documents", "décisions", "partenaires", "actualités"],
+      operationalDimensions: [
+        dimension("dailyActivityKind", "Type d'activité", "Compare les activités par type.")
+      ],
+      highlights: [
+        {
+          code: "daily-activities-volume",
+          label: "Activités enregistrées",
+          description: "Nombre d'activités quotidiennes enregistrées sur la période.",
+          metric: "totalTasksCount",
+          thresholds: { warningAt: 20 }
+        }
+      ]
+    }
   })
 };
 

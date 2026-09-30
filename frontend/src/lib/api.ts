@@ -58,6 +58,10 @@ import type {
   BtpProjectListResponse,
   BtpProjectSingleResponse
 } from "../types/projects";
+import type {
+  DailyActivityCategoryListResponse,
+  DailyActivityCategorySingleResponse
+} from "../types/daily-activity-categories";
 import type { BusinessActivityCode } from "../config/businessActivities";
 import type {
   DashboardSummaryResponse,
@@ -775,6 +779,59 @@ export function deleteBtpProjectRequest(
   projectId: string
 ): Promise<{ status: string }> {
   return request<{ status: string }>(`/btp/projects/${projectId}`, {
+    method: "DELETE",
+    accessToken
+  });
+}
+
+export function listDailyActivityCategoriesRequest(
+  accessToken: string,
+  query: { activeOnly?: boolean } = {}
+): Promise<DailyActivityCategoryListResponse> {
+  const params = new URLSearchParams();
+  if (query.activeOnly) {
+    params.set("activeOnly", "true");
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request<DailyActivityCategoryListResponse>(`/daily-activities/categories${suffix}`, {
+    method: "GET",
+    accessToken
+  });
+}
+
+export function createDailyActivityCategoryRequest(
+  accessToken: string,
+  input: {
+    name: string;
+  }
+): Promise<DailyActivityCategorySingleResponse> {
+  return request<DailyActivityCategorySingleResponse>("/daily-activities/categories", {
+    method: "POST",
+    body: input,
+    accessToken
+  });
+}
+
+export function updateDailyActivityCategoryRequest(
+  accessToken: string,
+  categoryId: string,
+  input: {
+    name: string;
+    isActive?: boolean;
+  }
+): Promise<DailyActivityCategorySingleResponse> {
+  return request<DailyActivityCategorySingleResponse>(`/daily-activities/categories/${categoryId}`, {
+    method: "PATCH",
+    body: input,
+    accessToken
+  });
+}
+
+export function deleteDailyActivityCategoryRequest(
+  accessToken: string,
+  categoryId: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/daily-activities/categories/${categoryId}`, {
     method: "DELETE",
     accessToken
   });

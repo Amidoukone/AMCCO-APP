@@ -14,7 +14,8 @@ export const BUSINESS_ACTIVITY_CODES = [
   "MINING",
   "WATER",
   "REAL_ESTATE_AGENCY",
-  "GENERAL_EXPENSES"
+  "GENERAL_EXPENSES",
+  "DAILY_ACTIVITIES"
 ] as const;
 
 export type BusinessActivityCode = (typeof BUSINESS_ACTIVITY_CODES)[number];
@@ -105,6 +106,11 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     code: "GENERAL_EXPENSES",
     label: "Dépenses générales",
     description: "Dépenses de fonctionnement du PDG et des employés, indépendantes des secteurs d'activité."
+  },
+  {
+    code: "DAILY_ACTIVITIES",
+    label: "Activités quotidiennes",
+    description: "Suivi des activités de bureau qui ne relèvent d'aucun secteur: rendez-vous, demandes, documents, décisions, partenaires et actualités."
   }
 ];
 

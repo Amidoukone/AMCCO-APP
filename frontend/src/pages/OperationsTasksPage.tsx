@@ -29,14 +29,18 @@ import {
   addTaskAttachmentRequest,
   ApiError,
   assignOperationsTaskRequest,
+  createDailyActivityCategoryRequest,
   createOperationsTaskRequest,
+  deleteDailyActivityCategoryRequest,
   deleteOperationsTaskRequest,
   getReportsOverviewRequest,
   getTaskAttachmentUploadAuthRequest,
   listBtpProjectsRequest,
+  listDailyActivityCategoriesRequest,
   listGeneralStoreShopsRequest,
   listOperationsMembersRequest,
   listOperationsTasksRequest,
+  updateDailyActivityCategoryRequest,
   updateOperationsTaskRequest,
   updateOperationsTaskStatusRequest
 } from "../lib/api";
@@ -56,6 +60,7 @@ import type { ActivityFieldDefinition } from "../types/activities";
 import type { OperationTask, OperationTaskMember, TaskAttachment, TaskScope, TaskStatus } from "../types/tasks";
 import type { GeneralStoreShop } from "../types/shops";
 import type { BtpProject } from "../types/projects";
+import type { DailyActivityCategory } from "../types/daily-activity-categories";
 import type { GeneralStoreOperationsReportRow } from "../types/reporting";
 
 const TASKS_PAGE_SIZE = 200;
@@ -271,6 +276,9 @@ const GENERAL_EXPENSE_KIND_LABELS: Record<GeneralExpenseKind, string> = {
 function isGeneralExpenseKind(value: string | undefined): value is GeneralExpenseKind {
   return Boolean(value) && Object.prototype.hasOwnProperty.call(GENERAL_EXPENSE_KIND_LABELS, value as string);
 }
+
+const DAILY_ACTIVITY_KIND_KEY = "dailyActivityKind";
+const DAILY_ACTIVITY_AMOUNT_KEY = "amount";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -490,6 +498,9 @@ function formatMetadataValue(key: string, value: string): string {
   if (key === GENERAL_EXPENSE_KIND_KEY && isGeneralExpenseKind(value)) {
     return GENERAL_EXPENSE_KIND_LABELS[value];
   }
+  if (key === DAILY_ACTIVITY_AMOUNT_KEY) {
+    return `${formatAmountForDisplay(value)} XOF`;
+  }
   return value;
 }
 
@@ -544,6 +555,12 @@ export function OperationsTasksPage(): JSX.Element {
   const [shops, setShops] = useState<GeneralStoreShop[]>([]);
   const [shopLedgerRows, setShopLedgerRows] = useState<GeneralStoreOperationsReportRow[]>([]);
   const [projects, setProjects] = useState<BtpProject[]>([]);
+  const [dailyActivityCategories, setDailyActivityCategories] = useState<DailyActivityCategory[]>([]);
+  const [categoryForm, setCategoryForm] = useState({ name: "" });
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [categoryPendingDelete, setCategoryPendingDelete] = useState<DailyActivityCategory | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
@@ -599,6 +616,11 @@ export function OperationsTasksPage(): JSX.Element {
   const canCreateTasks = useMemo(() => {
     return Boolean(user) && user?.role !== "OWNER";
   }, [user]);
+  const canManageDailyActivityCategories = useMemo(() => {
+    return (
+      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
+    );
+  }, [user?.role]);
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
   const hasRequiredTaskMetadata = taskMetadataFields.some((field) => field.required);
@@ -814,6 +836,92 @@ export function OperationsTasksPage(): JSX.Element {
     void loadProjects();
   }, [loadProjects]);
 
+  const loadDailyActivityCategories = useCallback(async () => {
+    if (selectedActivityCode !== "DAILY_ACTIVITIES") {
+      setDailyActivityCategories([]);
+      return;
+    }
+    try {
+      const payload = await withAuthorizedToken((accessToken) =>
+        listDailyActivityCategoriesRequest(accessToken)
+      );
+      setDailyActivityCategories(payload.items);
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    }
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    void loadDailyActivityCategories();
+  }, [loadDailyActivityCategories]);
+
+  function resetCategoryForm(): void {
+    setEditingCategoryId(null);
+    setCategoryForm({ name: "" });
+  }
+
+  async function handleSaveCategory(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsSavingCategory(true);
+    try {
+      const payload = { name: categoryForm.name.trim() };
+      await withAuthorizedToken((accessToken) =>
+        editingCategoryId
+          ? updateDailyActivityCategoryRequest(accessToken, editingCategoryId, payload)
+          : createDailyActivityCategoryRequest(accessToken, payload)
+      );
+      setSuccessMessage(editingCategoryId ? "Catégorie modifiée." : "Catégorie ajoutée.");
+      resetCategoryForm();
+      await loadDailyActivityCategories();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setIsSavingCategory(false);
+    }
+  }
+
+  function handleStartEditCategory(category: DailyActivityCategory): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingCategoryId(category.id);
+    setCategoryForm({ name: category.name });
+  }
+
+  function handleCancelEditCategory(): void {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    resetCategoryForm();
+  }
+
+  function handleDeleteCategory(category: DailyActivityCategory): void {
+    setCategoryPendingDelete(category);
+  }
+
+  async function handleConfirmDeleteCategory(): Promise<void> {
+    if (!categoryPendingDelete) {
+      return;
+    }
+    const category = categoryPendingDelete;
+    setBusyCategoryId(category.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await withAuthorizedToken((accessToken) => deleteDailyActivityCategoryRequest(accessToken, category.id));
+      if (editingCategoryId === category.id) {
+        resetCategoryForm();
+      }
+      setSuccessMessage("Catégorie supprimée.");
+      setCategoryPendingDelete(null);
+      await loadDailyActivityCategories();
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+    } finally {
+      setBusyCategoryId(null);
+    }
+  }
+
   useEffect(() => {
     setVisibleTasksPage(1);
   }, [searchQuery, filters.status, selectedActivityCode]);
@@ -955,12 +1063,18 @@ export function OperationsTasksPage(): JSX.Element {
     setSuccessMessage(null);
     setIsSavingTaskForm(true);
     try {
-      const taskMetadata = createForm.metadata.remainingStockValue
+      let taskMetadata = createForm.metadata.remainingStockValue
         ? {
             ...createForm.metadata,
             remainingStockValue: normalizeAmountForApi(createForm.metadata.remainingStockValue)
           }
         : createForm.metadata;
+      if (selectedActivityCode === "DAILY_ACTIVITIES" && taskMetadata[DAILY_ACTIVITY_AMOUNT_KEY]) {
+        taskMetadata = {
+          ...taskMetadata,
+          [DAILY_ACTIVITY_AMOUNT_KEY]: normalizeAmountForApi(taskMetadata[DAILY_ACTIVITY_AMOUNT_KEY])
+        };
+      }
       const response = await withAuthorizedToken((accessToken) =>
         editingTaskId
           ? updateOperationsTaskRequest(accessToken, editingTaskId, {
@@ -1354,20 +1468,21 @@ export function OperationsTasksPage(): JSX.Element {
                 }
                 required
               />
-              <input
-                type="text"
+              <textarea
                 placeholder={
                   selectedProfile?.tasks.requiresDescription
-                    ? "Description requise"
-                    : "Description (optionnelle)"
+                    ? "Description requise: détaillez le contexte, les étapes ou les points d'attention."
+                    : "Description (optionnelle): détaillez le contexte, les étapes ou les points d'attention."
                 }
                 value={createForm.description}
                 onChange={(event) =>
                   setCreateForm((prev) => ({
                     ...prev,
-                      description: event.target.value
-                    }))
-                  }
+                    description: event.target.value
+                  }))
+                }
+                rows={3}
+                maxLength={4000}
                 required={selectedProfile?.tasks.requiresDescription ?? false}
               />
             </div>
@@ -1802,6 +1917,68 @@ export function OperationsTasksPage(): JSX.Element {
                         <option value="EMPLOYEE_SUPPLIES">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_SUPPLIES}</option>
                         <option value="EMPLOYEE_OTHER">{GENERAL_EXPENSE_KIND_LABELS.EMPLOYEE_OTHER}</option>
                       </select>
+                    ) : field.key === DAILY_ACTIVITY_KIND_KEY && selectedActivityCode === "DAILY_ACTIVITIES" ? (
+                      <label key={field.key} className="operations-inline-group">
+                        <span>{field.label}</span>
+                        <select
+                          value={createForm.metadata[field.key] ?? ""}
+                          onChange={(event) =>
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                [field.key]: event.target.value
+                              }
+                            }))
+                          }
+                          title={field.helpText}
+                          required={field.required}
+                        >
+                          <option value="">Choisir le type d'activité</option>
+                          {dailyActivityCategories
+                            .filter((category) => category.isActive || category.name === createForm.metadata[field.key])
+                            .map((category) => (
+                              <option key={category.id} value={category.name}>
+                                {category.name}
+                              </option>
+                            ))}
+                        </select>
+                        {dailyActivityCategories.length === 0 ? (
+                          <small className="hint">
+                            Aucune catégorie disponible. Ajoutez-en une ci-dessous.
+                          </small>
+                        ) : null}
+                      </label>
+                    ) : field.key === DAILY_ACTIVITY_AMOUNT_KEY && selectedActivityCode === "DAILY_ACTIVITIES" ? (
+                      <label key={field.key} className="operations-inline-group">
+                        <span>{field.label}</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Ex: 5000"
+                          value={createForm.metadata[field.key] ?? ""}
+                          onChange={(event) =>
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                [field.key]: formatEditableAmountForInput(event.target.value)
+                              }
+                            }))
+                          }
+                          onBlur={() =>
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                [field.key]: formatAmountForInput(prev.metadata[field.key] ?? "")
+                              }
+                            }))
+                          }
+                          title={field.helpText}
+                          required={field.required}
+                        />
+                      </label>
                     ) : (
                       <input
                         key={field.key}
@@ -1894,6 +2071,90 @@ export function OperationsTasksPage(): JSX.Element {
               ) : null}
             </div>
           </form>
+        </section>
+      ) : null}
+
+      {selectedActivityCode === "DAILY_ACTIVITIES" && canManageDailyActivityCategories ? (
+        <section className="panel">
+          <details className="finance-section-toggle">
+            <summary className="finance-section-summary">
+              <span>{editingCategoryId ? "Modifier une catégorie" : "Gérer les catégories d'activité"}</span>
+              <small>
+                {editingCategoryId
+                  ? "Modification d'une catégorie enregistrée."
+                  : "Ajoutez vos propres catégories (rendez-vous, décision, partenaire...) pour les retrouver en sélection lors de la saisie."}
+              </small>
+            </summary>
+            <form className="finance-account-form" onSubmit={handleSaveCategory}>
+              <label className="operations-inline-group">
+                <span>Nom de la catégorie</span>
+                <input
+                  type="text"
+                  placeholder="Ex: Rendez-vous"
+                  value={categoryForm.name}
+                  onChange={(event) => setCategoryForm({ name: event.target.value })}
+                  required
+                />
+              </label>
+              <div className="mobile-sticky-form-actions">
+                <button type="submit" disabled={isSavingCategory}>
+                  {isSavingCategory ? (
+                    <>
+                      <ButtonSpinner />
+                      Enregistrement...
+                    </>
+                  ) : editingCategoryId ? (
+                    "Enregistrer les modifications"
+                  ) : (
+                    "Ajouter la catégorie"
+                  )}
+                </button>
+                {editingCategoryId ? (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={handleCancelEditCategory}
+                    disabled={isSavingCategory}
+                  >
+                    Annuler la modification
+                  </button>
+                ) : null}
+              </div>
+            </form>
+            {dailyActivityCategories.length > 0 ? (
+              <div className="operations-member-grid">
+                {dailyActivityCategories.map((category) => {
+                  const isBusy = busyCategoryId === category.id;
+                  return (
+                    <article key={category.id} className="operations-member-card">
+                      <h4>{category.name}</h4>
+                      {!category.isActive ? <p className="hint">Désactivée</p> : null}
+                      <div className="actions-inline">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => handleStartEditCategory(category)}
+                          disabled={isBusy}
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          onClick={() => handleDeleteCategory(category)}
+                          disabled={isBusy}
+                        >
+                          Supprimer
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="hint">Aucune catégorie enregistrée pour le moment.</p>
+            )}
+          </details>
         </section>
       ) : null}
 
@@ -2260,6 +2521,23 @@ export function OperationsTasksPage(): JSX.Element {
           setTaskPendingDelete(null);
         }}
         onConfirm={() => void handleConfirmDeleteTask()}
+      />
+
+      <ConfirmDialog
+        open={categoryPendingDelete !== null}
+        title="Confirmer la suppression de la catégorie"
+        description="Cette action retire la catégorie de la liste de sélection du formulaire."
+        objectLabel="Catégorie concernée"
+        objectName={categoryPendingDelete?.name ?? ""}
+        impactText="Les activités déjà enregistrées avec cette catégorie ne sont pas modifiées."
+        isConfirming={busyCategoryId === categoryPendingDelete?.id}
+        onCancel={() => {
+          if (busyCategoryId) {
+            return;
+          }
+          setCategoryPendingDelete(null);
+        }}
+        onConfirm={() => void handleConfirmDeleteCategory()}
       />
     </>
   );
