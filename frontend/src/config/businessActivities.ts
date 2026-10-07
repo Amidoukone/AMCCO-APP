@@ -16,6 +16,7 @@ export const BUSINESS_ACTIVITY_CODES = [
   "SERVICES",
   "MINING",
   "WATER",
+  "BEVERAGE_DEPOT",
   "REAL_ESTATE_AGENCY",
   "GENERAL_EXPENSES",
   "DAILY_ACTIVITIES"
@@ -102,6 +103,11 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     code: "WATER",
     label: "Production d'eau potable",
     description: "Production et distribution d'eau."
+  },
+  {
+    code: "BEVERAGE_DEPOT",
+    label: "Dépôt de boissons",
+    description: "Achats, ventes par produit, dépenses, stock et rapprochement journalier."
   },
   {
     code: "GENERAL_EXPENSES",

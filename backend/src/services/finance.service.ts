@@ -794,6 +794,7 @@ export async function createCompanyTransaction(
   try {
     assertTransactionInputMatchesActivityProfile(input.activityCode, {
       type: input.type,
+      amount: input.amount,
       currency,
       description,
       metadata
@@ -896,6 +897,7 @@ export async function updateCompanyTransaction(
   try {
     assertTransactionInputMatchesActivityProfile(input.activityCode, {
       type: input.type,
+      amount: input.amount,
       currency,
       description,
       metadata
@@ -1849,6 +1851,7 @@ export async function submitCompanyTransaction(
     try {
       assertTransactionInputMatchesActivityProfile(transaction.activityCode, {
         type: fullTransaction.type,
+        amount: fullTransaction.amount,
         currency: fullTransaction.currency,
         description: fullTransaction.description ?? undefined,
         metadata: fullTransaction.metadata

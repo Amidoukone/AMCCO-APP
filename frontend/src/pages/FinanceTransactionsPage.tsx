@@ -42,6 +42,7 @@ import {
   getFinanceProofUploadAuthRequest,
   listActivityArticlesRequest,
   listBtpProjectsRequest,
+  listDailyActivityCategoriesRequest,
   listFinanceAccountsRequest,
   listFinanceTransactionProofsRequest,
   listFinanceTransactionsRequest,
@@ -67,6 +68,7 @@ import type { ActivityArticle } from "../types/articles";
 import type { RentalTenant } from "../types/tenants";
 import type { GeneralStoreShop } from "../types/shops";
 import type { BtpProject } from "../types/projects";
+import type { DailyActivityCategory } from "../types/daily-activity-categories";
 import type {
   FinancialAccount,
   FinancialAccountScopeType,
@@ -474,6 +476,38 @@ const WATER_AMOUNT_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
 const WATER_SALE_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
 const WATER_NO_EXTRA_METADATA_FIELDS = new Set<string>();
 const WATER_METADATA_FIELDS = new Set([WATER_OPERATION_KIND_KEY, "quantity", "unitPrice"]);
+const BEVERAGE_OPERATION_KIND_KEY = "beverageOperationKind";
+type BeverageOperationKind = "VENTE" | "ACHAT_STOCK" | "DEPENSE" | "AUTRE_RECETTE";
+const BEVERAGE_OPERATION_LABELS: Record<BeverageOperationKind, string> = {
+  VENTE: "Vente de boissons",
+  ACHAT_STOCK: "Achat de stock",
+  DEPENSE: "Dépense d'exploitation",
+  AUTRE_RECETTE: "Autre recette"
+};
+const BEVERAGE_NUMERIC_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice", "saleUnitPrice"]);
+const BEVERAGE_AMOUNT_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice", "saleUnitPrice"]);
+const BEVERAGE_METADATA_FIELDS = new Set([
+  BEVERAGE_OPERATION_KIND_KEY, "productName", "quantity", "purchaseUnitPrice",
+  "saleUnitPrice", "supplierRef", "invoiceRef", "expenseCategory"
+]);
+const DAILY_AGREEMENT_OPERATION_KEY = "financialOperationKind";
+type DailyAgreementOperationKind = "PARTNER_PAYMENT" | "AGREEMENT_PROFIT" | "CAPITAL_RETURN" | "AGREEMENT_EXPENSE";
+const DAILY_AGREEMENT_OPERATION_LABELS: Record<DailyAgreementOperationKind, string> = {
+  PARTNER_PAYMENT: "Versement du partenaire",
+  AGREEMENT_PROFIT: "Bénéfice reçu",
+  CAPITAL_RETURN: "Retour de capital",
+  AGREEMENT_EXPENSE: "Dépense liée à l'accord"
+};
+const DAILY_PROTOCOL_CATEGORY = "Protocole d'accord";
+
+function isDailyProtocolCategory(value: string | undefined): boolean {
+  return (value ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr") ===
+    "protocole d'accord";
+}
+
+function getDailyAgreementOperationType(kind: DailyAgreementOperationKind): "CASH_IN" | "CASH_OUT" {
+  return kind === "PARTNER_PAYMENT" || kind === "AGREEMENT_PROFIT" ? "CASH_IN" : "CASH_OUT";
+}
 const AGENCY_OPERATION_KIND_KEY = "agencyOperationKind";
 type AgencyOperationKind =
   | "SALE_COMMISSION"
@@ -1305,6 +1339,29 @@ function deriveWaterAmount(
   return (quantity * unitPrice).toFixed(2);
 }
 
+function getBeverageOperationKind(
+  type: "CASH_IN" | "CASH_OUT",
+  metadata: Record<string, string>
+): BeverageOperationKind {
+  const value = metadata[BEVERAGE_OPERATION_KIND_KEY];
+  if (value === "VENTE" || value === "ACHAT_STOCK" || value === "DEPENSE" || value === "AUTRE_RECETTE") {
+    return value;
+  }
+  return type === "CASH_IN" ? "VENTE" : "ACHAT_STOCK";
+}
+
+function deriveBeverageAmount(
+  operationKind: BeverageOperationKind,
+  metadata: Record<string, string>
+): string | null {
+  if (operationKind !== "VENTE" && operationKind !== "ACHAT_STOCK") return null;
+  const quantity = toAmountNumber(metadata.quantity ?? "");
+  const unitPrice = toAmountNumber(
+    operationKind === "VENTE" ? metadata.saleUnitPrice ?? "" : metadata.purchaseUnitPrice ?? ""
+  );
+  return quantity > 0 && unitPrice > 0 ? (quantity * unitPrice).toFixed(2) : null;
+}
+
 function deriveAgencyAmount(
   operationKind: AgencyOperationKind,
   metadata: Record<string, string>
@@ -1441,6 +1498,7 @@ function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
     RENTAL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     HOTEL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     WATER_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    BEVERAGE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     AGENCY_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     AGRICULTURE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     BTP_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
@@ -1469,6 +1527,10 @@ function shouldDeriveHotelAmount(fieldKey: string): boolean {
 
 function shouldDeriveWaterAmount(fieldKey: string): boolean {
   return WATER_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveBeverageAmount(fieldKey: string): boolean {
+  return BEVERAGE_AMOUNT_METADATA_FIELDS.has(fieldKey);
 }
 
 function shouldDeriveAgencyAmount(fieldKey: string): boolean {
@@ -1502,7 +1564,9 @@ function getDefaultTransactionType(
     activityCode === "RENTAL" ||
     activityCode === "HOTEL_LODGING" ||
     activityCode === "WATER" ||
-    activityCode === "REAL_ESTATE_AGENCY"
+    activityCode === "BEVERAGE_DEPOT" ||
+    activityCode === "REAL_ESTATE_AGENCY" ||
+    activityCode === "DAILY_ACTIVITIES"
     ? "CASH_IN"
     : "CASH_OUT";
 }
@@ -2238,6 +2302,24 @@ function getVisibleFinanceMetadataFields(
     return fields.filter((field) => visibleKeys.has(field.key));
   }
 
+  if (activityCode === "BEVERAGE_DEPOT") {
+    const kind = getBeverageOperationKind(type, metadata);
+    const visibleKeys = new Set<string>([
+      "invoiceRef",
+      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"] : []),
+      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"] : []),
+      ...(kind === "DEPENSE" ? ["expenseCategory", "supplierRef"] : [])
+    ]);
+    return fields.filter((field) => field.key !== BEVERAGE_OPERATION_KIND_KEY && visibleKeys.has(field.key));
+  }
+
+  if (activityCode === "DAILY_ACTIVITIES") {
+    return fields.filter((field) =>
+      !["dailyActivityKind", DAILY_AGREEMENT_OPERATION_KEY].includes(field.key) &&
+      ["agreementRef", "partnerName", "paymentReference"].includes(field.key)
+    );
+  }
+
   if (activityCode === "REAL_ESTATE_AGENCY") {
     const operationKind = getAgencyOperationKind(type, metadata);
     const visibleKeys = getAgencyVisibleKeys(operationKind);
@@ -2419,6 +2501,20 @@ function cleanSectorFinanceMetadata(
     );
   }
 
+  if (activityCode === "BEVERAGE_DEPOT") {
+    const kind = getBeverageOperationKind(type, metadata);
+    const visibleKeys = new Set<string>([
+      "invoiceRef",
+      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"] : []),
+      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"] : []),
+      ...(kind === "DEPENSE" ? ["expenseCategory", "supplierRef"] : [])
+    ]);
+    return Object.fromEntries(Object.entries(metadata).map(([key, value]) => [
+      key,
+      BEVERAGE_METADATA_FIELDS.has(key) && key !== BEVERAGE_OPERATION_KIND_KEY && !visibleKeys.has(key) ? "" : value
+    ]));
+  }
+
   if (activityCode === "REAL_ESTATE_AGENCY") {
     const operationKind = getAgencyOperationKind(type, metadata);
     const visibleKeys = getAgencyVisibleKeys(operationKind);
@@ -2526,6 +2622,9 @@ function deriveSectorAmount(
   }
   if (activityCode === "WATER") {
     return deriveWaterAmount(getWaterOperationKind(type, metadata), metadata);
+  }
+  if (activityCode === "BEVERAGE_DEPOT") {
+    return deriveBeverageAmount(getBeverageOperationKind(type, metadata), metadata);
   }
   if (activityCode === "REAL_ESTATE_AGENCY") {
     return deriveAgencyAmount(getAgencyOperationKind(type, metadata), metadata);
@@ -3104,11 +3203,9 @@ export function FinanceTransactionsPage(): JSX.Element {
     selectedProfile,
     setSelectedActivityCode
   } = useBusinessActivity();
-  const financeEnabledActivities = useMemo(
-    () => enabledActivities.filter((activity) => activity.code !== "DAILY_ACTIVITIES"),
-    [enabledActivities]
-  );
+  const financeEnabledActivities = enabledActivities;
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [dailyActivityCategories, setDailyActivityCategories] = useState<DailyActivityCategory[]>([]);
   const [articles, setArticles] = useState<ActivityArticle[]>([]);
   const [hardwareCustomArticleMode, setHardwareCustomArticleMode] = useState(false);
   const [showGeneralExpenseCalculator, setShowGeneralExpenseCalculator] = useState(false);
@@ -3301,9 +3398,18 @@ export function FinanceTransactionsPage(): JSX.Element {
     ? getHotelOperationKind(transactionForm.type, transactionForm.metadata)
     : "ROOM_PAYMENT";
   const allowedCurrencies = selectedProfile?.finance.allowedCurrencies ?? DEFAULT_ALLOWED_CURRENCIES;
+  const dailyAgreementOperationKind = (() => {
+    const value = transactionForm.metadata[DAILY_AGREEMENT_OPERATION_KEY];
+    return value === "AGREEMENT_PROFIT" || value === "CAPITAL_RETURN" || value === "AGREEMENT_EXPENSE"
+      ? value
+      : "PARTNER_PAYMENT";
+  })() as DailyAgreementOperationKind;
   const waterOperationKind = selectedActivityCode === "WATER"
     ? getWaterOperationKind(transactionForm.type, transactionForm.metadata)
     : "WATER_SALE";
+  const beverageOperationKind = selectedActivityCode === "BEVERAGE_DEPOT"
+    ? getBeverageOperationKind(transactionForm.type, transactionForm.metadata)
+    : "VENTE";
   const agencyOperationKind = selectedActivityCode === "REAL_ESTATE_AGENCY"
     ? getAgencyOperationKind(transactionForm.type, transactionForm.metadata)
     : "SALE_COMMISSION";
@@ -3616,6 +3722,36 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [requestedActivityCode, setSelectedActivityCode]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (selectedActivityCode !== "DAILY_ACTIVITIES") {
+      setDailyActivityCategories([]);
+      return;
+    }
+    void withAuthorizedToken((accessToken) => listDailyActivityCategoriesRequest(accessToken, { activeOnly: true }))
+      .then((response) => { if (!cancelled) setDailyActivityCategories(response.items); })
+      .catch((error) => { if (!cancelled) setErrorMessage(toErrorMessage(error)); });
+    return () => { cancelled = true; };
+  }, [selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    if (selectedActivityCode !== "DAILY_ACTIVITIES" || dailyActivityCategories.length === 0) return;
+    setTransactionForm((previous) => {
+      const validCategory = dailyActivityCategories.some((category) => category.name === previous.metadata.dailyActivityKind);
+      const candidate = previous.metadata[DAILY_AGREEMENT_OPERATION_KEY] as DailyAgreementOperationKind;
+      const operationKind = candidate in DAILY_AGREEMENT_OPERATION_LABELS ? candidate : "PARTNER_PAYMENT";
+      return {
+        ...previous,
+        type: getDailyAgreementOperationType(operationKind),
+        metadata: {
+          ...previous.metadata,
+          dailyActivityKind: validCategory ? previous.metadata.dailyActivityKind : DAILY_PROTOCOL_CATEGORY,
+          [DAILY_AGREEMENT_OPERATION_KEY]: operationKind
+        }
+      };
+    });
+  }, [dailyActivityCategories, selectedActivityCode]);
+
+  useEffect(() => {
     if (location.hash !== "#transaction-create" || isLoading) {
       return;
     }
@@ -3922,6 +4058,10 @@ export function FinanceTransactionsPage(): JSX.Element {
     setTransactionForm((prev) => {
       if (editingTransactionId) {
         return prev;
+      }
+      if (selectedActivityCode === "BEVERAGE_DEPOT" && !prev.metadata[BEVERAGE_OPERATION_KIND_KEY]) {
+        const kind = prev.type === "CASH_IN" ? "VENTE" : "ACHAT_STOCK";
+        return { ...prev, metadata: { ...prev.metadata, [BEVERAGE_OPERATION_KIND_KEY]: kind } };
       }
       const hasDraftInput =
         prev.amount.trim().length > 0 ||
@@ -4769,15 +4909,6 @@ export function FinanceTransactionsPage(): JSX.Element {
         </p>
       ) : null}
 
-      {selectedActivityCode === "DAILY_ACTIVITIES" ? (
-        <EmptyState
-          title="Pas de transactions pour ce secteur"
-          description="Les activités quotidiennes (rendez-vous, demandes, documents, décisions, partenaires, actualités) se gèrent entièrement depuis les Tâches, avec un montant optionnel si une dépense y est liée."
-          actionLabel="Aller aux tâches"
-          onAction={() => navigate("/operations/tasks")}
-        />
-      ) : (
-        <>
       <PageGuide
         title="Guide des transactions"
         description={`Les écritures affichées sont filtrées par secteur: ${selectedActivity?.label ?? "aucun secteur actif"}.`}
@@ -5657,6 +5788,47 @@ export function FinanceTransactionsPage(): JSX.Element {
                   </strong>
                 </div>
               </>
+            ) : selectedActivityCode === "DAILY_ACTIVITIES" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Categorie</span>
+                  <select
+                    value={transactionForm.metadata.dailyActivityKind ?? DAILY_PROTOCOL_CATEGORY}
+                    onChange={(event) => setTransactionForm((previous) => ({
+                      ...previous,
+                      metadata: { ...previous.metadata, dailyActivityKind: event.target.value }
+                    }))}
+                  >
+                    {dailyActivityCategories.filter((category) => isDailyProtocolCategory(category.name)).map((category) => (
+                      <option key={category.id} value={category.name}>{category.name}</option>
+                    ))}
+                    {dailyActivityCategories.length === 0 ? <option value={DAILY_PROTOCOL_CATEGORY}>{DAILY_PROTOCOL_CATEGORY}</option> : null}
+                  </select>
+                </label>
+                <label className="operations-inline-group">
+                  <span>Nature du mouvement</span>
+                  <select
+                    value={dailyAgreementOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as DailyAgreementOperationKind;
+                      setTransactionForm((previous) => ({
+                        ...previous,
+                        type: getDailyAgreementOperationType(nextKind),
+                        metadata: { ...previous.metadata, [DAILY_AGREEMENT_OPERATION_KEY]: nextKind }
+                      }));
+                    }}
+                  >
+                    {Object.entries(DAILY_AGREEMENT_OPERATION_LABELS).map(([kind, label]) => (
+                      <option key={kind} value={kind}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>{transactionForm.type === "CASH_IN" ? "Entree de fonds" : "Sortie de fonds"}</strong>
+                </div>
+                <p className="helper-text">Creez d’abord la fiche du protocole dans Taches. Reprenez sa reference et le meme partenaire; seul le montant reellement verse se saisit ici.</p>
+              </>
             ) : selectedActivityCode === "HARDWARE" ? (
               <>
                 <label className="operations-inline-group">
@@ -5978,6 +6150,40 @@ export function FinanceTransactionsPage(): JSX.Element {
                     {transactionForm.type === "CASH_IN" ? "Recette hôtelière" : "Dépense hôtelière"}
                   </strong>
                 </div>
+              </>
+            ) : selectedActivityCode === "BEVERAGE_DEPOT" ? (
+              <>
+                <label className="operations-inline-group">
+                  <span>Catégorie du dépôt</span>
+                  <select
+                    value={beverageOperationKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as BeverageOperationKind;
+                      setTransactionForm((prev) => {
+                        const nextType = nextKind === "VENTE" || nextKind === "AUTRE_RECETTE" ? "CASH_IN" : "CASH_OUT";
+                        const nextMetadata = cleanSectorFinanceMetadata(selectedActivityCode, nextType, {
+                          ...prev.metadata,
+                          [BEVERAGE_OPERATION_KIND_KEY]: nextKind
+                        });
+                        return {
+                          ...prev,
+                          type: nextType,
+                          amount: formatAmountForInput(deriveBeverageAmount(nextKind, nextMetadata) ?? ""),
+                          metadata: nextMetadata
+                        };
+                      });
+                    }}
+                  >
+                    {Object.entries(BEVERAGE_OPERATION_LABELS).map(([kind, label]) => (
+                      <option key={kind} value={kind}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="operations-inline-group">
+                  <span>Flux financier</span>
+                  <strong>{transactionForm.type === "CASH_IN" ? "Recette du dépôt" : "Décaissement du dépôt"}</strong>
+                </div>
+                <p className="form-help-text">Les versements et reliquats se suivent dans les tâches de rapprochement; ils ne doivent pas être enregistrés une seconde fois comme des ventes.</p>
               </>
             ) : selectedActivityCode === "WATER" ? (
               <>
@@ -6524,6 +6730,16 @@ export function FinanceTransactionsPage(): JSX.Element {
               ) : null}
 
               {visibleFinanceMetadataFields.map((field) => {
+                const beverageRequiredFields = beverageOperationKind === "VENTE"
+                  ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"]
+                  : beverageOperationKind === "ACHAT_STOCK"
+                    ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"]
+                    : beverageOperationKind === "DEPENSE"
+                      ? ["expenseCategory"]
+                      : [];
+                const isFieldRequired = field.required || (
+                  selectedActivityCode === "BEVERAGE_DEPOT" && beverageRequiredFields.includes(field.key)
+                );
                 if (
                   selectedActivityCode === "GENERAL_EXPENSES" &&
                   !showGeneralExpenseCalculator &&
@@ -6807,7 +7023,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   return (
                     <label key={field.key} className="operations-inline-group">
                       <span>{field.label}</span>
-                      <select value={transactionForm.metadata[field.key] ?? ""} onChange={(event) => setTransactionForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={field.required}>
+                      <select value={transactionForm.metadata[field.key] ?? ""} onChange={(event) => setTransactionForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={isFieldRequired}>
                         <option value="">Choisir une catégorie</option>
                         {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                       </select>
@@ -6840,6 +7056,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           (selectedActivityCode === "RENTAL" && shouldDeriveRentalAmount(field.key)) ||
                           (selectedActivityCode === "HOTEL_LODGING" && shouldDeriveHotelAmount(field.key)) ||
                           (selectedActivityCode === "WATER" && shouldDeriveWaterAmount(field.key)) ||
+                          (selectedActivityCode === "BEVERAGE_DEPOT" && shouldDeriveBeverageAmount(field.key)) ||
                           (selectedActivityCode === "REAL_ESTATE_AGENCY" && shouldDeriveAgencyAmount(field.key)) ||
                           (selectedActivityCode === "FISH_FARMING" && shouldDeriveFishFarmingAmount(field.key)) ||
                           (selectedActivityCode === "LIVESTOCK" && shouldDeriveLivestockAmount(field.key)) ||
@@ -6874,7 +7091,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                       }));
                     }}
                     title={field.helpText}
-                    required={field.required}
+                    required={isFieldRequired}
                   />
                 </label>
                 );
@@ -7503,8 +7720,6 @@ export function FinanceTransactionsPage(): JSX.Element {
         }}
         onConfirm={() => void handleConfirmDeleteTransaction()}
       />
-        </>
-      )}
     </>
   );
 }

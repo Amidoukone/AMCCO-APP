@@ -526,6 +526,52 @@ export type WaterOperationsReport = {
   };
 };
 
+export type BeverageDepotReportTransaction = {
+  date: string;
+  category: "VENTE" | "ACHAT_STOCK" | "DEPENSE" | "AUTRE_RECETTE";
+  productName: string;
+  quantity: number | null;
+  purchaseUnitPrice: string | null;
+  saleUnitPrice: string | null;
+  amount: string;
+  description: string;
+  currency: "XOF";
+};
+
+export type BeverageDepotReportInventory = {
+  date: string;
+  status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+  productName: string;
+  quantity: number | null;
+  purchaseUnitPrice: string | null;
+  stockValue: string | null;
+};
+
+export type BeverageDepotReportReconciliation = {
+  date: string;
+  status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+  dailySales: string;
+  dailyDeposits: string;
+  dailyBalance: string;
+  dailyExpenses: string;
+};
+
+export type BeverageDepotReport = {
+  periodLabel: string;
+  transactions: BeverageDepotReportTransaction[];
+  inventory: BeverageDepotReportInventory[];
+  reconciliations: BeverageDepotReportReconciliation[];
+  totals: {
+    salesAmount: string;
+    purchasesAmount: string;
+    expensesAmount: string;
+    otherIncomeAmount: string;
+    grossMarginAmount: string;
+    stockValue: string;
+    currency: "XOF";
+  };
+};
+
 export type AgencyOperationsReportRow = {
   mandateRef: string;
   propertyRef: string;
@@ -837,6 +883,7 @@ export type ReportsOverview = {
   livestockOperationsReport: LivestockOperationsReport | null;
   hotelOperationsReport: HotelOperationsReport | null;
   waterOperationsReport: WaterOperationsReport | null;
+  beverageDepotReport: BeverageDepotReport | null;
   agencyOperationsReport: AgencyOperationsReport | null;
   generalExpensesReport: GeneralExpensesReport | null;
   roleDistribution: ReportRoleDistribution[];

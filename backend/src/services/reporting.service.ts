@@ -38,6 +38,7 @@ import {
   type AgricultureOperationsReport,
   type AgencyOperationsReport,
   type BtpOperationsReport,
+  type BeverageDepotReport,
   type DashboardSummary,
   type FishFarmingOperationsReport,
   type FoodOperationsReport,
@@ -799,7 +800,8 @@ function drawPdfBrandingFrame(
   doc: PDFKit.PDFDocument,
   pageNumber: number,
   totalPages: number,
-  periodLabel: string
+  periodLabel: string,
+  reportTitle = "Rapport consolide"
 ): void {
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
@@ -824,7 +826,7 @@ function drawPdfBrandingFrame(
     .fillColor("#486581")
     .font("Helvetica")
     .fontSize(9)
-    .text("Rapport consolide", margin + 40, 44, {
+    .text(reportTitle, margin + 40, 44, {
       width: 160
     });
   doc
@@ -7271,6 +7273,85 @@ function getMetadataNumber(metadata: Record<string, string>, key: string): numbe
   return toNumberAmount(metadata[key]);
 }
 
+function buildBeverageDepotReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): BeverageDepotReport {
+  const sectorTransactions = transactions.filter((item) =>
+    item.activityCode === "BEVERAGE_DEPOT" && item.currency === "XOF" && isReportableFinancialStatus(item.status)
+  );
+  const sectorTasks = tasks.filter((item) => item.activityCode === "BEVERAGE_DEPOT");
+  const sales = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "VENTE");
+  const purchases = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "ACHAT_STOCK");
+  const expenses = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "DEPENSE");
+  const otherIncome = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "AUTRE_RECETTE");
+  const inventoryTasks = sectorTasks.filter((item) => item.metadata.beverageTaskKind === "INVENTAIRE");
+  const reconciliationTasks = sectorTasks.filter((item) => item.metadata.beverageTaskKind === "RAPPROCHEMENT");
+  const inventoryDate = (task: ReportOperationalTask) =>
+    task.metadata.periodDate?.trim().slice(0, 10) || (task.dueDate ? toReportDate(task.dueDate) : "");
+  const latestInventoryByProduct = new Map<string, ReportOperationalTask>();
+  for (const task of inventoryTasks) {
+    const key = task.metadata.productName?.trim() || "—";
+    const existing = latestInventoryByProduct.get(key);
+    if (!existing || inventoryDate(task) >= inventoryDate(existing)) {
+      latestInventoryByProduct.set(key, task);
+    }
+  }
+  const sum = (items: ReportOperationalTransaction[]) => items.reduce((total, item) => total + toNumberAmount(item.amount), 0);
+  const grossMargin = sales.reduce((total, item) => {
+    if (!item.metadata.purchaseUnitPrice) return total;
+    const quantity = getMetadataNumber(item.metadata, "quantity");
+    const salePrice = getMetadataNumber(item.metadata, "saleUnitPrice");
+    const purchasePrice = getMetadataNumber(item.metadata, "purchaseUnitPrice");
+    return total + (salePrice - purchasePrice) * quantity;
+  }, 0);
+  const taskDate = inventoryDate;
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    transactions: sectorTransactions.map((item) => {
+      const category = item.metadata.beverageOperationKind;
+      return {
+        date: toReportDate(item.occurredAt),
+        category: category === "VENTE" || category === "ACHAT_STOCK" || category === "DEPENSE" || category === "AUTRE_RECETTE"
+          ? category : item.type === "CASH_IN" ? "AUTRE_RECETTE" : "DEPENSE",
+        productName: item.metadata.productName?.trim() || "—",
+        quantity: item.metadata.quantity ? getMetadataNumber(item.metadata, "quantity") : null,
+        purchaseUnitPrice: item.metadata.purchaseUnitPrice ? toMoneyString(getMetadataNumber(item.metadata, "purchaseUnitPrice")) : null,
+        saleUnitPrice: item.metadata.saleUnitPrice ? toMoneyString(getMetadataNumber(item.metadata, "saleUnitPrice")) : null,
+        amount: toMoneyString(toNumberAmount(item.amount)),
+        description: item.description?.trim() || item.metadata.supplierRef?.trim() || item.metadata.expenseCategory?.trim() || "—",
+        currency: "XOF" as const
+      };
+    }),
+    inventory: inventoryTasks.map((item) => ({
+      date: taskDate(item), status: item.status,
+      productName: item.metadata.productName?.trim() || "—",
+      quantity: item.metadata.quantity ? getMetadataNumber(item.metadata, "quantity") : null,
+      purchaseUnitPrice: item.metadata.purchaseUnitPrice ? toMoneyString(getMetadataNumber(item.metadata, "purchaseUnitPrice")) : null,
+      stockValue: item.metadata.stockValue ? toMoneyString(getMetadataNumber(item.metadata, "stockValue")) : null
+    })),
+    reconciliations: reconciliationTasks.map((item) => ({
+      date: taskDate(item), status: item.status,
+      dailySales: toMoneyString(getMetadataNumber(item.metadata, "dailySales")),
+      dailyDeposits: toMoneyString(getMetadataNumber(item.metadata, "dailyDeposits")),
+      dailyBalance: toMoneyString(getMetadataNumber(item.metadata, "dailyBalance")),
+      dailyExpenses: toMoneyString(getMetadataNumber(item.metadata, "dailyExpenses"))
+    })),
+    totals: {
+      salesAmount: toMoneyString(sum(sales)),
+      purchasesAmount: toMoneyString(sum(purchases)),
+      expensesAmount: toMoneyString(sum(expenses)),
+      otherIncomeAmount: toMoneyString(sum(otherIncome)),
+      grossMarginAmount: toMoneyString(grossMargin),
+      stockValue: toMoneyString(Array.from(latestInventoryByProduct.values()).reduce(
+        (total, item) => total + getMetadataNumber(item.metadata, "stockValue"), 0
+      )),
+      currency: "XOF"
+    }
+  };
+}
+
 function getHardwareDesignation(transaction: ReportOperationalTransaction): string {
   const metadata = transaction.metadata;
   const designation =
@@ -11089,6 +11170,9 @@ export async function getCompanyReportsOverview(
     livestockOperationsReport: buildLivestockOperationsReport(operationalTransactions, operationalTasks, filters),
     hotelOperationsReport: buildHotelOperationsReport(operationalTransactions, operationalTasks, filters),
     waterOperationsReport: buildWaterOperationsReport(operationalTransactions, filters),
+    beverageDepotReport: filters.activityCode === "BEVERAGE_DEPOT"
+      ? buildBeverageDepotReport(operationalTransactions, operationalTasks, filters)
+      : null,
     agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
     generalExpensesReport: buildGeneralExpensesReport(operationalTransactions, filters),
     roleDistribution: [],
@@ -12266,6 +12350,45 @@ export async function exportCompanyReportsPdf(
         totalPages,
         overview.waterOperationsReport?.periodLabel ?? periodLabel
       );
+    }, { layout: "landscape" });
+  }
+
+  if (filters.activityCode === "BEVERAGE_DEPOT") {
+    const report = overview.beverageDepotReport;
+    return buildPdfBuffer((doc) => {
+      doc.on("pageAdded", () => { doc.y = PDF_CONTENT_TOP; });
+      doc.y = PDF_CONTENT_TOP;
+      doc.fillColor("#0f2544").font("Helvetica-Bold").fontSize(18).text("AMCCO - Rapport dépôt de boissons");
+      doc.moveDown(0.5).fillColor("#334e68").font("Helvetica").fontSize(10)
+        .text(`Entreprise: ${actor.companyId}`)
+        .text(`Période appliquée: ${report?.periodLabel ?? periodLabel}`);
+      drawPdfReadingGuideBox(doc);
+      writePdfSectionTitle(doc, "Synthèse des flux XOF");
+      writePdfList(doc, report ? [
+        `Ventes: ${report.totals.salesAmount} XOF`,
+        `Achats de stock: ${report.totals.purchasesAmount} XOF`,
+        `Dépenses d'exploitation: ${report.totals.expensesAmount} XOF`,
+        `Autres recettes: ${report.totals.otherIncomeAmount} XOF`,
+        `Marge brute calculable: ${report.totals.grossMarginAmount} XOF`,
+        `Valeur de stock déclarée à l'inventaire: ${report.totals.stockValue} XOF`
+      ] : [], "Aucun flux ou inventaire sur cette période.");
+      writePdfSectionTitle(doc, "Transactions détaillées");
+      writePdfList(doc, limitPdfRows((report?.transactions ?? []).map((item) => {
+        const category = item.category === "VENTE" ? "Vente" : item.category === "ACHAT_STOCK"
+          ? "Achat stock" : item.category === "DEPENSE" ? "Dépense" : "Autre recette";
+        return `${item.date} | ${category} | ${item.productName} | quantité ${item.quantity ?? "-"} | achat unitaire ${item.purchaseUnitPrice ?? "-"} XOF | vente unitaire ${item.saleUnitPrice ?? "-"} XOF | montant ${item.amount} XOF | ${item.description}`;
+      })), "Aucune transaction sur cette période.");
+      writePdfSectionTitle(doc, "Inventaire des boissons (hors flux de caisse)");
+      writePdfList(doc, limitPdfRows((report?.inventory ?? []).map((item) =>
+        `${item.date || "Date non renseignée"} | ${item.productName} | stock ${item.quantity ?? "-"} | coût unitaire ${item.purchaseUnitPrice ?? "-"} XOF | valeur ${item.stockValue ?? "-"} XOF | ${toDisplayTaskStatusLabel(item.status)}`
+      )), "Aucun inventaire enregistré sur cette période.");
+      writePdfSectionTitle(doc, "Rapprochement journalier");
+      writePdfList(doc, limitPdfRows((report?.reconciliations ?? []).map((item) =>
+        `${item.date || "Date non renseignée"} | ventes ${item.dailySales} XOF | versements ${item.dailyDeposits} XOF | reliquat ${item.dailyBalance} XOF | dépenses ${item.dailyExpenses} XOF | ${toDisplayTaskStatusLabel(item.status)}`
+      )), "Aucun rapprochement journalier enregistré sur cette période.");
+      doc.fontSize(9).fillColor("#52606d").text("Les versements sont présentés séparément des ventes. La valeur d'inventaire ne modifie pas la caisse.");
+    }, (doc, pageNumber, totalPages) => {
+      drawPdfBrandingFrame(doc, pageNumber, totalPages, report?.periodLabel ?? periodLabel, "Rapport dépôt de boissons");
     }, { layout: "landscape" });
   }
 

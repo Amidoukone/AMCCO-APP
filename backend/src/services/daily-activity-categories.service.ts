@@ -35,6 +35,7 @@ const DEFAULT_CATEGORY_NAMES = [
   "Récupération de document",
   "Décision prise",
   "Nouveau partenaire",
+  "Protocole d'accord",
   "Actualité / information",
   "Autre"
 ];
@@ -44,13 +45,12 @@ export async function listCompanyDailyActivityCategories(input: {
   activeOnly?: boolean;
 }) {
   const items = await listDailyActivityCategories(input);
-  if (items.length > 0) {
-    return items;
-  }
-
+  const defaultNames = items.length > 0
+    ? ["Protocole d'accord"]
+    : DEFAULT_CATEGORY_NAMES;
   await seedDefaultDailyActivityCategories({
     companyId: input.companyId,
-    categories: DEFAULT_CATEGORY_NAMES.map((name) => ({ id: randomUUID(), name }))
+    categories: defaultNames.map((name) => ({ id: randomUUID(), name }))
   });
   return listDailyActivityCategories(input);
 }

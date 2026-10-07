@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { inflateSync } from "node:zlib";
 import {
   exportCompanyReportsPdf,
   exportCompanyTransactionsCsv,
@@ -842,6 +843,177 @@ describe("reporting.service", () => {
       dateTo: "2026-09-30T23:59:59.999Z"
     });
 
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("reports agreement partners and actual protocol movements in the overview and PDF", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 1, totalAmount: "500000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      { type: "CASH_IN", currency: "XOF", count: 1, totalAmount: "500000.00", approvedAmount: "500000.00" }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      { activityCode: "DAILY_ACTIVITIES", count: 1, totalAmount: "500000.00", approvedAmount: "500000.00" }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([{ status: "IN_PROGRESS", count: 1 }]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      { activityCode: "DAILY_ACTIVITIES", totalCount: 1, openCount: 1, blockedCount: 0, doneCount: 0 }
+    ]);
+    vi.mocked(listReportRoleDistribution).mockResolvedValue([]);
+    vi.mocked(listDashboardWorkload).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([{
+      activityCode: "DAILY_ACTIVITIES", status: "APPROVED", type: "CASH_IN", amount: "500000.00",
+      currency: "XOF", occurredAt: "2026-05-24T10:00:00.000Z",
+      metadata: {
+        dailyActivityKind: "Protocole d'accord", agreementRef: "NA-2026-01", partnerName: "Nouhoum Samake",
+        financialOperationKind: "PARTNER_PAYMENT", paymentReference: "BOA-02-001"
+      }
+    }]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([{
+      activityCode: "DAILY_ACTIVITIES", status: "IN_PROGRESS", dueDate: null,
+      metadata: {
+        dailyActivityKind: "Protocole d'accord", agreementRef: "NA-2026-01", partnerName: "Nouhoum Samake",
+        agreementType: "Financier", agreementCapitalAmount: "1500000", agreementProfitAmount: "120000"
+      }
+    }]);
+
+    const filters = {
+      activityCode: "DAILY_ACTIVITIES",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    };
+    const overview = await getCompanyReportsOverview(actor, filters);
+    expect(overview.operationalPerformance).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        scope: "ACTIVITY", activityCode: "DAILY_ACTIVITIES", transactionsCount: 1,
+        approvedCashIn: "500000.00", totalTasksCount: 1, openTasksCount: 1
+      }),
+      expect.objectContaining({
+        scope: "SUBSECTION", dimensionKey: "agreementRef", itemLabel: "NA-2026-01",
+        approvedCashIn: "500000.00", totalTasksCount: 1
+      }),
+      expect.objectContaining({
+        scope: "SUBSECTION", dimensionKey: "partnerName", itemLabel: "Nouhoum Samake",
+        approvedCashIn: "500000.00", totalTasksCount: 1
+      }),
+      expect.objectContaining({
+        scope: "SUBSECTION", dimensionKey: "financialOperationKind", itemLabel: "PARTNER_PAYMENT",
+        approvedCashIn: "500000.00"
+      })
+    ]));
+
+    const pdf = await exportCompanyReportsPdf(actor, filters);
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(0);
+    const pdfLatin1 = pdf.toString("latin1");
+    const decodedStreams = [...pdfLatin1.matchAll(/stream\r?\n/g)].map((match) => {
+      const start = (match.index ?? 0) + match[0].length;
+      const end = pdfLatin1.indexOf("endstream", start);
+      if (end < 0) return "";
+      try {
+        return inflateSync(Buffer.from(pdfLatin1.slice(start, end).replace(/\r?\n$/, ""), "latin1")).toString("latin1");
+      } catch {
+        return "";
+      }
+    }).join("\n");
+    const extractedPdfText = [...decodedStreams.matchAll(/<([0-9a-fA-F]+)>/g)]
+      .map((match) => Buffer.from(match[1], "hex").toString("latin1"))
+      .join("");
+    expect(extractedPdfText).toContain("Nouhoum Samake");
+    expect(extractedPdfText).toContain("NA-2026-01");
+    expect(extractedPdfText).toContain("500000.00 XOF");
+  });
+
+  it("reports beverage sales, stock purchases, expenses and inventory tasks without treating deposits as sales", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
+      { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "168000.00" }
+    ]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      { type: "CASH_IN", currency: "XOF", count: 1, totalAmount: "60000.00", approvedAmount: "60000.00" },
+      { type: "CASH_OUT", currency: "XOF", count: 2, totalAmount: "108000.00", approvedAmount: "108000.00" }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
+      { activityCode: "BEVERAGE_DEPOT", count: 3, totalAmount: "168000.00", approvedAmount: "168000.00" }
+    ]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([
+      { status: "DONE", count: 2 }, { status: "IN_PROGRESS", count: 1 }
+    ]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([
+      { activityCode: "BEVERAGE_DEPOT", totalCount: 3, openCount: 1, blockedCount: 0, doneCount: 2 }
+    ]);
+    vi.mocked(listReportRoleDistribution).mockResolvedValue([]);
+    vi.mocked(listDashboardWorkload).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_IN", amount: "60000.00", currency: "XOF",
+        occurredAt: "2026-09-05T10:00:00.000Z", metadata: {
+          beverageOperationKind: "VENTE", productName: "Boisson gazeuse", quantity: "12",
+          purchaseUnitPrice: "4500", saleUnitPrice: "5000"
+        }
+      },
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_OUT", amount: "100000.00", currency: "XOF",
+        occurredAt: "2026-09-06T10:00:00.000Z", metadata: { beverageOperationKind: "ACHAT_STOCK", productName: "Boisson gazeuse" }
+      },
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_OUT", amount: "8000.00", currency: "XOF",
+        occurredAt: "2026-09-07T10:00:00.000Z", metadata: { beverageOperationKind: "DEPENSE", expenseCategory: "Carburant" }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "DONE", dueDate: "2026-09-30T10:00:00.000Z",
+        metadata: { beverageTaskKind: "INVENTAIRE", productName: "Boisson gazeuse", quantity: "18", stockValue: "90000" }
+      },
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "DONE", dueDate: "2026-09-15T10:00:00.000Z",
+        metadata: { beverageTaskKind: "INVENTAIRE", periodDate: "2026-09-15", productName: "Boisson gazeuse", quantity: "20", stockValue: "80000" }
+      },
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "IN_PROGRESS", dueDate: null,
+        metadata: {
+          beverageTaskKind: "RAPPROCHEMENT", periodDate: "2026-09-30", dailySales: "60000",
+          dailyDeposits: "45000", dailyBalance: "15000", dailyExpenses: "8000"
+        }
+      }
+    ]);
+
+    const filters = {
+      activityCode: "BEVERAGE_DEPOT",
+      dateFrom: "2026-09-01T00:00:00.000Z",
+      dateTo: "2026-09-30T23:59:59.999Z"
+    };
+    const overview = await getCompanyReportsOverview(actor, filters);
+
+    expect(overview.activityProfile?.label).toBe("Dépôt de boissons");
+    expect(overview.beverageDepotReport).toMatchObject({
+      totals: { salesAmount: "60000.00", purchasesAmount: "100000.00", expensesAmount: "8000.00", grossMarginAmount: "6000.00", stockValue: "90000.00" },
+      inventory: expect.arrayContaining([expect.objectContaining({ productName: "Boisson gazeuse", quantity: 18, stockValue: "90000.00" })]),
+      reconciliations: [expect.objectContaining({ dailySales: "60000.00", dailyDeposits: "45000.00", dailyBalance: "15000.00", dailyExpenses: "8000.00" })]
+    });
+    expect(overview.beverageDepotReport?.inventory).toHaveLength(2);
+    expect(overview.operationalPerformance).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          scope: "ACTIVITY", activityCode: "BEVERAGE_DEPOT", transactionsCount: 3,
+          approvedCashIn: "60000.00", approvedCashOut: "108000.00", totalTasksCount: 3,
+          doneTasksCount: 2, openTasksCount: 1
+        }),
+        expect.objectContaining({
+          scope: "SUBSECTION", dimensionKey: "beverageOperationKind", itemLabel: "VENTE",
+          approvedCashIn: "60000.00", approvedCashOut: "0.00"
+        }),
+        expect.objectContaining({
+          scope: "SUBSECTION", dimensionKey: "beverageTaskKind", itemLabel: "RAPPROCHEMENT",
+          totalTasksCount: 1, openTasksCount: 1
+        })
+      ])
+    );
+
+    const pdf = await exportCompanyReportsPdf(actor, filters);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
   });

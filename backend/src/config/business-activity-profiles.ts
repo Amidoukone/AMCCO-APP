@@ -98,9 +98,10 @@ function field(
   key: string,
   label: string,
   required: boolean,
-  helpText: string
+  helpText: string,
+  options?: string[]
 ): ActivityFieldDefinition {
-  return { key, label, required, helpText };
+  return { key, label, required, helpText, ...(options ? { options } : {}) };
 }
 
 function workflow(
@@ -1395,6 +1396,77 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ]
     }
   }),
+  BEVERAGE_DEPOT: makeProfile("BEVERAGE_DEPOT", {
+    operationsModel: "Dépôt de boissons suivi par ventes détaillées par produit, achats de stock, dépenses d'exploitation, inventaires et rapprochement journalier. Les versements et reliquats sont des données de rapprochement et ne constituent pas une nouvelle vente.",
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
+      allowedCurrencies: ["XOF"],
+      requiresDescription: false,
+      requiresProof: false,
+      fields: [
+        field("accountId", "Compte", true, "Caisse ou compte utilisé pour l'opération."),
+        field("amount", "Montant", true, "Calculé depuis la quantité et le prix unitaire pour les achats et ventes."),
+        field("description", "Précision", false, "Client, fournisseur, référence ou motif de la dépense.")
+      ],
+      metadataFields: [
+        field("beverageOperationKind", "Catégorie", true, "Choisissez la nature réelle du flux.", ["VENTE", "ACHAT_STOCK", "DEPENSE", "AUTRE_RECETTE"]),
+        field("productName", "Produit", false, "Nom de la boisson vendue ou achetée."),
+        field("quantity", "Quantité", false, "Nombre de casiers, cartons ou unités."),
+        field("purchaseUnitPrice", "Prix d'achat unitaire", false, "Prix par unité lors d'un achat de stock."),
+        field("saleUnitPrice", "Prix de vente unitaire", false, "Prix par unité lors d'une vente."),
+        field("supplierRef", "Fournisseur", false, "Fournisseur du stock acheté."),
+        field("invoiceRef", "Référence / facture", false, "Numéro de facture, reçu ou pièce justificative."),
+        field("expenseCategory", "Nature de dépense", false, "Nature de la dépense d'exploitation.", ["Carburant", "Entretien véhicule", "Péage / contrôle", "Manutention", "Fournitures", "Téléphone", "Réparation", "Autre"])
+      ],
+      workflow: [
+        workflow("CLASSIFY", "Classer le flux", "Distinguer une vente, un achat de stock, une dépense ou une autre recette."),
+        workflow("DETAIL", "Renseigner les détails", "Pour les achats et ventes, préciser produit, quantité et prix unitaire."),
+        workflow("RECONCILE", "Rapprocher la journée", "Comparer ventes, achats, versements, reliquats et dépenses sans compter les versements comme de nouvelles ventes.")
+      ]
+    },
+    tasks: {
+      requiresDescription: false,
+      requiresDueDate: false,
+      requiresAssignee: false,
+      completionRequiresAssignee: false,
+      blockedRequiresAssignee: false,
+      blockedAlertSeverity: "WARNING",
+      fields: [
+        field("title", "Action", true, "Ex. inventaire de fin de journée ou réception fournisseur."),
+        field("description", "Détail", false, "Écart constaté, produit ou observation.")
+      ],
+      metadataFields: [
+        field("beverageTaskKind", "Type de suivi", true, "Distingue l'inventaire de stock du rapprochement journalier.", ["INVENTAIRE", "RAPPROCHEMENT", "RECEPTION", "SUIVI_GENERAL"]),
+        field("productName", "Produit", false, "Produit concerné par l'inventaire ou la réception."),
+        field("quantity", "Quantité en stock", false, "Quantité physique constatée lors de l'inventaire."),
+        field("purchaseUnitPrice", "Prix d'achat unitaire", false, "Coût unitaire utilisé pour évaluer le stock."),
+        field("stockValue", "Valeur du stock", false, "Valeur indicative de l'inventaire, sans effet sur la caisse."),
+        field("periodDate", "Date / période", false, "Date de l'inventaire ou journée rapprochée."),
+        field("dailySales", "Ventes du jour", false, "Total des ventes comptabilisées."),
+        field("dailyDeposits", "Versements", false, "Sommes versées en banque ou remises; ne pas les additionner aux ventes."),
+        field("dailyBalance", "Reliquat", false, "Solde restant à rapprocher après les versements."),
+        field("dailyExpenses", "Dépenses du jour", false, "Total des dépenses enregistrées séparément.")
+      ],
+      workflow: [
+        workflow("COUNT", "Compter", "Saisir les quantités physiques observées par produit."),
+        workflow("RECONCILE", "Rapprocher", "Comparer les ventes, versements, reliquats et dépenses de la journée."),
+        workflow("CLOSE", "Clôturer", "Documenter les écarts et valider le suivi.")
+      ]
+    },
+    reporting: {
+      focusArea: "Achats, ventes, dépenses, valeur du stock et rapprochement journalier du dépôt",
+      exportSections: ["achats de boissons", "ventes par produit", "dépenses", "inventaire", "versements et reliquats"],
+      operationalDimensions: [
+        dimension("beverageOperationKind", "Catégorie de flux", "Sépare ventes, achats, dépenses et autres recettes."),
+        dimension("productName", "Produit", "Suit achats et ventes par boisson."),
+        dimension("beverageTaskKind", "Type de suivi", "Distingue inventaires et rapprochements journaliers.")
+      ],
+      highlights: [
+        { code: "beverage-transactions", label: "Flux du dépôt", description: "Achats, ventes et dépenses enregistrés.", metric: "transactionsCount", thresholds: { warningAt: 5 } },
+        { code: "beverage-open-tasks", label: "Suivis à terminer", description: "Inventaires ou rapprochements encore ouverts.", metric: "openTasksCount", thresholds: { warningAt: 2, criticalAt: 5 } }
+      ]
+    }
+  }),
   REAL_ESTATE_AGENCY: makeProfile("REAL_ESTATE_AGENCY", {
     operationsModel: "Agence immobilière avec suivi détaillé des mandats, biens, proprietaires, prospects, visites, offres, dossiers de vente ou location, commissions, frais commerciaux, documents et closing.",
     finance: {
@@ -1572,9 +1644,9 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   DAILY_ACTIVITIES: makeProfile("DAILY_ACTIVITIES", {
-    operationsModel: "Suivi des activités de bureau qui ne relèvent d'aucun secteur d'activité: rendez-vous, demandes pour le PDG, récupération de documents, décisions prises, nouveaux partenaires et actualités.",
+    operationsModel: "Suivi des activités de bureau qui ne relèvent d'aucun secteur d'activité, y compris les protocoles d'accord, leurs partenaires, les montants convenus et les versements réellement reçus ou effectués.",
     finance: {
-      allowedTransactionTypes: ["CASH_OUT"],
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
       requiresDescription: false,
       requiresProof: false,
@@ -1584,12 +1656,16 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Précision", false, "Personne, partenaire, document ou précision utile.")
       ],
       metadataFields: [
-        field("dailyActivityKind", "Type d'activité", true, "Nature de l'activité concernée par la dépense.")
+        field("dailyActivityKind", "Type d'activité", true, "Nature de l'activité financière."),
+        field("agreementRef", "Référence de l'accord", true, "Référence identique à celle de la fiche Protocole d'accord."),
+        field("partnerName", "Partenaire", true, "Nom du partenaire qui verse ou reçoit les fonds."),
+        field("financialOperationKind", "Nature du mouvement", true, "Versement du partenaire, bénéfice reçu, retour de capital ou dépense d'accord.", ["PARTNER_PAYMENT", "AGREEMENT_PROFIT", "CAPITAL_RETURN", "AGREEMENT_EXPENSE"]),
+        field("paymentReference", "Référence du versement", false, "Référence du reçu, bordereau ou opération bancaire.")
       ],
       workflow: [
-        workflow("SELECT", "Sélection du type", "L'agent choisit le type d'activité concerné, puis précise si une dépense y est liée."),
-        workflow("AMOUNT", "Montant", "Le montant est saisi directement s'il y a une dépense liée à l'activité."),
-        workflow("REPORTING", "Suivi global", "Chaque activité alimente le suivi global, indépendamment des secteurs.")
+        workflow("AGREEMENT", "Créer l'accord", "Enregistrer le partenaire, la référence, l'objet, le capital et le bénéfice convenus."),
+        workflow("PAYMENT", "Saisir un versement", "Chaque versement réel est enregistré séparément avec sa date et le compte destinataire."),
+        workflow("RECONCILE", "Suivre l'accord", "Comparer les versements enregistrés au capital convenu sans enregistrer le capital prévu comme une recette encaissée.")
       ]
     },
     tasks: {
@@ -1605,19 +1681,30 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("dailyActivityKind", "Type d'activité", true, "Catégorie d'activité, définie et gérée par l'entreprise."),
-        field("amount", "Montant (optionnel)", false, "Montant d'une dépense éventuelle liée à l'activité, à titre indicatif.")
+        field("amount", "Montant (optionnel)", false, "Montant d'une dépense éventuelle liée à l'activité, à titre indicatif."),
+        field("agreementRef", "Référence de l'accord", false, "Référence unique utilisée pour relier l'accord à ses versements."),
+        field("partnerName", "Partenaire", false, "Nom de la personne ou entreprise partenaire."),
+        field("agreementType", "Nature de l'accord", false, "Un accord peut être financier ou non financier.", ["Financier", "Non financier"]),
+        field("agreementDate", "Date de l'accord", false, "Date de signature ou de mise en vigueur."),
+        field("agreementPurpose", "Objet du protocole", false, "Activité ou partenariat convenu, par exemple commerce général."),
+        field("agreementCapitalAmount", "Capital d'investissement convenu", false, "Capital prévu dans l'accord; ce montant n'est pas une recette encaissée."),
+        field("agreementProfitAmount", "Bénéfice convenu / prévu", false, "Bénéfice estimé ou prévu dans l'accord."),
+        field("agreementPaymentAccount", "Compte prévu", false, "Compte destinataire prévu, par exemple BOA 02.")
       ],
       workflow: [
-        workflow("PLAN", "Planification", "L'activité est enregistrée, avec échéance si nécessaire."),
-        workflow("EXECUTE", "Traitement", "L'activité est suivie jusqu'à sa réalisation."),
-        workflow("CLOSE", "Clôture", "Clôture de l'activité.")
+        workflow("AGREEMENT", "Formalisation", "Créer la fiche d'accord et ses conditions."),
+        workflow("PAYMENT", "Versements", "Enregistrer chaque versement partenaire dans les transactions financières."),
+        workflow("CLOSE", "Clôture", "Clôturer l'accord lorsque les engagements sont terminés.")
       ]
     },
     reporting: {
-      focusArea: "Suivi des activités quotidiennes de bureau, indépendantes des secteurs d'activité",
-      exportSections: ["rendez-vous", "demandes PDG", "documents", "décisions", "partenaires", "actualités"],
+      focusArea: "Suivi des activités quotidiennes et des protocoles d'accord, partenaires, capitaux convenus et versements",
+      exportSections: ["rendez-vous", "demandes PDG", "documents", "décisions", "partenaires", "protocoles d'accord", "versements", "actualités"],
       operationalDimensions: [
-        dimension("dailyActivityKind", "Type d'activité", "Compare les activités par type.")
+        dimension("dailyActivityKind", "Type d'activité", "Compare les activités par type."),
+        dimension("agreementRef", "Référence d'accord", "Relie une fiche d'accord à ses versements."),
+        dimension("partnerName", "Partenaire", "Suit les accords et mouvements par partenaire."),
+        dimension("financialOperationKind", "Nature du mouvement", "Distingue versements reçus, bénéfices, retours de capital et dépenses d'accord.")
       ],
       highlights: [
         {
@@ -1670,10 +1757,19 @@ export function listBusinessActivityProfiles(): BusinessActivityProfile[] {
   return Object.values(BUSINESS_ACTIVITY_PROFILES);
 }
 
+function normalizeActivityCategory(value: string | undefined): string {
+  return (value ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("fr");
+}
+
 export function assertTransactionInputMatchesActivityProfile(
   activityCode: BusinessActivityCode,
   input: {
     type: TransactionType;
+    amount?: string;
     currency: string;
     description?: string;
     metadata?: ActivityMetadataMap;
@@ -1714,6 +1810,73 @@ export function assertTransactionInputMatchesActivityProfile(
       }
     }
   }
+  if (activityCode === "BEVERAGE_DEPOT") {
+    const metadata = input.metadata ?? {};
+    const operationKind = metadata.beverageOperationKind?.trim();
+    const expectedType = operationKind === "VENTE" || operationKind === "AUTRE_RECETTE"
+      ? "CASH_IN"
+      : operationKind === "ACHAT_STOCK" || operationKind === "DEPENSE"
+        ? "CASH_OUT"
+        : null;
+    if (!expectedType) {
+      throw new Error("Choisissez une catégorie valide pour l'opération du dépôt de boissons.");
+    }
+    if (input.type !== expectedType) {
+      throw new Error("Le type de flux ne correspond pas à la catégorie du dépôt de boissons.");
+    }
+    const requiredFields = operationKind === "VENTE"
+      ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"]
+      : operationKind === "ACHAT_STOCK"
+        ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"]
+        : operationKind === "DEPENSE"
+          ? ["expenseCategory"]
+          : [];
+    for (const key of requiredFields) {
+      if (!metadata[key]?.trim()) {
+        const labels: Record<string, string> = {
+          productName: "Le produit est requis.", quantity: "La quantité est requise.",
+          saleUnitPrice: "Le prix de vente unitaire est requis.",
+          purchaseUnitPrice: "Le prix d'achat unitaire est requis.",
+          supplierRef: "Le fournisseur est requis pour un achat de stock.",
+          expenseCategory: "La nature de la dépense est requise."
+        };
+        throw new Error(labels[key] ?? "Un détail de l'opération est requis.");
+      }
+    }
+    if (operationKind === "VENTE" || operationKind === "ACHAT_STOCK") {
+      const parseMetadataNumber = (value: string | undefined) => Number((value ?? "").trim().replace(/\s/g, "").replace(",", "."));
+      const quantity = parseMetadataNumber(metadata.quantity);
+      const unitPrice = parseMetadataNumber(operationKind === "VENTE" ? metadata.saleUnitPrice : metadata.purchaseUnitPrice);
+      if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+        throw new Error("La quantité et le prix unitaire doivent être des nombres supérieurs à zéro.");
+      }
+      const purchaseUnitPrice = parseMetadataNumber(metadata.purchaseUnitPrice);
+      if (operationKind === "VENTE" && (!Number.isFinite(purchaseUnitPrice) || purchaseUnitPrice <= 0)) {
+        throw new Error("Le prix d'achat unitaire est requis pour calculer la marge brute de la vente.");
+      }
+      const amount = Number(input.amount ?? "");
+      if (!Number.isFinite(amount) || Math.round(amount * 100) !== Math.round(quantity * unitPrice * 100)) {
+        throw new Error("Le montant doit correspondre à la quantité multipliée par le prix unitaire.");
+      }
+    }
+  }
+  if (activityCode === "DAILY_ACTIVITIES") {
+    if (normalizeActivityCategory(input.metadata?.dailyActivityKind) !== "protocole d'accord") {
+      throw new Error("Les transactions quotidiennes sont réservées aux protocoles d'accord.");
+    }
+    const operationKind = input.metadata?.financialOperationKind?.trim();
+    const expectedType = operationKind === "PARTNER_PAYMENT" || operationKind === "AGREEMENT_PROFIT"
+      ? "CASH_IN"
+      : operationKind === "CAPITAL_RETURN" || operationKind === "AGREEMENT_EXPENSE"
+        ? "CASH_OUT"
+        : null;
+    if (!expectedType || input.type !== expectedType) {
+      throw new Error("Le type de flux ne correspond pas au mouvement du protocole d'accord.");
+    }
+    if (!input.metadata?.agreementRef?.trim() || !input.metadata?.partnerName?.trim()) {
+      throw new Error("La référence du protocole et le partenaire sont requis pour le mouvement financier.");
+    }
+  }
 }
 
 export function assertTaskInputMatchesActivityProfile(
@@ -1747,6 +1910,45 @@ export function assertTaskInputMatchesActivityProfile(
     profile.tasks.metadataFields,
     input.metadata
   );
+  if (activityCode === "BEVERAGE_DEPOT") {
+    const metadata = input.metadata ?? {};
+    const taskKind = metadata.beverageTaskKind?.trim();
+    const requiredFields = taskKind === "INVENTAIRE"
+      ? ["productName", "quantity", "purchaseUnitPrice"]
+      : taskKind === "RAPPROCHEMENT"
+        ? ["periodDate", "dailySales", "dailyDeposits", "dailyBalance", "dailyExpenses"]
+        : taskKind === "RECEPTION"
+          ? ["productName", "quantity"]
+          : [];
+    if (!taskKind || !["INVENTAIRE", "RAPPROCHEMENT", "RECEPTION", "SUIVI_GENERAL"].includes(taskKind)) {
+      throw new Error("Choisissez un type de suivi valide pour le dépôt de boissons.");
+    }
+    for (const key of requiredFields) {
+      if (!metadata[key]?.trim()) {
+        throw new Error(`Le champ ${key} est requis pour ce suivi du dépôt de boissons.`);
+      }
+    }
+  }
+  if (activityCode === "DAILY_ACTIVITIES" && normalizeActivityCategory(input.metadata?.dailyActivityKind) === "protocole d'accord") {
+    const metadata = input.metadata ?? {};
+    if (!metadata.agreementRef?.trim() || !metadata.partnerName?.trim()) {
+      throw new Error("La référence du protocole et le partenaire sont requis.");
+    }
+    const agreementType = normalizeActivityCategory(metadata.agreementType);
+    if (agreementType !== "financier" && agreementType !== "non financier") {
+      throw new Error("Choisissez si le protocole d'accord est financier ou non financier.");
+    }
+    const parseAmount = (value: string | undefined) => Number((value ?? "").trim().replace(/\s/g, "").replace(",", "."));
+    if (agreementType === "financier") {
+      const capital = parseAmount(metadata.agreementCapitalAmount);
+      if (!Number.isFinite(capital) || capital <= 0) {
+        throw new Error("Le capital d'investissement doit être supérieur à zéro pour un accord financier.");
+      }
+      if (metadata.agreementProfitAmount && (!Number.isFinite(parseAmount(metadata.agreementProfitAmount)) || parseAmount(metadata.agreementProfitAmount) < 0)) {
+        throw new Error("Le bénéfice prévu doit être un montant positif ou nul.");
+      }
+    }
+  }
 }
 
 export function assertTaskStatusMatchesActivityProfile(

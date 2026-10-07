@@ -279,6 +279,7 @@ function isGeneralExpenseKind(value: string | undefined): value is GeneralExpens
 
 const DAILY_ACTIVITY_KIND_KEY = "dailyActivityKind";
 const DAILY_ACTIVITY_AMOUNT_KEY = "amount";
+const DAILY_PROTOCOL_CATEGORY = "Protocole d'accord";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -501,6 +502,9 @@ function formatMetadataValue(key: string, value: string): string {
   if (key === DAILY_ACTIVITY_AMOUNT_KEY) {
     return `${formatAmountForDisplay(value)} XOF`;
   }
+  if (key === "agreementCapitalAmount" || key === "agreementProfitAmount") {
+    return `${formatAmountForDisplay(value)} XOF`;
+  }
   return value;
 }
 
@@ -523,6 +527,12 @@ function formatMetadataSummary(
     .filter(([, value]) => value.trim().length > 0)
     .map(([key, value]) => `${key}: ${formatMetadataValue(key, value)}`);
   return fallbackItems.length > 0 ? fallbackItems.join(" | ") : "-";
+}
+
+function isRequiredDailyAgreementField(fieldKey: string, metadata: Record<string, string>): boolean {
+  if (metadata[DAILY_ACTIVITY_KIND_KEY] !== DAILY_PROTOCOL_CATEGORY) return false;
+  if (["agreementRef", "partnerName", "agreementType"].includes(fieldKey)) return true;
+  return fieldKey === "agreementCapitalAmount" && metadata.agreementType === "Financier";
 }
 
 function createDefaultTaskForm(): {
@@ -1093,6 +1103,11 @@ export function OperationsTasksPage(): JSX.Element {
           [DAILY_ACTIVITY_AMOUNT_KEY]: normalizeAmountForApi(taskMetadata[DAILY_ACTIVITY_AMOUNT_KEY])
         };
       }
+      for (const key of ["agreementCapitalAmount", "agreementProfitAmount"]) {
+        if (selectedActivityCode === "DAILY_ACTIVITIES" && taskMetadata[key]) {
+          taskMetadata = { ...taskMetadata, [key]: normalizeAmountForApi(taskMetadata[key]) };
+        }
+      }
       const response = await withAuthorizedToken((accessToken) =>
         editingTaskId
           ? updateOperationsTaskRequest(accessToken, editingTaskId, {
@@ -1547,11 +1562,18 @@ export function OperationsTasksPage(): JSX.Element {
               <details className="operations-task-form-options" open={hasRequiredTaskMetadata}>
                 <summary>Champs avancés</summary>
                 <div className="operations-task-form-options-body">
-                  {taskMetadataFields.map((field) => (
+                  {taskMetadataFields.filter((field) => {
+                    if (selectedActivityCode !== "DAILY_ACTIVITIES") return true;
+                    const isProtocol = createForm.metadata[DAILY_ACTIVITY_KIND_KEY] === DAILY_PROTOCOL_CATEGORY;
+                    if (field.key.startsWith("agreement") && !isProtocol) return false;
+                    if (field.key === "amount" && isProtocol) return false;
+                    if (["agreementCapitalAmount", "agreementProfitAmount", "agreementPaymentAccount"].includes(field.key) && createForm.metadata.agreementType !== "Financier") return false;
+                    return true;
+                  }).map((field) => (
                     field.options?.length ? (
                       <label key={field.key} className="operations-inline-group">
                         <span>{field.label}</span>
-                        <select value={createForm.metadata[field.key] ?? ""} onChange={(event) => setCreateForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={field.required}>
+                        <select value={createForm.metadata[field.key] ?? ""} onChange={(event) => setCreateForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={field.required || isRequiredDailyAgreementField(field.key, createForm.metadata)}>
                           <option value="">Choisir une catégorie</option>
                           {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                         </select>
@@ -1966,20 +1988,20 @@ export function OperationsTasksPage(): JSX.Element {
                           </small>
                         ) : null}
                       </label>
-                    ) : field.key === DAILY_ACTIVITY_AMOUNT_KEY && selectedActivityCode === "DAILY_ACTIVITIES" ? (
+                    ) : (field.key === DAILY_ACTIVITY_AMOUNT_KEY || field.key === "agreementCapitalAmount" || field.key === "agreementProfitAmount") && selectedActivityCode === "DAILY_ACTIVITIES" ? (
                       <label key={field.key} className="operations-inline-group">
                         <span>{field.label}</span>
                         <input
                           type="text"
                           inputMode="numeric"
-                          placeholder="Ex: 5000"
+                          placeholder={field.key === DAILY_ACTIVITY_AMOUNT_KEY ? "Ex: 5000" : "Ex: 1 500 000"}
                           value={createForm.metadata[field.key] ?? ""}
                           onChange={(event) =>
                             setCreateForm((prev) => ({
                               ...prev,
                               metadata: {
                                 ...prev.metadata,
-                                [field.key]: formatEditableAmountForInput(event.target.value)
+                              [field.key]: formatEditableAmountForInput(event.target.value)
                               }
                             }))
                           }
@@ -1993,7 +2015,7 @@ export function OperationsTasksPage(): JSX.Element {
                             }))
                           }
                           title={field.helpText}
-                          required={field.required}
+                          required={field.required || isRequiredDailyAgreementField(field.key, createForm.metadata)}
                         />
                       </label>
                     ) : (
@@ -2012,7 +2034,7 @@ export function OperationsTasksPage(): JSX.Element {
                           }))
                         }
                         title={field.helpText}
-                        required={field.required}
+                        required={field.required || isRequiredDailyAgreementField(field.key, createForm.metadata)}
                       />
                     )
                   ))}

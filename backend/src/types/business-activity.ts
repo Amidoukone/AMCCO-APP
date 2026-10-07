@@ -16,6 +16,7 @@ export const BUSINESS_ACTIVITY_CODES = [
   "SERVICES",
   "MINING",
   "WATER",
+  "BEVERAGE_DEPOT",
   "REAL_ESTATE_AGENCY",
   "GENERAL_EXPENSES",
   "DAILY_ACTIVITIES"
@@ -25,7 +26,7 @@ export const BUSINESS_ACTIVITY_CODES = [
 export const SELECTABLE_BUSINESS_ACTIVITY_CODES = [
   "HARDWARE", "GENERAL_STORE", "FOOD", "RENTAL", "AGRICULTURE", "BTP",
   "FISH_FARMING", "LIVESTOCK", "TRANSPORT", "MONEY_TRANSFER", "HOTEL_LODGING",
-  "SERVICES", "MINING", "WATER", "TRANSIT", "HYDROCARBON", "HADJ", "GENERAL_EXPENSES", "DAILY_ACTIVITIES"
+  "SERVICES", "MINING", "WATER", "BEVERAGE_DEPOT", "TRANSIT", "HYDROCARBON", "HADJ", "GENERAL_EXPENSES", "DAILY_ACTIVITIES"
 ] as const;
 
 export type BusinessActivityCode = (typeof BUSINESS_ACTIVITY_CODES)[number];
@@ -106,6 +107,11 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     code: "WATER",
     label: "Production d'eau potable",
     description: "Production, distribution et exploitation du service d'eau potable."
+  },
+  {
+    code: "BEVERAGE_DEPOT",
+    label: "Dépôt de boissons",
+    description: "Achats de boissons, ventes par produit, dépenses d'exploitation, stocks et rapprochement journalier."
   },
   { code: "TRANSIT", label: "Transit", description: "Suivi général des opérations de transit." },
   { code: "HYDROCARBON", label: "Hydrocarbure", description: "Suivi général des opérations liées aux hydrocarbures." },
