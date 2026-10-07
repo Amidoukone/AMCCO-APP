@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type MouseEvent
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
@@ -543,6 +543,7 @@ function createDefaultTaskForm(): {
 
 export function OperationsTasksPage(): JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
   const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const {
@@ -778,6 +779,23 @@ export function OperationsTasksPage(): JSX.Element {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (location.hash !== "#task-create" || isLoading) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const target = document.getElementById("task-create");
+      if (!target) {
+        return;
+      }
+      target.scrollIntoView({ block: "start" });
+      navigate(`${location.pathname}${location.search}`, { replace: true });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isLoading, location.hash, location.pathname, location.search, navigate]);
 
   const loadShops = useCallback(async () => {
     if (selectedActivityCode !== "GENERAL_STORE") {
@@ -1452,7 +1470,7 @@ export function OperationsTasksPage(): JSX.Element {
       </section> : null}
 
       {canCreateTasks ? (
-        <section className="panel">
+        <section id="task-create" className="panel mobile-form-anchor">
           <h3>{editingTaskId ? "Modifier une tâche" : "Nouvelle tâche"}</h3>
           <form className="operations-task-form" onSubmit={handleCreateTask}>
             <div className="operations-task-form-primary">

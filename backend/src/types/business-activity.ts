@@ -18,6 +18,13 @@ export const BUSINESS_ACTIVITY_CODES = [
   "DAILY_ACTIVITIES"
 ] as const;
 
+// Retired codes stay readable so historic production records and reports remain intact.
+export const SELECTABLE_BUSINESS_ACTIVITY_CODES = [
+  "HARDWARE", "GENERAL_STORE", "FOOD", "RENTAL", "AGRICULTURE", "BTP",
+  "FISH_FARMING", "LIVESTOCK", "TRANSPORT", "MONEY_TRANSFER", "HOTEL_LODGING",
+  "SERVICES", "MINING", "WATER", "GENERAL_EXPENSES", "DAILY_ACTIVITIES"
+] as const;
+
 export type BusinessActivityCode = (typeof BUSINESS_ACTIVITY_CODES)[number];
 
 export type BusinessActivityDefinition = {
@@ -100,7 +107,7 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "REAL_ESTATE_AGENCY",
     label: "Agence immobilière",
-    description: "Commercialisation, intermédiation et suivi de mandats immobiliers."
+    description: "Anciennes opérations d'agence conservées pour la lecture des données historiques."
   },
   {
     code: "GENERAL_EXPENSES",
@@ -113,6 +120,10 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     description: "Suivi des activités de bureau qui ne relèvent d'aucun secteur: rendez-vous, demandes, documents, décisions, partenaires et actualités."
   }
 ];
+
+export const SELECTABLE_BUSINESS_ACTIVITIES = BUSINESS_ACTIVITIES.filter(
+  (activity) => activity.code !== "REAL_ESTATE_AGENCY"
+);
 
 export const BUSINESS_ACTIVITY_LABELS: Record<BusinessActivityCode, string> = Object.fromEntries(
   BUSINESS_ACTIVITIES.map((item) => [item.code, item.label])

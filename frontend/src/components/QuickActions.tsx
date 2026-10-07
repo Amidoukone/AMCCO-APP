@@ -24,6 +24,7 @@ export function QuickActions({
   const canUse = (key: NavigationItem["key"]): boolean =>
     navigation.some((item) => item.key === key) && canAccessFeature(role, key);
   const isReadOnlyOwner = isReadOnlyOwnerRole(role);
+  const canCreateTransactions = role === "SYS_ADMIN" || role === "ACCOUNTANT";
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
 
   const ownerActions = [
@@ -65,17 +66,19 @@ export function QuickActions({
     canUse("operationsTasks")
       ? {
           label: isReadOnlyOwner ? "Voir les tâches" : "Nouvelle tâche",
-          to: `/operations/tasks${activityQuery}`,
+          to: `/operations/tasks${activityQuery}#task-create`,
           tone: "primary",
           description: "Créer ou suivre une tâche opérationnelle"
         }
       : null,
     canUse("financeTransactions")
       ? {
-          label: isReadOnlyOwner ? "Voir les transactions" : "Nouvelle transaction",
-          to: `/finance/transactions${activityQuery}`,
+          label: canCreateTransactions ? "Nouvelle transaction" : "Voir les transactions",
+          to: `/finance/transactions${activityQuery}${canCreateTransactions ? "#transaction-create" : ""}`,
           tone: "neutral",
-          description: "Créer ou consulter une écriture financière"
+          description: canCreateTransactions
+            ? "Créer ou consulter une écriture financière"
+            : "Consulter les écritures financières"
         }
       : null,
     canUse("reports")
@@ -100,7 +103,10 @@ export function QuickActions({
   );
 
   return (
-    <div className="quick-actions" aria-label="Actions rapides">
+    <div
+      className={isReadOnlyOwner ? "quick-actions is-readonly-owner" : "quick-actions"}
+      aria-label="Actions rapides"
+    >
       {actions.map((action) => (
         <Link
           key={action.label}

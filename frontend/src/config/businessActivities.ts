@@ -98,11 +98,6 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     description: "Production et distribution d'eau."
   },
   {
-    code: "REAL_ESTATE_AGENCY",
-    label: "Agence immobilière",
-    description: "Mandats, ventes et intermédiation."
-  },
-  {
     code: "GENERAL_EXPENSES",
     label: "Dépenses générales",
     description: "Dépenses du PDG et des employés, indépendantes des secteurs."
@@ -126,5 +121,7 @@ export function getBusinessActivityLabel(activityCode: BusinessActivityCode | nu
   if (!activityCode) {
     return "Non renseignée";
   }
-  return BUSINESS_ACTIVITY_LABELS[activityCode];
+  return activityCode === "REAL_ESTATE_AGENCY"
+    ? "Ancienne activité immobilière"
+    : BUSINESS_ACTIVITY_LABELS[activityCode];
 }

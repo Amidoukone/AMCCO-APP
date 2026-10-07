@@ -17,7 +17,6 @@ Faire ressortir explicitement les activites du cahier des charges dans l'applica
 - Services divers
 - Exploitation miniere
 - Production d'eau potable
-- Agence immobiliere
 
 ## Choix d'implementation
 
@@ -55,6 +54,7 @@ mysql -u root -p < backend/sql/013_add_requested_business_activities.sql
 - elles ne remontent plus dans les listes, dashboards, rapports et exports metier
 - elles restent comptabilisees dans l'ecran admin pour reclassement
 - les nouvelles saisies imposent une activite active
+- les anciennes donnees portant le code retire `REAL_ESTATE_AGENCY` restent lisibles dans l'historique et les rapports; les nouvelles saisies et reclassifications utilisent `Location immobiliere`
 
 ## Suite logique
 

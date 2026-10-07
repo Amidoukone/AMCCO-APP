@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
@@ -3092,6 +3092,7 @@ function isAccountVisibleForSelectedActivity(
 
 export function FinanceTransactionsPage(): JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
@@ -3613,6 +3614,23 @@ export function FinanceTransactionsPage(): JSX.Element {
       setSelectedActivityCode(requestedActivityCode);
     }
   }, [requestedActivityCode, setSelectedActivityCode]);
+
+  useEffect(() => {
+    if (location.hash !== "#transaction-create" || isLoading) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const target = document.getElementById("transaction-create");
+      if (!target) {
+        return;
+      }
+      target.scrollIntoView({ block: "start" });
+      navigate(`${location.pathname}${location.search}`, { replace: true });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isLoading, location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (!requestedTransactionId) {
@@ -5553,7 +5571,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       </section>
 
       <section className="panel finance-page-panel">
-        <details className="finance-section-toggle" open>
+        <details id="transaction-create" className="finance-section-toggle mobile-form-anchor" open>
           <summary className="finance-section-summary">
             <span>{editingTransactionId ? "Modifier une transaction" : "Enregistrer une transaction"}</span>
             <small>

@@ -60,6 +60,13 @@ export async function ensureCompanyActivityEnabledOrThrow(
   companyId: string,
   activityCode: BusinessActivityCode
 ): Promise<void> {
+  if (activityCode === "REAL_ESTATE_AGENCY") {
+    throw new HttpError(
+      400,
+      "Le secteur Agence immobilière est retiré. Utilisez Location immobilière pour les nouvelles opérations."
+    );
+  }
+
   const isEnabled = await isCompanyActivityEnabled(companyId, activityCode);
   if (!isEnabled) {
     throw new HttpError(

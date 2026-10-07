@@ -13,6 +13,107 @@ import { enhanceMobileTables } from "../lib/mobileTables";
 
 const amccoLogoUrl = "/logo-amcco-web.jpg";
 
+function MobileNavigationIcon({ featureKey }: { featureKey: FeatureKey }): JSX.Element {
+  const commonProps = {
+    width: 22,
+    height: 22,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const
+  };
+
+  if (featureKey === "financeTransactions") {
+    return (
+      <svg {...commonProps}>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="M3 10h18M7 15h3" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "operationsTasks") {
+    return (
+      <svg {...commonProps}>
+        <rect x="5" y="4" width="14" height="17" rx="2.5" />
+        <path d="M9 4.5v-1h6v1M8.5 11l2 2 5-5M8.5 17h7" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "alerts") {
+    return (
+      <svg {...commonProps}>
+        <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "reports") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "adminCompanies") {
+    return (
+      <svg {...commonProps}>
+        <path d="M3 21h18M5 21V5l7-3 7 3v16M9 8h1m4 0h1M9 12h1m4 0h1M10 21v-5h4v5" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "adminUsers" || featureKey === "myWork") {
+    return (
+      <svg {...commonProps}>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5.5a3 3 0 0 1 0 5.8M18 14a5 5 0 0 1 3 5v1" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "adminActivities") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 7h16M4 17h16M8 4v6m8 4v6" />
+        <circle cx="8" cy="7" r="2" />
+        <circle cx="16" cy="17" r="2" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "settingsSecurity") {
+    return (
+      <svg {...commonProps}>
+        <path d="M12 3 19 6v5c0 4.5-3 7.5-7 10-4-2.5-7-5.5-7-10V6z" />
+        <path d="m9 12 2 2 4-4" />
+      </svg>
+    );
+  }
+
+  if (featureKey === "financeSalaries") {
+    return (
+      <svg {...commonProps}>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="M7 10h10M7 14h4" />
+        <circle cx="16" cy="14" r="1" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps}>
+      <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+      <path d="M9 21v-7h6v7" />
+    </svg>
+  );
+}
+
 export function AppLayout(): JSX.Element {
   const { activeCompany, memberships, user, switchCompany } = useAuth();
   const {
@@ -29,6 +130,10 @@ export function AppLayout(): JSX.Element {
   const [companySwitchError, setCompanySwitchError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const contentRef = useRef<HTMLElement | null>(null);
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
+  const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null);
+  const mobileMenuCloseRef = useRef<HTMLButtonElement | null>(null);
+  const mobileMenuWasOpenRef = useRef(false);
   const withAuthorizedToken = useAuthorizedRequest();
   const canManageCompanies = user?.role === "SYS_ADMIN";
   const isBootstrapMode = !activeCompany;
@@ -111,15 +216,46 @@ export function AppLayout(): JSX.Element {
 
   useEffect(() => {
     if (!isMobileMenuOpen) {
+      if (mobileMenuWasOpenRef.current) {
+        mobileMenuWasOpenRef.current = false;
+        mobileMenuToggleRef.current?.focus();
+      }
       return;
     }
 
+    mobileMenuWasOpenRef.current = true;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    mobileMenuCloseRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         setIsMobileMenuOpen(false);
+        return;
+      }
+
+      if (event.key === "Tab") {
+        const focusableElements = Array.from(
+          mobileMenuRef.current?.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+          ) ?? []
+        ).filter((element) => element.getClientRects().length > 0);
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (!firstElement || !lastElement) {
+          event.preventDefault();
+          mobileMenuRef.current?.focus();
+        } else if (!mobileMenuRef.current?.contains(document.activeElement)) {
+          event.preventDefault();
+          (event.shiftKey ? lastElement : firstElement).focus();
+        } else if (event.shiftKey && document.activeElement === firstElement) {
+          event.preventDefault();
+          lastElement.focus();
+        } else if (!event.shiftKey && document.activeElement === lastElement) {
+          event.preventDefault();
+          firstElement.focus();
+        }
       }
     };
 
@@ -199,22 +335,13 @@ export function AppLayout(): JSX.Element {
             <p className="sidebar-section-label">Mode initialisation</p>
             <strong>Aucune entreprise active</strong>
             <p className="hint">
-              Crée d'abord une entreprise pour débloquer le tableau de bord, les transactions,
-              les tâches et les rapports.
-            </p>
-            <p className="sidebar-sector-note">
-              L'application reste accessible, mais seules les fonctions d'administration des
-              entreprises sont ouvertes tant que l'initialisation n'est pas terminée.
+              Créez d’abord une entreprise pour activer l’espace de travail.
             </p>
           </section>
         ) : (
           <section className="sidebar-sector-card" aria-label="Secteur actif">
             <p className="sidebar-section-label">Secteur actif</p>
             <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
-            <p className="hint">
-              {selectedActivity?.description ??
-                "Activez au moins un secteur pour structurer les opérations et la saisie."}
-            </p>
             <select
               className="sidebar-sector-select"
               value={selectedActivityCode ?? ""}
@@ -231,9 +358,6 @@ export function AppLayout(): JSX.Element {
                 </option>
               ))}
             </select>
-            <p className="sidebar-sector-note">
-              Le tableau de bord, les transactions, les tâches et les rapports suivent ce secteur.
-            </p>
             {activityErrorMessage ? <p className="sidebar-error">{activityErrorMessage}</p> : null}
           </section>
           )}
@@ -269,6 +393,7 @@ export function AppLayout(): JSX.Element {
         <header className="app-header">
           <div className="mobile-header-row">
             <button
+              ref={mobileMenuToggleRef}
               type="button"
               className="mobile-menu-toggle"
               aria-label={isMobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
@@ -280,19 +405,6 @@ export function AppLayout(): JSX.Element {
             </button>
             <div className="mobile-title-block">
               <p className="header-mobile-title">{activeNavigationItem?.label ?? "Pilotage"}</p>
-              <button
-                type="button"
-                className="mobile-context-summary"
-                onClick={() => setIsMobileMenuOpen(true)}
-                aria-label="Changer le contexte actif"
-              >
-                <span>{activeCompany?.name ?? "Initialisation"}</span>
-                <span>
-                  {isBootstrapMode
-                    ? "Entreprise à créer"
-                    : selectedActivity?.label ?? "Aucun secteur actif"}
-                </span>
-              </button>
             </div>
             <div className="mobile-top-actions">
               {unreadAlertsCount > 0 ? (
@@ -305,26 +417,22 @@ export function AppLayout(): JSX.Element {
               </Link>
             </div>
           </div>
-          <div className="mobile-context-chips" aria-label="Contexte actif">
+          <div className="mobile-context-chips">
             <button
               type="button"
               className="mobile-context-chip"
               onClick={() => setIsMobileMenuOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-app-menu"
+              aria-label="Modifier l'entreprise ou le secteur actif"
             >
-              <span>Secteur</span>
+              <span>Contexte</span>
               <strong>
-                {isBootstrapMode
-                  ? "Initialisation"
+                {activeCompany?.name ?? "Initialisation"} · {isBootstrapMode
+                  ? "Créer une entreprise"
                   : selectedActivity?.label ?? "Aucun secteur actif"}
               </strong>
-            </button>
-            <button
-              type="button"
-              className="mobile-context-chip"
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <span>Entreprise</span>
-              <strong>{activeCompany?.name ?? "Aucune entreprise"}</strong>
             </button>
           </div>
           <div className="header-identity-block">
@@ -348,12 +456,14 @@ export function AppLayout(): JSX.Element {
             aria-hidden="true"
           />
           <div
+            ref={mobileMenuRef}
             id="mobile-app-menu"
             className={isMobileMenuOpen ? "mobile-context-panel is-open" : "mobile-context-panel"}
             role="dialog"
             aria-label="Menu mobile"
             aria-modal={isMobileMenuOpen}
             aria-hidden={!isMobileMenuOpen}
+            tabIndex={-1}
           >
             <div className="mobile-app-menu-header">
               <div>
@@ -361,66 +471,68 @@ export function AppLayout(): JSX.Element {
                 <strong>Menu</strong>
               </div>
               <button
+                ref={mobileMenuCloseRef}
                 type="button"
                 className="mobile-menu-close"
                 onClick={() => setIsMobileMenuOpen(false)}
                 aria-label="Fermer le menu"
               >
-                X
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="m18 6-12 12M6 6l12 12" />
+                </svg>
               </button>
             </div>
             <div className="mobile-smart-menu">
-              <div className="mobile-menu-utility-grid" aria-label="Acces rapides">
-                <Link
-                  to="/"
-                  className="mobile-utility-link"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <span>Vitrine</span>
-                  <strong>Retour au site</strong>
-                </Link>
-                {canManageCompanies ? (
-                  <Link
-                    to="/admin/companies"
-                    className="mobile-utility-link"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span>Admin</span>
-                    <strong>{isBootstrapMode ? "Entreprise" : "Entreprises"}</strong>
-                  </Link>
-                ) : null}
-              </div>
+              {!isBootstrapMode ? (
+                <GlobalSearch
+                  className="mobile-drawer-search"
+                  inputId="mobile-global-search-input-smart"
+                  navigation={visibleNavigation}
+                  role={user.role}
+                  selectedActivityCode={selectedActivityCode}
+                />
+              ) : null}
 
-              <details className="mobile-menu-section" open>
-                <summary>
-                  <span>Navigation</span>
-                  <strong>{activeNavigationItem?.label ?? "Tableau de bord"}</strong>
-                </summary>
-                <nav className="mobile-drawer-nav mobile-smart-nav" aria-label="Navigation mobile">
-                  {Object.entries(navigationSections).map(([section, items]) => (
-                    <div key={section} className="mobile-drawer-section">
-                      <p className="sidebar-section-label">{section}</p>
-                      <div className="mobile-drawer-list">
-                        {items.map((item) => (
-                          <NavLink
-                            key={item.key}
-                            to={item.to}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className={({ isActive }) =>
-                              isActive ? "mobile-drawer-link active" : "mobile-drawer-link"
-                            }
-                          >
-                            <span>{item.label}</span>
-                            {item.key === "alerts" && unreadAlertsCount > 0 ? (
-                              <strong>{unreadAlertsCount}</strong>
-                            ) : null}
-                          </NavLink>
-                        ))}
-                      </div>
+              <nav className="mobile-smart-nav" aria-label="Navigation mobile">
+                {Object.entries(navigationSections).map(([section, items], sectionIndex) => (
+                  <details
+                    key={section}
+                    className="mobile-menu-section mobile-nav-section"
+                    open={items.some((item) => item.key === activeNavigationItem?.key) || sectionIndex === 0}
+                  >
+                    <summary>
+                      <span>{section}</span>
+                      <strong>{items.length} {items.length > 1 ? "pages" : "page"}</strong>
+                    </summary>
+                    <div className="mobile-drawer-list">
+                      {items.map((item) => (
+                        <NavLink
+                          key={item.key}
+                          to={item.to}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={({ isActive }) =>
+                            isActive ? "mobile-drawer-link active" : "mobile-drawer-link"
+                          }
+                        >
+                          <span>{item.label}</span>
+                          {item.key === "alerts" && unreadAlertsCount > 0 ? (
+                            <strong>{unreadAlertsCount}</strong>
+                          ) : null}
+                        </NavLink>
+                      ))}
                     </div>
-                  ))}
-                </nav>
-              </details>
+                  </details>
+                ))}
+              </nav>
 
               {!isBootstrapMode ? (
                 <details className="mobile-menu-section">
@@ -485,22 +597,14 @@ export function AppLayout(): JSX.Element {
                 </details>
               ) : null}
 
-              {!isBootstrapMode ? (
-                <details className="mobile-menu-section">
-                  <summary>
-                    <span>Recherche</span>
-                    <strong>Pages et modules</strong>
-                  </summary>
-                  <GlobalSearch
-                    className="mobile-drawer-search"
-                    inputId="mobile-global-search-input-smart"
-                    navigation={visibleNavigation}
-                    role={user.role}
-                    selectedActivityCode={selectedActivityCode}
-                  />
-                </details>
-              ) : null}
             </div>
+            <Link
+              to="/"
+              className="mobile-drawer-public-link"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Retour au site vitrine
+            </Link>
             {companySwitchError ? <p className="header-switch-error">{companySwitchError}</p> : null}
           </div>
           {!isBootstrapMode ? (
@@ -542,7 +646,7 @@ export function AppLayout(): JSX.Element {
         </header>
         <section className="app-content" ref={contentRef}>
           {!isBootstrapMode ? (
-            <div className="workspace-toolbar">
+          <div className={user.role === "OWNER" ? "workspace-toolbar mobile-owner-toolbar" : "workspace-toolbar"}>
               <Breadcrumbs />
               <QuickActions
                 role={user.role}
@@ -563,8 +667,8 @@ export function AppLayout(): JSX.Element {
                   isActive ? "mobile-bottom-nav-item active" : "mobile-bottom-nav-item"
                 }
               >
-                <span className="mobile-bottom-nav-mark" aria-hidden="true">
-                  {item.label.slice(0, 2)}
+                <span className="mobile-bottom-nav-mark">
+                  <MobileNavigationIcon featureKey={item.key} />
                 </span>
                 <span className="mobile-bottom-nav-label">{item.label}</span>
                 {item.key === "alerts" && unreadAlertsCount > 0 ? (

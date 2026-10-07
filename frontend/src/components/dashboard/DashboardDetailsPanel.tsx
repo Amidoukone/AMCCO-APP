@@ -1,4 +1,4 @@
-import { BUSINESS_ACTIVITY_LABELS } from "../../config/businessActivities";
+import { getBusinessActivityLabel } from "../../config/businessActivities";
 import type { DashboardSummary } from "../../types/reporting";
 import { formatAmount, formatDateTime } from "../../utils/dashboardDisplay";
 
@@ -67,7 +67,7 @@ export function DashboardDetailsPanel({
                     item.activityCode === selectedActivityCode ? "activity-card is-selected" : "activity-card"
                   }
                 >
-                  <h4>{BUSINESS_ACTIVITY_LABELS[item.activityCode]}</h4>
+                  <h4>{getBusinessActivityLabel(item.activityCode)}</h4>
                   <p className="activity-card-stat">
                     Tâches : {item.totalTasksCount} | Ouvertes : {item.openTasksCount}
                   </p>

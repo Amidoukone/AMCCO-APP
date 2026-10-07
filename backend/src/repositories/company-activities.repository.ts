@@ -1,7 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDbPool, queryRows } from "../lib/db.js";
 import {
-  BUSINESS_ACTIVITIES,
+  SELECTABLE_BUSINESS_ACTIVITIES,
   type BusinessActivityCode,
   type BusinessActivityDefinition
 } from "../types/business-activity.js";
@@ -40,10 +40,10 @@ async function ensureCompanyActivitiesStorageReady(): Promise<void> {
 async function ensureCompanyActivitiesSeeded(companyId: string): Promise<void> {
   await ensureCompanyActivitiesStorageReady();
 
-  const valuesSql = BUSINESS_ACTIVITIES.map(() => "(?, ?, 1)").join(", ");
+  const valuesSql = SELECTABLE_BUSINESS_ACTIVITIES.map(() => "(?, ?, 1)").join(", ");
   const values: Array<string | number> = [];
 
-  for (const activity of BUSINESS_ACTIVITIES) {
+  for (const activity of SELECTABLE_BUSINESS_ACTIVITIES) {
     values.push(companyId, activity.code);
   }
 
@@ -58,7 +58,7 @@ async function ensureCompanyActivitiesSeeded(companyId: string): Promise<void> {
 
 function toCompanyActivityItems(rows: CompanyActivityRow[]): CompanyActivityItem[] {
   const rowMap = new Map(rows.map((row) => [row.activityCode, row.isEnabled === 1]));
-  return BUSINESS_ACTIVITIES.map((activity) => ({
+  return SELECTABLE_BUSINESS_ACTIVITIES.map((activity) => ({
     ...activity,
     isEnabled: rowMap.get(activity.code) ?? true
   }));
@@ -85,6 +85,10 @@ export async function isCompanyActivityEnabled(
   companyId: string,
   activityCode: BusinessActivityCode
 ): Promise<boolean> {
+  if (activityCode === "REAL_ESTATE_AGENCY") {
+    return false;
+  }
+
   await ensureCompanyActivitiesSeeded(companyId);
 
   const rows = await queryRows<CompanyActivityRow[]>(

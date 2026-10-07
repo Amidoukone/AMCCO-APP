@@ -146,7 +146,6 @@ Le referentiel metier v1 expose maintenant les activites du projet:
 - Services divers
 - Exploitation miniere
 - Production d'eau potable
-- Agence immobiliere
 
 Les nouvelles transactions et nouvelles taches sont rattachees a une activite. Le dashboard, les rapports et les exports remontent aussi cette ventilation.
 

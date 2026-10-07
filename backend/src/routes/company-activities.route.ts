@@ -3,7 +3,10 @@ import { z } from "zod";
 import { HttpError } from "../errors/http-error.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { authenticateAccessToken, authorizeRoles } from "../middleware/auth.middleware.js";
-import { BUSINESS_ACTIVITY_CODES } from "../types/business-activity.js";
+import {
+  BUSINESS_ACTIVITY_CODES,
+  SELECTABLE_BUSINESS_ACTIVITY_CODES
+} from "../types/business-activity.js";
 import {
   getCompanyActivityProfile,
   getAdminCompanyActivities,
@@ -20,8 +23,12 @@ const updateActivitySchema = z.object({
   isEnabled: z.boolean()
 });
 
+const selectableActivityCodeParamSchema = z.object({
+  activityCode: z.enum(SELECTABLE_BUSINESS_ACTIVITY_CODES)
+});
+
 const reclassifyLegacySchema = z.object({
-  targetActivityCode: z.enum(BUSINESS_ACTIVITY_CODES),
+  targetActivityCode: z.enum(SELECTABLE_BUSINESS_ACTIVITY_CODES),
   scope: z.enum(["TRANSACTIONS", "TASKS", "BOTH"])
 });
 
@@ -79,7 +86,7 @@ companyActivitiesRouter.patch(
       throw new HttpError(401, "Authentification requise.");
     }
 
-    const params = activityCodeParamSchema.parse(req.params);
+    const params = selectableActivityCodeParamSchema.parse(req.params);
     const body = updateActivitySchema.parse(req.body);
 
     const item = await updateCompanyActivityState(
