@@ -612,8 +612,8 @@ export function OperationsTasksPage(): JSX.Element {
     return user?.role === "SYS_ADMIN" || user?.role === "SUPERVISOR";
   }, [user?.role]);
   const canViewAllTasks = useMemo(() => {
-    return user?.role === "OWNER" || canAssignTasks;
-  }, [canAssignTasks, user?.role]);
+    return Boolean(user);
+  }, [user]);
   const canCreateTasks = useMemo(() => {
     return Boolean(user) && user?.role !== "OWNER";
   }, [user]);
@@ -1176,12 +1176,6 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   function getTaskEditLockMessage(task: OperationTask): string | null {
-    if (task.status === "DONE") {
-      return "Une tâche terminée ne peut plus être modifiée.";
-    }
-    if (canAssignTasks) {
-      return null;
-    }
     if (task.createdById !== user?.id) {
       return "Vous ne pouvez modifier que les tâches que vous avez créées.";
     }
@@ -1191,9 +1185,6 @@ export function OperationsTasksPage(): JSX.Element {
   function getTaskDeleteLockMessage(task: OperationTask): string | null {
     if (user?.role === "SYS_ADMIN") {
       return null;
-    }
-    if (task.status === "DONE") {
-      return "Une tâche terminée ne peut plus être supprimée.";
     }
     if (task.createdById !== user?.id) {
       return "Vous ne pouvez supprimer que les tâches que vous avez créées.";
@@ -2366,7 +2357,7 @@ export function OperationsTasksPage(): JSX.Element {
                         type="button"
                         className="secondary-btn"
                         onClick={() => handleStartEditTask(task)}
-                        disabled={isBusy || editingTaskId === task.id}
+                        disabled={isBusy || editingTaskId === task.id || editLockMessage !== null}
                         title={editLockMessage ?? undefined}
                       >
                         Modifier
@@ -2376,7 +2367,7 @@ export function OperationsTasksPage(): JSX.Element {
                     {isCompleted ? (
                       <div className="operations-actions-secondary-content">
                         <div className="operations-task-closed-note">
-                          Tâche terminée: statut, modification et assignation verrouillés.
+                          Tâche terminée: statut et assignation verrouillés.
                         </div>
                         {canDelete ? (
                           <button

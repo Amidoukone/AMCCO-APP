@@ -81,14 +81,12 @@ function canEditTask(actor: ActorContext, task: { createdById: string }): boolea
   return task.createdById === actor.actorId;
 }
 
-function canViewTask(actor: ActorContext, task: { createdById: string; assignedToId: string | null }): boolean {
-  if (isReadOnlyOwner(actor.role)) {
-    return true;
-  }
-  if (canManageTasks(actor.role)) {
-    return true;
-  }
-  return task.createdById === actor.actorId || task.assignedToId === actor.actorId;
+function canCollaborateOnTask(actor: ActorContext, task: { createdById: string }): boolean {
+  return canManageTasks(actor.role) || actor.role === "SYS_ADMIN" || canEditTask(actor, task);
+}
+
+function canViewTask(_actor: ActorContext, _task: { createdById: string; assignedToId: string | null }): boolean {
+  return true;
 }
 
 async function toTaskAttachmentItems(attachments: TaskAttachment[]): Promise<TaskAttachmentItem[]> {
@@ -105,10 +103,6 @@ function computeListFilters(actor: ActorContext, scope: TaskScope | undefined): 
   createdById?: string;
   assignedToId?: string;
 } {
-  if (actor.role === "EMPLOYEE") {
-    return { assignedToId: actor.actorId };
-  }
-
   if (scope === "ASSIGNED_TO_ME") {
     if (actor.role === "OWNER") {
       return {};
@@ -508,9 +502,6 @@ export async function updateCompanyTask(
   if (!canEditTask(actor, existing)) {
     throw new HttpError(403, "Permissions insuffisantes pour modifier cette tâche.");
   }
-  if (existing.status === "DONE") {
-    throw new HttpError(400, "Une tâche terminée ne peut plus être modifiée.");
-  }
   if (!existing.activityCode) {
     throw new HttpError(400, "L'activité de cette tâche est introuvable.");
   }
@@ -588,9 +579,6 @@ export async function deleteCompanyTask(
   const canDelete = actor.role === "SYS_ADMIN" || canEditTask(actor, existing);
   if (!canDelete) {
     throw new HttpError(403, "Permissions insuffisantes pour supprimer cette tâche.");
-  }
-  if (existing.status === "DONE" && actor.role !== "SYS_ADMIN") {
-    throw new HttpError(400, "Une tâche terminée ne peut plus être supprimée.");
   }
 
   await createAuditLogRecord({
@@ -784,7 +772,7 @@ export async function addCompanyTaskComment(
   if (!task) {
     throw new HttpError(404, "Tâche introuvable.");
   }
-  if (!canViewTask(actor, task)) {
+  if (!canCollaborateOnTask(actor, task)) {
     throw new HttpError(403, "Permissions insuffisantes pour commenter cette tâche.");
   }
 
@@ -857,7 +845,7 @@ export async function addAttachmentToCompanyTask(
   if (!task) {
     throw new HttpError(404, "Tâche introuvable.");
   }
-  if (!canViewTask(actor, task)) {
+  if (!canCollaborateOnTask(actor, task)) {
     throw new HttpError(403, "Permissions insuffisantes pour ajouter une pièce jointe à cette tâche.");
   }
 
@@ -907,7 +895,7 @@ export async function getTaskAttachmentUploadAuth(
   if (!task) {
     throw new HttpError(404, "Tâche introuvable.");
   }
-  if (!canViewTask(actor, task)) {
+  if (!canCollaborateOnTask(actor, task)) {
     throw new HttpError(403, "Permissions insuffisantes pour ajouter une pièce jointe à cette tâche.");
   }
 

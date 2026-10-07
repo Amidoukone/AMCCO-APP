@@ -3159,7 +3159,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [user?.role]);
 
   const canManageTransactions = useMemo(() => {
-    return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT";
+    return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "EMPLOYEE";
   }, [user?.role]);
 
   const canManageArticles = useMemo(() => {
@@ -3196,7 +3196,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         return true;
       }
 
-      return user.role === "ACCOUNTANT" && transaction.createdById === user.id;
+      return transaction.createdById === user.id;
     },
     [canManageTransactions, user?.id, user?.role]
   );
@@ -4458,7 +4458,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     if (!canMutateTransaction(transaction)) {
-      setErrorMessage("Le comptable peut modifier uniquement ses propres transactions.");
+      setErrorMessage("Vous pouvez modifier uniquement les transactions que vous avez créées.");
       return;
     }
 
@@ -4531,7 +4531,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   async function handleDeleteTransaction(transaction: FinancialTransaction): Promise<void> {
     if (!canMutateTransaction(transaction)) {
-      setErrorMessage("Le comptable peut supprimer uniquement ses propres transactions.");
+      setErrorMessage("Vous pouvez supprimer uniquement les transactions que vous avez créées.");
       return;
     }
 
@@ -7095,7 +7095,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                               </div>
                             ) : null}
 
-                            {canManageTransactions ? <div className="proof-inline-form">
+                            {canMutateTransaction(tx) ? <div className="proof-inline-form">
                               <input
                                 type="file"
                                 aria-label={`Preuve pour la transaction ${tx.accountName}`}
@@ -7274,7 +7274,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 </button>
               ) : null}
             </div>
-            {canManageTransactions ? <div className="proof-inline-form">
+            {canMutateSelectedTransaction ? <div className="proof-inline-form">
               <input
                 type="file"
                 aria-label={`Preuve pour la transaction ${selectedTransaction.accountName}`}

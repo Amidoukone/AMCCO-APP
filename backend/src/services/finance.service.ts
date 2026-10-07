@@ -112,7 +112,7 @@ function canReviewTransaction(role: RoleCode): boolean {
 }
 
 function canManageTransaction(role: RoleCode): boolean {
-  return TRANSACTION_REVIEW_ROLES.includes(role);
+  return role === "SYS_ADMIN" || role === "ACCOUNTANT" || role === "EMPLOYEE";
 }
 
 function canManageSalary(role: RoleCode): boolean {
@@ -142,10 +142,12 @@ function ensureTransactionManagementAccess(role: RoleCode): void {
 }
 
 function ensureTransactionMutationOwnership(actor: ActorContext, transaction: FinancialTransaction): void {
-  if (actor.role === "ACCOUNTANT" && transaction.createdById !== actor.actorId) {
+  if (actor.role !== "SYS_ADMIN" && transaction.createdById !== actor.actorId) {
     throw new HttpError(
       403,
-      "Le comptable peut modifier ou supprimer uniquement ses propres transactions."
+      actor.role === "ACCOUNTANT"
+        ? "Le comptable peut modifier ou supprimer uniquement ses propres transactions."
+        : "Vous pouvez modifier ou supprimer uniquement les transactions que vous avez créées."
     );
   }
 }
@@ -1731,12 +1733,7 @@ export async function addProofToTransaction(
     throw new HttpError(404, "Transaction introuvable.");
   }
 
-  const canEdit =
-    transaction.createdById === actor.actorId ||
-    actor.role === "OWNER" ||
-    actor.role === "SYS_ADMIN" ||
-    actor.role === "SUPERVISOR" ||
-    actor.role === "ACCOUNTANT";
+  const canEdit = transaction.createdById === actor.actorId || actor.role === "SYS_ADMIN" || actor.role === "SUPERVISOR";
 
   if (!canEdit) {
     throw new HttpError(403, "Permissions insuffisantes pour ajouter une preuve.");
@@ -1814,7 +1811,6 @@ export async function submitCompanyTransaction(
   const canSubmit =
     transaction.createdById === actor.actorId ||
     actor.role === "SYS_ADMIN" ||
-    actor.role === "ACCOUNTANT" ||
     actor.role === "SUPERVISOR";
 
   if (!canSubmit) {
@@ -2099,12 +2095,7 @@ export async function getTransactionProofUploadAuth(
     throw new HttpError(404, "Transaction introuvable.");
   }
 
-  const canEdit =
-    transaction.createdById === actor.actorId ||
-    actor.role === "OWNER" ||
-    actor.role === "SYS_ADMIN" ||
-    actor.role === "SUPERVISOR" ||
-    actor.role === "ACCOUNTANT";
+  const canEdit = transaction.createdById === actor.actorId || actor.role === "SYS_ADMIN" || actor.role === "SUPERVISOR";
 
   if (!canEdit) {
     throw new HttpError(403, "Permissions insuffisantes pour ajouter une preuve.");

@@ -454,6 +454,10 @@ export function TaskDetailsPage(): JSX.Element {
     return task.assignedToId === user.id;
   }, [canManageTasks, isReadOnlyOwner, task, user]);
 
+  const canManageTaskContent = Boolean(
+    task && user && (canManageTasks || task.createdById === user.id)
+  );
+
   const isTaskCompleted = task?.status === "DONE";
 
   const timelineEntries = useMemo<TimelineEntry[]>(() => {
@@ -671,7 +675,7 @@ export function TaskDetailsPage(): JSX.Element {
             ) : null}
           </div>
 
-          {!isReadOnlyOwner ? (
+          {canManageTaskContent ? (
             <div className="proof-inline-form task-attachment-inline-form">
               <input
                 key={`${attachmentFile?.name ?? "empty"}-${attachmentFile?.size ?? 0}`}
@@ -694,7 +698,7 @@ export function TaskDetailsPage(): JSX.Element {
         </section>
       ) : null}
 
-      {!isLoading && task ? (
+      {!isLoading && task && canManageTaskContent ? (
         <section className="panel">
           <h3>Ajouter un commentaire</h3>
           <div className="task-comment-form">
