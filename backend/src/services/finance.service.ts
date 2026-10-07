@@ -1808,10 +1808,17 @@ export async function submitCompanyTransaction(
     throw new HttpError(404, "Transaction introuvable.");
   }
 
+  const fullTransaction = await findFinancialTransactionById(actor.companyId, transaction.id);
+  if (!fullTransaction) {
+    throw new HttpError(500, "Impossible de recharger la transaction avant soumission.");
+  }
+  const salarySnapshot = extractSalarySnapshot(fullTransaction.metadata);
+
   const canSubmit =
     transaction.createdById === actor.actorId ||
     actor.role === "SYS_ADMIN" ||
-    actor.role === "SUPERVISOR";
+    actor.role === "SUPERVISOR" ||
+    (actor.role === "ACCOUNTANT" && salarySnapshot !== null);
 
   if (!canSubmit) {
     throw new HttpError(403, "Permissions insuffisantes pour soumettre cette transaction.");
@@ -1821,15 +1828,10 @@ export async function submitCompanyTransaction(
     throw new HttpError(400, "Seules les transactions en brouillon peuvent être soumises.");
   }
 
-  const fullTransaction = await findFinancialTransactionById(actor.companyId, transaction.id);
-  if (!fullTransaction) {
-    throw new HttpError(500, "Impossible de recharger la transaction avant soumission.");
-  }
   const account = await findFinancialAccountById(actor.companyId, fullTransaction.accountId);
   if (!account) {
     throw new HttpError(500, "Impossible de recharger le compte financier avant soumission.");
   }
-  const salarySnapshot = extractSalarySnapshot(fullTransaction.metadata);
   const profile =
     !salarySnapshot && transaction.activityCode
       ? getBusinessActivityProfile(transaction.activityCode)
