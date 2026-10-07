@@ -8,6 +8,9 @@ export const BUSINESS_ACTIVITY_CODES = [
   "FISH_FARMING",
   "LIVESTOCK",
   "TRANSPORT",
+  "TRANSIT",
+  "HYDROCARBON",
+  "HADJ",
   "MONEY_TRANSFER",
   "HOTEL_LODGING",
   "SERVICES",
@@ -22,7 +25,7 @@ export const BUSINESS_ACTIVITY_CODES = [
 export const SELECTABLE_BUSINESS_ACTIVITY_CODES = [
   "HARDWARE", "GENERAL_STORE", "FOOD", "RENTAL", "AGRICULTURE", "BTP",
   "FISH_FARMING", "LIVESTOCK", "TRANSPORT", "MONEY_TRANSFER", "HOTEL_LODGING",
-  "SERVICES", "MINING", "WATER", "GENERAL_EXPENSES", "DAILY_ACTIVITIES"
+  "SERVICES", "MINING", "WATER", "TRANSIT", "HYDROCARBON", "HADJ", "GENERAL_EXPENSES", "DAILY_ACTIVITIES"
 ] as const;
 
 export type BusinessActivityCode = (typeof BUSINESS_ACTIVITY_CODES)[number];
@@ -104,6 +107,9 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     label: "Production d'eau potable",
     description: "Production, distribution et exploitation du service d'eau potable."
   },
+  { code: "TRANSIT", label: "Transit", description: "Suivi général des opérations de transit." },
+  { code: "HYDROCARBON", label: "Hydrocarbure", description: "Suivi général des opérations liées aux hydrocarbures." },
+  { code: "HADJ", label: "Hadj", description: "Suivi général des opérations liées au Hadj." },
   {
     code: "REAL_ESTATE_AGENCY",
     label: "Agence immobilière",

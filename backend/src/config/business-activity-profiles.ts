@@ -18,6 +18,7 @@ export type ActivityFieldDefinition = {
   label: string;
   required: boolean;
   helpText: string;
+  options?: string[];
 };
 
 export type ActivityMetadataMap = Record<string, string>;
@@ -127,6 +128,29 @@ function makeProfile(
     label: BUSINESS_ACTIVITY_LABELS[activityCode],
     ...input
   };
+}
+
+function makeBasicProfile(activityCode: BusinessActivityCode): BusinessActivityProfile {
+  const label = BUSINESS_ACTIVITY_LABELS[activityCode];
+  return makeProfile(activityCode, {
+    operationsModel: `Suivi général des opérations du secteur ${label}.`,
+    finance: {
+      allowedTransactionTypes: ["CASH_IN", "CASH_OUT"], allowedCurrencies: ["XOF", "EUR", "USD"],
+      requiresDescription: false, requiresProof: false,
+      fields: [field("accountId", "Compte", true, "Compte ou caisse concerné."), field("amount", "Montant", true, "Montant du flux."), field("description", "Description", false, "Détail de l'opération.")],
+      workflow: [workflow("CREATE", "Saisie", "Enregistrement du flux."), workflow("OVERVIEW", "Suivi", "Consultation du suivi financier.")]
+    },
+    tasks: {
+      requiresDescription: false, requiresDueDate: false, requiresAssignee: false, completionRequiresAssignee: false,
+      blockedRequiresAssignee: false, blockedAlertSeverity: "WARNING",
+      fields: [field("title", "Action", true, "Objet de l'action."), field("description", "Détail", false, "Informations complémentaires.")],
+      workflow: [workflow("PLAN", "Planification", "Enregistrement de l'action."), workflow("CLOSE", "Clôture", "Clôture de l'action.")]
+    },
+    reporting: { focusArea: `Suivi général ${label}`, exportSections: ["flux financiers", "actions"], highlights: [
+      { code: `${activityCode.toLowerCase()}-flows`, label: "Flux enregistrés", description: "Nombre de flux financiers enregistrés.", metric: "transactionsCount" },
+      { code: `${activityCode.toLowerCase()}-open`, label: "Actions ouvertes", description: "Actions à suivre.", metric: "openTasksCount" }
+    ] }
+  });
 }
 
 const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityProfile> = {
@@ -884,6 +908,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("transportService", "Sous-section transport", true, "Location, gestion camion benne, tracteur ou citerne."),
+        { ...field("transportCategory", "Catégorie transport", false, "Ambulances ou corbillard."), options: ["Ambulances", "Corbillard"] },
         field("assetType", "Type d'engin", true, "Camion benne, tracteur, citerne ou autre engin."),
         field("vehicleRef", "Référence véhicule", false, "Immatriculation ou code interne."),
         field("routeRef", "Trajet ou mission", false, "Trajet, client ou ordre de mission.")
@@ -909,6 +934,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("transportService", "Sous-section transport", true, "Location, gestion camion benne, tracteur ou citerne."),
+        { ...field("transportCategory", "Catégorie transport", false, "Ambulances ou corbillard."), options: ["Ambulances", "Corbillard"] },
         field("assetType", "Type d'engin", true, "Camion benne, tracteur, citerne ou autre engin."),
         field("vehicleRef", "Référence véhicule", false, "Immatriculation ou code interne."),
         field("routeRef", "Trajet ou mission", false, "Trajet, client ou ordre de mission.")
@@ -925,6 +951,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       exportSections: ["locations", "camions bennes", "tracteurs", "citernes", "maintenance", "blocages"],
       operationalDimensions: [
         dimension("transportService", "Sous-section transport", "Compare location et gestion d'engins."),
+        dimension("transportCategory", "Catégorie transport", "Suit les nouvelles catégories transport."),
         dimension("assetType", "Type d'engin", "Mesure les flux et blocages camions bennes, tracteurs et citernes."),
         dimension("vehicleRef", "Vehicule", "Suit rentabilité et disponibilité par véhicule.")
       ],
@@ -953,6 +980,9 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ]
     }
   }),
+  TRANSIT: makeBasicProfile("TRANSIT"),
+  HYDROCARBON: makeBasicProfile("HYDROCARBON"),
+  HADJ: makeBasicProfile("HADJ"),
   MONEY_TRANSFER: makeProfile("MONEY_TRANSFER", {
     operationsModel: "Gestion des transactions Orange Money, Moov Money, Wave, Western Union, MoneyGram et Ria avec suivi caisse et rapprochement.",
     finance: {
@@ -1164,6 +1194,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("serviceType", "Type de service", false, "Type de prestation ou intervention."),
+        { ...field("serviceCategory", "Catégorie service", false, "Morgue."), options: ["Morgue"] },
         field("clientRef", "Client", false, "Client, site ou dossier de prestation.")
       ],
       workflow: [
@@ -1186,6 +1217,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("serviceType", "Type de service", false, "Type de prestation ou intervention."),
+        { ...field("serviceCategory", "Catégorie service", false, "Morgue."), options: ["Morgue"] },
         field("clientRef", "Client", false, "Client, site ou dossier de prestation.")
       ],
       workflow: [
@@ -1199,6 +1231,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       exportSections: ["facturation", "interventions", "charge équipe"],
       operationalDimensions: [
         dimension("serviceType", "Type de service", "Compare rentabilité et exécution par type de prestation."),
+        dimension("serviceCategory", "Catégorie service", "Suit la catégorie Morgue."),
         dimension("clientRef", "Client", "Suit les flux, interventions et blocages par client.")
       ],
       highlights: [

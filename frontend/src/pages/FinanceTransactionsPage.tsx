@@ -6803,6 +6803,18 @@ export function FinanceTransactionsPage(): JSX.Element {
                   );
                 }
 
+                if (field.options?.length) {
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select value={transactionForm.metadata[field.key] ?? ""} onChange={(event) => setTransactionForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={field.required}>
+                        <option value="">Choisir une catégorie</option>
+                        {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                  );
+                }
+
                 return (
                 <label key={field.key} className="operations-inline-group">
                   <span>{field.label}</span>

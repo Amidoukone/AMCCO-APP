@@ -1557,7 +1557,15 @@ export function OperationsTasksPage(): JSX.Element {
                 <summary>Champs avancés</summary>
                 <div className="operations-task-form-options-body">
                   {taskMetadataFields.map((field) => (
-                    field.key === AGRICULTURE_TASK_KIND_KEY && selectedActivityCode === "AGRICULTURE" ? (
+                    field.options?.length ? (
+                      <label key={field.key} className="operations-inline-group">
+                        <span>{field.label}</span>
+                        <select value={createForm.metadata[field.key] ?? ""} onChange={(event) => setCreateForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={field.required}>
+                          <option value="">Choisir une catégorie</option>
+                          {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </label>
+                    ) : field.key === AGRICULTURE_TASK_KIND_KEY && selectedActivityCode === "AGRICULTURE" ? (
                       <select
                         key={field.key}
                         value={createForm.metadata[field.key] ?? ""}

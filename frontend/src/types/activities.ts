@@ -5,6 +5,7 @@ export type ActivityFieldDefinition = {
   label: string;
   required: boolean;
   helpText: string;
+  options?: string[];
 };
 
 export type ActivityWorkflowStep = {

@@ -8,6 +8,9 @@ export const BUSINESS_ACTIVITY_CODES = [
   "FISH_FARMING",
   "LIVESTOCK",
   "TRANSPORT",
+  "TRANSIT",
+  "HYDROCARBON",
+  "HADJ",
   "MONEY_TRANSFER",
   "HOTEL_LODGING",
   "SERVICES",
@@ -77,6 +80,9 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     label: "Transaction",
     description: "Orange Money, Moov Money, Wave, Western Union, MoneyGram et Ria."
   },
+  { code: "TRANSIT", label: "Transit", description: "Suivi général des opérations de transit." },
+  { code: "HYDROCARBON", label: "Hydrocarbure", description: "Suivi général des opérations liées aux hydrocarbures." },
+  { code: "HADJ", label: "Hadj", description: "Suivi général des opérations liées au Hadj." },
   {
     code: "HOTEL_LODGING",
     label: "Hôtellerie / Auberge",
