@@ -153,6 +153,9 @@ export function FinanceSalariesPage(): JSX.Element {
   const [selectedSalaryId, setSelectedSalaryId] = useState<string | null>(null);
   const [editingSalaryId, setEditingSalaryId] = useState<string | null>(null);
   const [isSavingSalary, setIsSavingSalary] = useState(false);
+  const [isSalaryFormExpanded, setIsSalaryFormExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
   const [busySalaryExport, setBusySalaryExport] = useState<"csv" | "xlsx" | null>(null);
@@ -320,6 +323,14 @@ export function FinanceSalariesPage(): JSX.Element {
         next.set("transactionId", salaryId);
         return next;
       });
+      if (window.matchMedia("(max-width: 640px)").matches) {
+        window.requestAnimationFrame(() => {
+          document.getElementById("salary-detail")?.scrollIntoView({
+            block: "start",
+            behavior: "smooth"
+          });
+        });
+      }
     },
     [setSearchParams]
   );
@@ -564,6 +575,9 @@ export function FinanceSalariesPage(): JSX.Element {
       })) as { item: { id: string } };
 
       handleOpenSalaryDetails(response.item.id);
+      if (window.matchMedia("(max-width: 640px)").matches) {
+        setIsSalaryFormExpanded(false);
+      }
       setSuccessMessage(
         editingSalaryId
           ? "Salaire mis à jour."
@@ -582,6 +596,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingSalaryId(item.id);
+    setIsSalaryFormExpanded(true);
     setSalaryForm({
       accountId: item.accountId,
       employeeUserId: item.employeeUserId,
@@ -601,6 +616,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     resetSalaryForm();
+    setIsSalaryFormExpanded(false);
   }
 
   async function handleDeleteSalary(item: SalaryTransaction): Promise<void> {
@@ -804,7 +820,7 @@ export function FinanceSalariesPage(): JSX.Element {
         ]}
       />
 
-      <section className="grid">
+      <section className="grid salary-kpi-grid">
         {salaryCards.map((card) => (
           <article key={card.title} className="metric-card finance-overview-card">
             <h2>{card.title}</h2>
@@ -859,23 +875,18 @@ export function FinanceSalariesPage(): JSX.Element {
               ))}
             </select>
           ) : null}
-          <button type="submit">Actualiser</button>
+          <button type="submit" className="mobile-hide-redundant-action">Actualiser</button>
         </form>
       </section>
 
       {canManageSalaries ? (
-        <section className="panel">
-          <div className="dashboard-panel-header">
-            <div>
-              <h3>{editingSalaryId ? "Modifier un salaire" : "Enregistrer un salaire"}</h3>
-              <p className="hint">
-                {editingSalaryId
-                  ? "Modification du salaire en brouillon."
-                  : "Nouveau salaire à traiter."}
-              </p>
-            </div>
-          </div>
-
+        <section className="panel salary-form-panel">
+          <details
+            className="mobile-create-disclosure"
+            open={isSalaryFormExpanded || Boolean(editingSalaryId)}
+            onToggle={(event) => setIsSalaryFormExpanded(event.currentTarget.open)}
+          >
+            <summary>{editingSalaryId ? "Modifier un salaire" : "Enregistrer un salaire"}</summary>
           <form className="finance-transaction-form finance-salary-form" onSubmit={handleSaveSalary}>
             <select
               value={salaryForm.employeeUserId}
@@ -1076,6 +1087,7 @@ export function FinanceSalariesPage(): JSX.Element {
               ) : null}
             </div>
           </form>
+          </details>
         </section>
       ) : null}
 
@@ -1144,7 +1156,7 @@ export function FinanceSalariesPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className="panel finance-salary-list-panel">
+      <section id="salary-list" className="panel finance-salary-list-panel">
         <h3>Liste des salaires</h3>
         {!isLoading && salaryItems.length === 0 ? <p>Aucun salaire sur cette période.</p> : null}
         {!isLoading && salaryItems.length > 0 && displaySalaryItems.length === 0 ? (
@@ -1195,7 +1207,7 @@ export function FinanceSalariesPage(): JSX.Element {
                           {canEditSalary ? (
                             <button
                               type="button"
-                              className="secondary-btn"
+                              className="secondary-btn mobile-hide-secondary-salary-action"
                               onClick={() => handleStartEditSalary(item)}
                               disabled={isBusy}
                             >
@@ -1205,7 +1217,7 @@ export function FinanceSalariesPage(): JSX.Element {
                           {canDeleteSalary ? (
                             <button
                               type="button"
-                              className="danger-btn"
+                              className="danger-btn mobile-hide-secondary-salary-action"
                               onClick={() => void handleDeleteSalary(item)}
                               disabled={isBusy}
                             >
@@ -1338,7 +1350,7 @@ export function FinanceSalariesPage(): JSX.Element {
       </section>
 
       {selectedSalary ? (
-        <section className="panel finance-transaction-detail-panel salary-detail-panel">
+        <section id="salary-detail" className="panel finance-transaction-detail-panel salary-detail-panel">
           <div className="task-detail-header">
             <div>
               <h3>Détail du salaire</h3>

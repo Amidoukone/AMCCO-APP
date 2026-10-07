@@ -3345,6 +3345,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   });
   const [transactionProofFile, setTransactionProofFile] = useState<File | null>(null);
   const [isSavingTransaction, setIsSavingTransaction] = useState(false);
+  const [isTransactionFormExpanded, setIsTransactionFormExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
 
   const [proofFiles, setProofFiles] = useState<Record<string, File | null>>({});
   const [proofsByTransaction, setProofsByTransaction] = useState<Record<string, TransactionProof[]>>(
@@ -3705,6 +3708,19 @@ export function FinanceTransactionsPage(): JSX.Element {
     [setSearchParams]
   );
 
+  useEffect(() => {
+    if (!selectedTransactionId || !window.matchMedia("(max-width: 640px)").matches) {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      document.getElementById("transaction-detail")?.scrollIntoView({
+        block: "start",
+        behavior: "smooth"
+      });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [selectedTransactionId]);
+
   const handleCloseTransactionDetails = useCallback(() => {
     setSelectedTransactionId(null);
     setSearchParams((prev) => {
@@ -3757,6 +3773,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
 
     const frameId = window.requestAnimationFrame(() => {
+      setIsTransactionFormExpanded(true);
       const target = document.getElementById("transaction-create");
       if (!target) {
         return;
@@ -4568,6 +4585,9 @@ export function FinanceTransactionsPage(): JSX.Element {
           : [response.item, ...prev];
       });
       handleOpenTransactionDetails(response.item.id, response.item.activityCode);
+      if (window.matchMedia("(max-width: 640px)").matches) {
+        setIsTransactionFormExpanded(false);
+      }
       setSuccessMessage(
         editingTransactionId ? "Transaction modifiée." : "Transaction enregistrée."
       );
@@ -4604,6 +4624,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
     setTransactionProofFile(null);
     setEditingTransactionId(transaction.id);
+    setIsTransactionFormExpanded(true);
     setTransactionForm({
       accountId: transaction.accountId,
       type: transaction.type,
@@ -5697,12 +5718,17 @@ export function FinanceTransactionsPage(): JSX.Element {
               onChange={(event) => setSearchQuery(event.target.value)}
             />
           </label>
-          <button type="submit">Actualiser</button>
+          <button type="submit" className="mobile-hide-redundant-action">Actualiser</button>
         </form>
       </section>
 
       <section className="panel finance-page-panel">
-        <details id="transaction-create" className="finance-section-toggle mobile-form-anchor" open>
+        <details
+          id="transaction-create"
+          className="finance-section-toggle mobile-form-anchor mobile-create-disclosure"
+          open={isTransactionFormExpanded || Boolean(editingTransactionId)}
+          onToggle={(event) => setIsTransactionFormExpanded(event.currentTarget.open)}
+        >
           <summary className="finance-section-summary">
             <span>{editingTransactionId ? "Modifier une transaction" : "Enregistrer une transaction"}</span>
             <small>
@@ -7227,7 +7253,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           {canEditTransaction ? (
                             <button
                               type="button"
-                              className="secondary-btn"
+                              className="secondary-btn mobile-hide-secondary-transaction-action"
                               onClick={() => handleStartEditTransaction(tx)}
                               disabled={isBusy}
                             >
@@ -7237,7 +7263,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           {canDeleteTransaction ? (
                             <button
                               type="button"
-                              className="danger-btn"
+                              className="danger-btn mobile-hide-secondary-transaction-action"
                               onClick={() => void handleDeleteTransaction(tx)}
                               disabled={isBusy}
                             >
@@ -7367,7 +7393,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       </section>
 
       {selectedTransaction ? (
-        <section className="panel finance-transaction-detail-panel">
+        <section id="transaction-detail" className="panel finance-transaction-detail-panel">
           <div className="task-detail-header">
             <div>
               <h3>Detail de la transaction</h3>

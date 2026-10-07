@@ -6035,6 +6035,59 @@ textarea:focus,
 }
 
 @media (max-width: 640px) {
+  .app-content .page-guide {
+    display: none;
+  }
+
+  .mobile-hide-redundant-action,
+  .mobile-hide-secondary-transaction-action {
+    display: none !important;
+  }
+
+  .mobile-create-disclosure {
+    padding: 0 !important;
+  }
+
+  .mobile-create-disclosure > summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .mobile-create-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-create-disclosure[open] > summary {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  }
+
+  .mobile-create-disclosure > :not(summary) {
+    margin-inline: 12px;
+  }
+
+  .mobile-create-disclosure > form,
+  .mobile-create-disclosure > .finance-transaction-form {
+    padding-block: 12px;
+  }
+
+  .finance-transaction-detail-panel,
+  #transaction-create,
+  #task-create {
+    scroll-margin-top: 12px;
+  }
+
+  .operations-task-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
   .home-nav {
     padding: 12px 16px;
   }
@@ -11878,7 +11931,13 @@ textarea {
   }
 
   .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-list .dashboard-priority-item:nth-child(n + 3) {
-    display: grid;
+    display: none;
+  }
+
+  .owner-command-panel,
+  .sector-focus-panel,
+  .dashboard-operational-panel {
+    display: none;
   }
 }
 
@@ -13262,5 +13321,159 @@ textarea {
     scroll-behavior: auto;
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* The active sector replaces secondary shortcuts in the mobile top bar. */
+.mobile-sector-shortcut {
+  min-width: 0;
+  max-width: min(42vw, 240px);
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  color: var(--theme-text);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  text-align: left;
+}
+
+.mobile-sector-shortcut span {
+  flex: 0 0 auto;
+  color: var(--theme-gold);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.mobile-sector-shortcut strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .app-content > .workspace-toolbar {
+    display: none;
+  }
+
+  .mobile-sector-shortcut {
+    max-width: min(58vw, 280px);
+  }
+}
+
+/* Keep page actions in their natural place instead of making them follow the scroll. */
+@media (max-width: 820px) {
+  .mobile-sticky-form-actions {
+    position: static;
+    bottom: auto;
+    z-index: auto;
+    margin: 10px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .list-pagination,
+  .finance-transactions-pagination,
+  .list-view-pagination {
+    position: static;
+    bottom: auto;
+    z-index: auto;
+    padding: 8px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .operations-bulk-bar {
+    position: static;
+    top: auto;
+    z-index: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .operations-actions-primary .operations-primary-action,
+  .operations-task-meta-secondary {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .alerts-summary-strip,
+  .alert-meta-row,
+  .reports-reading-guide-panel,
+  .reports-sector-profile-panel {
+    display: none;
+  }
+
+  .reports-control-panel {
+    padding: 0 !important;
+  }
+
+  .reports-filter-disclosure > summary {
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .reports-filter-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .reports-filter-disclosure > summary span {
+    font-weight: 750;
+  }
+
+  .reports-filter-disclosure > summary small {
+    color: var(--mobile-muted);
+    text-align: right;
+  }
+
+  .reports-filter-content {
+    padding: 0 12px 12px;
+  }
+
+  .salary-kpi-grid > :nth-child(n + 3),
+  .mobile-hide-secondary-salary-action {
+    display: none !important;
+  }
+
+  .admin-users-management-header .admin-summary-strip,
+  .company-admin-summary .admin-summary-strip,
+  .company-admin-secondary-detail,
+  .company-admin-card .admin-impact-block {
+    display: none;
+  }
+
+  .task-status-hero,
+  .mobile-hide-task-secondary-action,
+  .task-detail-meta-secondary {
+    display: none !important;
+  }
+
+  .task-timeline-disclosure > summary {
+    min-height: 48px;
+    font-weight: 750;
+  }
+
+  .task-timeline-content {
+    padding-top: 10px;
   }
 }

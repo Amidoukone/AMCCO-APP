@@ -581,6 +581,9 @@ export function OperationsTasksPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSavingTaskForm, setIsSavingTaskForm] = useState(false);
+  const [isTaskFormExpanded, setIsTaskFormExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
 
   const tasksViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("operations-tasks", activeCompany?.id, user?.id);
@@ -796,6 +799,7 @@ export function OperationsTasksPage(): JSX.Element {
     }
 
     const frameId = window.requestAnimationFrame(() => {
+      setIsTaskFormExpanded(true);
       const target = document.getElementById("task-create");
       if (!target) {
         return;
@@ -1141,6 +1145,9 @@ export function OperationsTasksPage(): JSX.Element {
         }
       }
       setEditingTaskId(null);
+      if (window.matchMedia("(max-width: 640px)").matches) {
+        setIsTaskFormExpanded(false);
+      }
       setCreateForm({
         ...createDefaultTaskForm(),
         metadata: syncMetadataState({}, taskMetadataFields)
@@ -1220,6 +1227,7 @@ export function OperationsTasksPage(): JSX.Element {
     }
 
     setEditingTaskId(task.id);
+    setIsTaskFormExpanded(true);
     setErrorMessage(null);
     setSuccessMessage(null);
     setTaskAttachmentFile(null);
@@ -1234,6 +1242,7 @@ export function OperationsTasksPage(): JSX.Element {
 
   function handleCancelEditTask(): void {
     setEditingTaskId(null);
+    setIsTaskFormExpanded(false);
     setCreateForm({
       ...createDefaultTaskForm(),
       metadata: syncMetadataState({}, taskMetadataFields)
@@ -1439,7 +1448,7 @@ export function OperationsTasksPage(): JSX.Element {
             <option value="BLOCKED">Bloquée</option>
           </select>
 
-          <button type="submit">Actualiser</button>
+          <button type="submit" className="mobile-hide-redundant-action">Actualiser</button>
         </form>
       </section>
 
@@ -1476,8 +1485,13 @@ export function OperationsTasksPage(): JSX.Element {
       </section> : null}
 
       {canCreateTasks ? (
-        <section id="task-create" className="panel mobile-form-anchor">
-          <h3>{editingTaskId ? "Modifier une tâche" : "Nouvelle tâche"}</h3>
+        <details
+          id="task-create"
+          className="panel mobile-form-anchor mobile-create-disclosure"
+          open={isTaskFormExpanded || Boolean(editingTaskId)}
+          onToggle={(event) => setIsTaskFormExpanded(event.currentTarget.open)}
+        >
+          <summary>{editingTaskId ? "Modifier une tâche" : "Nouvelle tâche"}</summary>
           <form className="operations-task-form" onSubmit={handleCreateTask}>
             <div className="operations-task-form-primary">
               <input
@@ -2110,7 +2124,7 @@ export function OperationsTasksPage(): JSX.Element {
               ) : null}
             </div>
           </form>
-        </section>
+        </details>
       ) : null}
 
       {selectedActivityCode === "DAILY_ACTIVITIES" && canManageDailyActivityCategories ? (
@@ -2345,14 +2359,14 @@ export function OperationsTasksPage(): JSX.Element {
                       {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignée"}
                     </p>
                     {canAssignTasks ? (
-                      <p>
+                      <p className="operations-task-meta-secondary">
                         <strong>Créateur:</strong> {task.createdByFullName} ({task.createdByEmail})
                       </p>
                     ) : null}
                     <p>
                       <strong>Échéance:</strong> {formatDate(task.dueDate)}
                     </p>
-                    <p>
+                    <p className="operations-task-meta-secondary">
                       <strong>Mise à jour:</strong> {formatDate(task.updatedAt)}
                     </p>
                     {Object.keys(task.metadata).length > 0 ? (

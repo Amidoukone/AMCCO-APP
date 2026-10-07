@@ -55,6 +55,9 @@ export function AdminUsersPage(): JSX.Element {
     password: "",
     role: "EMPLOYEE" as RoleCode
   });
+  const [isCreateFormExpanded, setIsCreateFormExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
 
   const canManageUser = useMemo(() => {
     return user?.role === "SYS_ADMIN";
@@ -152,6 +155,9 @@ export function AdminUsersPage(): JSX.Element {
         role: "EMPLOYEE"
       });
       setSuccessMessage("Utilisateur créé avec succès.");
+      if (window.matchMedia("(max-width: 640px)").matches) {
+        setIsCreateFormExpanded(false);
+      }
       await loadUsers();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -295,7 +301,12 @@ export function AdminUsersPage(): JSX.Element {
       />
 
       {canManageUser ? <section className="panel admin-users-create-panel">
-        <h3>Créer un utilisateur</h3>
+        <details
+          className="mobile-create-disclosure"
+          open={isCreateFormExpanded}
+          onToggle={(event) => setIsCreateFormExpanded(event.currentTarget.open)}
+        >
+        <summary>Créer un utilisateur</summary>
         <form className="admin-form admin-users-create-form" onSubmit={handleCreateUser}>
           <input
             type="text"
@@ -361,6 +372,7 @@ export function AdminUsersPage(): JSX.Element {
             </button>
           </div>
         </form>
+        </details>
       </section> : null}
 
       <FeedbackBanner

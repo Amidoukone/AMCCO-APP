@@ -187,6 +187,9 @@ export function TaskDetailsPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingMoreTimeline, setIsLoadingMoreTimeline] = useState(false);
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
   const [hasMoreTimeline, setHasMoreTimeline] = useState(false);
   const [hasMoreComments, setHasMoreComments] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -534,7 +537,7 @@ export function TaskDetailsPage(): JSX.Element {
             <div className="actions-inline">
               <button
                 type="button"
-                className="secondary-btn"
+                className="secondary-btn mobile-hide-task-secondary-action"
                 onClick={() =>
                   navigate(`/alerts?entityType=TASK&entityId=${encodeURIComponent(task.id)}`)
                 }
@@ -553,16 +556,16 @@ export function TaskDetailsPage(): JSX.Element {
               <strong>Assigné:</strong>{" "}
               {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignée"}
             </p>
-            <p>
+            <p className="task-detail-meta-secondary">
               <strong>Créateur:</strong> {task.createdByFullName} ({task.createdByEmail})
             </p>
             <p>
               <strong>Échéance:</strong> {formatDate(task.dueDate)}
             </p>
-            <p>
+            <p className="task-detail-meta-secondary">
               <strong>Créée le:</strong> {formatDate(task.createdAt)}
             </p>
-            <p>
+            <p className="task-detail-meta-secondary">
               <strong>Dernière mise à jour:</strong> {formatDate(task.updatedAt)}
             </p>
           </div>
@@ -723,7 +726,13 @@ export function TaskDetailsPage(): JSX.Element {
 
       {!isLoading && task ? (
         <section className={canManageTasks ? "panel" : "panel task-detail-lite-panel"}>
-          <h3>{canManageTasks ? "Timeline opérationnelle" : "Historique"}</h3>
+          <details
+            className="mobile-create-disclosure task-timeline-disclosure"
+            open={isTimelineExpanded}
+            onToggle={(event) => setIsTimelineExpanded(event.currentTarget.open)}
+          >
+          <summary>{canManageTasks ? "Timeline opérationnelle" : "Historique"}</summary>
+          <div className="task-timeline-content">
           {timelineEntries.length === 0 ? <p>Aucun événement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
             <>
@@ -776,6 +785,8 @@ export function TaskDetailsPage(): JSX.Element {
               </div>
             </>
           ) : null}
+          </div>
+          </details>
         </section>
       ) : null}
     </>

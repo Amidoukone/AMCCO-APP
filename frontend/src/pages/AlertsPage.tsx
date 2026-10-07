@@ -337,22 +337,26 @@ export function AlertsPage(): JSX.Element {
               </article>
             </div>
             <div className="actions-inline">
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => void handleReadAll()}
-                disabled={isMarkingAll || unreadCount === 0}
-              >
-                Tout marquer comme lu
-              </button>
-              <button
-                type="button"
-                className="danger-btn"
-                onClick={() => void handleDeleteSelection()}
-                disabled={isDeletingSelection || selectedAlertIds.length === 0}
-              >
-                Supprimer la sélection
-              </button>
+              {unreadCount > 0 ? (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => void handleReadAll()}
+                  disabled={isMarkingAll}
+                >
+                  Tout marquer comme lu
+                </button>
+              ) : null}
+              {selectedAlertIds.length > 0 ? (
+                <button
+                  type="button"
+                  className="danger-btn"
+                  onClick={() => void handleDeleteSelection()}
+                  disabled={isDeletingSelection || isMarkingAll}
+                >
+                  Supprimer la sélection ({selectedAlertIds.length})
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

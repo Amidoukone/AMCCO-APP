@@ -165,7 +165,7 @@ export function AppLayout(): JSX.Element {
     const preferredKeys: FeatureKey[] =
       user?.role === "OWNER"
         ? ["dashboard", "financeTransactions", "operationsTasks", "alerts"]
-        : ["dashboard", "myWork", "financeTransactions", "alerts"];
+        : ["dashboard", "operationsTasks", "financeTransactions", "alerts"];
     const preferredItems = preferredKeys
       .map((key) => visibleNavigation.find((item) => item.key === key))
       .filter((item): item is typeof visibleNavigation[number] => item !== undefined);
@@ -407,33 +407,25 @@ export function AppLayout(): JSX.Element {
               <p className="header-mobile-title">{activeNavigationItem?.label ?? "Pilotage"}</p>
             </div>
             <div className="mobile-top-actions">
-              {unreadAlertsCount > 0 ? (
-                <Link to="/alerts" className="mobile-alert-shortcut" aria-label="Alertes non lues">
-                  {unreadAlertsCount}
-                </Link>
+              {!isBootstrapMode ? (
+                <button
+                  type="button"
+                  className="mobile-sector-shortcut"
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-expanded={isMobileMenuOpen}
+                  aria-controls="mobile-app-menu"
+                  aria-label={`Secteur actif : ${selectedActivity?.label ?? "aucun secteur actif"}. Modifier le secteur.`}
+                  title={selectedActivity?.label ?? "Aucun secteur actif"}
+                >
+                  <span>Secteur</span>
+                  <strong>{selectedActivity?.label ?? "Aucun secteur"}</strong>
+                </button>
               ) : null}
               <Link to="/" className="topbar-logo-link mobile-topbar-logo" aria-label="Retour au site vitrine">
                 <img src={amccoLogoUrl} alt="Logo AMCCO MBAG" />
               </Link>
             </div>
-          </div>
-          <div className="mobile-context-chips">
-            <button
-              type="button"
-              className="mobile-context-chip"
-              onClick={() => setIsMobileMenuOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={isMobileMenuOpen}
-              aria-controls="mobile-app-menu"
-              aria-label="Modifier l'entreprise ou le secteur actif"
-            >
-              <span>Contexte</span>
-              <strong>
-                {activeCompany?.name ?? "Initialisation"} · {isBootstrapMode
-                  ? "Créer une entreprise"
-                  : selectedActivity?.label ?? "Aucun secteur actif"}
-              </strong>
-            </button>
           </div>
           <div className="header-identity-block">
             <p className="header-user">{user.fullName}</p>

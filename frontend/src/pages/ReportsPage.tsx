@@ -505,6 +505,14 @@ function formatAppliedRange(overview: ReportsOverview): string {
   return `${periodLabel} | ${getBusinessActivityLabel(overview.filters.activityCode)}`;
 }
 
+function summarizePeriodForm(form: PeriodFormState): string {
+  if (form.periodMode === "MONTH") return form.month || "Choisir un mois";
+  if (form.periodMode === "QUARTER") return `T${form.quarter} ${form.year}`;
+  if (form.periodMode === "YEAR") return form.year || "Choisir une année";
+  if (!form.dateFrom && !form.dateTo) return "Toutes les dates";
+  return `${form.dateFrom || "Début"} – ${form.dateTo || "Aujourd'hui"}`;
+}
+
 export function ReportsPage(): JSX.Element {
   const withAuthorizedToken = useAuthorizedRequest();
   const { enabledActivities, selectedActivity, selectedActivityCode } = useBusinessActivity();
@@ -516,6 +524,9 @@ export function ReportsPage(): JSX.Element {
     createDefaultPeriodForm(selectedActivityCode ?? "")
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [isReportFiltersExpanded, setIsReportFiltersExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
   const [busyExport, setBusyExport] = useState<ExportTarget | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -566,6 +577,9 @@ export function ReportsPage(): JSX.Element {
     setSuccessMessage(null);
     setErrorMessage(null);
     setAppliedPeriod(periodForm);
+    if (window.matchMedia("(max-width: 640px)").matches) {
+      setIsReportFiltersExpanded(false);
+    }
   }
 
   function handleResetFilters(): void {
@@ -575,6 +589,9 @@ export function ReportsPage(): JSX.Element {
     const nextPeriod = createDefaultPeriodForm(nextActivityCode);
     setPeriodForm(nextPeriod);
     setAppliedPeriod(nextPeriod);
+    if (window.matchMedia("(max-width: 640px)").matches) {
+      setIsReportFiltersExpanded(false);
+    }
   }
 
   const reportMetrics = useMemo(
@@ -644,7 +661,16 @@ export function ReportsPage(): JSX.Element {
       </header>
 
       <section className="panel reports-control-panel">
-        <h3>Filtres du rapport</h3>
+        <details
+          className="reports-filter-disclosure"
+          open={isReportFiltersExpanded}
+          onToggle={(event) => setIsReportFiltersExpanded(event.currentTarget.open)}
+        >
+          <summary>
+            <span>Filtres du rapport</span>
+            <small>{selectedActivity?.label ?? "Choisir un secteur"} | {summarizePeriodForm(periodForm)}</small>
+          </summary>
+          <div className="reports-filter-content">
         <div className="reports-period-presets" role="group" aria-label="Type de période">
           {REPORT_PERIOD_MODE_OPTIONS.map((option) => (
             <button
@@ -801,6 +827,8 @@ export function ReportsPage(): JSX.Element {
         <p className="hint">
           Secteur appliqué: {selectedActivity?.label ?? "aucun secteur actif"}.
         </p>
+          </div>
+        </details>
       </section>
 
       <FeedbackBanner
@@ -887,7 +915,7 @@ export function ReportsPage(): JSX.Element {
           {!hasFocusedOperationsReport ? (
             <>
           {!overview.hardwareMonthlyReport ? (
-          <section className="panel">
+          <section className="panel reports-sector-profile-panel">
             <div className="dashboard-panel-header">
               <div>
                 <h3>Profil du secteur</h3>

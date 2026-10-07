@@ -101,6 +101,9 @@ export function AdminCompaniesPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [form, setForm] = useState<CreateCompanyInput>(createInitialFormState);
+  const [isCompanyFormExpanded, setIsCompanyFormExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
   const [companyPendingDelete, setCompanyPendingDelete] = useState<AdminCompanyItem | null>(null);
 
   const canManageCompanies = useMemo(() => {
@@ -211,6 +214,9 @@ export function AdminCompaniesPage(): JSX.Element {
       }
 
       resetCompanyForm();
+      if (window.matchMedia("(max-width: 640px)").matches) {
+        setIsCompanyFormExpanded(false);
+      }
       await loadCompanies();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -230,6 +236,7 @@ export function AdminCompaniesPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingCompanyId(item.company.id);
+    setIsCompanyFormExpanded(true);
     setForm(createFormStateFromCompany(item));
   }
 
@@ -237,6 +244,7 @@ export function AdminCompaniesPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     resetCompanyForm();
+    setIsCompanyFormExpanded(false);
   }
 
   function handleDeleteCompany(item: AdminCompanyItem): void {
@@ -395,16 +403,16 @@ export function AdminCompaniesPage(): JSX.Element {
                     <p>
                       <strong>Secteur:</strong> {displayText(item.company.businessSector)}
                     </p>
-                    <p>
+                    <p className="company-admin-secondary-detail">
                       <strong>Email:</strong> {item.company.email ?? "Non renseigné"}
                     </p>
-                    <p>
+                    <p className="company-admin-secondary-detail">
                       <strong>Téléphone:</strong> {item.company.phone ?? "Non renseigné"}
                     </p>
-                    <p>
+                    <p className="company-admin-secondary-detail">
                       <strong>Site web:</strong> {item.company.website ?? "Non renseigné"}
                     </p>
-                    <p>
+                    <p className="company-admin-secondary-detail">
                       <strong>Contact:</strong>{" "}
                       {item.company.contactFullName
                         ? `${displayText(item.company.contactFullName, "")}${
@@ -412,7 +420,7 @@ export function AdminCompaniesPage(): JSX.Element {
                           }`
                         : "Non renseigné"}
                     </p>
-                    <p className="company-admin-address">
+                    <p className="company-admin-address company-admin-secondary-detail">
                       <strong>Adresse:</strong> {formatCompanyAddress(item)}
                     </p>
                   </div>
@@ -479,8 +487,13 @@ export function AdminCompaniesPage(): JSX.Element {
         ) : null}
       </section>
 
-      {canManageCompanies ? <section className="panel">
-        <h3>{isEditingCompany ? "Modifier une entreprise" : "Créer une entreprise"}</h3>
+      {canManageCompanies ? <section className="panel company-create-panel">
+        <details
+          className="mobile-create-disclosure"
+          open={isCompanyFormExpanded || isEditingCompany}
+          onToggle={(event) => setIsCompanyFormExpanded(event.currentTarget.open)}
+        >
+        <summary>{isEditingCompany ? "Modifier une entreprise" : "Créer une entreprise"}</summary>
         <div className="company-admin-form">
           <input
             type="text"
@@ -585,6 +598,7 @@ export function AdminCompaniesPage(): JSX.Element {
             ) : null}
           </div>
         </div>
+        </details>
       </section> : null}
 
       <ConfirmDialog
