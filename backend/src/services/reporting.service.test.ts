@@ -1016,6 +1016,24 @@ describe("reporting.service", () => {
     const pdf = await exportCompanyReportsPdf(actor, filters);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    const pdfLatin1 = pdf.toString("latin1");
+    const decodedStreams = [...pdfLatin1.matchAll(/stream\r?\n/g)].map((match) => {
+      const start = (match.index ?? 0) + match[0].length;
+      const end = pdfLatin1.indexOf("endstream", start);
+      if (end < 0) return "";
+      try {
+        return inflateSync(Buffer.from(pdfLatin1.slice(start, end).replace(/\r?\n$/, ""), "latin1")).toString("latin1");
+      } catch {
+        return "";
+      }
+    }).join("\n");
+    const extractedPdfText = [...decodedStreams.matchAll(/<([0-9a-fA-F]+)>/g)]
+      .map((match) => Buffer.from(match[1], "hex").toString("latin1"))
+      .join("");
+    expect(extractedPdfText).toContain("Ventes");
+    expect(extractedPdfText).toContain("Boisson gazeuse");
+    expect(extractedPdfText).toContain("Inventaire hors caisse");
+    expect(extractedPdfText).toContain("Rapprochement journalier");
   });
 
   it("builds the agriculture opérations report from campaign metadata", async () => {

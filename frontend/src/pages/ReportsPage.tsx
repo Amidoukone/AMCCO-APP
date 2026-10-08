@@ -2119,52 +2119,161 @@ export function ReportsPage(): JSX.Element {
 
           {overview.beverageDepotReport ? (() => {
             const report = overview.beverageDepotReport;
+            const flowSections = [
+              { category: "VENTE" as const, label: "Ventes", amount: report.totals.salesAmount },
+              { category: "ACHAT_STOCK" as const, label: "Achats de stock", amount: report.totals.purchasesAmount },
+              { category: "DEPENSE" as const, label: "Dépenses", amount: report.totals.expensesAmount },
+              { category: "AUTRE_RECETTE" as const, label: "Autres recettes", amount: report.totals.otherIncomeAmount }
+            ];
             return (
-              <section className="panel">
+              <section className="panel reports-beverage-depot-panel">
                 <div className="dashboard-panel-header">
                   <div>
-                    <h3>Rapport dépôt de boissons</h3>
-                    <p className="hint">{report.periodLabel} | ventes, achats de stock, dépenses, inventaire et rapprochement journalier.</p>
+                    <h3>Rapport du dépôt de boissons</h3>
+                    <p className="hint">
+                      {report.periodLabel} | suivi des ventes, des approvisionnements, des dépenses,
+                      des stocks et des rapprochements journaliers.
+                    </p>
                   </div>
                 </div>
                 <div className="reports-summary-grid">
-                  <article className="reports-kpi-card"><span>Ventes</span><strong>{formatAmount(report.totals.salesAmount, report.totals.currency)}</strong></article>
-                  <article className="reports-kpi-card"><span>Achats de stock</span><strong>{formatAmount(report.totals.purchasesAmount, report.totals.currency)}</strong></article>
-                  <article className="reports-kpi-card"><span>Dépenses</span><strong>{formatAmount(report.totals.expensesAmount, report.totals.currency)}</strong></article>
-                  <article className="reports-kpi-card"><span>Marge brute calculable</span><strong>{formatAmount(report.totals.grossMarginAmount, report.totals.currency)}</strong></article>
-                  <article className="reports-kpi-card"><span>Valeur déclarée du stock</span><strong>{formatAmount(report.totals.stockValue, report.totals.currency)}</strong><small>Valeur d'inventaire, hors caisse</small></article>
+                  <article className="reports-kpi-card">
+                    <span>Ventes</span>
+                    <strong>{formatAmount(report.totals.salesAmount, report.totals.currency)}</strong>
+                    <small>{formatCount(report.transactions.filter((row) => row.category === "VENTE").length)} opération(s)</small>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Achats de stock</span>
+                    <strong>{formatAmount(report.totals.purchasesAmount, report.totals.currency)}</strong>
+                    <small>{formatCount(report.transactions.filter((row) => row.category === "ACHAT_STOCK").length)} opération(s)</small>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Dépenses d'exploitation</span>
+                    <strong>{formatAmount(report.totals.expensesAmount, report.totals.currency)}</strong>
+                    <small>{formatCount(report.transactions.filter((row) => row.category === "DEPENSE").length)} opération(s)</small>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Autres recettes</span>
+                    <strong>{formatAmount(report.totals.otherIncomeAmount, report.totals.currency)}</strong>
+                    <small>{formatCount(report.transactions.filter((row) => row.category === "AUTRE_RECETTE").length)} opération(s)</small>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Marge brute calculable</span>
+                    <strong>{formatAmount(report.totals.grossMarginAmount, report.totals.currency)}</strong>
+                    <small>Calculée sur les ventes avec quantité et prix renseignés</small>
+                  </article>
+                  <article className="reports-kpi-card">
+                    <span>Valeur déclarée du stock</span>
+                    <strong>{formatAmount(report.totals.stockValue, report.totals.currency)}</strong>
+                    <small>{formatCount(report.inventory.length)} ligne(s) d'inventaire, hors caisse</small>
+                  </article>
                 </div>
+
                 <div className="reports-owner-section">
-                  <h4 className="reports-owner-section-title">Transactions détaillées</h4>
-                  <div className="table-wrap"><table className="admin-table">
-                    <thead><tr><th>Date</th><th>Catégorie</th><th>Produit</th><th>Quantité</th><th>Prix achat</th><th>Prix vente</th><th>Montant</th><th>Référence / motif</th></tr></thead>
-                    <tbody>{report.transactions.length === 0 ? <tr><td colSpan={8}>Aucune transaction sur la période filtrée.</td></tr> : report.transactions.map((row, index) => (
-                      <tr key={`${row.date}-${row.category}-${index}`}>
-                        <td>{formatReportDate(row.date)}</td><td>{row.category === "VENTE" ? "Vente" : row.category === "ACHAT_STOCK" ? "Achat de stock" : row.category === "DEPENSE" ? "Dépense" : "Autre recette"}</td><td>{row.productName}</td>
-                        <td>{row.quantity === null ? "—" : formatCount(row.quantity)}</td><td>{row.purchaseUnitPrice ? formatAmount(row.purchaseUnitPrice, row.currency) : "—"}</td><td>{row.saleUnitPrice ? formatAmount(row.saleUnitPrice, row.currency) : "—"}</td><td>{formatAmount(row.amount, row.currency)}</td><td>{row.description}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table></div>
+                  <h4 className="reports-owner-section-title">Répartition des flux</h4>
+                  <div className="table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr><th>Nature de l'opération</th><th>Nombre d'opérations</th><th>Montant</th></tr>
+                      </thead>
+                      <tbody>
+                        {flowSections.map((section) => (
+                          <tr key={section.category}>
+                            <td>{section.label}</td>
+                            <td>{formatCount(report.transactions.filter((row) => row.category === section.category).length)}</td>
+                            <td>{formatAmount(section.amount, report.totals.currency)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+
+                <div className="reports-owner-section">
+                  <div className="reports-table-header">
+                    <h4>Transactions détaillées</h4>
+                    <span>{formatCount(report.transactions.length)} opération(s)</span>
+                  </div>
+                  <div className="table-wrap" role="region" aria-label="Transactions détaillées du dépôt de boissons" tabIndex={0}>
+                    <table className="admin-table">
+                      <thead>
+                        <tr><th>Date</th><th>Catégorie</th><th>Produit</th><th>Quantité</th><th>Prix d'achat</th><th>Prix de vente</th><th>Montant</th><th>Référence / motif</th></tr>
+                      </thead>
+                      <tbody>
+                        {report.transactions.length === 0 ? (
+                          <tr><td colSpan={8}>Aucune transaction sur la période filtrée.</td></tr>
+                        ) : report.transactions.map((row, index) => (
+                          <tr key={`${row.date}-${row.category}-${index}`}>
+                            <td>{formatReportDate(row.date)}</td>
+                            <td>{flowSections.find((section) => section.category === row.category)?.label ?? "Autre opération"}</td>
+                            <td>{row.productName}</td>
+                            <td>{row.quantity === null ? "—" : formatCount(row.quantity)}</td>
+                            <td>{row.purchaseUnitPrice ? formatAmount(row.purchaseUnitPrice, row.currency) : "—"}</td>
+                            <td>{row.saleUnitPrice ? formatAmount(row.saleUnitPrice, row.currency) : "—"}</td>
+                            <td>{formatAmount(row.amount, row.currency)}</td>
+                            <td>{row.description}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
                 <div className="reports-data-grid">
                   <article className="reports-table-panel">
-                    <div className="reports-table-header"><h4>Inventaire (hors caisse)</h4><span>{formatAmount(report.totals.stockValue, report.totals.currency)}</span></div>
-                    <div className="table-wrap"><table className="admin-table">
-                      <thead><tr><th>Date</th><th>Produit</th><th>Quantité</th><th>Prix d'achat</th><th>Valeur</th><th>État</th></tr></thead>
-                      <tbody>{report.inventory.length === 0 ? <tr><td colSpan={6}>Aucun inventaire sur la période filtrée.</td></tr> : report.inventory.map((row, index) => (
-                        <tr key={`${row.date}-${row.productName}-${index}`}><td>{row.date ? formatReportDate(row.date) : "—"}</td><td>{row.productName}</td><td>{row.quantity === null ? "—" : formatCount(row.quantity)}</td><td>{row.purchaseUnitPrice ? formatAmount(row.purchaseUnitPrice, report.totals.currency) : "—"}</td><td>{row.stockValue ? formatAmount(row.stockValue, report.totals.currency) : "—"}</td><td>{taskStatusLabel(row.status)}</td></tr>
-                      ))}</tbody>
-                    </table></div>
+                    <div className="reports-table-header">
+                      <h4>Inventaire (hors caisse)</h4>
+                      <span>{formatCount(report.inventory.length)} ligne(s) | {formatAmount(report.totals.stockValue, report.totals.currency)}</span>
+                    </div>
+                    <div className="table-wrap" role="region" aria-label="Inventaire du dépôt de boissons" tabIndex={0}>
+                      <table className="admin-table">
+                        <thead>
+                          <tr><th>Date</th><th>Produit</th><th>Quantité</th><th>Prix d'achat</th><th>Valeur</th><th>État</th></tr>
+                        </thead>
+                        <tbody>
+                          {report.inventory.length === 0 ? (
+                            <tr><td colSpan={6}>Aucun inventaire sur la période filtrée.</td></tr>
+                          ) : report.inventory.map((row, index) => (
+                            <tr key={`${row.date}-${row.productName}-${index}`}>
+                              <td>{row.date ? formatReportDate(row.date) : "—"}</td>
+                              <td>{row.productName}</td>
+                              <td>{row.quantity === null ? "—" : formatCount(row.quantity)}</td>
+                              <td>{row.purchaseUnitPrice ? formatAmount(row.purchaseUnitPrice, report.totals.currency) : "—"}</td>
+                              <td>{row.stockValue ? formatAmount(row.stockValue, report.totals.currency) : "—"}</td>
+                              <td>{taskStatusLabel(row.status)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </article>
                   <article className="reports-table-panel">
-                    <div className="reports-table-header"><h4>Rapprochement journalier</h4><span>{report.reconciliations.length} journée(s)</span></div>
-                    <div className="table-wrap"><table className="admin-table">
-                      <thead><tr><th>Date</th><th>Ventes</th><th>Versements</th><th>Reliquat</th><th>Dépenses</th><th>État</th></tr></thead>
-                      <tbody>{report.reconciliations.length === 0 ? <tr><td colSpan={6}>Aucun rapprochement sur la période filtrée.</td></tr> : report.reconciliations.map((row, index) => (
-                        <tr key={`${row.date}-${index}`}><td>{row.date ? formatReportDate(row.date) : "—"}</td><td>{formatAmount(row.dailySales, report.totals.currency)}</td><td>{formatAmount(row.dailyDeposits, report.totals.currency)}</td><td>{formatAmount(row.dailyBalance, report.totals.currency)}</td><td>{formatAmount(row.dailyExpenses, report.totals.currency)}</td><td>{taskStatusLabel(row.status)}</td></tr>
-                      ))}</tbody>
-                    </table></div>
-                    <p className="hint">Les versements rapprochent les ventes et ne s'ajoutent pas une seconde fois aux recettes.</p>
+                    <div className="reports-table-header">
+                      <h4>Rapprochement journalier</h4>
+                      <span>{formatCount(report.reconciliations.length)} journée(s)</span>
+                    </div>
+                    <div className="table-wrap" role="region" aria-label="Rapprochement journalier du dépôt de boissons" tabIndex={0}>
+                      <table className="admin-table">
+                        <thead>
+                          <tr><th>Date</th><th>Ventes</th><th>Versements</th><th>Reliquat</th><th>Dépenses</th><th>État</th></tr>
+                        </thead>
+                        <tbody>
+                          {report.reconciliations.length === 0 ? (
+                            <tr><td colSpan={6}>Aucun rapprochement sur la période filtrée.</td></tr>
+                          ) : report.reconciliations.map((row, index) => (
+                            <tr key={`${row.date}-${index}`}>
+                              <td>{row.date ? formatReportDate(row.date) : "—"}</td>
+                              <td>{formatAmount(row.dailySales, report.totals.currency)}</td>
+                              <td>{formatAmount(row.dailyDeposits, report.totals.currency)}</td>
+                              <td>{formatAmount(row.dailyBalance, report.totals.currency)}</td>
+                              <td>{formatAmount(row.dailyExpenses, report.totals.currency)}</td>
+                              <td>{taskStatusLabel(row.status)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="hint">Les versements rapprochent les ventes; ils ne sont pas ajoutés une seconde fois aux recettes. La valeur de l'inventaire reste hors caisse.</p>
                   </article>
                 </div>
               </section>

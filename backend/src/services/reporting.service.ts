@@ -2028,6 +2028,274 @@ function drawGeneralExpensesPdfFooter(
   doc.restore();
 }
 
+const BEVERAGE_DEPOT_PDF_TITLE = "Rapport dépôt de boissons";
+
+function buildEmptyBeverageDepotReport(filters: ReportPeriodFilter): BeverageDepotReport {
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    transactions: [],
+    inventory: [],
+    reconciliations: [],
+    totals: {
+      salesAmount: "0.00",
+      purchasesAmount: "0.00",
+      expensesAmount: "0.00",
+      otherIncomeAmount: "0.00",
+      grossMarginAmount: "0.00",
+      stockValue: "0.00",
+      currency: "XOF"
+    }
+  };
+}
+
+function drawBeverageDepotMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: BeverageDepotReport,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const y = doc.y;
+  const columnWidth = width / 3;
+  const items = [
+    { label: "PÉRIODE", value: report.periodLabel },
+    { label: "SECTEUR", value: "Dépôt de boissons" },
+    { label: "GÉNÉRÉ LE", value: formatPdfDate(generatedAt) }
+  ];
+
+  items.forEach((item, index) => {
+    const x = margin + index * columnWidth;
+    doc.roundedRect(x, y, columnWidth - 6, 48, 4).fill("#fffbeb");
+    doc.rect(x, y, columnWidth - 6, 48).strokeColor("#fde68a").lineWidth(0.8).stroke();
+    doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(8.5)
+      .text(item.label, x + 9, y + 8, { width: columnWidth - 24 });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10)
+      .text(truncatePdfText(item.value, 46), x + 9, y + 23, { width: columnWidth - 24 });
+  });
+  doc.y = y + 60;
+}
+
+function drawBeverageDepotMetricCards(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const gap = 8;
+  const columns = 3;
+  const cardWidth = (width - gap * (columns - 1)) / columns;
+  const cardHeight = 48;
+  const metrics = [
+    { label: "Ventes", value: formatPdfMoney(report.totals.salesAmount) },
+    { label: "Achats de stock", value: formatPdfMoney(report.totals.purchasesAmount) },
+    { label: "Dépenses d'exploitation", value: formatPdfMoney(report.totals.expensesAmount) },
+    { label: "Autres recettes", value: formatPdfMoney(report.totals.otherIncomeAmount) },
+    { label: "Marge brute calculable", value: formatPdfMoney(report.totals.grossMarginAmount) },
+    { label: "Valeur déclarée du stock", value: formatPdfMoney(report.totals.stockValue) }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    const x = margin + column * (cardWidth + gap);
+    const y = doc.y + row * (cardHeight + 7);
+    doc.roundedRect(x, y, cardWidth, cardHeight, 4).fill("#fffbeb");
+    doc.rect(x, y, cardWidth, cardHeight).strokeColor("#fde68a").lineWidth(0.8).stroke();
+    doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(8.5)
+      .text(metric.label, x + 9, y + 8, { width: cardWidth - 18 });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11)
+      .text(metric.value, x + 9, y + 24, { width: cardWidth - 18 });
+  });
+  doc.y += 2 * (cardHeight + 7) + 8;
+}
+
+type BeverageDepotPdfRow = Array<{ value: string; align?: "left" | "center" | "right" }>;
+
+function drawBeverageDepotTable(
+  doc: PDFKit.PDFDocument,
+  title: string,
+  columns: PdfTableColumn[],
+  rows: BeverageDepotPdfRow[],
+  emptyMessage: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const tableWidth = doc.page.width - margin * 2;
+  const headerHeight = 23;
+  const rowHeight = 23;
+  const bottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  const drawSectionTitle = (isContinuation = false): void => {
+    doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(11)
+      .text(`${title}${isContinuation ? " (suite)" : ""}`, margin, doc.y, { width: tableWidth });
+    doc.y += 18;
+  };
+  const drawHeader = (): number => {
+    let x = margin;
+    columns.forEach((column) => {
+      drawPdfTableCell(doc, column.label, x, doc.y, column.width, headerHeight, {
+        align: "center",
+        fill: "#fde68a",
+        font: "Helvetica-Bold",
+        fontSize: 8,
+        borderColor: "#cbd5e1"
+      });
+      x += column.width;
+    });
+    return doc.y + headerHeight;
+  };
+
+  if (needsPdfPageBreak(doc, 50 + headerHeight + rowHeight)) {
+    doc.addPage();
+    doc.y = PDF_CONTENT_TOP;
+  }
+  drawSectionTitle();
+  let y = drawHeader();
+
+  const tableRows = rows.length > 0
+    ? rows
+    : [[{ value: emptyMessage, align: "left" as const }]];
+  for (const row of tableRows) {
+    if (y + rowHeight > bottom) {
+      doc.addPage();
+      doc.y = PDF_CONTENT_TOP;
+      drawSectionTitle(true);
+      y = drawHeader();
+    }
+    if (rows.length === 0) {
+      drawPdfTableCell(doc, emptyMessage, margin, y, tableWidth, rowHeight, {
+        fontSize: 8.5,
+        borderColor: "#d9e2ec"
+      });
+    } else {
+      let x = margin;
+      row.forEach((cell, index) => {
+        const column = columns[index];
+        if (!column) return;
+        drawPdfTableCell(doc, cell.value, x, y, column.width, rowHeight, {
+          align: cell.align ?? column.align,
+          fontSize: 7.6,
+          borderColor: "#d9e2ec"
+        });
+        x += column.width;
+      });
+    }
+    y += rowHeight;
+  }
+  doc.y = y + 14;
+}
+
+function drawBeverageDepotReadingNotes(doc: PDFKit.PDFDocument): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const height = 46;
+  if (needsPdfPageBreak(doc, height)) {
+    doc.addPage();
+    doc.y = PDF_CONTENT_TOP;
+  }
+  const y = doc.y;
+  doc.roundedRect(margin, y, width, height, 4).fill("#f8fafc");
+  doc.rect(margin, y, width, height).strokeColor("#d9e2ec").lineWidth(0.8).stroke();
+  doc.fillColor("#334e68").font("Helvetica").fontSize(8.5)
+    .text(
+      "Lecture : la marge brute est calculée sur les ventes disposant d'une quantité et de prix d'achat et de vente. Les versements servent au rapprochement des ventes et ne sont pas ajoutés une seconde fois aux recettes. La valeur d'inventaire reste hors caisse.",
+      margin + 10,
+      y + 9,
+      { width: width - 20, height: height - 14 }
+    );
+  doc.y = y + height + 12;
+}
+
+function renderBeverageDepotReportsPdf(
+  doc: PDFKit.PDFDocument,
+  report: BeverageDepotReport,
+  generatedAt: string
+): void {
+  doc.on("pageAdded", () => {
+    doc.y = PDF_CONTENT_TOP;
+  });
+  doc.y = PDF_CONTENT_TOP;
+  drawBeverageDepotMetadataStrip(doc, report, generatedAt);
+  drawBeverageDepotMetricCards(doc, report);
+
+  const transactionColumns: PdfTableColumn[] = [
+    { label: "DATE", width: 62, align: "center" },
+    { label: "NATURE", width: 91, align: "left" },
+    { label: "PRODUIT", width: 117, align: "left" },
+    { label: "QTÉ", width: 48, align: "right" },
+    { label: "PRIX ACHAT", width: 92, align: "right" },
+    { label: "PRIX VENTE", width: 92, align: "right" },
+    { label: "MONTANT", width: 96, align: "right" },
+    { label: "RÉFÉRENCE / MOTIF", width: 164, align: "left" }
+  ];
+  const categoryLabel = (category: BeverageDepotReport["transactions"][number]["category"]): string => {
+    switch (category) {
+      case "VENTE": return "Vente";
+      case "ACHAT_STOCK": return "Achat de stock";
+      case "DEPENSE": return "Dépense";
+      default: return "Autre recette";
+    }
+  };
+  drawBeverageDepotTable(
+    doc,
+    `Transactions détaillées (${formatPdfNumber(report.transactions.length)} ligne(s))`,
+    transactionColumns,
+    report.transactions.map((row) => [
+      { value: formatPdfDate(row.date), align: "center" },
+      { value: categoryLabel(row.category) },
+      { value: truncatePdfText(row.productName, 24) },
+      { value: row.quantity === null ? "-" : formatPdfNumber(row.quantity, 2), align: "right" },
+      { value: row.purchaseUnitPrice ? formatPdfMoney(row.purchaseUnitPrice) : "-", align: "right" },
+      { value: row.saleUnitPrice ? formatPdfMoney(row.saleUnitPrice) : "-", align: "right" },
+      { value: formatPdfMoney(row.amount), align: "right" },
+      { value: truncatePdfText(row.description, 32) }
+    ]),
+    "Aucune transaction sur la période sélectionnée."
+  );
+
+  const inventoryColumns: PdfTableColumn[] = [
+    { label: "DATE", width: 75, align: "center" },
+    { label: "PRODUIT", width: 220, align: "left" },
+    { label: "QUANTITÉ", width: 78, align: "right" },
+    { label: "COÛT UNITAIRE", width: 128, align: "right" },
+    { label: "VALEUR DU STOCK", width: 135, align: "right" },
+    { label: "ÉTAT", width: 126, align: "left" }
+  ];
+  drawBeverageDepotTable(
+    doc,
+    `Inventaire hors caisse (${formatPdfNumber(report.inventory.length)} ligne(s))`,
+    inventoryColumns,
+    report.inventory.map((row) => [
+      { value: row.date ? formatPdfDate(row.date) : "-", align: "center" },
+      { value: truncatePdfText(row.productName, 38) },
+      { value: row.quantity === null ? "-" : formatPdfNumber(row.quantity, 2), align: "right" },
+      { value: row.purchaseUnitPrice ? formatPdfMoney(row.purchaseUnitPrice) : "-", align: "right" },
+      { value: row.stockValue ? formatPdfMoney(row.stockValue) : "-", align: "right" },
+      { value: toDisplayTaskStatusLabel(row.status) }
+    ]),
+    "Aucun inventaire enregistré sur la période sélectionnée."
+  );
+
+  const reconciliationColumns: PdfTableColumn[] = [
+    { label: "DATE", width: 90, align: "center" },
+    { label: "VENTES", width: 125, align: "right" },
+    { label: "VERSEMENTS", width: 125, align: "right" },
+    { label: "RELIQUAT", width: 125, align: "right" },
+    { label: "DÉPENSES", width: 125, align: "right" },
+    { label: "ÉTAT", width: 172, align: "left" }
+  ];
+  drawBeverageDepotTable(
+    doc,
+    `Rapprochement journalier (${formatPdfNumber(report.reconciliations.length)} journée(s))`,
+    reconciliationColumns,
+    report.reconciliations.map((row) => [
+      { value: row.date ? formatPdfDate(row.date) : "-", align: "center" },
+      { value: formatPdfMoney(row.dailySales), align: "right" },
+      { value: formatPdfMoney(row.dailyDeposits), align: "right" },
+      { value: formatPdfMoney(row.dailyBalance), align: "right" },
+      { value: formatPdfMoney(row.dailyExpenses), align: "right" },
+      { value: toDisplayTaskStatusLabel(row.status) }
+    ]),
+    "Aucun rapprochement enregistré sur la période sélectionnée."
+  );
+  drawBeverageDepotReadingNotes(doc);
+}
+
 function renderGeneralExpensesReportsPdf(
   doc: PDFKit.PDFDocument,
   overview: ReportsOverview,
@@ -12354,41 +12622,11 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "BEVERAGE_DEPOT") {
-    const report = overview.beverageDepotReport;
+    const report = overview.beverageDepotReport ?? buildEmptyBeverageDepotReport(filters);
     return buildPdfBuffer((doc) => {
-      doc.on("pageAdded", () => { doc.y = PDF_CONTENT_TOP; });
-      doc.y = PDF_CONTENT_TOP;
-      doc.fillColor("#0f2544").font("Helvetica-Bold").fontSize(18).text("AMCCO - Rapport dépôt de boissons");
-      doc.moveDown(0.5).fillColor("#334e68").font("Helvetica").fontSize(10)
-        .text(`Entreprise: ${actor.companyId}`)
-        .text(`Période appliquée: ${report?.periodLabel ?? periodLabel}`);
-      drawPdfReadingGuideBox(doc);
-      writePdfSectionTitle(doc, "Synthèse des flux XOF");
-      writePdfList(doc, report ? [
-        `Ventes: ${report.totals.salesAmount} XOF`,
-        `Achats de stock: ${report.totals.purchasesAmount} XOF`,
-        `Dépenses d'exploitation: ${report.totals.expensesAmount} XOF`,
-        `Autres recettes: ${report.totals.otherIncomeAmount} XOF`,
-        `Marge brute calculable: ${report.totals.grossMarginAmount} XOF`,
-        `Valeur de stock déclarée à l'inventaire: ${report.totals.stockValue} XOF`
-      ] : [], "Aucun flux ou inventaire sur cette période.");
-      writePdfSectionTitle(doc, "Transactions détaillées");
-      writePdfList(doc, limitPdfRows((report?.transactions ?? []).map((item) => {
-        const category = item.category === "VENTE" ? "Vente" : item.category === "ACHAT_STOCK"
-          ? "Achat stock" : item.category === "DEPENSE" ? "Dépense" : "Autre recette";
-        return `${item.date} | ${category} | ${item.productName} | quantité ${item.quantity ?? "-"} | achat unitaire ${item.purchaseUnitPrice ?? "-"} XOF | vente unitaire ${item.saleUnitPrice ?? "-"} XOF | montant ${item.amount} XOF | ${item.description}`;
-      })), "Aucune transaction sur cette période.");
-      writePdfSectionTitle(doc, "Inventaire des boissons (hors flux de caisse)");
-      writePdfList(doc, limitPdfRows((report?.inventory ?? []).map((item) =>
-        `${item.date || "Date non renseignée"} | ${item.productName} | stock ${item.quantity ?? "-"} | coût unitaire ${item.purchaseUnitPrice ?? "-"} XOF | valeur ${item.stockValue ?? "-"} XOF | ${toDisplayTaskStatusLabel(item.status)}`
-      )), "Aucun inventaire enregistré sur cette période.");
-      writePdfSectionTitle(doc, "Rapprochement journalier");
-      writePdfList(doc, limitPdfRows((report?.reconciliations ?? []).map((item) =>
-        `${item.date || "Date non renseignée"} | ventes ${item.dailySales} XOF | versements ${item.dailyDeposits} XOF | reliquat ${item.dailyBalance} XOF | dépenses ${item.dailyExpenses} XOF | ${toDisplayTaskStatusLabel(item.status)}`
-      )), "Aucun rapprochement journalier enregistré sur cette période.");
-      doc.fontSize(9).fillColor("#52606d").text("Les versements sont présentés séparément des ventes. La valeur d'inventaire ne modifie pas la caisse.");
+      renderBeverageDepotReportsPdf(doc, report, overview.generatedAt);
     }, (doc, pageNumber, totalPages) => {
-      drawPdfBrandingFrame(doc, pageNumber, totalPages, report?.periodLabel ?? periodLabel, "Rapport dépôt de boissons");
+      drawPdfBrandingFrame(doc, pageNumber, totalPages, report.periodLabel, BEVERAGE_DEPOT_PDF_TITLE);
     }, { layout: "landscape" });
   }
 
