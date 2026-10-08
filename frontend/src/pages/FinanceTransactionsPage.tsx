@@ -84,8 +84,8 @@ import {
 const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
 const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
 const TRANSACTIONS_PAGE_SIZE = 100;
-const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
-const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 25;
+const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 10;
 const STORE_OPERATION_KIND_KEY = "storeOperationKind";
 type StoreOperationKind = "ACHAT" | "RECOUVREMENT";
 const STORE_OPERATION_LABELS: Record<StoreOperationKind, string> = {
@@ -7195,7 +7195,12 @@ export function FinanceTransactionsPage(): JSX.Element {
         {!isLoading && displayTransactions.length > 0 ? (
           <>
           {renderVisibleTransactionsPagination()}
-          <div className="table-wrap finance-transactions-table-wrap mobile-card-table">
+          <div
+            className="table-wrap finance-transactions-table-wrap mobile-card-table"
+            role="region"
+            aria-label="Liste des transactions"
+            tabIndex={0}
+          >
             <table className="admin-table">
               <thead>
                 <tr>

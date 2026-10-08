@@ -839,6 +839,13 @@ export function ReportsPage(): JSX.Element {
 
       {!isLoading && overview && reportMetrics ? (
         <>
+          <div
+            className="reports-result-scroll"
+            role="region"
+            aria-label="Détails du rapport"
+            tabIndex={0}
+          >
+            <p className="reports-scroll-hint">Détails du rapport · Faites défiler cette zone pour consulter toutes les sections.</p>
           <section className="panel reports-overview-panel">
             <div className="dashboard-panel-header">
               <div>
@@ -3307,6 +3314,7 @@ export function ReportsPage(): JSX.Element {
           {selectedActivityCode !== "HARDWARE" && !hasFocusedOperationsReport ? (
             <ReportReadingGuidePanel />
           ) : null}
+          </div>
         </>
       ) : null}
     </div>

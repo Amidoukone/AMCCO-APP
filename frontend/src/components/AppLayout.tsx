@@ -351,6 +351,9 @@ export function AppLayout(): JSX.Element {
 
   return (
     <div className="app-shell">
+      <a className="skip-to-main" href="#main-content">
+        Aller au contenu principal
+      </a>
       <aside className="app-sidebar">
         <div className="app-sidebar-inner">
           <div className="brand-block">
@@ -689,7 +692,7 @@ export function AppLayout(): JSX.Element {
             </Link>
           </div>
         </header>
-        <section className="app-content" ref={contentRef}>
+        <main className="app-content" id="main-content" ref={contentRef} tabIndex={-1}>
           {!isBootstrapMode ? (
           <div className={user.role === "OWNER" ? "workspace-toolbar mobile-owner-toolbar" : "workspace-toolbar"}>
               <Breadcrumbs />
@@ -701,7 +704,7 @@ export function AppLayout(): JSX.Element {
             </div>
           ) : null}
           <Outlet />
-        </section>
+        </main>
         {mobilePrimaryNavigation.length > 0 ? (
           <nav className="mobile-bottom-nav" aria-label="Navigation mobile principale">
             {mobilePrimaryNavigation.map((item) => (

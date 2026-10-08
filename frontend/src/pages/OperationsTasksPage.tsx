@@ -64,8 +64,8 @@ import type { DailyActivityCategory } from "../types/daily-activity-categories";
 import type { GeneralStoreOperationsReportRow } from "../types/reporting";
 
 const TASKS_PAGE_SIZE = 200;
-const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
-const DEFAULT_TASKS_VISIBLE_PAGE_SIZE = 25;
+const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const DEFAULT_TASKS_VISIBLE_PAGE_SIZE = 10;
 const AGRICULTURE_TASK_KIND_KEY = "agricultureTaskKind";
 type AgricultureTaskKind =
   | "PREPARATION"
@@ -2314,7 +2314,12 @@ export function OperationsTasksPage(): JSX.Element {
         {!isLoading && displayTasks.length > 0 ? (
           <>
           {renderVisibleTasksPagination()}
-          <div className="operations-task-list">
+          <div
+            className="operations-task-list operations-task-list-scroll"
+            role="region"
+            aria-label="Liste des tâches"
+            tabIndex={0}
+          >
             {paginatedTasks.map((task) => {
               const isBusy = busyTaskId === task.id;
               const canUpdate = canUpdateTask(task);
