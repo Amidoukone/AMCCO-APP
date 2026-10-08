@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { GlobalSearch } from "./GlobalSearch";
 import { QuickActions } from "./QuickActions";
@@ -115,7 +115,7 @@ function MobileNavigationIcon({ featureKey }: { featureKey: FeatureKey }): JSX.E
 }
 
 export function AppLayout(): JSX.Element {
-  const { activeCompany, memberships, user, switchCompany } = useAuth();
+  const { activeCompany, memberships, user, switchCompany, logout } = useAuth();
   const {
     enabledActivities,
     errorMessage: activityErrorMessage,
@@ -125,13 +125,17 @@ export function AppLayout(): JSX.Element {
     setSelectedActivityCode
   } = useBusinessActivity();
   const location = useLocation();
+  const navigate = useNavigate();
   const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
   const [companySwitchError, setCompanySwitchError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mobilePanelMode, setMobilePanelMode] = useState<"menu" | "sectors">("menu");
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const contentRef = useRef<HTMLElement | null>(null);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null);
+  const mobileSectorToggleRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuCloseRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuWasOpenRef = useRef(false);
   const withAuthorizedToken = useAuthorizedRequest();
@@ -162,16 +166,30 @@ export function AppLayout(): JSX.Element {
     [location.pathname, visibleNavigation]
   );
   const mobilePrimaryNavigation = useMemo(() => {
-    const preferredKeys: FeatureKey[] =
-      user?.role === "OWNER"
-        ? ["dashboard", "financeTransactions", "operationsTasks", "alerts"]
-        : ["dashboard", "operationsTasks", "financeTransactions", "alerts"];
+    const preferredKeys: FeatureKey[] = [
+      "dashboard",
+      "operationsTasks",
+      "financeTransactions",
+      "reports",
+      "alerts"
+    ];
     const preferredItems = preferredKeys
       .map((key) => visibleNavigation.find((item) => item.key === key))
       .filter((item): item is typeof visibleNavigation[number] => item !== undefined);
 
-    return (preferredItems.length > 0 ? preferredItems : visibleNavigation).slice(0, 4);
-  }, [user?.role, visibleNavigation]);
+    return (preferredItems.length > 0 ? preferredItems : visibleNavigation).slice(0, 5);
+  }, [visibleNavigation]);
+  const mobileSecondaryNavigationSections = useMemo(() => {
+    const bottomNavigationKeys = new Set(mobilePrimaryNavigation.map((item) => item.key));
+    const menuNavigation = isBootstrapMode
+      ? visibleNavigation
+      : visibleNavigation.filter((item) => !bottomNavigationKeys.has(item.key));
+
+    return menuNavigation.reduce<Record<string, typeof menuNavigation>>((groups, item) => {
+      groups[item.section] = [...(groups[item.section] ?? []), item];
+      return groups;
+    }, {});
+  }, [isBootstrapMode, mobilePrimaryNavigation, visibleNavigation]);
 
   useEffect(() => {
     if (isBootstrapMode) {
@@ -212,13 +230,16 @@ export function AppLayout(): JSX.Element {
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
+    setIsMobileSearchOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
     if (!isMobileMenuOpen) {
       if (mobileMenuWasOpenRef.current) {
         mobileMenuWasOpenRef.current = false;
-        mobileMenuToggleRef.current?.focus();
+        (mobilePanelMode === "sectors"
+          ? mobileSectorToggleRef.current
+          : mobileMenuToggleRef.current)?.focus();
       }
       return;
     }
@@ -265,7 +286,7 @@ export function AppLayout(): JSX.Element {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMobileMenuOpen]);
+  }, [isMobileMenuOpen, mobilePanelMode]);
 
   useEffect(() => {
     const root = contentRef.current;
@@ -320,6 +341,12 @@ export function AppLayout(): JSX.Element {
     } finally {
       setIsSwitchingCompany(false);
     }
+  }
+
+  async function handleMobileLogout(): Promise<void> {
+    await logout();
+    setIsMobileMenuOpen(false);
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -399,7 +426,11 @@ export function AppLayout(): JSX.Element {
               aria-label={isMobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-app-menu"
-              onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+              onClick={() => {
+                setMobilePanelMode("menu");
+                setIsMobileSearchOpen(false);
+                setIsMobileMenuOpen((isOpen) => !isOpen);
+              }}
             >
               <span aria-hidden="true" />
             </button>
@@ -411,7 +442,12 @@ export function AppLayout(): JSX.Element {
                 <button
                   type="button"
                   className="mobile-sector-shortcut"
-                  onClick={() => setIsMobileMenuOpen(true)}
+                  ref={mobileSectorToggleRef}
+                  onClick={() => {
+                    setMobilePanelMode("sectors");
+                    setIsMobileSearchOpen(false);
+                    setIsMobileMenuOpen(true);
+                  }}
                   aria-haspopup="dialog"
                   aria-expanded={isMobileMenuOpen}
                   aria-controls="mobile-app-menu"
@@ -452,7 +488,7 @@ export function AppLayout(): JSX.Element {
             id="mobile-app-menu"
             className={isMobileMenuOpen ? "mobile-context-panel is-open" : "mobile-context-panel"}
             role="dialog"
-            aria-label="Menu mobile"
+            aria-label={mobilePanelMode === "sectors" ? "Choisir un secteur" : "Menu mobile"}
             aria-modal={isMobileMenuOpen}
             aria-hidden={!isMobileMenuOpen}
             tabIndex={-1}
@@ -460,7 +496,7 @@ export function AppLayout(): JSX.Element {
             <div className="mobile-app-menu-header">
               <div>
                 <p className="header-mobile-kicker">AMCCO &amp; SND</p>
-                <strong>Menu</strong>
+                <strong>{mobilePanelMode === "sectors" ? "Secteurs" : "Menu"}</strong>
               </div>
               <button
                 ref={mobileMenuCloseRef}
@@ -484,18 +520,66 @@ export function AppLayout(): JSX.Element {
               </button>
             </div>
             <div className="mobile-smart-menu">
+              {mobilePanelMode === "sectors" ? (
+                <div className="mobile-sector-picker">
+                  {enabledActivities.length === 0 ? (
+                    <p className="hint">Aucun secteur actif pour cette entreprise.</p>
+                  ) : (
+                    <div className="mobile-choice-list" role="group" aria-label="Choisir un secteur">
+                      {enabledActivities.map((activity) => {
+                        const isSelected = selectedActivityCode === activity.code;
+                        return (
+                          <button
+                            key={activity.code}
+                            type="button"
+                            className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
+                            onClick={() => handleActivityChange(activity.code)}
+                            disabled={isLoadingActivities}
+                            aria-pressed={isSelected}
+                          >
+                            <strong>{activity.label}</strong>
+                            <span>{isSelected ? "Secteur actif" : "Choisir ce secteur"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+              {isBootstrapMode ? (
+                <div className="mobile-context-card">
+                  <span>Initialisation</span>
+                  <strong>Aucune entreprise active</strong>
+                </div>
+              ) : null}
               {!isBootstrapMode ? (
-                <GlobalSearch
-                  className="mobile-drawer-search"
-                  inputId="mobile-global-search-input-smart"
-                  navigation={visibleNavigation}
-                  role={user.role}
-                  selectedActivityCode={selectedActivityCode}
-                />
+                <>
+                  <button
+                    type="button"
+                    className="mobile-search-toggle"
+                    aria-expanded={isMobileSearchOpen}
+                    aria-controls="mobile-menu-search"
+                    onClick={() => setIsMobileSearchOpen((isOpen) => !isOpen)}
+                  >
+                    {isMobileSearchOpen ? "Fermer la recherche" : "Rechercher une page"}
+                  </button>
+                  <div id="mobile-menu-search" hidden={!isMobileSearchOpen}>
+                    {isMobileSearchOpen ? (
+                      <GlobalSearch
+                        className="mobile-drawer-search"
+                        inputId="mobile-global-search-input-smart"
+                        navigation={visibleNavigation}
+                        role={user.role}
+                        selectedActivityCode={selectedActivityCode}
+                      />
+                    ) : null}
+                  </div>
+                </>
               ) : null}
 
               <nav className="mobile-smart-nav" aria-label="Navigation mobile">
-                {Object.entries(navigationSections).map(([section, items], sectionIndex) => (
+                {Object.entries(mobileSecondaryNavigationSections).map(([section, items], sectionIndex) => (
                   <details
                     key={section}
                     className="mobile-menu-section mobile-nav-section"
@@ -526,43 +610,7 @@ export function AppLayout(): JSX.Element {
                 ))}
               </nav>
 
-              {!isBootstrapMode ? (
-                <details className="mobile-menu-section">
-                  <summary>
-                    <span>Secteur</span>
-                    <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
-                  </summary>
-                  {enabledActivities.length === 0 ? (
-                    <p className="hint">Aucun secteur actif pour cette entreprise.</p>
-                  ) : (
-                    <div className="mobile-choice-list" role="group" aria-label="Choisir un secteur">
-                      {enabledActivities.map((activity) => {
-                        const isSelected = selectedActivityCode === activity.code;
-                        return (
-                          <button
-                            key={activity.code}
-                            type="button"
-                            className={isSelected ? "mobile-choice-item is-selected" : "mobile-choice-item"}
-                            onClick={() => handleActivityChange(activity.code)}
-                            disabled={isLoadingActivities}
-                            aria-pressed={isSelected}
-                          >
-                            <strong>{activity.label}</strong>
-                            <span>{isSelected ? "Secteur actif" : "Choisir ce secteur"}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </details>
-              ) : (
-                <div className="mobile-context-card">
-                  <span>Initialisation</span>
-                  <strong>Aucune entreprise active</strong>
-                </div>
-              )}
-
-              {activeCompany ? (
+              {activeCompany && memberships.length > 1 ? (
                 <details className="mobile-menu-section">
                   <summary>
                     <span>Entreprise</span>
@@ -588,16 +636,21 @@ export function AppLayout(): JSX.Element {
                   </div>
                 </details>
               ) : null}
-
+                </>
+              )}
             </div>
-            <Link
-              to="/"
-              className="mobile-drawer-public-link"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Retour au site vitrine
-            </Link>
             {companySwitchError ? <p className="header-switch-error">{companySwitchError}</p> : null}
+            {mobilePanelMode === "menu" ? (
+              <div className="mobile-menu-footer">
+                <button
+                  type="button"
+                  className="secondary-btn mobile-menu-logout"
+                  onClick={() => void handleMobileLogout()}
+                >
+                  Se déconnecter
+                </button>
+              </div>
+            ) : null}
           </div>
           {!isBootstrapMode ? (
             <GlobalSearch
