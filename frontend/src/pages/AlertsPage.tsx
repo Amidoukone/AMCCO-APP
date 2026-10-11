@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -43,8 +43,8 @@ function formatDateTime(value: string | null): string {
   return new Date(value).toLocaleString("fr-FR");
 }
 
-function notifyAlertsChanged(): void {
-  window.dispatchEvent(new Event("amcco-alerts-changed"));
+function notifyAlertsChanged(change: { delta?: number; unreadCount?: number }): void {
+  window.dispatchEvent(new CustomEvent("amcco-alerts-changed", { detail: change }));
 }
 
 function entityTypeLabel(entityType: string | null): string {
@@ -94,6 +94,10 @@ export function AlertsPage(): JSX.Element {
   const [items, setItems] = useState<AlertItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedAlertsRef = useRef(false);
+  const hasStartedAlertsLoadRef = useRef(false);
+  const alertsLoadRequestRef = useRef(0);
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [busyAlertId, setBusyAlertId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [isDeletingSelection, setIsDeletingSelection] = useState(false);
@@ -134,13 +138,25 @@ export function AlertsPage(): JSX.Element {
     }));
   }, [isReadOnlyOwner, searchParams, setFilters]);
 
-  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean; silent?: boolean }) => {
+    const requestId = ++alertsLoadRequestRef.current;
     const offset = options?.offset ?? 0;
     const append = options?.append === true;
+    const silent = options?.silent === true;
+    if (!activeCompany?.id) {
+      setItems([]);
+      setUnreadCount(0);
+      setHasMoreItems(false);
+      setIsLoadingMore(false);
+      setIsLoading(false);
+      return;
+    }
+    hasStartedAlertsLoadRef.current = true;
     if (append) {
       setIsLoadingMore(true);
     } else {
-      setIsLoading(true);
+      setIsLoadingMore(false);
+      if (!silent && !hasLoadedAlertsRef.current) setIsLoading(true);
     }
     setErrorMessage(null);
 
@@ -156,6 +172,7 @@ export function AlertsPage(): JSX.Element {
               : undefined
         })
       );
+      if (requestId !== alertsLoadRequestRef.current) return;
 
       setItems((prev) => (append ? [...prev, ...response.items] : response.items));
       setHasMoreItems(response.items.length === ALERTS_PAGE_SIZE);
@@ -166,18 +183,36 @@ export function AlertsPage(): JSX.Element {
         );
       }
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === alertsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (append) {
-        setIsLoadingMore(false);
-      } else {
-        setIsLoading(false);
+      if (requestId === alertsLoadRequestRef.current) {
+        if (append) {
+          setIsLoadingMore(false);
+        } else if (!silent) {
+          hasLoadedAlertsRef.current = true;
+          setIsLoading(false);
+        }
       }
     }
-  }, [filters.entityType, filters.unreadOnly, isReadOnlyOwner, withAuthorizedToken]);
+  }, [activeCompany?.id, filters.entityType, filters.unreadOnly, isReadOnlyOwner, withAuthorizedToken]);
 
   useEffect(() => {
-    void loadData();
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    setItems([]);
+    setUnreadCount(0);
+    setHasMoreItems(false);
+    setSelectedAlertIds([]);
+    hasLoadedAlertsRef.current = false;
+    hasStartedAlertsLoadRef.current = false;
+    setIsLoading(true);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
+
+  useEffect(() => {
+    const delay = hasStartedAlertsLoadRef.current ? 250 : 0;
+    const timeoutId = window.setTimeout(() => void loadData(), delay);
+    return () => window.clearTimeout(timeoutId);
   }, [loadData]);
 
   async function handleRead(alertId: string): Promise<void> {
@@ -186,9 +221,19 @@ export function AlertsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => markAlertReadRequest(accessToken, alertId));
+      const wasUnread = items.some((item) => item.id === alertId && item.readAt === null);
+      setItems((prev) =>
+        filters.unreadOnly && wasUnread
+          ? prev.filter((item) => item.id !== alertId)
+          : prev.map((item) =>
+              item.id === alertId ? { ...item, readAt: new Date().toISOString() } : item
+            )
+      );
+      if (wasUnread) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
       setSuccessMessage("Alerte marquée comme lue.");
-      await loadData();
-      notifyAlertsChanged();
+      notifyAlertsChanged({ delta: wasUnread ? -1 : 0 });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -202,9 +247,13 @@ export function AlertsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => markAllAlertsReadRequest(accessToken));
+      const readAt = new Date().toISOString();
+      setItems((prev) =>
+        filters.unreadOnly ? [] : prev.map((item) => ({ ...item, readAt: item.readAt ?? readAt }))
+      );
+      setUnreadCount(0);
       setSuccessMessage("Toutes les alertes ont été marquées comme lues.");
-      await loadData();
-      notifyAlertsChanged();
+      notifyAlertsChanged({ unreadCount: 0 });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -218,10 +267,14 @@ export function AlertsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteAlertRequest(accessToken, alertId));
+      const deletedAlert = items.find((item) => item.id === alertId);
+      setItems((prev) => prev.filter((item) => item.id !== alertId));
+      if (deletedAlert?.readAt === null) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
       setSelectedAlertIds((prev) => prev.filter((item) => item !== alertId));
       setSuccessMessage("Alerte supprimée.");
-      await loadData();
-      notifyAlertsChanged();
+      notifyAlertsChanged({ delta: deletedAlert?.readAt === null ? -1 : 0 });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -238,13 +291,18 @@ export function AlertsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
+      const selectedAlerts = items.filter((item) => selectedAlertIds.includes(item.id));
       await withAuthorizedToken((accessToken) =>
         deleteManyAlertsRequest(accessToken, selectedAlertIds)
       );
+      setItems((prev) => prev.filter((item) => !selectedAlertIds.includes(item.id)));
+      const deletedUnreadCount = selectedAlerts.filter((item) => item.readAt === null).length;
+      if (deletedUnreadCount > 0) {
+        setUnreadCount((prev) => Math.max(0, prev - deletedUnreadCount));
+      }
       setSelectedAlertIds([]);
       setSuccessMessage("Alertes supprimées.");
-      await loadData();
-      notifyAlertsChanged();
+      notifyAlertsChanged({ delta: -deletedUnreadCount });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -263,7 +321,6 @@ export function AlertsPage(): JSX.Element {
       }
       return next;
     });
-    void loadData();
   }
 
   async function handleLoadMore(): Promise<void> {

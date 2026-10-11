@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import {
   ApiError,
@@ -6,6 +6,7 @@ import {
   getReportsOverviewRequest
 } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
+import { useAuth } from "../context/AuthContext";
 import { formatAmountForDisplay } from "../lib/amountFormatting";
 import {
   getBusinessActivityLabel,
@@ -514,8 +515,9 @@ function summarizePeriodForm(form: PeriodFormState): string {
 }
 
 export function ReportsPage(): JSX.Element {
+  const { activeCompany } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
-  const { enabledActivities, selectedActivity, selectedActivityCode } = useBusinessActivity();
+  const { enabledActivities, isLoading: isLoadingActivities, selectedActivity, selectedActivityCode } = useBusinessActivity();
   const [overview, setOverview] = useState<ReportsOverview | null>(null);
   const [periodForm, setPeriodForm] = useState<PeriodFormState>(() =>
     createDefaultPeriodForm(selectedActivityCode ?? "")
@@ -524,6 +526,10 @@ export function ReportsPage(): JSX.Element {
     createDefaultPeriodForm(selectedActivityCode ?? "")
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasLoadedOverviewRef = useRef(false);
+  const overviewLoadRequestRef = useRef(0);
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [isReportFiltersExpanded, setIsReportFiltersExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
@@ -534,26 +540,52 @@ export function ReportsPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    hasLoadedOverviewRef.current = false;
+    setOverview(null);
+    setIsLoading(true);
+    setIsRefreshing(false);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
+
   const loadData = useCallback(async () => {
+    const requestId = ++overviewLoadRequestRef.current;
+    if (isLoadingActivities) {
+      setIsRefreshing(false);
+      return;
+    }
     if (!appliedPeriod.activityCode) {
+      hasLoadedOverviewRef.current = false;
       setOverview(null);
       setIsLoading(false);
+      setIsRefreshing(false);
       return;
     }
 
-    setIsLoading(true);
+    if (hasLoadedOverviewRef.current) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         getReportsOverviewRequest(accessToken, normalizePeriodQuery(appliedPeriod))
       );
+      if (requestId !== overviewLoadRequestRef.current) return;
+      hasLoadedOverviewRef.current = true;
       setOverview(response.item);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === overviewLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (requestId === overviewLoadRequestRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [appliedPeriod, withAuthorizedToken]);
+  }, [activeCompany?.id, appliedPeriod, isLoadingActivities, withAuthorizedToken]);
 
   useEffect(() => {
     void loadData();
@@ -643,7 +675,6 @@ export function ReportsPage(): JSX.Element {
     }
 
     const exportPeriod = periodForm;
-    setAppliedPeriod(exportPeriod);
     setBusyExport("overview-pdf");
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -847,7 +878,7 @@ export function ReportsPage(): JSX.Element {
       <FeedbackBanner
         errorMessage={errorMessage}
         successMessage={successMessage}
-        isLoading={isLoading}
+        isLoading={isLoading || isRefreshing}
       />
 
       {!isLoading && overview && reportMetrics ? (

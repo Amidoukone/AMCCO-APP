@@ -264,7 +264,7 @@ export function HomePage(): JSX.Element {
               className={`home-sector-card sector-${sector.key}`}
             >
               <div className="home-sector-image">
-                <img src={sector.image} alt={sector.imageAlt} />
+                <img src={sector.image} alt={sector.imageAlt} loading="lazy" decoding="async" />
                 <span>{sector.code}</span>
               </div>
               <div className="home-sector-content">

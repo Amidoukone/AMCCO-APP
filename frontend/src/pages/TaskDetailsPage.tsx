@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { useAuth } from "../context/AuthContext";
@@ -176,7 +176,7 @@ type TimelineEntry =
 export function TaskDetailsPage(): JSX.Element {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const { profiles, setSelectedActivityCode } = useBusinessActivity();
   const [task, setTask] = useState<OperationTask | null>(null);
@@ -185,8 +185,13 @@ export function TaskDetailsPage(): JSX.Element {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const loadRequestRef = useRef(0);
+  const timelineLoadRequestRef = useRef(0);
+  const loadedHistoryTaskRef = useRef<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingMoreTimeline, setIsLoadingMoreTimeline] = useState(false);
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [isCompactScreen] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
   );
@@ -199,6 +204,8 @@ export function TaskDetailsPage(): JSX.Element {
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
+  const isTimelineExpandedRef = useRef(isTimelineExpanded);
+  isTimelineExpandedRef.current = isTimelineExpanded;
   const [hasMoreTimeline, setHasMoreTimeline] = useState(false);
   const [hasMoreComments, setHasMoreComments] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -214,86 +221,202 @@ export function TaskDetailsPage(): JSX.Element {
   const isReadOnlyOwner = user?.role === "OWNER";
   const loadData = useCallback(async (options?: {
     append?: boolean;
+    silent?: boolean;
     timelineOffset?: number;
     commentsOffset?: number;
   }) => {
+    const requestId = ++loadRequestRef.current;
+    const timelineRequestId = ++timelineLoadRequestRef.current;
     const append = options?.append === true;
+    const silent = options?.silent === true;
+    const includeHistory = append || isTimelineExpandedRef.current;
+    if (!append && loadedHistoryTaskRef.current !== taskId) {
+      loadedHistoryTaskRef.current = null;
+      setTimeline([]);
+      setComments([]);
+      setHasMoreTimeline(false);
+      setHasMoreComments(false);
+      setIsLoadingHistory(false);
+    }
     if (!taskId) {
       return;
     }
     if (append) {
       setIsLoadingMoreTimeline(true);
     } else {
-      setIsLoading(true);
+      setIsLoadingMoreTimeline(false);
+      if (!silent) setIsLoading(true);
     }
     setErrorMessage(null);
     try {
       const data = await withAuthorizedToken(async (accessToken) => {
-        const [taskResponse, timelineResponse, commentsResponse, attachmentsResponse] = await Promise.all([
-          getOperationsTaskRequest(accessToken, taskId),
-          listOperationsTaskTimelineRequest(accessToken, taskId, {
-            limit: TASK_DETAIL_PAGE_SIZE,
-            offset: options?.timelineOffset ?? 0
-          }),
-          listTaskCommentsRequest(accessToken, taskId, {
-            limit: TASK_DETAIL_PAGE_SIZE,
-            offset: options?.commentsOffset ?? 0
-          }),
-          append ? Promise.resolve({ items: [] as TaskAttachment[] }) : listTaskAttachmentsRequest(accessToken, taskId)
-        ]);
-        const membersResponse =
-          !append && canManageTasks
-            ? await listOperationsMembersRequest(accessToken, {
+        const taskResponsePromise = append
+          ? Promise.resolve(null)
+          : getOperationsTaskRequest(accessToken, taskId);
+        const timelineResponsePromise = includeHistory
+          ? listOperationsTaskTimelineRequest(accessToken, taskId, {
+              limit: TASK_DETAIL_PAGE_SIZE,
+              offset: options?.timelineOffset ?? 0
+            })
+          : Promise.resolve({ items: [] as OperationTaskTimelineEvent[] });
+        const commentsResponsePromise = includeHistory
+          ? listTaskCommentsRequest(accessToken, taskId, {
+              limit: TASK_DETAIL_PAGE_SIZE,
+              offset: options?.commentsOffset ?? 0
+            })
+          : Promise.resolve({ items: [] as TaskComment[] });
+        const attachmentsResponsePromise = append
+          ? Promise.resolve({ items: [] as TaskAttachment[] })
+          : listTaskAttachmentsRequest(accessToken, taskId);
+        const taskResponse = await taskResponsePromise;
+        const membersResponsePromise =
+          taskResponse && canManageTasks
+            ? listOperationsMembersRequest(accessToken, {
                 activityCode: taskResponse.item.activityCode ?? undefined
               })
-            : { items: [] };
+            : Promise.resolve({ items: [] });
+        const [timelineResponse, commentsResponse, attachmentsResponse, membersResponse] =
+          await Promise.all([
+            timelineResponsePromise,
+            commentsResponsePromise,
+            attachmentsResponsePromise,
+            membersResponsePromise
+          ]);
         return {
-          task: taskResponse.item,
+          task: taskResponse?.item ?? null,
           timeline: timelineResponse.items,
           comments: commentsResponse.items,
           attachments: attachmentsResponse.items,
           members: membersResponse.items
         };
       });
-      setTask(data.task);
-      setHasMoreTimeline(data.timeline.length === TASK_DETAIL_PAGE_SIZE);
-      setHasMoreComments(data.comments.length === TASK_DETAIL_PAGE_SIZE);
-      setTimeline((prev) => {
-        if (!append) {
-          return data.timeline;
+      if (requestId !== loadRequestRef.current) return;
+      if (data.task) {
+        setTask(data.task);
+        setAssignment(data.task.assignedToId ?? "");
+        if (!append && data.task.activityCode) {
+          setSelectedActivityCode(data.task.activityCode);
         }
-        const seen = new Set(prev.map((item) => item.id));
-        return [...prev, ...data.timeline.filter((item) => !seen.has(item.id))];
-      });
-      setComments((prev) => {
-        if (!append) {
-          return data.comments;
-        }
-        const seen = new Set(prev.map((item) => item.id));
-        return [...prev, ...data.comments.filter((item) => !seen.has(item.id))];
-      });
+      }
+      if (includeHistory) {
+        loadedHistoryTaskRef.current = taskId;
+        setHasMoreComments(data.comments.length === TASK_DETAIL_PAGE_SIZE);
+      }
+      if (includeHistory && timelineRequestId === timelineLoadRequestRef.current) {
+        setHasMoreTimeline(data.timeline.length === TASK_DETAIL_PAGE_SIZE);
+        setTimeline((prev) => {
+          if (!append) {
+            return data.timeline;
+          }
+          const seen = new Set(prev.map((item) => item.id));
+          return [...prev, ...data.timeline.filter((item) => !seen.has(item.id))];
+        });
+      }
+      if (includeHistory) {
+        setComments((prev) => {
+          if (!append) {
+            return data.comments;
+          }
+          const seen = new Set(prev.map((item) => item.id));
+          return [...prev, ...data.comments.filter((item) => !seen.has(item.id))];
+        });
+      }
       if (!append) {
         setMembers(data.members);
         setAttachments(data.attachments);
       }
-      setAssignment(data.task.assignedToId ?? "");
-      if (!append && data.task.activityCode) {
-        setSelectedActivityCode(data.task.activityCode);
-      }
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === loadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (append) {
-        setIsLoadingMoreTimeline(false);
-      } else {
-        setIsLoading(false);
+      if (requestId === loadRequestRef.current) {
+        if (append) {
+          setIsLoadingMoreTimeline(false);
+        } else if (!silent) {
+          setIsLoading(false);
+        }
       }
     }
-  }, [canManageTasks, setSelectedActivityCode, taskId, withAuthorizedToken]);
+  }, [activeCompany?.id, canManageTasks, setSelectedActivityCode, taskId, withAuthorizedToken]);
+
+  const loadHistory = useCallback(async () => {
+    if (!taskId || loadedHistoryTaskRef.current === taskId) return;
+    const requestId = ++timelineLoadRequestRef.current;
+    setIsLoadingHistory(true);
+    try {
+      const [timelineResponse, commentsResponse] = await withAuthorizedToken(async (accessToken) =>
+        Promise.all([
+          listOperationsTaskTimelineRequest(accessToken, taskId, {
+            limit: TASK_DETAIL_PAGE_SIZE,
+            offset: 0
+          }),
+          listTaskCommentsRequest(accessToken, taskId, {
+            limit: TASK_DETAIL_PAGE_SIZE,
+            offset: 0
+          })
+        ])
+      );
+      if (requestId !== timelineLoadRequestRef.current) return;
+      loadedHistoryTaskRef.current = taskId;
+      setTimeline(timelineResponse.items);
+      setHasMoreTimeline(timelineResponse.items.length === TASK_DETAIL_PAGE_SIZE);
+      setComments(commentsResponse.items);
+      setHasMoreComments(commentsResponse.items.length === TASK_DETAIL_PAGE_SIZE);
+    } catch (error) {
+      if (requestId === timelineLoadRequestRef.current) {
+        setErrorMessage(toErrorMessage(error));
+      }
+    } finally {
+      if (requestId === timelineLoadRequestRef.current) setIsLoadingHistory(false);
+    }
+  }, [taskId, withAuthorizedToken]);
+
+  const refreshTimeline = useCallback(async () => {
+    if (!taskId || !isTimelineExpandedRef.current) return;
+    const requestId = ++timelineLoadRequestRef.current;
+    try {
+      const response = await withAuthorizedToken((accessToken) =>
+        listOperationsTaskTimelineRequest(accessToken, taskId, {
+          limit: TASK_DETAIL_PAGE_SIZE,
+          offset: 0
+        })
+      );
+      if (requestId !== timelineLoadRequestRef.current) return;
+      setTimeline(response.items);
+      setHasMoreTimeline(response.items.length === TASK_DETAIL_PAGE_SIZE);
+    } catch (error) {
+      if (requestId === timelineLoadRequestRef.current) {
+        setErrorMessage(toErrorMessage(error));
+      }
+    }
+  }, [taskId, withAuthorizedToken]);
+
+  useEffect(() => {
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    loadRequestRef.current += 1;
+    timelineLoadRequestRef.current += 1;
+    setTask(null);
+    setTimeline([]);
+    setComments([]);
+    setAttachments([]);
+    setMembers([]);
+    setHasMoreTimeline(false);
+    setHasMoreComments(false);
+    loadedHistoryTaskRef.current = null;
+    setIsLoadingHistory(false);
+    setIsLoading(true);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!isLoading && task?.id === taskId && isTimelineExpanded) {
+      void loadHistory();
+    }
+  }, [isLoading, isTimelineExpanded, loadHistory, task]);
 
   async function handleLoadMoreTimeline(): Promise<void> {
     if (isLoading || isLoadingMoreTimeline || (!hasMoreTimeline && !hasMoreComments)) {
@@ -319,12 +442,14 @@ export function TaskDetailsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         assignOperationsTaskRequest(accessToken, taskId, nextAssignedToId, assignmentNote.trim() || undefined)
       );
+      setTask(response.item);
+      setAssignment(response.item.assignedToId ?? "");
       setAssignmentNote("");
       setSuccessMessage("Assignation mise à jour.");
-      await loadData();
+      void refreshTimeline();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -343,9 +468,12 @@ export function TaskDetailsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await withAuthorizedToken((accessToken) => updateOperationsTaskStatusRequest(accessToken, taskId, status));
+      const response = await withAuthorizedToken((accessToken) =>
+        updateOperationsTaskStatusRequest(accessToken, taskId, status)
+      );
+      setTask(response.item);
       setSuccessMessage("Statut mis à jour.");
-      await loadData();
+      void refreshTimeline();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -365,10 +493,13 @@ export function TaskDetailsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await withAuthorizedToken((accessToken) => addTaskCommentRequest(accessToken, taskId, body));
+      const response = await withAuthorizedToken((accessToken) =>
+        addTaskCommentRequest(accessToken, taskId, body)
+      );
+      setComments((prev) => [response.item, ...prev.filter((item) => item.id !== response.item.id)]);
       setNewComment("");
       setSuccessMessage("Commentaire ajoute.");
-      await loadData();
+      void refreshTimeline();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -445,7 +576,7 @@ export function TaskDetailsPage(): JSX.Element {
       if (isCompactScreen) {
         setIsAttachmentUploadExpanded(false);
       }
-      await loadData();
+      void refreshTimeline();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -766,7 +897,8 @@ export function TaskDetailsPage(): JSX.Element {
           >
           <summary>{canManageTasks ? "Historique et commentaires" : "Historique"}</summary>
           <div className="task-timeline-content">
-          {timelineEntries.length === 0 ? <p>Aucun événement pour le moment.</p> : null}
+          {isLoadingHistory ? <p role="status">Chargement de l’historique…</p> : null}
+          {!isLoadingHistory && timelineEntries.length === 0 ? <p>Aucun événement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (
             <>
               <ol className="task-timeline">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   listAdminCompanyActivitiesRequest,
@@ -23,9 +23,10 @@ function toErrorMessage(error: unknown): string {
 export function AdminActivitiesPage(): JSX.Element {
   const { user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
-  const { reloadActivities } = useBusinessActivity();
+  const { applyActivityUpdate } = useBusinessActivity();
   const [items, setItems] = useState<CompanyActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const loadRequestRef = useRef(0);
   const [busyActivityCode, setBusyActivityCode] = useState<BusinessActivityCode | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -40,17 +41,19 @@ export function AdminActivitiesPage(): JSX.Element {
   const disabledActivitiesCount = items.length - enabledActivitiesCount;
 
   const loadData = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
     setIsLoading(true);
     setErrorMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listAdminCompanyActivitiesRequest(accessToken)
       );
+      if (requestId !== loadRequestRef.current) return;
       setItems(response.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === loadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (requestId === loadRequestRef.current) setIsLoading(false);
     }
   }, [withAuthorizedToken]);
 
@@ -73,13 +76,12 @@ export function AdminActivitiesPage(): JSX.Element {
       setItems((prev) =>
         prev.map((row) => (row.code === response.item.code ? response.item : row))
       );
+      applyActivityUpdate(response.item);
       setSuccessMessage(
         response.item.isEnabled
           ? `Secteur ${response.item.label} activé.`
           : `Secteur ${response.item.label} désactivé.`
       );
-      await loadData();
-      await reloadActivities();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {

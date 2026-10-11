@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -26,6 +27,7 @@ type BusinessActivityContextValue = {
   isLoading: boolean;
   errorMessage: string | null;
   setSelectedActivityCode: (activityCode: BusinessActivityCode | null) => void;
+  applyActivityUpdate: (activity: CompanyActivityItem) => void;
   reloadActivities: () => Promise<void>;
 };
 
@@ -60,12 +62,14 @@ function toErrorMessage(error: unknown): string {
 
 export function BusinessActivityProvider({ children }: { children: ReactNode }): JSX.Element {
   const { activeCompany, user } = useAuth();
+  const activeCompanyId = activeCompany?.id;
   const [activities, setActivities] = useState<CompanyActivityItem[]>([]);
   const [profiles, setProfiles] = useState<BusinessActivityProfile[]>([]);
   const [selectedActivityCode, setSelectedActivityCodeState] =
     useState<BusinessActivityCode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const activitiesRequestRef = useRef(0);
   const withAuthorizedToken = useAuthorizedRequest();
 
   const syncSelectedActivity = useCallback(
@@ -93,7 +97,8 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   );
 
   const reloadActivities = useCallback(async () => {
-    if (!user || !activeCompany) {
+    const requestId = ++activitiesRequestRef.current;
+    if (!user || !activeCompanyId) {
       setActivities([]);
       setProfiles([]);
       setSelectedActivityCodeState(null);
@@ -109,18 +114,20 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       const response = await withAuthorizedToken((accessToken) =>
         listCompanyActivitiesRequest(accessToken)
       );
+      if (requestId !== activitiesRequestRef.current) return;
       setActivities(response.items);
       setProfiles(response.profiles);
       syncSelectedActivity(response.items);
     } catch (error) {
+      if (requestId !== activitiesRequestRef.current) return;
       setActivities([]);
       setProfiles([]);
       setSelectedActivityCodeState(null);
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (requestId === activitiesRequestRef.current) setIsLoading(false);
     }
-  }, [activeCompany, syncSelectedActivity, user, withAuthorizedToken]);
+  }, [activeCompanyId, syncSelectedActivity, user, withAuthorizedToken]);
 
   useEffect(() => {
     void reloadActivities();
@@ -134,6 +141,26 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       }
     },
     [activeCompany?.id]
+  );
+
+  const applyActivityUpdate = useCallback(
+    (updatedActivity: CompanyActivityItem) => {
+      const nextActivities = activities.some((item) => item.code === updatedActivity.code)
+        ? activities.map((item) =>
+            item.code === updatedActivity.code ? updatedActivity : item
+          )
+        : [...activities, updatedActivity];
+      setActivities(nextActivities);
+
+      if (!updatedActivity.isEnabled && selectedActivityCode === updatedActivity.code) {
+        const nextSelectedCode = nextActivities.find((item) => item.isEnabled)?.code ?? null;
+        setSelectedActivityCodeState(nextSelectedCode);
+        if (activeCompanyId) {
+          persistActivityCode(activeCompanyId, nextSelectedCode);
+        }
+      }
+    },
+    [activeCompanyId, activities, selectedActivityCode]
   );
 
   const selectedActivity = useMemo(
@@ -162,10 +189,12 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       isLoading,
       errorMessage,
       setSelectedActivityCode,
+      applyActivityUpdate,
       reloadActivities
     }),
     [
       activities,
+      applyActivityUpdate,
       enabledActivities,
       errorMessage,
       isLoading,

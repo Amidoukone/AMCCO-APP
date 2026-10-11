@@ -90,6 +90,9 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+let inFlightGetEpoch = 0;
+
 export class ApiError extends Error {
   statusCode: number;
 
@@ -113,21 +116,49 @@ async function parseErrorMessage(response: Response): Promise<string> {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-      ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {})
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, await parseErrorMessage(response));
+  const method = options.method ?? "GET";
+  if (method !== "GET") {
+    inFlightGetEpoch += 1;
+  }
+  const inFlightKey = method === "GET"
+    ? `${inFlightGetEpoch}:${options.accessToken ?? ""}:${path}`
+    : null;
+  if (inFlightKey) {
+    const existingRequest = inFlightGetRequests.get(inFlightKey);
+    if (existingRequest) {
+      return existingRequest as Promise<T>;
+    }
   }
 
-  return (await response.json()) as T;
+  const requestPromise = (async (): Promise<T> => {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: {
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers ?? {}),
+        ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : {})
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+    });
+
+    if (!response.ok) {
+      throw new ApiError(response.status, await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as T;
+  })();
+
+  if (inFlightKey) {
+    inFlightGetRequests.set(inFlightKey, requestPromise);
+  }
+
+  try {
+    return await requestPromise;
+  } finally {
+    if (inFlightKey && inFlightGetRequests.get(inFlightKey) === requestPromise) {
+      inFlightGetRequests.delete(inFlightKey);
+    }
+  }
 }
 
 async function download(path: string, accessToken: string): Promise<Blob> {

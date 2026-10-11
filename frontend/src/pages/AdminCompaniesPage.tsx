@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   ApiError,
@@ -87,12 +87,13 @@ function createFormStateFromCompany(item: AdminCompanyItem): CreateCompanyInput 
 export function AdminCompaniesPage(): JSX.Element {
   const {
     activeCompany,
-    reloadProfile,
+    applyCompanyUpdate,
     switchCompany,
     user
   } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const [items, setItems] = useState<AdminCompanyItem[]>([]);
+  const companiesLoadRequestRef = useRef(0);
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -124,6 +125,7 @@ export function AdminCompaniesPage(): JSX.Element {
   const inactiveCompaniesCount = items.length - activeCompaniesCount;
 
   const loadCompanies = useCallback(async () => {
+    const requestId = ++companiesLoadRequestRef.current;
     if (!canViewCompanies) {
       setIsLoading(false);
       return;
@@ -135,11 +137,14 @@ export function AdminCompaniesPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         listAdminCompaniesRequest(accessToken)
       );
+      if (requestId !== companiesLoadRequestRef.current) return;
       setItems(response.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === companiesLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (requestId === companiesLoadRequestRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [canViewCompanies, withAuthorizedToken]);
 
@@ -197,22 +202,28 @@ export function AdminCompaniesPage(): JSX.Element {
         const response = await withAuthorizedToken((accessToken) =>
           updateAdminCompanyRequest(accessToken, editingCompanyId, payload as UpdateCompanyInput)
         );
+        setItems((prev) =>
+          prev.map((item) =>
+            item.company.id === response.item.company.id ? response.item : item
+          )
+        );
+        applyCompanyUpdate(response.item.company, response.item.role);
         setSuccessMessage(`Entreprise ${displayText(response.item.company.name, "")} modifiée.`);
-        await reloadProfile();
       } else {
         const response = await withAuthorizedToken((accessToken) =>
           createAdminCompanyRequest(accessToken, payload as CreateCompanyInput)
         );
+        setItems((prev) => [response.item, ...prev]);
         if (!activeCompany) {
           await switchCompany(response.item.company.id);
           setSuccessMessage(
             `Entreprise ${displayText(response.item.company.name, "")} créée et activée. L'application est maintenant initialisée.`
           );
         } else {
+          applyCompanyUpdate(response.item.company, response.item.role);
           setSuccessMessage(
             `Entreprise ${displayText(response.item.company.name, "")} créée. Elle est maintenant disponible dans votre liste.`
           );
-          await reloadProfile();
         }
       }
 
@@ -220,7 +231,6 @@ export function AdminCompaniesPage(): JSX.Element {
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsCompanyFormExpanded(false);
       }
-      await loadCompanies();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -279,8 +289,8 @@ export function AdminCompaniesPage(): JSX.Element {
       }
       setSuccessMessage(`Entreprise ${displayText(item.company.name, "")} désactivée.`);
       setCompanyPendingDelete(null);
-      await reloadProfile();
-      await loadCompanies();
+      setItems((prev) => prev.filter((company) => company.company.id !== item.company.id));
+      applyCompanyUpdate({ ...item.company, isActive: false }, item.role);
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -155,11 +155,19 @@ export function FinanceSalariesPage(): JSX.Element {
   const [isCompactScreen] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
   );
+  const [isSalaryFiltersExpanded, setIsSalaryFiltersExpanded] = useState(!isCompactScreen);
   const [isSavingSalary, setIsSavingSalary] = useState(false);
   const [isSalaryFormExpanded, setIsSalaryFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedSalariesRef = useRef(false);
+  const salariesLoadRequestRef = useRef(0);
+  const salaryAccountsLoadRequestRef = useRef(0);
+  const salaryMembersLoadRequestRef = useRef(0);
+  const loadedSalaryAccountsCompanyRef = useRef<string | null>(null);
+  const loadedSalaryMembersCompanyRef = useRef<string | null>(null);
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
   const [busySalaryExport, setBusySalaryExport] = useState<"csv" | "xlsx" | null>(null);
   const [isLoadingMoreSalaries, setIsLoadingMoreSalaries] = useState(false);
@@ -221,6 +229,57 @@ export function FinanceSalariesPage(): JSX.Element {
 
   const canAccessAudit = user?.role === "OWNER" || user?.role === "SYS_ADMIN";
   const requestedTransactionId = searchParams.get("transactionId");
+  const requestedTransactionIdRef = useRef(requestedTransactionId);
+
+  const loadSalaryAccounts = useCallback(async () => {
+    if (!canManageSalaries || !isSalaryFormExpanded) return;
+    const companyId = activeCompany?.id ?? "";
+    if (loadedSalaryAccountsCompanyRef.current === companyId) return;
+    const requestId = ++salaryAccountsLoadRequestRef.current;
+    try {
+      const response = await withAuthorizedToken((accessToken) =>
+        listFinanceAccountsRequest(accessToken)
+      );
+      if (requestId !== salaryAccountsLoadRequestRef.current) return;
+      loadedSalaryAccountsCompanyRef.current = companyId;
+      setSalaryAccounts(response.items);
+      setSalaryForm((previous) => ({
+        ...previous,
+        accountId: response.items.some((account) => account.id === previous.accountId)
+          ? previous.accountId
+          : (response.items[0]?.id ?? "")
+      }));
+    } catch (error) {
+      if (requestId === salaryAccountsLoadRequestRef.current) {
+        setErrorMessage(toErrorMessage(error));
+      }
+    }
+  }, [activeCompany?.id, canManageSalaries, isSalaryFormExpanded, withAuthorizedToken]);
+
+  const loadSalaryMembers = useCallback(async () => {
+    if (!canManageSalaries || (!isSalaryFiltersExpanded && !isSalaryFormExpanded)) return;
+    const companyId = activeCompany?.id ?? "";
+    if (loadedSalaryMembersCompanyRef.current === companyId) return;
+    const requestId = ++salaryMembersLoadRequestRef.current;
+    try {
+      const response = await withAuthorizedToken((accessToken) =>
+        listFinanceSalaryMembersRequest(accessToken)
+      );
+      if (requestId !== salaryMembersLoadRequestRef.current) return;
+      loadedSalaryMembersCompanyRef.current = companyId;
+      setSalaryMembers(response.items);
+      setSalaryForm((previous) => ({
+        ...previous,
+        employeeUserId: response.items.some((member) => member.userId === previous.employeeUserId)
+          ? previous.employeeUserId
+          : (response.items[0]?.userId ?? "")
+      }));
+    } catch (error) {
+      if (requestId === salaryMembersLoadRequestRef.current) {
+        setErrorMessage(toErrorMessage(error));
+      }
+    }
+  }, [activeCompany?.id, canManageSalaries, isSalaryFiltersExpanded, isSalaryFormExpanded, withAuthorizedToken]);
 
   const selectedSalary = useMemo(
     () => salaryItems.find((item) => item.id === selectedSalaryId) ?? null,
@@ -348,6 +407,7 @@ export function FinanceSalariesPage(): JSX.Element {
   }, [setSearchParams]);
 
   useEffect(() => {
+    requestedTransactionIdRef.current = requestedTransactionId;
     if (!requestedTransactionId) {
       setSelectedSalaryId(null);
       return;
@@ -366,13 +426,16 @@ export function FinanceSalariesPage(): JSX.Element {
     );
   }, [totalVisibleSalaryPages]);
 
-  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean; silent?: boolean }) => {
+    const requestId = ++salariesLoadRequestRef.current;
     const offset = options?.offset ?? 0;
     const append = options?.append === true;
+    const silent = options?.silent === true;
     if (append) {
       setIsLoadingMoreSalaries(true);
     } else {
-      setIsLoading(true);
+      setIsLoadingMoreSalaries(false);
+      if (!silent && !hasLoadedSalariesRef.current) setIsLoading(true);
     }
     setErrorMessage(null);
     try {
@@ -388,35 +451,27 @@ export function FinanceSalariesPage(): JSX.Element {
         if (!canManageSalaries) {
           const salariesResp = await salariesPromise;
           return {
-            salaryAccounts: [] as FinancialAccount[],
-            salaryMembers: [] as SalaryMember[],
             salarySummary: null as SalarySummary | null,
             salaryItems: salariesResp.items
           };
         }
 
-        const [salaryAccountsResp, salaryMembersResp, salarySummaryResp, salariesResp] =
-          await Promise.all([
-            listFinanceAccountsRequest(accessToken),
-            listFinanceSalaryMembersRequest(accessToken),
-            getFinanceSalarySummaryRequest(accessToken, {
-              payPeriod: salaryFilters.payPeriod,
-              employeeUserId: salaryFilters.employeeUserId || undefined
-            }),
-            salariesPromise
-          ]);
+        const [salarySummaryResp, salariesResp] = await Promise.all([
+          getFinanceSalarySummaryRequest(accessToken, {
+            payPeriod: salaryFilters.payPeriod,
+            employeeUserId: salaryFilters.employeeUserId || undefined
+          }),
+          salariesPromise
+        ]);
 
         return {
-          salaryAccounts: salaryAccountsResp.items,
-          salaryMembers: salaryMembersResp.items,
           salarySummary: salarySummaryResp.item,
           salaryItems: salariesResp.items
         };
       });
+      if (requestId !== salariesLoadRequestRef.current) return;
 
       setHasMoreSalaries(payload.salaryItems.length === SALARIES_PAGE_SIZE);
-      setSalaryAccounts(payload.salaryAccounts);
-      setSalaryMembers(payload.salaryMembers);
       setSalarySummary(payload.salarySummary);
       setSalaryItems((prev) => {
         if (!append) {
@@ -428,9 +483,10 @@ export function FinanceSalariesPage(): JSX.Element {
       if (!append) {
         setEditingSalaryId((prev) => (prev && payload.salaryItems.some((item) => item.id === prev) ? prev : null));
         setSelectedSalaryId((prev) => {
-          if (requestedTransactionId) {
-            return payload.salaryItems.some((item) => item.id === requestedTransactionId)
-              ? requestedTransactionId
+          const requestedId = requestedTransactionIdRef.current;
+          if (requestedId) {
+            return payload.salaryItems.some((item) => item.id === requestedId)
+              ? requestedId
               : null;
           }
           return payload.salaryItems.some((item) => item.id === prev)
@@ -448,33 +504,52 @@ export function FinanceSalariesPage(): JSX.Element {
           Object.fromEntries(Object.entries(prev).filter(([transactionId]) => salaryIds.has(transactionId)))
         );
       }
-      setSalaryForm((prev) => ({
-        ...prev,
-        accountId:
-          payload.salaryAccounts.some((account) => account.id === prev.accountId)
-            ? prev.accountId
-            : (payload.salaryAccounts[0]?.id ?? ""),
-        employeeUserId:
-          payload.salaryMembers.some((member) => member.userId === prev.employeeUserId)
-            ? prev.employeeUserId
-            : (payload.salaryMembers[0]?.userId ?? "")
-      }));
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === salariesLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (append) {
-        setIsLoadingMoreSalaries(false);
-      } else {
-        setIsLoading(false);
+      if (requestId === salariesLoadRequestRef.current) {
+        if (append) {
+          setIsLoadingMoreSalaries(false);
+        } else if (!silent) {
+          hasLoadedSalariesRef.current = true;
+          setIsLoading(false);
+        }
       }
     }
   }, [
+    activeCompany?.id,
     canManageSalaries,
-    requestedTransactionId,
     salaryFilters.employeeUserId,
     salaryFilters.payPeriod,
     withAuthorizedToken
   ]);
+
+  useEffect(() => {
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    salaryAccountsLoadRequestRef.current += 1;
+    salaryMembersLoadRequestRef.current += 1;
+    loadedSalaryAccountsCompanyRef.current = null;
+    loadedSalaryMembersCompanyRef.current = null;
+    setSalaryAccounts([]);
+    setSalaryMembers([]);
+    setSalaryItems([]);
+    setSalarySummary(null);
+    setSelectedSalaryId(null);
+    setEditingSalaryId(null);
+    setProofsByTransaction({});
+    setOpenProofs({});
+    setIsLoading(true);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
+
+  useEffect(() => {
+    void loadSalaryAccounts();
+  }, [loadSalaryAccounts]);
+
+  useEffect(() => {
+    void loadSalaryMembers();
+  }, [loadSalaryMembers]);
 
   useEffect(() => {
     void loadData();
@@ -555,7 +630,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setIsSavingSalary(true);
 
     try {
-      const response = (await withAuthorizedToken(async (accessToken) => {
+      const response = await withAuthorizedToken(async (accessToken) => {
         const payload = {
           accountId: salaryForm.accountId,
           employeeUserId: salaryForm.employeeUserId,
@@ -575,9 +650,15 @@ export function FinanceSalariesPage(): JSX.Element {
             : createFinanceSalaryRequest(accessToken, payload)
         );
         return result;
-      })) as { item: { id: string } };
+      });
 
       handleOpenSalaryDetails(response.item.id);
+      setSalaryItems((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsSalaryFormExpanded(false);
       }
@@ -587,7 +668,9 @@ export function FinanceSalariesPage(): JSX.Element {
           : "Salaire enregistré."
       );
       resetSalaryForm();
-      await loadData();
+      loadedSalaryAccountsCompanyRef.current = null;
+      void loadSalaryAccounts();
+      void loadData({ silent: true });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -622,34 +705,8 @@ export function FinanceSalariesPage(): JSX.Element {
     setIsSalaryFormExpanded(false);
   }
 
-  async function handleDeleteSalary(item: SalaryTransaction): Promise<void> {
+  function handleDeleteSalary(item: SalaryTransaction): void {
     setSalaryPendingDelete(item);
-    return;
-
-    const confirmationMessage = "Confirmer la suppression de ce salaire ?";
-
-    if (false) {
-      return;
-    }
-
-    setBusyTransactionId(item.id);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) => deleteFinanceSalaryRequest(accessToken, item.id));
-      if (selectedSalaryId === item.id) {
-        handleCloseSalaryDetails();
-      }
-      if (editingSalaryId === item.id) {
-        resetSalaryForm();
-      }
-      setSuccessMessage("Salaire supprimé.");
-      await loadData();
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyTransactionId(null);
-    }
   }
 
   async function handleConfirmDeleteSalary(): Promise<void> {
@@ -671,7 +728,10 @@ export function FinanceSalariesPage(): JSX.Element {
       }
       setSuccessMessage("Salaire supprimé.");
       setSalaryPendingDelete(null);
-      await loadData();
+      setSalaryItems((prev) => prev.filter((salary) => salary.id !== item.id));
+      loadedSalaryAccountsCompanyRef.current = null;
+      void loadSalaryAccounts();
+      void loadData({ silent: true });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -782,7 +842,6 @@ export function FinanceSalariesPage(): JSX.Element {
         [transactionId]: proofResponse.items
       }));
       setOpenProofs((prev) => ({ ...prev, [transactionId]: true }));
-      await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -849,7 +908,11 @@ export function FinanceSalariesPage(): JSX.Element {
             onChange={(event) => setSearchQuery(event.target.value)}
           />
 
-          <details className="salary-filter-disclosure" open={!isCompactScreen}>
+          <details
+            className="salary-filter-disclosure"
+            open={isSalaryFiltersExpanded}
+            onToggle={(event) => setIsSalaryFiltersExpanded(event.currentTarget.open)}
+          >
             <summary>Période et membre</summary>
             <div className="salary-filter-disclosure-content">
               <input

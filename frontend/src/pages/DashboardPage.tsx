@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardHero } from "../components/dashboard/DashboardHero";
 import { DashboardPriorityPanels } from "../components/dashboard/DashboardPriorityPanels";
@@ -130,15 +130,38 @@ function getOperationalRowLabel(row: ReportOperationalMetric): string {
 
 export function DashboardPage(): JSX.Element {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { selectedActivity, selectedActivityCode } = useBusinessActivity();
+  const { activeCompany, user } = useAuth();
+  const { selectedActivity, selectedActivityCode, isLoading: isLoadingActivities } = useBusinessActivity();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasLoadedSummaryRef = useRef(false);
+  const summaryLoadRequestRef = useRef(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const withAuthorizedToken = useAuthorizedRequest();
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
+
+  useEffect(() => {
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    hasLoadedSummaryRef.current = false;
+    setSummary(null);
+    setIsLoading(true);
+    setIsRefreshing(false);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
+    const requestId = ++summaryLoadRequestRef.current;
+    if (isLoadingActivities) {
+      setIsRefreshing(false);
+      return;
+    }
+    if (hasLoadedSummaryRef.current) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
@@ -146,13 +169,18 @@ export function DashboardPage(): JSX.Element {
           activityCode: selectedActivityCode ?? undefined
         })
       );
+      if (requestId !== summaryLoadRequestRef.current) return;
+      hasLoadedSummaryRef.current = true;
       setSummary(response.item);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === summaryLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (requestId === summaryLoadRequestRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadData();
@@ -202,6 +230,7 @@ export function DashboardPage(): JSX.Element {
 
       {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
       {isLoading ? <p>Chargement en cours...</p> : null}
+      {isRefreshing ? <p className="dashboard-refresh-status" role="status">Mise à jour…</p> : null}
 
       {!isLoading && summary ? (
         <>

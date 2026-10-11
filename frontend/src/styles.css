@@ -144,6 +144,12 @@ a {
   color: #334e68;
 }
 
+.dashboard-refresh-status {
+  margin: 0 0 10px;
+  color: var(--theme-text-muted, #64748b);
+  font-size: 0.875rem;
+}
+
 .list-pagination {
   display: flex;
   align-items: center;

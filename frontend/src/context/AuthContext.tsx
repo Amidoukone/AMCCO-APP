@@ -32,6 +32,7 @@ type AuthState = {
   login: (input: LoginInput) => Promise<void>;
   refreshSession: () => Promise<string | null>;
   switchCompany: (companyId: string) => Promise<void>;
+  applyCompanyUpdate: (company: CompanyProfile, role: RoleCode) => void;
   reloadProfile: () => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -193,6 +194,32 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     [activeCompany, applyAuthenticatedState, resetAuth]
   );
 
+  const applyCompanyUpdate = useCallback((company: CompanyProfile, role: RoleCode) => {
+    setActiveCompany((current) => (current?.id === company.id ? company : current));
+    setUser((current) =>
+      current?.companyId === company.id
+        ? { ...current, companyCode: company.code }
+        : current
+    );
+    setMemberships((current) => {
+      const membership: CompanyMembershipSummary = {
+        companyId: company.id,
+        companyCode: company.code,
+        companyName: company.name,
+        role,
+        isActive: company.isActive
+      };
+      const exists = current.some((item) => item.companyId === company.id);
+      const next = exists
+        ? current.map((item) => (item.companyId === company.id ? membership : item))
+        : [...current, membership];
+      return next.sort((left, right) =>
+        left.companyName.localeCompare(right.companyName, "fr") ||
+        left.companyCode.localeCompare(right.companyCode, "fr")
+      );
+    });
+  }, []);
+
   const reloadProfile = useCallback(async (): Promise<void> => {
     const currentSession = sessionRef.current;
     if (!currentSession?.accessToken || !currentSession.refreshToken) {
@@ -287,11 +314,13 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       login,
       refreshSession,
       switchCompany,
+      applyCompanyUpdate,
       reloadProfile,
       logout
     }),
     [
       activeCompany,
+      applyCompanyUpdate,
       getSession,
       isInitializing,
       login,

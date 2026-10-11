@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   ApiError,
   changeAdminUserRoleRequest,
@@ -44,6 +44,8 @@ export function AdminUsersPage(): JSX.Element {
   const [items, setItems] = useState<AdminUserItem[]>([]);
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const usersLoadRequestRef = useRef(0);
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -114,18 +116,31 @@ export function AdminUsersPage(): JSX.Element {
   }, []);
 
   const loadUsers = useCallback(async () => {
+    const requestId = ++usersLoadRequestRef.current;
     setIsLoading(true);
     setErrorMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) => listAdminUsersRequest(accessToken));
+      if (requestId !== usersLoadRequestRef.current) return;
       setItems(response.items);
       setDraftsFromItems(response.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === usersLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      if (requestId === usersLoadRequestRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [setDraftsFromItems, withAuthorizedToken]);
+  }, [activeCompany?.id, setDraftsFromItems, withAuthorizedToken]);
+
+  useEffect(() => {
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    setItems([]);
+    setDrafts({});
+    setIsLoading(true);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
 
   useEffect(() => {
     if (!canViewUsers) {
@@ -142,7 +157,7 @@ export function AdminUsersPage(): JSX.Element {
     setIsSubmittingCreate(true);
 
     try {
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         createAdminUserRequest(accessToken, {
           fullName: createForm.fullName.trim(),
           email: createForm.email.trim().toLowerCase(),
@@ -150,6 +165,20 @@ export function AdminUsersPage(): JSX.Element {
           role: createForm.role
         })
       );
+
+      setItems((prev) => [
+        response.item,
+        ...prev.filter((item) => item.userId !== response.item.userId)
+      ]);
+      setDrafts((prev) => ({
+        ...prev,
+        [response.item.userId]: {
+          fullName: response.item.fullName,
+          isActive: response.item.isActive,
+          role: response.item.role,
+          newPassword: ""
+        }
+      }));
 
       setCreateForm({
         fullName: "",
@@ -161,7 +190,6 @@ export function AdminUsersPage(): JSX.Element {
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsCreateFormExpanded(false);
       }
-      await loadUsers();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -180,21 +208,31 @@ export function AdminUsersPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await withAuthorizedToken((accessToken) =>
+      let response = await withAuthorizedToken((accessToken) =>
         updateAdminUserRequest(accessToken, userId, {
           fullName: draft.fullName.trim(),
           isActive: draft.isActive
         })
       );
       if (currentUser && currentUser.role !== draft.role) {
-        await withAuthorizedToken((accessToken) =>
+        response = await withAuthorizedToken((accessToken) =>
           changeAdminUserRoleRequest(accessToken, userId, {
             role: draft.role
           })
         );
       }
+      const savedUser = response.item;
+      setItems((prev) => prev.map((item) => (item.userId === savedUser.userId ? savedUser : item)));
+      setDrafts((prev) => ({
+        ...prev,
+        [savedUser.userId]: {
+          fullName: savedUser.fullName,
+          isActive: savedUser.isActive,
+          role: savedUser.role,
+          newPassword: prev[savedUser.userId]?.newPassword ?? ""
+        }
+      }));
       setSuccessMessage("Profil utilisateur mis à jour.");
-      await loadUsers();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -208,8 +246,13 @@ export function AdminUsersPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteAdminUserRequest(accessToken, userId));
+      setItems((prev) => prev.filter((item) => item.userId !== userId));
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
       setSuccessMessage("Membre retire de l'entreprise.");
-      await loadUsers();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {

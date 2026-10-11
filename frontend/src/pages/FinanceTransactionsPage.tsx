@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -3207,7 +3207,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const financeEnabledActivities = enabledActivities;
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [dailyActivityCategories, setDailyActivityCategories] = useState<DailyActivityCategory[]>([]);
+  const dailyCategoriesLoadRequestRef = useRef(0);
   const [articles, setArticles] = useState<ActivityArticle[]>([]);
+  const articlesLoadRequestRef = useRef(0);
   const [hardwareCustomArticleMode, setHardwareCustomArticleMode] = useState(false);
   const [showGeneralExpenseCalculator, setShowGeneralExpenseCalculator] = useState(false);
   const [articleForm, setArticleForm] = useState(buildDefaultArticleForm());
@@ -3216,18 +3218,21 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isSavingArticle, setIsSavingArticle] = useState(false);
   const [articlePendingDelete, setArticlePendingDelete] = useState<ActivityArticle | null>(null);
   const [tenants, setTenants] = useState<RentalTenant[]>([]);
+  const tenantsLoadRequestRef = useRef(0);
   const [tenantForm, setTenantForm] = useState(buildDefaultTenantForm());
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
   const [busyTenantId, setBusyTenantId] = useState<string | null>(null);
   const [isSavingTenant, setIsSavingTenant] = useState(false);
   const [tenantPendingDelete, setTenantPendingDelete] = useState<RentalTenant | null>(null);
   const [shops, setShops] = useState<GeneralStoreShop[]>([]);
+  const shopsLoadRequestRef = useRef(0);
   const [shopForm, setShopForm] = useState(buildDefaultShopForm());
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
   const [busyShopId, setBusyShopId] = useState<string | null>(null);
   const [isSavingShop, setIsSavingShop] = useState(false);
   const [shopPendingDelete, setShopPendingDelete] = useState<GeneralStoreShop | null>(null);
   const [projects, setProjects] = useState<BtpProject[]>([]);
+  const projectsLoadRequestRef = useRef(0);
   const [projectForm, setProjectForm] = useState(buildDefaultProjectForm());
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
@@ -3239,6 +3244,10 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedTransactionsRef = useRef(false);
+  const transactionsLoadRequestRef = useRef(0);
+  const accountsLoadRequestRef = useRef(0);
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [busyAccountId, setBusyAccountId] = useState<string | null>(null);
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
@@ -3349,6 +3358,10 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isTransactionFormExpanded, setIsTransactionFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
+  const [isArticleManagementExpanded, setIsArticleManagementExpanded] = useState(false);
+  const [isTenantManagementExpanded, setIsTenantManagementExpanded] = useState(false);
+  const [isShopManagementExpanded, setIsShopManagementExpanded] = useState(false);
+  const [isProjectManagementExpanded, setIsProjectManagementExpanded] = useState(false);
   const [isCompactScreen] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
   );
@@ -3565,6 +3578,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     [financeEnabledActivities]
   );
   const requestedTransactionId = searchParams.get("transactionId");
+  const requestedTransactionIdRef = useRef(requestedTransactionId);
   const requestedActivityCode = useMemo(() => {
     const activityCode = searchParams.get("activityCode");
     return activityCode && isBusinessActivityCode(activityCode) ? activityCode : null;
@@ -3743,15 +3757,25 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    if (selectedActivityCode !== "DAILY_ACTIVITIES") {
+    const requestId = ++dailyCategoriesLoadRequestRef.current;
+    if (isLoadingActivities || selectedActivityCode !== "DAILY_ACTIVITIES") {
       setDailyActivityCategories([]);
       return;
     }
+    if (!isTransactionFormExpanded) return;
     void withAuthorizedToken((accessToken) => listDailyActivityCategoriesRequest(accessToken, { activeOnly: true }))
-      .then((response) => { if (!cancelled) setDailyActivityCategories(response.items); })
-      .catch((error) => { if (!cancelled) setErrorMessage(toErrorMessage(error)); });
+      .then((response) => {
+        if (!cancelled && requestId === dailyCategoriesLoadRequestRef.current) {
+          setDailyActivityCategories(response.items);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled && requestId === dailyCategoriesLoadRequestRef.current) {
+          setErrorMessage(toErrorMessage(error));
+        }
+      });
     return () => { cancelled = true; };
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isLoadingActivities, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     if (selectedActivityCode !== "DAILY_ACTIVITIES" || dailyActivityCategories.length === 0) return;
@@ -3790,6 +3814,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [isLoading, location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
+    requestedTransactionIdRef.current = requestedTransactionId;
     if (!requestedTransactionId) {
       setSelectedTransactionId(null);
       return;
@@ -3808,29 +3833,32 @@ export function FinanceTransactionsPage(): JSX.Element {
     );
   }, [totalVisibleTransactionPages]);
 
-  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean; silent?: boolean }) => {
+    const requestId = ++transactionsLoadRequestRef.current;
     const offset = options?.offset ?? 0;
     const append = options?.append === true;
+    const silent = options?.silent === true;
+    if (isLoadingActivities) {
+      setIsLoadingMoreTransactions(false);
+      return;
+    }
     if (append) {
       setIsLoadingMoreTransactions(true);
     } else {
-      setIsLoading(true);
+      setIsLoadingMoreTransactions(false);
+      if (!silent && !hasLoadedTransactionsRef.current) setIsLoading(true);
     }
     setErrorMessage(null);
     try {
       const payload = await withAuthorizedToken(async (accessToken) => {
         if (!selectedActivityCode) {
           return {
-            accounts: [] as FinancialAccount[],
             transactions: [] as FinancialTransaction[],
             sectorHistory: [] as FinancialTransaction[]
           };
         }
 
         return Promise.all([
-          listFinanceAccountsRequest(accessToken, {
-            activityCode: selectedActivityCode
-          }),
           listFinanceTransactionsRequest(accessToken, {
             limit: TRANSACTIONS_PAGE_SIZE,
             offset,
@@ -3843,16 +3871,15 @@ export function FinanceTransactionsPage(): JSX.Element {
                 activityCode: selectedActivityCode
               }).catch(() => null)
             : Promise.resolve(null)
-        ]).then(([accountsResp, transactionsResp, sectorHistoryResp]) => ({
-          accounts: accountsResp.items,
+        ]).then(([transactionsResp, sectorHistoryResp]) => ({
           transactions: transactionsResp.items,
           sectorHistory: isQuickFillSectorActivity(selectedActivityCode)
             ? (sectorHistoryResp?.items ?? (append ? [] : transactionsResp.items))
             : []
         }));
       });
+      if (requestId !== transactionsLoadRequestRef.current) return;
       setHasMoreTransactions(payload.transactions.length === TRANSACTIONS_PAGE_SIZE);
-      setAccounts(payload.accounts);
       if (!append) {
         setSectorSuggestionHistory(payload.sectorHistory);
       }
@@ -3864,14 +3891,14 @@ export function FinanceTransactionsPage(): JSX.Element {
         return [...prev, ...payload.transactions.filter((item) => !seen.has(item.id))];
       });
       if (!append) {
-        setEditingAccountId((prev) => (prev && payload.accounts.some((item) => item.id === prev) ? prev : null));
         setEditingTransactionId((prev) =>
           prev && payload.transactions.some((item) => item.id === prev) ? prev : null
         );
         setSelectedTransactionId((prev) => {
-          if (requestedTransactionId) {
-            return payload.transactions.some((item) => item.id === requestedTransactionId)
-              ? requestedTransactionId
+          const requestedId = requestedTransactionIdRef.current;
+          if (requestedId) {
+            return payload.transactions.some((item) => item.id === requestedId)
+              ? requestedId
               : null;
           }
           return payload.transactions.some((item) => item.id === prev)
@@ -3889,99 +3916,167 @@ export function FinanceTransactionsPage(): JSX.Element {
           Object.fromEntries(Object.entries(prev).filter(([transactionId]) => txIds.has(transactionId)))
         );
       }
-      setTransactionForm((prev) => ({
-        ...prev,
-        accountId:
-          payload.accounts.some((account) => account.id === prev.accountId)
-            ? prev.accountId
-            : (payload.accounts[0]?.id ?? "")
-      }));
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === transactionsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (append) {
-        setIsLoadingMoreTransactions(false);
-      } else {
-        setIsLoading(false);
+      if (requestId === transactionsLoadRequestRef.current) {
+        if (append) {
+          setIsLoadingMoreTransactions(false);
+        } else if (!silent) {
+          hasLoadedTransactionsRef.current = true;
+          setIsLoading(false);
+        }
       }
     }
-  }, [filters.type, requestedTransactionId, selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, filters.type, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
+
+  const loadAccounts = useCallback(async () => {
+    const requestId = ++accountsLoadRequestRef.current;
+    if (isLoadingActivities) return;
+    if (!selectedActivityCode) {
+      setAccounts([]);
+      setEditingAccountId(null);
+      setTransactionForm((prev) => ({ ...prev, accountId: "" }));
+      return;
+    }
+    try {
+      const response = await withAuthorizedToken((accessToken) =>
+        listFinanceAccountsRequest(accessToken, { activityCode: selectedActivityCode })
+      );
+      if (requestId !== accountsLoadRequestRef.current) return;
+      setAccounts(response.items);
+      setEditingAccountId((previous) =>
+        previous && response.items.some((account) => account.id === previous) ? previous : null
+      );
+      setTransactionForm((prev) => ({
+        ...prev,
+        accountId: response.items.some((account) => account.id === prev.accountId)
+          ? prev.accountId
+          : (response.items[0]?.id ?? "")
+      }));
+    } catch (error) {
+      if (requestId === accountsLoadRequestRef.current) {
+        setErrorMessage(toErrorMessage(error));
+      }
+    }
+  }, [activeCompany?.id, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    accountsLoadRequestRef.current += 1;
+    setAccounts([]);
+    setTransactions([]);
+    setSelectedTransactionId(null);
+    setEditingTransactionId(null);
+    setSectorSuggestionHistory([]);
+    setProofsByTransaction({});
+    setOpenProofs({});
+    setLoadingProofsByTransaction({});
+    setDailyActivityCategories([]);
+    setArticles([]);
+    setTenants([]);
+    setShops([]);
+    setProjects([]);
+    setIsLoading(true);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    void loadAccounts();
+  }, [loadAccounts]);
+
   const loadArticles = useCallback(async () => {
+    const requestId = ++articlesLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "HARDWARE") {
       setArticles([]);
       return;
     }
+    if (!isTransactionFormExpanded && !isArticleManagementExpanded) return;
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listActivityArticlesRequest(accessToken, "HARDWARE")
       );
+      if (requestId !== articlesLoadRequestRef.current) return;
       setArticles(payload.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === articlesLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isArticleManagementExpanded, isLoadingActivities, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadArticles();
   }, [loadArticles]);
 
   const loadTenants = useCallback(async () => {
+    const requestId = ++tenantsLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "RENTAL") {
       setTenants([]);
       return;
     }
+    if (!isTransactionFormExpanded && !isTenantManagementExpanded) return;
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listRentalTenantsRequest(accessToken)
       );
+      if (requestId !== tenantsLoadRequestRef.current) return;
       setTenants(payload.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === tenantsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isLoadingActivities, isTenantManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadTenants();
   }, [loadTenants]);
 
   const loadShops = useCallback(async () => {
+    const requestId = ++shopsLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "GENERAL_STORE") {
       setShops([]);
       return;
     }
+    if (!isTransactionFormExpanded && !isShopManagementExpanded) return;
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listGeneralStoreShopsRequest(accessToken)
       );
+      if (requestId !== shopsLoadRequestRef.current) return;
       setShops(payload.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === shopsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isLoadingActivities, isShopManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadShops();
   }, [loadShops]);
 
   const loadProjects = useCallback(async () => {
+    const requestId = ++projectsLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "BTP") {
       setProjects([]);
       return;
     }
+    if (!isTransactionFormExpanded && !isProjectManagementExpanded) return;
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listBtpProjectsRequest(accessToken)
       );
+      if (requestId !== projectsLoadRequestRef.current) return;
       setProjects(payload.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === projectsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isLoadingActivities, isProjectManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadProjects();
@@ -4136,11 +4231,17 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateFinanceAccountRequest(accessToken, editingAccountId, payload)
           : createFinanceAccountRequest(accessToken, payload);
       });
+      accountsLoadRequestRef.current += 1;
       setSuccessMessage(
         editingAccountId ? "Compte financier modifié." : "Compte financier créé."
       );
+      setAccounts((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       resetAccountForm();
-      await loadData();
       setTransactionForm((prev) => ({
         ...prev,
         accountId: response.item.id
@@ -4201,12 +4302,18 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteFinanceAccountRequest(accessToken, account.id));
+      accountsLoadRequestRef.current += 1;
       if (editingAccountId === account.id) {
         resetAccountForm();
       }
       setSuccessMessage("Compte financier supprimé.");
       setAccountPendingDelete(null);
-      await loadData();
+      setAccounts((prev) => prev.filter((item) => item.id !== account.id));
+      setTransactionForm((prev) =>
+        prev.accountId === account.id
+          ? { ...prev, accountId: accounts.find((item) => item.id !== account.id)?.id ?? "" }
+          : prev
+      );
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4231,14 +4338,19 @@ export function FinanceTransactionsPage(): JSX.Element {
           : undefined
       };
 
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         editingArticleId
           ? updateActivityArticleRequest(accessToken, "HARDWARE", editingArticleId, payload)
           : createActivityArticleRequest(accessToken, "HARDWARE", payload)
       );
+      setArticles((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       setSuccessMessage(editingArticleId ? "Article modifié." : "Article créé.");
       resetArticleForm();
-      await loadArticles();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4287,7 +4399,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage("Article supprimé.");
       setArticlePendingDelete(null);
-      await loadArticles();
+      setArticles((prev) => prev.filter((item) => item.id !== article.id));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4310,14 +4422,19 @@ export function FinanceTransactionsPage(): JSX.Element {
         tenancyStart: tenantForm.tenancyStart.trim() || undefined
       };
 
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         editingTenantId
           ? updateRentalTenantRequest(accessToken, editingTenantId, payload)
           : createRentalTenantRequest(accessToken, payload)
       );
+      setTenants((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       setSuccessMessage(editingTenantId ? "Locataire modifié." : "Locataire ajouté.");
       resetTenantForm();
-      await loadTenants();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4364,7 +4481,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage("Locataire supprimé.");
       setTenantPendingDelete(null);
-      await loadTenants();
+      setTenants((prev) => prev.filter((item) => item.id !== tenant.id));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4385,14 +4502,19 @@ export function FinanceTransactionsPage(): JSX.Element {
         phone: shopForm.phone.trim() ? shopForm.phone.trim() : undefined
       };
 
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         editingShopId
           ? updateGeneralStoreShopRequest(accessToken, editingShopId, payload)
           : createGeneralStoreShopRequest(accessToken, payload)
       );
+      setShops((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       setSuccessMessage(editingShopId ? "Boutique modifiée." : "Boutique ajoutée.");
       resetShopForm();
-      await loadShops();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4437,7 +4559,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage("Boutique supprimée.");
       setShopPendingDelete(null);
-      await loadShops();
+      setShops((prev) => prev.filter((item) => item.id !== shop.id));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4459,14 +4581,19 @@ export function FinanceTransactionsPage(): JSX.Element {
         location: projectForm.location.trim() ? projectForm.location.trim() : undefined
       };
 
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         editingProjectId
           ? updateBtpProjectRequest(accessToken, editingProjectId, payload)
           : createBtpProjectRequest(accessToken, payload)
       );
+      setProjects((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       setSuccessMessage(editingProjectId ? "Chantier modifié." : "Chantier ajouté.");
       resetProjectForm();
-      await loadProjects();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4512,7 +4639,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage("Chantier supprimé.");
       setProjectPendingDelete(null);
-      await loadProjects();
+      setProjects((prev) => prev.filter((item) => item.id !== project.id));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4563,53 +4690,59 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateFinanceTransactionRequest(accessToken, editingTransactionId, payload)
           : createFinanceTransactionRequest(accessToken, payload);
       });
-      let proofUploadError: string | null = null;
-      if (proofFileToUpload) {
-        setBusyTransactionId(response.item.id);
-        try {
-          const proofItems = await uploadTransactionProof(response.item.id, proofFileToUpload);
-          setProofsByTransaction((prev) => ({
-            ...prev,
-            [response.item.id]: proofItems
-          }));
-          setOpenProofs((prev) => ({
-            ...prev,
-            [response.item.id]: true
-          }));
-        } catch (error) {
-          proofUploadError = toErrorMessage(error);
-        } finally {
-          setBusyTransactionId(null);
-        }
-      }
+      transactionsLoadRequestRef.current += 1;
+      setIsLoadingMoreTransactions(false);
+      const transactionMatchesCurrentList =
+        response.item.activityCode === selectedActivityCode &&
+        (filters.type === "ALL" || response.item.type === filters.type);
       setTransactions((prev) => {
-        const exists = prev.some((item) => item.id === response.item.id);
-        return exists
-          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
-          : [response.item, ...prev];
+        const next = prev.filter((item) => item.id !== response.item.id);
+        return transactionMatchesCurrentList
+          ? [response.item, ...next].sort(
+              (left, right) =>
+                right.occurredAt.localeCompare(left.occurredAt) ||
+                right.createdAt.localeCompare(left.createdAt)
+            )
+          : next;
       });
+      if (isQuickFillSectorActivity(selectedActivityCode)) {
+        setSectorSuggestionHistory((prev) => [
+          response.item,
+          ...prev.filter((item) => item.id !== response.item.id)
+        ]);
+      }
       handleOpenTransactionDetails(response.item.id, response.item.activityCode);
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsTransactionFormExpanded(false);
       }
       setSuccessMessage(
-        editingTransactionId ? "Transaction modifiée." : "Transaction enregistrée."
+        proofFileToUpload
+          ? `${transactionSavedLabel}. Envoi de la preuve en cours…`
+          : editingTransactionId
+            ? "Transaction modifiée."
+            : "Transaction enregistrée."
       );
       resetTransactionForm();
-      void loadData();
-      if (proofUploadError) {
-        setErrorMessage(
-          `${transactionSavedLabel}, mais la preuve n'a pas pu être ajoutée. ${proofUploadError}`
-        );
-        setSuccessMessage(`${transactionSavedLabel}. Vous pouvez réessayer depuis le détail.`);
-        return;
-      }
+      void loadAccounts();
       if (proofFileToUpload) {
-        setSuccessMessage(
-          editingTransactionId
-            ? "Transaction modifiée et preuve ajoutée."
-            : "Transaction enregistrée avec preuve."
-        );
+        void uploadTransactionProof(response.item.id, proofFileToUpload)
+          .then((proofItems) => {
+            setProofsByTransaction((prev) => ({
+              ...prev,
+              [response.item.id]: proofItems
+            }));
+            setOpenProofs((prev) => ({
+              ...prev,
+              [response.item.id]: true
+            }));
+            setSuccessMessage(`${transactionSavedLabel} et preuve ajoutée.`);
+          })
+          .catch((error) => {
+            setErrorMessage(
+              `${transactionSavedLabel}, mais la preuve n'a pas pu être ajoutée. ${toErrorMessage(error)}`
+            );
+            setSuccessMessage(`${transactionSavedLabel}. Vous pouvez réessayer depuis le détail.`);
+          });
       }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -4710,6 +4843,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         deleteFinanceTransactionRequest(accessToken, transaction.id)
       );
+      transactionsLoadRequestRef.current += 1;
+      setIsLoadingMoreTransactions(false);
       if (selectedTransactionId === transaction.id) {
         handleCloseTransactionDetails();
       }
@@ -4717,7 +4852,8 @@ export function FinanceTransactionsPage(): JSX.Element {
         resetTransactionForm();
       }
       setSuccessMessage("Transaction supprimée.");
-      await loadData();
+      setTransactions((prev) => prev.filter((item) => item.id !== transaction.id));
+      void loadData({ silent: true });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4746,7 +4882,22 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage("Transaction supprimée.");
       setTransactionPendingDelete(null);
-      await loadData();
+      setTransactions((prev) => prev.filter((item) => item.id !== transaction.id));
+      setSectorSuggestionHistory((prev) => prev.filter((item) => item.id !== transaction.id));
+      setProofsByTransaction((prev) => {
+        const next = { ...prev };
+        delete next[transaction.id];
+        return next;
+      });
+      setOpenProofs((prev) => {
+        const next = { ...prev };
+        delete next[transaction.id];
+        return next;
+      });
+      void loadAccounts();
+      if (hasMoreTransactions) {
+        void loadData({ offset: Math.max(0, transactions.length - 1), append: true });
+      }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -4866,7 +5017,6 @@ export function FinanceTransactionsPage(): JSX.Element {
         ...prev,
         [transactionId]: true
       }));
-      await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -5118,7 +5268,11 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       {selectedActivityCode === "HARDWARE" && canManageArticles ? (
         <section className="panel finance-page-panel">
-          <details className="finance-section-toggle">
+          <details
+            className="finance-section-toggle"
+            open={isArticleManagementExpanded}
+            onToggle={(event) => setIsArticleManagementExpanded(event.currentTarget.open)}
+          >
             <summary className="finance-section-summary">
               <span>{editingArticleId ? "Modifier un article" : "Gérer mes articles"}</span>
               <small>
@@ -5261,7 +5415,11 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       {selectedActivityCode === "RENTAL" && canManageTenants ? (
         <section className="panel finance-page-panel">
-          <details className="finance-section-toggle">
+          <details
+            className="finance-section-toggle"
+            open={isTenantManagementExpanded}
+            onToggle={(event) => setIsTenantManagementExpanded(event.currentTarget.open)}
+          >
             <summary className="finance-section-summary">
               <span>{editingTenantId ? "Modifier un locataire" : "Gérer mes locataires"}</span>
               <small>
@@ -5422,7 +5580,11 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       {selectedActivityCode === "GENERAL_STORE" && canManageShops ? (
         <section className="panel finance-page-panel">
-          <details className="finance-section-toggle">
+          <details
+            className="finance-section-toggle"
+            open={isShopManagementExpanded}
+            onToggle={(event) => setIsShopManagementExpanded(event.currentTarget.open)}
+          >
             <summary className="finance-section-summary">
               <span>{editingShopId ? "Modifier une boutique" : "Gérer mes boutiques"}</span>
               <small>
@@ -5540,7 +5702,11 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       {selectedActivityCode === "BTP" && canManageProjects ? (
         <section className="panel finance-page-panel">
-          <details className="finance-section-toggle">
+          <details
+            className="finance-section-toggle"
+            open={isProjectManagementExpanded}
+            onToggle={(event) => setIsProjectManagementExpanded(event.currentTarget.open)}
+          >
             <summary className="finance-section-summary">
               <span>{editingProjectId ? "Modifier un chantier" : "Gérer mes chantiers"}</span>
               <small>

@@ -138,6 +138,7 @@ export function AppLayout(): JSX.Element {
   const mobileSectorToggleRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuCloseRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuWasOpenRef = useRef(false);
+  const unreadSummaryRequestRef = useRef(0);
   const withAuthorizedToken = useAuthorizedRequest();
   const canManageCompanies = user?.role === "SYS_ADMIN";
   const isBootstrapMode = !activeCompany;
@@ -199,15 +200,16 @@ export function AppLayout(): JSX.Element {
     let isMounted = true;
 
     const loadSummary = async (): Promise<void> => {
+      const requestId = ++unreadSummaryRequestRef.current;
       try {
         const response = await withAuthorizedToken((accessToken) =>
           getAlertsSummaryRequest(accessToken)
         );
-        if (isMounted) {
+        if (isMounted && requestId === unreadSummaryRequestRef.current) {
           setUnreadAlertsCount(response.item.unreadCount);
         }
       } catch {
-        if (isMounted) {
+        if (isMounted && requestId === unreadSummaryRequestRef.current) {
           setUnreadAlertsCount(0);
         }
       }
@@ -215,7 +217,19 @@ export function AppLayout(): JSX.Element {
 
     void loadSummary();
 
-    const onAlertsChanged = (): void => {
+    const onAlertsChanged = (event: Event): void => {
+      const detail = (event as CustomEvent<{ delta?: number; unreadCount?: number }>).detail;
+      if (typeof detail?.unreadCount === "number") {
+        unreadSummaryRequestRef.current += 1;
+        setUnreadAlertsCount(detail.unreadCount);
+        return;
+      }
+      if (typeof detail?.delta === "number") {
+        unreadSummaryRequestRef.current += 1;
+        const delta = detail.delta;
+        setUnreadAlertsCount((current) => Math.max(0, current + delta));
+        return;
+      }
       void loadSummary();
     };
 
@@ -223,6 +237,7 @@ export function AppLayout(): JSX.Element {
 
     return () => {
       isMounted = false;
+      unreadSummaryRequestRef.current += 1;
       window.removeEventListener("amcco-alerts-changed", onAlertsChanged);
     };
   }, [activeCompany?.id, isBootstrapMode, withAuthorizedToken]);
@@ -294,13 +309,48 @@ export function AppLayout(): JSX.Element {
     }
 
     let animationFrameId = 0;
-    const scheduleEnhancement = (): void => {
+    let scanAllTables = false;
+    const pendingTableWrappers = new Set<HTMLElement>();
+    const scheduleEnhancement = (wrappers?: Iterable<HTMLElement>): void => {
+      if (!wrappers) {
+        scanAllTables = true;
+      } else {
+        for (const wrapper of wrappers) pendingTableWrappers.add(wrapper);
+      }
       window.cancelAnimationFrame(animationFrameId);
-      animationFrameId = window.requestAnimationFrame(() => enhanceMobileTables(root));
+      animationFrameId = window.requestAnimationFrame(() => {
+        if (scanAllTables) {
+          scanAllTables = false;
+          pendingTableWrappers.clear();
+          enhanceMobileTables(root);
+          return;
+        }
+        const wrappersToEnhance = Array.from(pendingTableWrappers);
+        pendingTableWrappers.clear();
+        enhanceMobileTables(root, wrappersToEnhance);
+      });
     };
 
     scheduleEnhancement();
-    const observer = new MutationObserver(scheduleEnhancement);
+    const observer = new MutationObserver((records) => {
+      const changedWrappers = new Set<HTMLElement>();
+      records.forEach((record) => {
+        const target = record.target instanceof Element
+          ? record.target
+          : record.target.parentElement;
+        const changedWrapper = target?.closest<HTMLElement>(".table-wrap");
+        if (changedWrapper) changedWrappers.add(changedWrapper);
+
+        record.addedNodes.forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          if (node.matches(".table-wrap")) changedWrappers.add(node);
+          node.querySelectorAll<HTMLElement>(".table-wrap").forEach((wrapper) =>
+            changedWrappers.add(wrapper)
+          );
+        });
+      });
+      if (changedWrappers.size > 0) scheduleEnhancement(changedWrappers);
+    });
     observer.observe(root, {
       childList: true,
       subtree: true

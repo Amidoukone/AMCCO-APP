@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type KeyboardEvent,
@@ -564,8 +565,11 @@ export function OperationsTasksPage(): JSX.Element {
   const [tasks, setTasks] = useState<OperationTask[]>([]);
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
   const [shops, setShops] = useState<GeneralStoreShop[]>([]);
+  const [loadedShopsContext, setLoadedShopsContext] = useState<string | null>(null);
   const [shopLedgerRows, setShopLedgerRows] = useState<GeneralStoreOperationsReportRow[]>([]);
+  const [loadedShopLedgerContext, setLoadedShopLedgerContext] = useState<string | null>(null);
   const [projects, setProjects] = useState<BtpProject[]>([]);
+  const [loadedProjectsContext, setLoadedProjectsContext] = useState<string | null>(null);
   const [dailyActivityCategories, setDailyActivityCategories] = useState<DailyActivityCategory[]>([]);
   const [categoryForm, setCategoryForm] = useState({ name: "" });
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -573,6 +577,17 @@ export function OperationsTasksPage(): JSX.Element {
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [categoryPendingDelete, setCategoryPendingDelete] = useState<DailyActivityCategory | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const hasLoadedTasksRef = useRef(false);
+  const tasksLoadRequestRef = useRef(0);
+  const membersLoadRequestRef = useRef(0);
+  const loadedMembersContextRef = useRef<string | null>(null);
+  const membersContextRef = useRef("");
+  const shopsLoadRequestRef = useRef(0);
+  const shopLedgerLoadRequestRef = useRef(0);
+  const projectsLoadRequestRef = useRef(0);
+  const dailyCategoriesLoadRequestRef = useRef(0);
+  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -723,13 +738,51 @@ export function OperationsTasksPage(): JSX.Element {
     [filters.status, statusSummary]
   );
 
-  const loadData = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+  const currentMembersContext = `${activeCompany?.id ?? ""}:${selectedActivityCode ?? ""}`;
+  membersContextRef.current = currentMembersContext;
+
+  const loadMembers = useCallback(async () => {
+    if (isLoadingActivities) return;
+    if (!selectedActivityCode || !canAssignTasks) {
+      setMembers([]);
+      setIsLoadingMembers(false);
+      return;
+    }
+    const requestContext = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
+    if (loadedMembersContextRef.current === requestContext) return;
+    const requestId = ++membersLoadRequestRef.current;
+    setIsLoadingMembers(true);
+
+    try {
+      const response = await withAuthorizedToken((accessToken) =>
+        listOperationsMembersRequest(accessToken, { activityCode: selectedActivityCode })
+      );
+      if (
+        requestId !== membersLoadRequestRef.current ||
+        membersContextRef.current !== requestContext
+      ) return;
+      loadedMembersContextRef.current = requestContext;
+      setMembers(response.items);
+    } catch (error) {
+      if (requestId === membersLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+    } finally {
+      if (requestId === membersLoadRequestRef.current) setIsLoadingMembers(false);
+    }
+  }, [activeCompany?.id, canAssignTasks, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
+
+  const loadData = useCallback(async (options?: { offset?: number; append?: boolean; silent?: boolean }) => {
+    const requestId = ++tasksLoadRequestRef.current;
     const offset = options?.offset ?? 0;
     const append = options?.append === true;
+    const silent = options?.silent === true;
+    if (isLoadingActivities) {
+      setIsLoadingMoreTasks(false);
+      return;
+    }
     if (!selectedActivityCode) {
       setTasks([]);
-      setMembers([]);
       setHasMoreTasks(false);
+      setIsLoadingMoreTasks(false);
       setIsLoading(false);
       return;
     }
@@ -737,7 +790,8 @@ export function OperationsTasksPage(): JSX.Element {
     if (append) {
       setIsLoadingMoreTasks(true);
     } else {
-      setIsLoading(true);
+      setIsLoadingMoreTasks(false);
+      if (!silent && !hasLoadedTasksRef.current) setIsLoading(true);
     }
     setErrorMessage(null);
     try {
@@ -752,6 +806,7 @@ export function OperationsTasksPage(): JSX.Element {
       const taskResponse = await withAuthorizedToken((accessToken) =>
         listOperationsTasksRequest(accessToken, query)
       );
+      if (requestId !== tasksLoadRequestRef.current) return;
       setHasMoreTasks(taskResponse.items.length === TASKS_PAGE_SIZE);
       setTasks((prev) => {
         if (!append) {
@@ -774,37 +829,65 @@ export function OperationsTasksPage(): JSX.Element {
         }
         return next;
       });
-
-      if (!append && canAssignTasks) {
-        const membersResponse = await withAuthorizedToken((accessToken) =>
-          listOperationsMembersRequest(accessToken, {
-            activityCode: selectedActivityCode
-          })
-        );
-        setMembers(membersResponse.items);
-      } else {
-        setMembers([]);
-      }
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === tasksLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (append) {
-        setIsLoadingMoreTasks(false);
-      } else {
-        setIsLoading(false);
+      if (requestId === tasksLoadRequestRef.current) {
+        if (append) {
+          setIsLoadingMoreTasks(false);
+        } else if (!silent) {
+          hasLoadedTasksRef.current = true;
+          setIsLoading(false);
+        }
       }
     }
   }, [
-    canAssignTasks,
     canViewAllTasks,
+    activeCompany?.id,
     filters.status,
+    isLoadingActivities,
     selectedActivityCode,
     withAuthorizedToken
   ]);
 
   useEffect(() => {
+    if (loadedCompanyIdRef.current === activeCompany?.id) return;
+    loadedCompanyIdRef.current = activeCompany?.id;
+    membersLoadRequestRef.current += 1;
+    loadedMembersContextRef.current = null;
+    setTasks([]);
+    setAssignments({});
+    setAssignmentNotes({});
+    setHasMoreTasks(false);
+    setIsLoadingMoreTasks(false);
+    setMembers([]);
+    setShops([]);
+    setShopLedgerRows([]);
+    setProjects([]);
+    setDailyActivityCategories([]);
+    setLoadedShopsContext(null);
+    setLoadedShopLedgerContext(null);
+    setLoadedProjectsContext(null);
+    setIsLoading(true);
+    setErrorMessage(null);
+  }, [activeCompany?.id]);
+
+  useEffect(() => {
+    membersLoadRequestRef.current += 1;
+    loadedMembersContextRef.current = null;
+    setMembers([]);
+    setIsLoadingMembers(false);
+  }, [activeCompany?.id, selectedActivityCode]);
+
+  useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if ((canCreateTasks && isTaskFormExpanded) || editingTaskId) {
+      void loadMembers();
+    }
+  }, [canCreateTasks, editingTaskId, isTaskFormExpanded, loadMembers]);
 
   useEffect(() => {
     if (location.hash !== "#task-create" || isLoading) {
@@ -825,63 +908,104 @@ export function OperationsTasksPage(): JSX.Element {
   }, [isLoading, location.hash, location.pathname, location.search, navigate]);
 
   const loadShops = useCallback(async () => {
+    const requestId = ++shopsLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "GENERAL_STORE") {
       setShops([]);
+      setLoadedShopsContext(null);
       return;
     }
+    if (!isTaskFormExpanded && !editingTaskId) {
+      return;
+    }
+    const contextKey = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
+    if (loadedShopsContext === contextKey) {
+      return;
+    }
+    setShops([]);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listGeneralStoreShopsRequest(accessToken)
       );
+      if (requestId !== shopsLoadRequestRef.current) return;
       setShops(payload.items);
+      setLoadedShopsContext(contextKey);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === shopsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, editingTaskId, isLoadingActivities, isTaskFormExpanded, loadedShopsContext, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadShops();
   }, [loadShops]);
 
   const loadShopLedger = useCallback(async () => {
+    const requestId = ++shopLedgerLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "GENERAL_STORE") {
       setShopLedgerRows([]);
+      setLoadedShopLedgerContext(null);
       return;
     }
+    if (!isTaskFormExpanded && !editingTaskId) {
+      return;
+    }
+    const contextKey = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
+    if (loadedShopLedgerContext === contextKey) {
+      return;
+    }
+    setShopLedgerRows([]);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         getReportsOverviewRequest(accessToken, { activityCode: "GENERAL_STORE" })
       );
+      if (requestId !== shopLedgerLoadRequestRef.current) return;
       setShopLedgerRows(payload.item.generalStoreOperationsReport?.rows ?? []);
+      setLoadedShopLedgerContext(contextKey);
     } catch {
-      setShopLedgerRows([]);
+      if (requestId === shopLedgerLoadRequestRef.current) setShopLedgerRows([]);
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, editingTaskId, isLoadingActivities, isTaskFormExpanded, loadedShopLedgerContext, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadShopLedger();
   }, [loadShopLedger]);
 
   const loadProjects = useCallback(async () => {
+    const requestId = ++projectsLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "BTP") {
       setProjects([]);
+      setLoadedProjectsContext(null);
       return;
     }
+    if (!isTaskFormExpanded && !editingTaskId) {
+      return;
+    }
+    const contextKey = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
+    if (loadedProjectsContext === contextKey) {
+      return;
+    }
+    setProjects([]);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listBtpProjectsRequest(accessToken)
       );
+      if (requestId !== projectsLoadRequestRef.current) return;
       setProjects(payload.items);
+      setLoadedProjectsContext(contextKey);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === projectsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, editingTaskId, isLoadingActivities, isTaskFormExpanded, loadedProjectsContext, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadProjects();
   }, [loadProjects]);
 
   const loadDailyActivityCategories = useCallback(async () => {
+    const requestId = ++dailyCategoriesLoadRequestRef.current;
+    if (isLoadingActivities) return;
     if (selectedActivityCode !== "DAILY_ACTIVITIES") {
       setDailyActivityCategories([]);
       return;
@@ -890,11 +1014,12 @@ export function OperationsTasksPage(): JSX.Element {
       const payload = await withAuthorizedToken((accessToken) =>
         listDailyActivityCategoriesRequest(accessToken)
       );
+      if (requestId !== dailyCategoriesLoadRequestRef.current) return;
       setDailyActivityCategories(payload.items);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (requestId === dailyCategoriesLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     }
-  }, [selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadDailyActivityCategories();
@@ -912,14 +1037,19 @@ export function OperationsTasksPage(): JSX.Element {
     setIsSavingCategory(true);
     try {
       const payload = { name: categoryForm.name.trim() };
-      await withAuthorizedToken((accessToken) =>
+      const response = await withAuthorizedToken((accessToken) =>
         editingCategoryId
           ? updateDailyActivityCategoryRequest(accessToken, editingCategoryId, payload)
           : createDailyActivityCategoryRequest(accessToken, payload)
       );
+      setDailyActivityCategories((prev) => {
+        const exists = prev.some((item) => item.id === response.item.id);
+        return exists
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : [response.item, ...prev];
+      });
       setSuccessMessage(editingCategoryId ? "Catégorie modifiée." : "Catégorie ajoutée.");
       resetCategoryForm();
-      await loadDailyActivityCategories();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -959,7 +1089,7 @@ export function OperationsTasksPage(): JSX.Element {
       }
       setSuccessMessage("Catégorie supprimée.");
       setCategoryPendingDelete(null);
-      await loadDailyActivityCategories();
+      setDailyActivityCategories((prev) => prev.filter((item) => item.id !== category.id));
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -1146,17 +1276,6 @@ export function OperationsTasksPage(): JSX.Element {
                 : undefined
             })
       );
-      let attachmentUploadError: string | null = null;
-      if (!editingTaskId && attachmentFileToUpload) {
-        setBusyTaskId(response.item.id);
-        try {
-          await uploadTaskAttachment(response.item.id, attachmentFileToUpload);
-        } catch (error) {
-          attachmentUploadError = toErrorMessage(error);
-        } finally {
-          setBusyTaskId(null);
-        }
-      }
       setEditingTaskId(null);
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsTaskFormExpanded(false);
@@ -1166,7 +1285,13 @@ export function OperationsTasksPage(): JSX.Element {
         metadata: syncMetadataState({}, taskMetadataFields)
       });
       setTaskAttachmentFile(null);
-      setSuccessMessage(editingTaskId ? "Tâche modifiée." : "Tâche créée.");
+      setSuccessMessage(
+        attachmentFileToUpload && !editingTaskId
+          ? "Tâche créée. Envoi de la pièce jointe en cours…"
+          : editingTaskId
+            ? "Tâche modifiée."
+            : "Tâche créée."
+      );
       if (wasEditingTask) {
         setTasks((prev) =>
           prev.map((task) => (task.id === response.item.id ? response.item : task))
@@ -1182,6 +1307,9 @@ export function OperationsTasksPage(): JSX.Element {
             response.item,
             ...prev.filter((task) => task.id !== response.item.id)
           ]);
+          if (tasks.length + 1 >= TASKS_PAGE_SIZE) {
+            setHasMoreTasks(true);
+          }
           setAssignments((prev) => ({
             ...prev,
             [response.item.id]: prev[response.item.id] ?? response.item.assignedToId ?? ""
@@ -1192,16 +1320,15 @@ export function OperationsTasksPage(): JSX.Element {
           }));
         }
       }
-      void loadData();
-      if (attachmentUploadError) {
-        setErrorMessage(
-          `Tâche créée, mais la pièce jointe n'a pas pu être ajoutée. ${attachmentUploadError}`
-        );
-        setSuccessMessage("Tâche créée. Vous pouvez réessayer depuis le détail.");
-        return;
-      }
-      if (attachmentFileToUpload) {
-        setSuccessMessage("Tâche créée avec pièce jointe.");
+      if (!editingTaskId && attachmentFileToUpload) {
+        void uploadTaskAttachment(response.item.id, attachmentFileToUpload)
+          .then(() => setSuccessMessage("Tâche créée avec pièce jointe."))
+          .catch((error) => {
+            setErrorMessage(
+              `Tâche créée, mais la pièce jointe n'a pas pu être ajoutée. ${toErrorMessage(error)}`
+            );
+            setSuccessMessage("Tâche créée. Vous pouvez réessayer depuis le détail.");
+          });
       }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -1293,7 +1420,12 @@ export function OperationsTasksPage(): JSX.Element {
       setTasks((prev) => prev.filter((item) => item.id !== task.id));
       setSuccessMessage("Tâche supprimée.");
       setTaskPendingDelete(null);
-      void loadData();
+      if (hasMoreTasks) {
+        void loadData({
+          offset: Math.max(0, tasks.length - 1),
+          append: true
+        });
+      }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -1327,11 +1459,16 @@ export function OperationsTasksPage(): JSX.Element {
           assignmentNotes[taskId]?.trim() || undefined
         )
       );
+      const remainsInCurrentList = taskMatchesCurrentList(response.item);
       setTasks((prev) =>
-        prev.map((item) => (item.id === response.item.id ? response.item : item))
+        remainsInCurrentList
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : prev.filter((item) => item.id !== response.item.id)
       );
       setSuccessMessage("Assignation mise à jour.");
-      void loadData();
+      if (!remainsInCurrentList && hasMoreTasks) {
+        void loadData({ offset: Math.max(0, tasks.length - 1), append: true });
+      }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -1351,11 +1488,16 @@ export function OperationsTasksPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         updateOperationsTaskStatusRequest(accessToken, taskId, status)
       );
+      const remainsInCurrentList = taskMatchesCurrentList(response.item);
       setTasks((prev) =>
-        prev.map((item) => (item.id === response.item.id ? response.item : item))
+        remainsInCurrentList
+          ? prev.map((item) => (item.id === response.item.id ? response.item : item))
+          : prev.filter((item) => item.id !== response.item.id)
       );
       setSuccessMessage("Statut mis à jour.");
-      void loadData();
+      if (!remainsInCurrentList && hasMoreTasks) {
+        void loadData({ offset: Math.max(0, tasks.length - 1), append: true });
+      }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -1371,6 +1513,14 @@ export function OperationsTasksPage(): JSX.Element {
       return true;
     }
     return task.assignedToId === user?.id;
+  }
+
+  function taskMatchesCurrentList(task: OperationTask): boolean {
+    return (
+      task.activityCode === selectedActivityCode &&
+      (filters.status === "ALL" || filters.status === task.status) &&
+      (canViewAllTasks || task.assignedToId === user?.id)
+    );
   }
 
   function openTaskDetails(taskId: string): void {
@@ -1570,6 +1720,9 @@ export function OperationsTasksPage(): JSX.Element {
                     required={selectedProfile?.tasks.requiresAssignee ?? false}
                   >
                     <option value="">Non assignée</option>
+                    {isLoadingMembers ? (
+                      <option value="" disabled>Chargement des membres…</option>
+                    ) : null}
                     {members.map((member) => (
                       <option key={member.userId} value={member.userId}>
                         {memberLabel(member)}
@@ -2486,7 +2639,12 @@ export function OperationsTasksPage(): JSX.Element {
                         ) : null}
                       </div>
                     ) : (
-                      <details className="operations-actions-secondary">
+                      <details
+                        className="operations-actions-secondary"
+                        onToggle={(event) => {
+                          if (event.currentTarget.open) void loadMembers();
+                        }}
+                      >
                         <summary>Statut et assignation</summary>
                         <div className="operations-actions-secondary-content">
                         {canUpdate ? (
@@ -2522,6 +2680,9 @@ export function OperationsTasksPage(): JSX.Element {
                                 disabled={isBusy || isBulkAssigning}
                               >
                                 <option value="">Non assignée</option>
+                                {isLoadingMembers ? (
+                                  <option value="" disabled>Chargement des membres…</option>
+                                ) : null}
                                 {members.map((member) => (
                                   <option key={member.userId} value={member.userId}>
                                     {memberLabel(member)}

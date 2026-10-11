@@ -26,8 +26,13 @@ function labelTableRows(table: HTMLTableElement, headers: string[]): void {
   });
 }
 
-export function enhanceMobileTables(root: HTMLElement): void {
-  const wrappers = root.querySelectorAll<HTMLElement>(".table-wrap");
+export function enhanceMobileTables(
+  root: HTMLElement,
+  candidates?: Iterable<HTMLElement>
+): void {
+  const wrappers = candidates
+    ? Array.from(candidates).filter((wrapper) => root.contains(wrapper))
+    : Array.from(root.querySelectorAll<HTMLElement>(".table-wrap"));
   const isReportsPage = root.querySelector(".reports-control-panel") !== null;
 
   wrappers.forEach((wrapper) => {
