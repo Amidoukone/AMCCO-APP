@@ -653,6 +653,7 @@ export type AgencyOperationsReport = {
 export type BtpOperationsReportRow = {
   projectRef: string;
   clientRef: string;
+  contractRef: string;
   location: string;
   cashInAmount: string;
   materialAmount: string;
@@ -832,6 +833,48 @@ export type GeneralExpensesReport = {
   };
 };
 
+export type HydrocarbonOperationsReportRow = {
+  date: string;
+  direction: "CASH_IN" | "CASH_OUT";
+  description: string;
+  status: "SUBMITTED" | "APPROVED";
+  amount: string;
+  currency: string;
+};
+
+export type HydrocarbonOperationsReportCurrencySummary = {
+  currency: string;
+  transactionsCount: number;
+  cashInAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+};
+
+export type HydrocarbonOperationsReportTask = {
+  dueDate: string | null;
+  title: string;
+  description: string;
+  status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+};
+
+export type HydrocarbonOperationsReport = {
+  periodLabel: string;
+  rows: HydrocarbonOperationsReportRow[];
+  currencySummaries: HydrocarbonOperationsReportCurrencySummary[];
+  tasks: HydrocarbonOperationsReportTask[];
+  taskStatusSummary: Array<{
+    status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+    count: number;
+  }>;
+  totals: {
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+  };
+};
+
 export type FinancialAccountsScopeSummary = {
   totalCount: number;
   globalCount: number;
@@ -884,6 +927,7 @@ export type ReportsOverview = {
   hotelOperationsReport: HotelOperationsReport | null;
   waterOperationsReport: WaterOperationsReport | null;
   beverageDepotReport: BeverageDepotReport | null;
+  hydrocarbonOperationsReport: HydrocarbonOperationsReport | null;
   agencyOperationsReport: AgencyOperationsReport | null;
   generalExpensesReport: GeneralExpensesReport | null;
   roleDistribution: ReportRoleDistribution[];
@@ -1030,6 +1074,8 @@ type ReportOperationalTransactionRow = RowDataPacket & {
 };
 
 type ReportOperationalTaskRow = RowDataPacket & {
+  title: string;
+  description: string | null;
   activityCode: BusinessActivityCode;
   status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
   dueDate: Date | null;
@@ -1048,6 +1094,8 @@ export type ReportOperationalTransaction = {
 };
 
 export type ReportOperationalTask = {
+  title?: string;
+  description?: string | null;
   activityCode: BusinessActivityCode;
   status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
   dueDate: string | null;
@@ -1157,7 +1205,10 @@ function appendTaskPeriodFilters(
   tableAlias?: string
 ): void {
   const prefix = tableAlias ? `${tableAlias}.` : "";
-  appendPeriodFilters(filters, values, `COALESCE(${prefix}due_date, ${prefix}updated_at)`, period);
+  const taskDate = period?.activityCode === "BEVERAGE_DEPOT"
+    ? `COALESCE(CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(${prefix}metadata_json, '$.periodDate')), '') AS DATETIME), ${prefix}due_date, ${prefix}updated_at)`
+    : `COALESCE(${prefix}due_date, ${prefix}updated_at)`;
+  appendPeriodFilters(filters, values, taskDate, period);
 }
 
 function appendActivityFilter(
@@ -1872,6 +1923,8 @@ export async function listReportOperationalTasks(
   const rows = await queryRows<ReportOperationalTaskRow[]>(
     `
       SELECT
+        title AS title,
+        description AS description,
         activity_code AS activityCode,
         status AS status,
         due_date AS dueDate,
@@ -1883,6 +1936,8 @@ export async function listReportOperationalTasks(
   );
 
   return rows.map((row) => ({
+    title: row.title,
+    description: row.description,
     activityCode: row.activityCode,
     status: row.status,
     dueDate: toIso(row.dueDate),

@@ -484,9 +484,14 @@ describe("reporting.service", () => {
       dateFrom: "2026-05-01T00:00:00.000Z",
       dateTo: "2026-05-31T23:59:59.999Z"
     });
-
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    const pdfText = extractPdfText(pdf);
+    expect(pdfText).toContain("RAPPORT DES ACHATS - QUINCAILLERIE");
+    expect(pdfText).toContain("Achat comptoir plomberie");
+    expect(pdfText).toContain("210 000 F CFA");
+    expect(pdfText).not.toContain("27 000 F CFA");
+    expect(pdfText).not.toContain("SITUATION CUMULATIVE DES REMISES ET RECOUVREMENTS");
   });
 
   it("tracks hardware purchase and recovery variances by recipient as of the report date", async () => {
@@ -550,6 +555,169 @@ describe("reporting.service", () => {
       dateTo: "2026-05-31T23:59:59.999Z"
     });
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    const pdfText = extractPdfText(pdf);
+    expect(pdfText).toContain("SITUATION CUMULATIVE DES REMISES ET RECOUVREMENTS");
+    expect(pdfText).toContain("AU 31/05/2026");
+    expect(pdfText).toContain("18 000 F CFA");
+    expect(pdfText).toContain("-1 000 F CFA");
+    expect(pdfText).toContain("1 achat(s), 1 recouvrement(s) exclus");
+  });
+
+  it("keeps the hardware recipient totals and reading guide with a long report", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    vi.mocked(listReportRoleDistribution).mockResolvedValue([]);
+    vi.mocked(listDashboardWorkload).mockResolvedValue([]);
+    const longHardwareReportTransactions = Array.from({ length: 30 }, (_, index) => ({
+        activityCode: "HARDWARE",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "10000.00",
+        currency: "XOF",
+        occurredAt: `2026-05-${String((index % 28) + 1).padStart(2, "0")}T09:00:00.000Z`,
+        metadata: {
+          hardwareOperationKind: "ITEM_ENTRY",
+          itemName: "CIMENT",
+          quantity: "1",
+          purchaseUnitPrice: "10000",
+          recipientRef: `Quincaillerie ${String(index + 1).padStart(2, "0")}`,
+          marginAmount: "2000"
+        }
+      }));
+    vi.mocked(listReportHardwareTransactions).mockResolvedValue(longHardwareReportTransactions);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue(longHardwareReportTransactions);
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "HARDWARE",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    });
+    const pdfText = extractPdfText(pdf);
+    expect(pdfText).toMatch(/Page 2 \/ \d+/);
+    expect(pdfText).toContain("Quincaillerie 30");
+    expect(pdfText).toContain("SITUATION CUMULATIVE DES REMISES ET RECOUVREMENTS");
+    expect(pdfText).toContain("TOTAL");
+    expect(pdfText).toContain("Lecture :");
+  });
+
+  it("builds a professional hydrocarbon report with currency-safe totals and paginated details", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    vi.mocked(listReportRoleDistribution).mockResolvedValue([]);
+    vi.mocked(listDashboardWorkload).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "HYDROCARBON", status: "APPROVED", type: "CASH_IN", amount: "120000.00", currency: "XOF",
+        description: "Vente de gasoil", occurredAt: "2026-07-02T09:00:00.000Z", metadata: {}
+      },
+      {
+        activityCode: "HYDROCARBON", status: "SUBMITTED", type: "CASH_OUT", amount: "45000.00", currency: "XOF",
+        description: "Approvisionnement cuve", occurredAt: "2026-07-03T09:00:00.000Z", metadata: {}
+      },
+      {
+        activityCode: "HYDROCARBON", status: "APPROVED", type: "CASH_IN", amount: "250.50", currency: "EUR",
+        description: "Vente lubrifiant", occurredAt: "2026-07-04T09:00:00.000Z", metadata: {}
+      },
+      {
+        activityCode: "HYDROCARBON", status: "APPROVED", type: "CASH_OUT", amount: "100.25", currency: "USD",
+        description: "Transport fournisseur", occurredAt: "2026-07-05T09:00:00.000Z", metadata: {}
+      },
+      {
+        activityCode: "HYDROCARBON", status: "DRAFT", type: "CASH_IN", amount: "900000.00", currency: "XOF",
+        description: "Brouillon exclu", occurredAt: "2026-07-06T09:00:00.000Z", metadata: {}
+      },
+      {
+        activityCode: "HYDROCARBON", status: "REJECTED", type: "CASH_OUT", amount: "500000.00", currency: "XOF",
+        description: "Rejetée exclue", occurredAt: "2026-07-07T09:00:00.000Z", metadata: {}
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([
+      { activityCode: "HYDROCARBON", status: "TODO", dueDate: "2026-07-08T09:00:00.000Z", title: "Contrôler le stock", description: "Cuve A", metadata: {} },
+      { activityCode: "HYDROCARBON", status: "IN_PROGRESS", dueDate: "2026-07-09T09:00:00.000Z", title: "Réviser la pompe", description: "Pompe 2", metadata: {} },
+      { activityCode: "HYDROCARBON", status: "DONE", dueDate: "2026-07-10T09:00:00.000Z", title: "Vérifier le registre", description: "Clôture journalière", metadata: {} },
+      { activityCode: "HYDROCARBON", status: "BLOCKED", dueDate: "2026-07-11T09:00:00.000Z", title: "Réparer le groupe", description: "Pièce manquante", metadata: {} }
+    ]);
+
+    const filters = {
+      activityCode: "HYDROCARBON",
+      dateFrom: "2026-07-01T00:00:00.000Z",
+      dateTo: "2026-07-31T23:59:59.999Z"
+    };
+    const overview = await getCompanyReportsOverview(actor, filters);
+    expect(overview.hydrocarbonOperationsReport).toMatchObject({
+      totals: { transactionsCount: 4, tasksCount: 4, doneTasksCount: 1, openTasksCount: 2, blockedTasksCount: 1 },
+      currencySummaries: [
+        { currency: "XOF", transactionsCount: 2, cashInAmount: "120000.00", cashOutAmount: "45000.00", netAmount: "75000.00" },
+        { currency: "EUR", transactionsCount: 1, cashInAmount: "250.50", cashOutAmount: "0.00", netAmount: "250.50" },
+        { currency: "USD", transactionsCount: 1, cashInAmount: "0.00", cashOutAmount: "100.25", netAmount: "-100.25" }
+      ]
+    });
+
+    const pdf = await exportCompanyReportsPdf(actor, filters);
+    const pdfText = extractPdfText(pdf);
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdfText).toContain("HYDROCARBURES");
+    expect(pdfText).toContain("Synthèse financière par devise");
+    expect(pdfText).toContain("75 000 F CFA");
+    expect(pdfText).toContain("250,5 EUR");
+    expect(pdfText).toContain("-100,25 USD");
+    expect(pdfText).toContain("Flux financiers détaillés");
+    expect(pdfText).toContain("Approvisionnement cuve");
+    expect(pdfText).toContain("Suivi des actions");
+    expect(pdfText).toContain("À faire");
+    expect(pdfText).toContain("En cours");
+    expect(pdfText).toContain("Terminées");
+    expect(pdfText).toContain("Bloquées");
+    expect(pdfText).toContain("Actions détaillées (4 ligne(s))");
+    expect(pdfText).toContain("Réviser la pompe");
+    expect(pdfText).toContain("Pièce manquante");
+    expect(pdfText).toContain("Lecture : le solde net correspond aux entrées moins les sorties.");
+    expect(pdfText).not.toContain("Brouillon exclu");
+    expect(pdfText).not.toContain("Rejetée exclue");
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([]);
+    const emptyPdf = await exportCompanyReportsPdf(actor, filters);
+    const emptyPdfText = extractPdfText(emptyPdf);
+    expect(emptyPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBe(1);
+    expect(emptyPdfText).toContain("Aucun flux financier reportable sur la période sélectionnée.");
+    expect(emptyPdfText).toContain("Aucune action enregistrée sur la période sélectionnée.");
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue(
+      Array.from({ length: 50 }, (_, index) => ({
+        activityCode: "HYDROCARBON" as const,
+        status: "APPROVED" as const,
+        type: index % 2 === 0 ? "CASH_IN" as const : "CASH_OUT" as const,
+        amount: "1000.00",
+        currency: "XOF",
+        description: `Opération test hydrocarbure ${index + 1}`,
+        occurredAt: `2026-07-${String((index % 28) + 1).padStart(2, "0")}T09:00:00.000Z`,
+        metadata: {}
+      }))
+    );
+    vi.mocked(listReportOperationalTasks).mockResolvedValue(
+      Array.from({ length: 40 }, (_, index) => ({
+        activityCode: "HYDROCARBON" as const,
+        status: "DONE" as const,
+        dueDate: `2026-07-${String((index % 28) + 1).padStart(2, "0")}T11:00:00.000Z`,
+        title: `Action test hydrocarbure ${index + 1}`,
+        description: `Contrôle opérationnel ${index + 1}`,
+        metadata: {}
+      }))
+    );
+    const longPdf = await exportCompanyReportsPdf(actor, filters);
+    const longPdfText = extractPdfText(longPdf);
+    expect(longPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
+    expect(longPdfText).toContain("Flux financiers détaillés (50 ligne(s)) (suite)");
+    expect(longPdfText).toContain("Opération test hydrocarbure 50");
+    expect(longPdfText).toContain("Actions détaillées (40 ligne(s)) (suite)");
+    expect(longPdfText).toContain("Action test hydrocarbure 40");
   });
 
   it("builds the general expenses report split between PDG and employees", async () => {
@@ -996,6 +1164,10 @@ describe("reporting.service", () => {
         metadata: { beverageTaskKind: "INVENTAIRE", periodDate: "2026-09-15", productName: "Boisson gazeuse", quantity: "20", stockValue: "80000" }
       },
       {
+        activityCode: "BEVERAGE_DEPOT", status: "TODO", dueDate: "2026-09-30T10:00:00.000Z",
+        metadata: { beverageTaskKind: "INVENTAIRE", periodDate: "2026-09-30", productName: "Boisson gazeuse", quantity: "25", stockValue: "200000" }
+      },
+      {
         activityCode: "BEVERAGE_DEPOT", status: "IN_PROGRESS", dueDate: null,
         metadata: {
           beverageTaskKind: "RAPPROCHEMENT", periodDate: "2026-09-30", dailySales: "60000",
@@ -1017,13 +1189,13 @@ describe("reporting.service", () => {
       inventory: expect.arrayContaining([expect.objectContaining({ productName: "Boisson gazeuse", quantity: 18, stockValue: "90000.00" })]),
       reconciliations: [expect.objectContaining({ dailySales: "60000.00", dailyDeposits: "45000.00", dailyBalance: "15000.00", dailyExpenses: "8000.00" })]
     });
-    expect(overview.beverageDepotReport?.inventory).toHaveLength(2);
+    expect(overview.beverageDepotReport?.inventory).toHaveLength(3);
     expect(overview.operationalPerformance).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           scope: "ACTIVITY", activityCode: "BEVERAGE_DEPOT", transactionsCount: 3,
-          approvedCashIn: "60000.00", approvedCashOut: "108000.00", totalTasksCount: 3,
-          doneTasksCount: 2, openTasksCount: 1
+          approvedCashIn: "60000.00", approvedCashOut: "108000.00", totalTasksCount: 4,
+          doneTasksCount: 2, openTasksCount: 2
         }),
         expect.objectContaining({
           scope: "SUBSECTION", dimensionKey: "beverageOperationKind", itemLabel: "VENTE",
@@ -1032,6 +1204,10 @@ describe("reporting.service", () => {
         expect.objectContaining({
           scope: "SUBSECTION", dimensionKey: "beverageTaskKind", itemLabel: "RAPPROCHEMENT",
           totalTasksCount: 1, openTasksCount: 1
+        }),
+        expect.objectContaining({
+          scope: "SUBSECTION", dimensionKey: "beverageTaskKind", itemLabel: "INVENTAIRE",
+          totalTasksCount: 3, doneTasksCount: 2, openTasksCount: 1
         })
       ])
     );
@@ -1054,9 +1230,103 @@ describe("reporting.service", () => {
       .map((match) => Buffer.from(match[1], "hex").toString("latin1"))
       .join("");
     expect(extractedPdfText).toContain("Ventes");
+    expect(extractedPdfText).toContain("Synthèse financière");
+    expect(extractedPdfText).toContain("Achats de stock");
+    expect(extractedPdfText).toContain("Dépenses courantes");
+    expect(extractedPdfText).toContain("Autres recettes");
+    expect(extractedPdfText).toContain("AMCCO - Dépôt de boissons");
+    expect(extractedPdfText).toContain("45 000 F CFA");
+    expect(extractedPdfText).toContain("15 000 F CFA");
+    expect(extractedPdfText).toContain("dernier inventaire clôturé sur la période");
+    expect(extractedPdfText).not.toContain("105 000 F CFA");
     expect(extractedPdfText).toContain("Boisson gazeuse");
     expect(extractedPdfText).toContain("Inventaire hors caisse");
     expect(extractedPdfText).toContain("Rapprochement journalier");
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_IN", amount: "12500.00", currency: "XOF",
+        occurredAt: "2026-09-08T10:00:00.000Z", metadata: { beverageOperationKind: "LEGACY_INCOME" }
+      },
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_OUT", amount: "5000.00", currency: "XOF",
+        occurredAt: "2026-09-09T10:00:00.000Z", metadata: { beverageOperationKind: "VENTE" }
+      },
+      {
+        activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_IN", amount: "12000.00", currency: "XOF",
+        occurredAt: "2026-09-10T10:00:00.000Z", metadata: {
+          beverageOperationKind: "VENTE", quantity: "2", saleUnitPrice: "6000"
+        }
+      }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([]);
+    const fallbackOverview = await getCompanyReportsOverview(actor, filters);
+    expect(fallbackOverview.beverageDepotReport?.transactions.map((row) => row.category)).toEqual([
+      "AUTRE_RECETTE", "DEPENSE", "VENTE"
+    ]);
+    expect(fallbackOverview.beverageDepotReport?.totals).toMatchObject({
+      salesAmount: "12000.00",
+      expensesAmount: "5000.00",
+      otherIncomeAmount: "12500.00",
+      grossMarginAmount: "0.00"
+    });
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([]);
+    const emptyPdf = await exportCompanyReportsPdf(actor, filters);
+    const emptyPdfText = extractPdfText(emptyPdf);
+    expect(emptyPdfText).toContain("Aucune transaction sur la période sélectionnée.");
+    expect(emptyPdfText).toContain("Aucun inventaire enregistré sur la période sélectionnée.");
+    expect(emptyPdfText).toContain("Aucun rapprochement enregistré sur la période sélectionnée.");
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue(
+      Array.from({ length: 50 }, (_, index) => ({
+        activityCode: "BEVERAGE_DEPOT" as const,
+        status: "APPROVED" as const,
+        type: "CASH_OUT" as const,
+        amount: "1000.00",
+        currency: "XOF" as const,
+        occurredAt: `2026-09-${String((index % 28) + 1).padStart(2, "0")}T10:00:00.000Z`,
+        metadata: { beverageOperationKind: "DEPENSE", expenseCategory: `Catégorie ${index + 1}` },
+        description: `Dépense de test ${index + 1}`
+      }))
+    );
+    vi.mocked(listReportOperationalTasks).mockResolvedValue(
+      [
+        ...Array.from({ length: 36 }, (_, index) => ({
+          activityCode: "BEVERAGE_DEPOT" as const,
+          status: "DONE" as const,
+          dueDate: `2026-09-${String((index % 28) + 1).padStart(2, "0")}T10:00:00.000Z`,
+          metadata: {
+            beverageTaskKind: "INVENTAIRE",
+            productName: `Produit ${index + 1}`,
+            quantity: "10",
+            stockValue: "10000"
+          }
+        })),
+        ...Array.from({ length: 32 }, (_, index) => ({
+          activityCode: "BEVERAGE_DEPOT" as const,
+          status: "DONE" as const,
+          dueDate: `2026-09-${String((index % 28) + 1).padStart(2, "0")}T11:00:00.000Z`,
+          metadata: {
+            beverageTaskKind: "RAPPROCHEMENT",
+            periodDate: `2026-09-${String((index % 28) + 1).padStart(2, "0")}`,
+            dailySales: String((index + 1) * 1000),
+            dailyDeposits: String(index * 900),
+            dailyBalance: "100",
+            dailyExpenses: "50"
+          }
+        }))
+      ]
+    );
+    const longPdf = await exportCompanyReportsPdf(actor, filters);
+    const longPdfText = extractPdfText(longPdf);
+    expect(longPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
+    expect(longPdfText).toContain("Transactions détaillées (50 ligne(s)) (suite)");
+    expect(longPdfText).toContain("Inventaire hors caisse (36 ligne(s)) (suite)");
+    expect(longPdfText).toContain("Rapprochement journalier (32 journée(s)) (suite)");
+    expect(longPdfText).toContain("32 000 F CFA");
+    expect(longPdfText).toContain("Dépense de test 50");
+    expect(longPdfText).toContain("Produit 36");
   });
 
   it("builds the agriculture opérations report from campaign metadata", async () => {
@@ -1790,6 +2060,7 @@ describe("reporting.service", () => {
       expect.objectContaining({
         projectRef: "Chantier Kalaban",
         clientRef: "Client AMCCO",
+        contractRef: "DEV-2026-10",
         location: "Kalaban",
         cashInAmount: "500000.00",
         materialAmount: "120000.00",
@@ -2056,6 +2327,17 @@ describe("reporting.service", () => {
       })
     ]);
 
+    const focusedPdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "RENTAL",
+      dateFrom: "2026-11-01T00:00:00.000Z",
+      dateTo: "2026-11-30T23:59:59.999Z"
+    });
+    const focusedPdfText = extractPdfText(focusedPdf);
+    expect(focusedPdfText).toContain("-20 000 F CFA");
+    expect(focusedPdfText).toContain("En avance");
+    expect(focusedPdfText).toContain("Versement reçu");
+    expect(focusedPdfText).toContain("60 000 F CFA");
+
     vi.mocked(listRentalTenants).mockResolvedValue(
       Array.from({ length: 35 }, (_, index) => ({
         id: `tenant-page-${index}`,
@@ -2076,10 +2358,17 @@ describe("reporting.service", () => {
       dateFrom: "2026-11-01T00:00:00.000Z",
       dateTo: "2026-11-30T23:59:59.999Z"
     });
-
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
-    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
+    const pdfText = extractPdfText(pdf);
+    expect(pdfText).toContain("SITUATION DES LOYERS - AU 30/11/2026");
+    expect(pdfText).toContain("TOTAL DES ARRIÉRÉS");
+    expect(pdfText).toContain("10 500 000 F CFA");
+    expect(pdfText).toContain("Récapitulatif des loyers encaissés");
+    expect(pdfText).toContain("TOTAL ENCAISSÉ");
+    expect(pdfText).toContain("Suivi des cautions au 30/11/2026");
+    expect(pdfText).toContain("TOTAL CAUTIONS REÇUES");
+    expect(pdfText).toContain("Page 6 / 6");
   });
 
   it("builds the hotel opérations report from booking and stay metadata", async () => {
@@ -2500,6 +2789,12 @@ describe("reporting.service", () => {
     });
 
     expect(result.waterOperationsReport?.periodLabel).toBe("mai 2026");
+    const boundaryPeriodResult = await getCompanyReportsOverview(actor, {
+      activityCode: "WATER",
+      dateFrom: "2026-05-31T23:30:00-02:00",
+      dateTo: "2026-06-30T23:59:59.999Z"
+    });
+    expect(boundaryPeriodResult.waterOperationsReport?.periodLabel).toBe("juin 2026");
     expect(result.waterOperationsReport?.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -2613,6 +2908,52 @@ describe("reporting.service", () => {
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    const pdfText = extractPdfText(pdf);
+    expect(pdfText).toContain("PRODUCTION D'EAU POTABLE - MAI 2026");
+    expect(pdfText).toContain("TOTAL RECETTES");
+    expect(pdfText).not.toContain("TOTAL VENTES");
+    expect(pdfText).toContain("TOTAL DÉPENSES");
+    expect(pdfText).toContain("Répartition des recettes");
+    expect(pdfText).toContain("Répartition des dépenses");
+    expect(pdfText).toContain("125 900 F CFA");
+    expect(pdfText).toContain("66 000 F CFA");
+    expect(pdfText).toContain("59 900 F CFA");
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue(
+      Array.from({ length: 45 }, (_, index) => ({
+        activityCode: "WATER",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "1000.00",
+        currency: "XOF",
+        occurredAt: `2026-05-${String((index % 28) + 1).padStart(2, "0")}T09:00:00.000Z`,
+        metadata: { waterOperationKind: `WATER_EXPENSE_TEST_${index + 1}` },
+        description: `Dépense de test ${index + 1}`
+      }))
+    );
+    const longPdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "WATER",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    });
+    const longPdfText = extractPdfText(longPdf);
+    expect(longPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
+    expect(longPdfText).toContain("WATER_EXPENSE_TEST_45");
+    expect(longPdfText).toContain("TOTAL DÉPENSES");
+    expect([...longPdfText.matchAll(/CATÉGORIE/g)].length).toBeGreaterThan(4);
+
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([]);
+    const emptyPdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "WATER",
+      dateFrom: "2026-05-01T00:00:00.000Z",
+      dateTo: "2026-05-31T23:59:59.999Z"
+    });
+    const emptyPdfText = extractPdfText(emptyPdf);
+    expect(emptyPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBe(1);
+    expect(emptyPdfText).toContain("Aucune recette ni dépense sur la période");
+    expect(emptyPdfText).toContain("0 opération enregistrée sur la période");
+    expect(emptyPdfText).not.toContain("TOTAL RECETTES");
+    expect(emptyPdfText).not.toContain("TOTAL DÉPENSES");
   });
 
   it("builds the real estate agency opérations report from mandate and deal metadata", async () => {

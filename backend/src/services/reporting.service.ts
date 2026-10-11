@@ -46,6 +46,7 @@ import {
   type GeneralStoreInventorySnapshot,
   type GeneralStoreOperationsReport,
   type HardwareMonthlyReport,
+  type HydrocarbonOperationsReport,
   type HotelOperationsReport,
   type LivestockOperationsReport,
   type RentalOperationsReport,
@@ -256,7 +257,7 @@ const FOOD_REPORT_BRANDING = {
   phone: "TEL: 79 07 24 40"
 };
 const RENTAL_REPORT_BRANDING = {
-  title: "LOCATION IMMOBILIERE",
+  title: "LOCATION IMMOBILIÈRE",
   subtitle: "Suivi mensuel des paiements de loyer par locataire",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
@@ -312,7 +313,7 @@ const WATER_OPERATION_LABELS: Record<string, string> = {
   WATER_EXPENSE_OTHER: "Autre dépense"
 };
 const WATER_REPORT_BRANDING = {
-  title: "PRODUCTION D'EAU",
+  title: "PRODUCTION D'EAU POTABLE",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -362,7 +363,7 @@ const BTP_OPERATION_LABELS: Record<string, string> = {
   SITE_EXPENSE: "Charge chantier"
 };
 const BTP_REPORT_BRANDING = {
-  title: "BATIMENT ET TRAVAUX PUBLICS",
+  title: "BÂTIMENT ET TRAVAUX PUBLICS",
   subtitle: "Encaissements, coûts par nature et marge par chantier",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
@@ -948,12 +949,12 @@ type PdfTableColumn = {
 
 const HARDWARE_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "DATE", width: 72, align: "center" },
-  { label: "DESIGNATION", width: 169, align: "left" },
-  { label: "QUANTITE", width: 68, align: "right" },
-  { label: "PRIX D'ACHAT", width: 105, align: "right" },
-  { label: "MONTANT", width: 105, align: "right" },
-  { label: "BENEFICE", width: 105, align: "right" },
-  { label: "REMIS A", width: 137, align: "left" }
+  { label: "DÉSIGNATION", width: 169, align: "center" },
+  { label: "QUANTITÉ", width: 68, align: "center" },
+  { label: "PRIX UNITAIRE", width: 105, align: "center" },
+  { label: "MONTANT", width: 105, align: "center" },
+  { label: "BÉNÉFICE", width: 105, align: "center" },
+  { label: "DESTINATAIRE", width: 137, align: "center" }
 ];
 
 function drawPdfTableCell(
@@ -970,6 +971,7 @@ function drawPdfTableCell(
     fontSize?: number;
     textColor?: string;
     borderColor?: string;
+    verticalAlign?: "center" | "top";
   } = {}
 ): void {
   const align = options.align ?? "left";
@@ -986,7 +988,7 @@ function drawPdfTableCell(
     .fillColor(options.textColor ?? "#111827")
     .font(font)
     .fontSize(fontSize)
-    .text(text, x + 4, y + Math.max(3, (height - fontSize) / 2 - 1), {
+    .text(text, x + 4, options.verticalAlign === "top" ? y + 5 : y + Math.max(3, (height - fontSize) / 2 - 1), {
       width: width - 8,
       height: height - 4,
       align
@@ -1142,7 +1144,7 @@ function drawSectorContinuationHeader(doc: PDFKit.PDFDocument, title: string, pe
     .fillColor("#486581")
     .font("Helvetica-Bold")
     .fontSize(9)
-    .text(`Période: ${periodLabel}`, margin + 44, 43, {
+    .text(`Période : ${periodLabel}`, margin + 44, 43, {
       width: pageWidth - margin * 2 - 88
     });
   doc
@@ -1192,7 +1194,7 @@ function drawHardwareMetadataStrip(
     .fillColor("#486581")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Genere le", pageWidth - margin - 160, y + 10, {
+    .text("Généré le", pageWidth - margin - 160, y + 10, {
       width: 150,
       align: "right"
     });
@@ -1237,28 +1239,24 @@ function drawHardwareMetricCards(doc: PDFKit.PDFDocument, report: HardwareMonthl
       .fontSize(13)
       .text(metric.value, x + 8, y + 27, {
         width: cardWidth - 16,
-        align: "left"
+        align: "center"
       });
   });
   doc.y = y + 70;
 }
 
-function toHardwarePdfTitle(report: HardwareMonthlyReport): string {
-  const designations = Array.from(new Set(report.rows.map((item) => item.designation.trim()).filter(Boolean)));
-  if (designations.length === 1) {
-    return `QUINCAILLERIE - ${truncatePdfText(designations[0].toUpperCase(), 38)}`;
-  }
-  return "RAPPORT QUINCAILLERIE";
+function toHardwarePdfTitle(_report: HardwareMonthlyReport): string {
+  return "RAPPORT DES ACHATS - QUINCAILLERIE";
 }
 
 function drawHardwareTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
   for (const column of HARDWARE_PDF_COLUMNS) {
     drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
-      align: "center",
+      align: column.align,
       fill: "#e7f1dc",
       font: "Helvetica-Bold",
-      fontSize: 11
+      fontSize: 8.5
     });
     x += column.width;
   }
@@ -1272,12 +1270,15 @@ function drawHardwareDataRow(
 ): number {
   const values = [
     { value: formatPdfDate(row.date), align: "center" as const },
-    { value: truncatePdfText(row.designation, 24), align: "left" as const },
-    { value: formatPdfNumber(row.quantity, 2), align: "right" as const },
-    { value: formatPdfMoney(row.purchaseUnitPrice), align: "right" as const },
-    { value: formatPdfMoney(row.purchaseAmount), align: "right" as const },
-    { value: formatPdfMoney(row.grossProfit), align: "right" as const },
-    { value: truncatePdfText(row.recipientRef, 20), align: "left" as const }
+    { value: truncatePdfText(row.designation, 24), align: "center" as const },
+    { value: row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "—", align: "center" as const },
+    {
+      value: toNumberAmount(row.purchaseUnitPrice) > 0 ? formatPdfMoney(row.purchaseUnitPrice) : "—",
+      align: "center" as const
+    },
+    { value: formatPdfMoney(row.purchaseAmount), align: "center" as const },
+    { value: formatPdfMoney(row.grossProfit), align: "center" as const },
+    { value: truncatePdfText(row.recipientRef, 25), align: "center" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
@@ -1304,14 +1305,14 @@ function drawHardwareTotalsRow(doc: PDFKit.PDFDocument, report: HardwareMonthlyR
 
   const totalValues = [
     formatPdfNumber(report.totals.quantity, 2),
-    formatPdfMoney(report.totals.purchaseUnitPrice),
+    "—",
     formatPdfMoney(report.totals.purchaseAmount),
     formatPdfMoney(report.totals.grossProfit)
   ];
   for (let index = 0; index < totalValues.length; index += 1) {
     const column = HARDWARE_PDF_COLUMNS[index + 2];
     drawPdfTableCell(doc, totalValues[index], x, y, column.width, 27, {
-      align: "right",
+      align: "center",
       fill: index === 0 ? "#e7f1dc" : "#f7fbf4",
       font: "Helvetica-Bold",
       fontSize: 11
@@ -1338,7 +1339,7 @@ function drawHardwareEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#9a3412")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Aucun achat quincaillerie reportable", margin + 14, y + 16, {
+    .text("Aucun achat détaillé à afficher", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -1346,7 +1347,7 @@ function drawHardwareEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(8.5)
     .text(
-      "Le rapport reprend les achats (Acquisition) comptabilisés avec désignation article. Vérifiez la période et les champs quantité/prix d'achat si le tableau doit être alimenté.",
+      "Le tableau reprend les acquisitions avec une désignation d'article. Vérifiez la période ou les informations de l'achat si ce résultat est inattendu.",
       margin + 14,
       y + 34,
       {
@@ -1386,32 +1387,50 @@ function drawHardwareMonthlyTable(doc: PDFKit.PDFDocument, report: HardwareMonth
   doc.y = drawHardwareTotalsRow(doc, report, y) + 12;
 }
 
-function drawHardwareRecipientTable(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport): void {
+function drawHardwareRecipientTable(
+  doc: PDFKit.PDFDocument,
+  report: HardwareMonthlyReport,
+  asOfDateLabel: string
+): void {
+  if (report.recipientRows.length === 0) return;
+
   const margin = PDF_PAGE_MARGIN;
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
   const widths = [0.19, 0.135, 0.135, 0.135, 0.135, 0.135, 0.135]
     .map((part) => (doc.page.width - margin * 2) * part);
-  const headers = ["DESTINATAIRE", "ACHATS", "BENEFICE", "ATTENDU", "RECOUVRE", "ECART ACHATS", "RESTE"];
+  const rowHeight = 25;
+  const totalHeight = 30;
+  const noteReserve = 30;
+  const firstPageRows = Math.min(report.recipientRows.length, 2);
+  const firstRecipientBlockHeight = 20 + 28 + firstPageRows * rowHeight +
+    (report.recipientRows.length <= 2 ? totalHeight + 10 + noteReserve : 0);
+  const headers = ["DESTINATAIRE", "ACHATS", "BÉNÉFICE", "ATTENDU", "RECOUVRÉ", "ÉCART ACHATS", "RESTE"];
   const drawHeader = (startY: number): number => {
     doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11)
-      .text("SITUATION DES REMISES ET RECOUVREMENTS", margin, startY, { width: doc.page.width - margin * 2 });
+      .text(`SITUATION CUMULATIVE DES REMISES ET RECOUVREMENTS AU ${asOfDateLabel}`, margin, startY, {
+        width: doc.page.width - margin * 2
+      });
     let x = margin;
     const y = startY + 20;
     headers.forEach((header, index) => {
       drawPdfTableCell(doc, header, x, y, widths[index], 28, {
-        align: index === 0 ? "left" : "center", fill: "#e7f1dc", font: "Helvetica-Bold", fontSize: 8
+        align: "center", fill: "#e7f1dc", font: "Helvetica-Bold", fontSize: 8
       });
       x += widths[index];
     });
     return y + 28;
   };
-  if (doc.y + 80 > tableBottom) {
+  if (doc.y + firstRecipientBlockHeight > tableBottom) {
     doc.addPage();
     drawHardwareContinuationHeader(doc, report);
   }
   let y = drawHeader(doc.y);
-  for (const row of report.recipientRows) {
-    if (y + 25 + 30 > tableBottom) {
+  for (const [index, row] of report.recipientRows.entries()) {
+    const remainingRows = report.recipientRows.length - index;
+    const requiredHeight = remainingRows <= 3
+      ? remainingRows * rowHeight + totalHeight + 10 + noteReserve
+      : rowHeight * 2;
+    if (y + requiredHeight > tableBottom) {
       doc.addPage();
       drawHardwareContinuationHeader(doc, report);
       y = drawHeader(doc.y);
@@ -1420,13 +1439,13 @@ function drawHardwareRecipientTable(doc: PDFKit.PDFDocument, report: HardwareMon
       row.expectedReturnAmount, row.collectedAmount, row.purchaseVarianceAmount, row.balanceAmount];
     let x = margin;
     values.forEach((value, index) => {
-      drawPdfTableCell(doc, index === 0 ? truncatePdfText(value, 22) : formatPdfMoney(value),
-        x, y, widths[index], 25, { align: index === 0 ? "left" : "right", fontSize: 8 });
+      drawPdfTableCell(doc, index === 0 ? truncatePdfText(value, 30) : formatPdfMoney(value),
+        x, y, widths[index], rowHeight, { align: "center", fontSize: 8 });
       x += widths[index];
     });
-    y += 25;
+    y += rowHeight;
   }
-  if (y + 30 > tableBottom) {
+  if (y + totalHeight + 10 + noteReserve > tableBottom) {
     doc.addPage();
     drawHardwareContinuationHeader(doc, report);
     y = drawHeader(doc.y);
@@ -1436,8 +1455,8 @@ function drawHardwareRecipientTable(doc: PDFKit.PDFDocument, report: HardwareMon
     totals.expectedReturnAmount, totals.collectedAmount, totals.purchaseVarianceAmount, totals.balanceAmount];
   let x = margin;
   totalValues.forEach((value, index) => {
-    drawPdfTableCell(doc, index === 0 ? value : formatPdfMoney(value), x, y, widths[index], 30,
-      { align: index === 0 ? "left" : "right", fill: "#f7fbf4", font: "Helvetica-Bold", fontSize: 8 });
+    drawPdfTableCell(doc, index === 0 ? value : formatPdfMoney(value), x, y, widths[index], totalHeight,
+      { align: "center", fill: "#f7fbf4", font: "Helvetica-Bold", fontSize: 8 });
     x += widths[index];
   });
   doc.y = y + 40;
@@ -1500,7 +1519,7 @@ function drawHardwarePdfFooter(
     .fontSize(8)
     .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
       width: 80,
-      align: "right",
+      align: "center",
       lineBreak: false
     });
   doc.page.margins.bottom = bottomMargin;
@@ -1518,23 +1537,29 @@ function renderHardwareReportsPdf(
   drawHardwareMetadataStrip(doc, report, filters, overview.generatedAt);
   drawHardwareMetricCards(doc, report);
   drawHardwareMonthlyTable(doc, report);
-  drawHardwareRecipientTable(doc, report);
+  drawHardwareRecipientTable(doc, report, formatPdfDate(filters.dateTo ?? overview.generatedAt));
 
-  const note =
-    `Lecture: écart achats = achats remis - recouvré ; reste attendu = achats + bénéfice prévu - recouvré. Sans destinataire: ${report.totals.unassignedPurchasesCount} achat(s), ${report.totals.unassignedCollectionsCount} recouvrement(s) exclus.`;
+  const hasUnassignedTransactions =
+    report.totals.unassignedPurchasesCount > 0 || report.totals.unassignedCollectionsCount > 0;
+  if (report.recipientRows.length === 0 && !hasUnassignedTransactions) return;
+
+  const note = report.recipientRows.length > 0
+    ? `Lecture : écart achats = achats remis - recouvré ; reste attendu = achats + bénéfice prévu - recouvré.${
+        hasUnassignedTransactions
+          ? ` Sans destinataire : ${report.totals.unassignedPurchasesCount} achat(s), ${report.totals.unassignedCollectionsCount} recouvrement(s) exclus du suivi par destinataire.`
+          : ""
+      }`
+    : `Sans destinataire : ${report.totals.unassignedPurchasesCount} achat(s), ${report.totals.unassignedCollectionsCount} recouvrement(s) exclus du suivi des remises.`;
   const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  doc.font("Helvetica-Bold").fontSize(10);
   const noteHeight = doc.heightOfString(note, {
     width: noteWidth
   });
-  if (doc.y + noteHeight <= doc.page.height - PDF_CONTENT_BOTTOM) {
-    doc
-      .fillColor("#486581")
-      .font("Helvetica-Bold")
-      .fontSize(10)
-      .text(note, PDF_PAGE_MARGIN, doc.y, {
-        width: noteWidth
-      });
+  if (doc.y + noteHeight > doc.page.height - PDF_CONTENT_BOTTOM) {
+    doc.addPage();
+    drawHardwareContinuationHeader(doc, report);
   }
+  doc.fillColor("#486581").text(note, PDF_PAGE_MARGIN, doc.y, { width: noteWidth });
 }
 
 function drawGeneralExpensesIcon(doc: PDFKit.PDFDocument, x: number, y: number): void {
@@ -2057,7 +2082,393 @@ function drawGeneralExpensesPdfFooter(
   doc.restore();
 }
 
-const BEVERAGE_DEPOT_PDF_TITLE = "Rapport dépôt de boissons";
+const HYDROCARBON_REPORT_BRANDING = {
+  title: "HYDROCARBURES",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+
+function drawHydrocarbonReportHeader(doc: PDFKit.PDFDocument, report: HydrocarbonOperationsReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 78;
+  const centerWidth = pageWidth - margin * 2 - 156;
+
+  drawAmccoPdfLogo(doc, margin, 19, 58);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(17)
+    .text(HYDROCARBON_REPORT_BRANDING.title, centerX, 24, { width: centerWidth, align: "center" });
+  doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(10.5)
+    .text(HYDROCARBON_REPORT_BRANDING.agency, centerX, 43, { width: centerWidth, align: "center" });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(12.5)
+    .text(`"${HYDROCARBON_REPORT_BRANDING.brand}"`, centerX, 57, { width: centerWidth, align: "center" });
+  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(10.5)
+    .text(`${HYDROCARBON_REPORT_BRANDING.fiscal}     ${HYDROCARBON_REPORT_BRANDING.phone}`, centerX, 72, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#64748b").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16)
+    .text(`${HYDROCARBON_REPORT_BRANDING.title} — ${report.periodLabel.toUpperCase()}`, margin, 116, {
+      width: pageWidth - margin * 2,
+      align: "center"
+    });
+  doc.y = 144;
+}
+
+function drawHydrocarbonContinuationHeader(doc: PDFKit.PDFDocument, report: HydrocarbonOperationsReport): void {
+  drawSectorContinuationHeader(doc, HYDROCARBON_REPORT_BRANDING.title, report.periodLabel);
+}
+
+function drawHydrocarbonPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
+  doc.save();
+  doc.page.margins.bottom = 0;
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#cbd5e1").lineWidth(1).stroke();
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
+    .text(`AMCCO - Hydrocarbures | ${periodLabel}`, margin, pageHeight - 32, { width: 330, lineBreak: false });
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80,
+      align: "right",
+      lineBreak: false
+    });
+  doc.page.margins.bottom = bottomMargin;
+  doc.restore();
+}
+
+function formatHydrocarbonMoney(value: string, currency: string): string {
+  const amount = normalizePdfSpacing(new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 })
+    .format(toNumberAmount(value)));
+  return `${amount} ${currency === "XOF" ? "F CFA" : currency}`;
+}
+
+function drawHydrocarbonMetadataStrip(
+  doc: PDFKit.PDFDocument,
+  report: HydrocarbonOperationsReport,
+  generatedAt: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const gap = 8;
+  const itemWidth = (width - gap * 2) / 3;
+  const y = doc.y;
+  const items = [
+    { label: "PÉRIODE", value: report.periodLabel },
+    { label: "SECTEUR", value: "Hydrocarbures" },
+    { label: "GÉNÉRÉ LE", value: formatPdfDate(generatedAt) }
+  ];
+
+  items.forEach((item, index) => {
+    const x = margin + index * (itemWidth + gap);
+    doc.roundedRect(x, y, itemWidth, 46, 4).fill("#f8fafc");
+    doc.rect(x, y, itemWidth, 46).strokeColor("#cbd5e1").lineWidth(0.8).stroke();
+    doc.fillColor("#486581").font("Helvetica-Bold").fontSize(8.5)
+      .text(item.label, x + 9, y + 7, { width: itemWidth - 18, align: "center" });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10)
+      .text(truncatePdfText(item.value, 44), x + 9, y + 22, { width: itemWidth - 18, align: "center" });
+  });
+  doc.y = y + 56;
+}
+
+function drawHydrocarbonMetricCards(doc: PDFKit.PDFDocument, report: HydrocarbonOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const gap = 8;
+  const cardWidth = (width - gap * 3) / 4;
+  const cardHeight = 48;
+  const y = doc.y;
+  const metrics = [
+    { label: "Transactions", value: report.totals.transactionsCount },
+    { label: "Tâches terminées", value: report.totals.doneTasksCount },
+    { label: "À faire / en cours", value: report.totals.openTasksCount },
+    { label: "Bloquées", value: report.totals.blockedTasksCount }
+  ];
+
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, cardHeight, 4).fill("#f8fafc");
+    doc.rect(x, y, cardWidth, cardHeight).strokeColor("#cbd5e1").lineWidth(0.8).stroke();
+    doc.fillColor("#486581").font("Helvetica-Bold").fontSize(8.5)
+      .text(metric.label, x + 8, y + 7, { width: cardWidth - 16, align: "center" });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13)
+      .text(formatPdfNumber(metric.value), x + 8, y + 22, { width: cardWidth - 16, align: "center" });
+  });
+  doc.y = y + cardHeight + 12;
+}
+
+function drawHydrocarbonTable(
+  doc: PDFKit.PDFDocument,
+  report: HydrocarbonOperationsReport,
+  title: string,
+  columns: PdfTableColumn[],
+  rows: string[][],
+  emptyMessage: string
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const tableWidth = doc.page.width - margin * 2;
+  const headerHeight = 23;
+  const rowHeight = 23;
+  const bottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  const drawTitle = (continuation = false): void => {
+    const y = doc.y;
+    doc.fillColor("#334155").font("Helvetica-Bold").fontSize(11.5)
+      .text(`${title}${continuation ? " (suite)" : ""}`, margin, y, { width: tableWidth });
+    doc.y = y + 18;
+  };
+  const drawHeader = (): number => {
+    let x = margin;
+    for (const column of columns) {
+      drawPdfTableCell(doc, column.label, x, doc.y, column.width, headerHeight, {
+        align: "center", fill: "#e2e8f0", font: "Helvetica-Bold", fontSize: 8.2, borderColor: "#cbd5e1"
+      });
+      x += column.width;
+    }
+    return doc.y + headerHeight;
+  };
+
+  if (needsPdfPageBreak(doc, 18 + headerHeight + rowHeight)) {
+    doc.addPage();
+    drawHydrocarbonContinuationHeader(doc, report);
+  }
+  drawTitle();
+  if (rows.length === 0) {
+    const y = doc.y;
+    drawPdfTableCell(doc, emptyMessage, margin, y, tableWidth, rowHeight, {
+      align: "center", fontSize: 8.5, textColor: "#64748b", borderColor: "#cbd5e1"
+    });
+    doc.y = y + rowHeight + 12;
+    return;
+  }
+
+  let y = drawHeader();
+  for (const row of rows) {
+    if (y + rowHeight > bottom) {
+      doc.addPage();
+      drawHydrocarbonContinuationHeader(doc, report);
+      drawTitle(true);
+      y = drawHeader();
+    }
+    let x = margin;
+    columns.forEach((column, index) => {
+      drawPdfTableCell(doc, truncatePdfText(row[index] ?? "", column.width < 100 ? 18 : 44), x, y, column.width, rowHeight, {
+        align: "center", fontSize: 8.2, borderColor: "#cbd5e1"
+      });
+      x += column.width;
+    });
+    y += rowHeight;
+  }
+  doc.y = y + 12;
+}
+
+function renderHydrocarbonReportsPdf(
+  doc: PDFKit.PDFDocument,
+  report: HydrocarbonOperationsReport,
+  generatedAt: string
+): void {
+  doc.on("pageAdded", () => {
+    doc.y = PDF_CONTENT_TOP;
+  });
+  drawHydrocarbonReportHeader(doc, report);
+  drawHydrocarbonMetadataStrip(doc, report, generatedAt);
+  drawHydrocarbonMetricCards(doc, report);
+
+  const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const summaryColumns: PdfTableColumn[] = [
+    { label: "DEVISE", width: availableWidth * 0.13, align: "center" },
+    { label: "OPÉRATIONS", width: availableWidth * 0.14, align: "center" },
+    { label: "ENTRÉES", width: availableWidth * 0.23, align: "center" },
+    { label: "SORTIES", width: availableWidth * 0.23, align: "center" },
+    { label: "SOLDE NET", width: availableWidth * 0.27, align: "center" }
+  ];
+  drawHydrocarbonTable(
+    doc,
+    report,
+    "Synthèse financière par devise",
+    summaryColumns,
+    report.currencySummaries.map((row) => [
+      row.currency,
+      formatPdfNumber(row.transactionsCount),
+      formatHydrocarbonMoney(row.cashInAmount, row.currency),
+      formatHydrocarbonMoney(row.cashOutAmount, row.currency),
+      formatHydrocarbonMoney(row.netAmount, row.currency)
+    ]),
+    "Aucun flux financier reportable sur la période sélectionnée."
+  );
+
+  const transactionColumns: PdfTableColumn[] = [
+    { label: "DATE", width: 70, align: "center" },
+    { label: "SENS", width: 82, align: "center" },
+    { label: "DESCRIPTION", width: 320, align: "center" },
+    { label: "STATUT", width: 105, align: "center" },
+    { label: "DEVISE", width: 76, align: "center" },
+    { label: "MONTANT", width: availableWidth - 653, align: "center" }
+  ];
+  drawHydrocarbonTable(
+    doc,
+    report,
+    `Flux financiers détaillés (${formatPdfNumber(report.rows.length)} ligne(s))`,
+    transactionColumns,
+    report.rows.map((row) => [
+      formatPdfDate(row.date),
+      row.direction === "CASH_IN" ? "Entrée" : "Sortie",
+      row.description,
+      row.status === "APPROVED" ? "Finalisée" : "Enregistrée",
+      row.currency,
+      formatHydrocarbonMoney(row.amount, row.currency)
+    ]),
+    "Aucun flux financier reportable sur la période sélectionnée."
+  );
+
+  const taskColumns: PdfTableColumn[] = [
+    { label: "ÉTAT DES ACTIONS", width: availableWidth * 0.62, align: "center" },
+    { label: "NOMBRE", width: availableWidth * 0.38, align: "center" }
+  ];
+  const taskStatusLabels: Record<HydrocarbonOperationsReport["taskStatusSummary"][number]["status"], string> = {
+    TODO: "À faire",
+    IN_PROGRESS: "En cours",
+    DONE: "Terminées",
+    BLOCKED: "Bloquées"
+  };
+  drawHydrocarbonTable(
+    doc,
+    report,
+    "Suivi des actions",
+    taskColumns,
+    report.taskStatusSummary
+      .filter((row) => row.count > 0)
+      .map((row) => [taskStatusLabels[row.status], formatPdfNumber(row.count)]),
+    "Aucune action enregistrée sur la période sélectionnée."
+  );
+
+  if (report.tasks.length > 0) {
+    const taskDetailColumns: PdfTableColumn[] = [
+      { label: "ÉCHÉANCE", width: 75, align: "center" },
+      { label: "ACTION", width: 210, align: "center" },
+      { label: "DÉTAIL", width: 350, align: "center" },
+      { label: "ÉTAT", width: availableWidth - 635, align: "center" }
+    ];
+    drawHydrocarbonTable(
+      doc,
+      report,
+      `Actions détaillées (${formatPdfNumber(report.tasks.length)} ligne(s))`,
+      taskDetailColumns,
+      report.tasks.map((task) => [
+        task.dueDate ? formatPdfDate(task.dueDate) : "—",
+        task.title,
+        task.description,
+        taskStatusLabels[task.status]
+      ]),
+      "Aucune action enregistrée sur la période sélectionnée."
+    );
+  }
+
+  if (needsPdfPageBreak(doc, 44)) {
+    doc.addPage();
+    drawHydrocarbonContinuationHeader(doc, report);
+  }
+  const noteY = doc.y;
+  doc.roundedRect(PDF_PAGE_MARGIN, noteY, availableWidth, 38, 4).fill("#f8fafc");
+  doc.rect(PDF_PAGE_MARGIN, noteY, availableWidth, 38).strokeColor("#cbd5e1").lineWidth(0.8).stroke();
+  doc.fillColor("#334155").font("Helvetica").fontSize(8.5)
+    .text(
+      "Lecture : le solde net correspond aux entrées moins les sorties. Les totaux sont calculés séparément pour chaque devise, sans conversion. Seules les transactions enregistrées ou finalisées sont incluses.",
+      PDF_PAGE_MARGIN + 10,
+      noteY + 8,
+      { width: availableWidth - 20, height: 25 }
+    );
+  doc.y = noteY + 48;
+}
+
+const BEVERAGE_DEPOT_REPORT_BRANDING = {
+  title: "DÉPÔT DE BOISSONS",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+
+function drawBeverageDepotIcon(doc: PDFKit.PDFDocument, x: number, y: number): void {
+  doc.save();
+  doc.roundedRect(x + 6, y + 10, 104, 58, 8).fillAndStroke("#fffbeb", "#92400e");
+  doc.roundedRect(x + 6, y + 10, 104, 16, 8).fill("#f59e0b");
+  doc.rect(x + 6, y + 18, 104, 8).fill("#f59e0b");
+  doc.roundedRect(x + 22, y + 34, 18, 26, 4).fillAndStroke("#fef3c7", "#92400e");
+  doc.roundedRect(x + 48, y + 30, 18, 30, 4).fillAndStroke("#fef3c7", "#92400e");
+  doc.roundedRect(x + 74, y + 34, 18, 26, 4).fillAndStroke("#fef3c7", "#92400e");
+  doc.rect(x + 27, y + 30, 8, 5).fill("#92400e");
+  doc.rect(x + 53, y + 26, 8, 5).fill("#92400e");
+  doc.rect(x + 79, y + 30, 8, 5).fill("#92400e");
+  doc.restore();
+}
+
+function drawBeverageDepotReportHeader(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 118;
+  const centerWidth = pageWidth - margin * 2 - 220;
+
+  drawBeverageDepotIcon(doc, margin, 18);
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(17)
+    .text(BEVERAGE_DEPOT_REPORT_BRANDING.title, centerX, 24, { width: centerWidth, align: "center" });
+  doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(10.5)
+    .text(BEVERAGE_DEPOT_REPORT_BRANDING.agency, centerX, 43, { width: centerWidth, align: "center" });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(12.5)
+    .text(`"${BEVERAGE_DEPOT_REPORT_BRANDING.brand}"`, centerX, 57, { width: centerWidth, align: "center" });
+  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(10.5)
+    .text(`${BEVERAGE_DEPOT_REPORT_BRANDING.fiscal}     ${BEVERAGE_DEPOT_REPORT_BRANDING.phone}`, centerX, 72, {
+      width: centerWidth,
+      align: "center"
+    });
+  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#f59e0b").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16)
+    .text(`${BEVERAGE_DEPOT_REPORT_BRANDING.title} — ${report.periodLabel.toUpperCase()}`, margin, 116, {
+      width: pageWidth - margin * 2,
+      align: "center"
+    });
+  doc.y = 144;
+}
+
+function drawBeverageDepotContinuationHeader(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
+  drawSectorContinuationHeader(doc, BEVERAGE_DEPOT_REPORT_BRANDING.title, report.periodLabel);
+}
+
+function drawBeverageDepotPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
+  doc.save();
+  doc.page.margins.bottom = 0;
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#fde68a").lineWidth(1).stroke();
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
+    .text(`AMCCO - Dépôt de boissons | ${periodLabel}`, margin, pageHeight - 32, { width: 330, lineBreak: false });
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80,
+      align: "right",
+      lineBreak: false
+    });
+  doc.page.margins.bottom = bottomMargin;
+  doc.restore();
+}
 
 function buildEmptyBeverageDepotReport(filters: ReportPeriodFilter): BeverageDepotReport {
   return {
@@ -2085,7 +2496,8 @@ function drawBeverageDepotMetadataStrip(
   const margin = PDF_PAGE_MARGIN;
   const width = doc.page.width - margin * 2;
   const y = doc.y;
-  const columnWidth = width / 3;
+  const gap = 8;
+  const columnWidth = (width - gap * 2) / 3;
   const items = [
     { label: "PÉRIODE", value: report.periodLabel },
     { label: "SECTEUR", value: "Dépôt de boissons" },
@@ -2093,13 +2505,13 @@ function drawBeverageDepotMetadataStrip(
   ];
 
   items.forEach((item, index) => {
-    const x = margin + index * columnWidth;
-    doc.roundedRect(x, y, columnWidth - 6, 48, 4).fill("#fffbeb");
-    doc.rect(x, y, columnWidth - 6, 48).strokeColor("#fde68a").lineWidth(0.8).stroke();
+    const x = margin + index * (columnWidth + gap);
+    doc.roundedRect(x, y, columnWidth, 48, 4).fill("#fffbeb");
+    doc.rect(x, y, columnWidth, 48).strokeColor("#fde68a").lineWidth(0.8).stroke();
     doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(8.5)
-      .text(item.label, x + 9, y + 8, { width: columnWidth - 24 });
+      .text(item.label, x + 9, y + 8, { width: columnWidth - 18, align: "center" });
     doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10)
-      .text(truncatePdfText(item.value, 46), x + 9, y + 23, { width: columnWidth - 24 });
+      .text(truncatePdfText(item.value, 46), x + 9, y + 23, { width: columnWidth - 18, align: "center" });
   });
   doc.y = y + 60;
 }
@@ -2111,34 +2523,46 @@ function drawBeverageDepotMetricCards(doc: PDFKit.PDFDocument, report: BeverageD
   const columns = 3;
   const cardWidth = (width - gap * (columns - 1)) / columns;
   const cardHeight = 48;
+  const cardsY = doc.y;
   const metrics = [
     { label: "Ventes", value: formatPdfMoney(report.totals.salesAmount) },
     { label: "Achats de stock", value: formatPdfMoney(report.totals.purchasesAmount) },
     { label: "Dépenses d'exploitation", value: formatPdfMoney(report.totals.expensesAmount) },
     { label: "Autres recettes", value: formatPdfMoney(report.totals.otherIncomeAmount) },
     { label: "Marge brute calculable", value: formatPdfMoney(report.totals.grossMarginAmount) },
-    { label: "Valeur déclarée du stock", value: formatPdfMoney(report.totals.stockValue) }
+    { label: "Valeur du stock clôturé", value: formatPdfMoney(report.totals.stockValue) }
   ];
 
   metrics.forEach((metric, index) => {
     const row = Math.floor(index / columns);
     const column = index % columns;
     const x = margin + column * (cardWidth + gap);
-    const y = doc.y + row * (cardHeight + 7);
+    const y = cardsY + row * (cardHeight + 7);
     doc.roundedRect(x, y, cardWidth, cardHeight, 4).fill("#fffbeb");
     doc.rect(x, y, cardWidth, cardHeight).strokeColor("#fde68a").lineWidth(0.8).stroke();
     doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(8.5)
-      .text(metric.label, x + 9, y + 8, { width: cardWidth - 18 });
+      .text(metric.label, x + 9, y + 8, { width: cardWidth - 18, align: "center" });
     doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11)
-      .text(metric.value, x + 9, y + 24, { width: cardWidth - 18 });
+      .text(metric.value, x + 9, y + 24, { width: cardWidth - 18, align: "center" });
   });
-  doc.y += 2 * (cardHeight + 7) + 8;
+  const countLineY = cardsY + 2 * (cardHeight + 7) + 8;
+  const transactionCount = report.transactions.length;
+  const inventoryCount = report.inventory.length;
+  const reconciliationCount = report.reconciliations.length;
+  doc.fillColor("#475569").font("Helvetica").fontSize(8.5).text(
+    `${formatPdfNumber(transactionCount)} opération${transactionCount > 1 ? "s" : ""} · ${formatPdfNumber(inventoryCount)} inventaire${inventoryCount > 1 ? "s" : ""} · ${formatPdfNumber(reconciliationCount)} rapprochement${reconciliationCount > 1 ? "s" : ""}`,
+    margin,
+    countLineY,
+    { width, align: "center" }
+  );
+  doc.y = countLineY + 20;
 }
 
 type BeverageDepotPdfRow = Array<{ value: string; align?: "left" | "center" | "right" }>;
 
 function drawBeverageDepotTable(
   doc: PDFKit.PDFDocument,
+  report: BeverageDepotReport,
   title: string,
   columns: PdfTableColumn[],
   rows: BeverageDepotPdfRow[],
@@ -2150,9 +2574,10 @@ function drawBeverageDepotTable(
   const rowHeight = 23;
   const bottom = doc.page.height - PDF_CONTENT_BOTTOM;
   const drawSectionTitle = (isContinuation = false): void => {
-    doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(11)
-      .text(`${title}${isContinuation ? " (suite)" : ""}`, margin, doc.y, { width: tableWidth });
-    doc.y += 18;
+    const titleY = doc.y;
+    doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(11.5)
+      .text(`${title}${isContinuation ? " (suite)" : ""}`, margin, titleY, { width: tableWidth });
+    doc.y = titleY + 18;
   };
   const drawHeader = (): number => {
     let x = margin;
@@ -2169,60 +2594,66 @@ function drawBeverageDepotTable(
     return doc.y + headerHeight;
   };
 
-  if (needsPdfPageBreak(doc, 50 + headerHeight + rowHeight)) {
+  if (needsPdfPageBreak(doc, 18 + headerHeight + rowHeight)) {
     doc.addPage();
-    doc.y = PDF_CONTENT_TOP;
+    drawBeverageDepotContinuationHeader(doc, report);
   }
   drawSectionTitle();
   let y = drawHeader();
 
-  const tableRows = rows.length > 0
-    ? rows
-    : [[{ value: emptyMessage, align: "left" as const }]];
-  for (const row of tableRows) {
+  if (rows.length === 0) {
     if (y + rowHeight > bottom) {
       doc.addPage();
-      doc.y = PDF_CONTENT_TOP;
+      drawBeverageDepotContinuationHeader(doc, report);
       drawSectionTitle(true);
       y = drawHeader();
     }
-    if (rows.length === 0) {
-      drawPdfTableCell(doc, emptyMessage, margin, y, tableWidth, rowHeight, {
-        fontSize: 8.5,
+    drawPdfTableCell(doc, emptyMessage, margin, y, tableWidth, rowHeight, {
+      align: "center",
+      fontSize: 8.5,
+      textColor: "#64748b",
+      borderColor: "#d9e2ec"
+    });
+    doc.y = y + rowHeight + 14;
+    return;
+  }
+
+  for (const row of rows) {
+    if (y + rowHeight > bottom) {
+      doc.addPage();
+      drawBeverageDepotContinuationHeader(doc, report);
+      drawSectionTitle(true);
+      y = drawHeader();
+    }
+    let x = margin;
+    columns.forEach((column, index) => {
+      const cell = row[index];
+      drawPdfTableCell(doc, cell?.value ?? "", x, y, column.width, rowHeight, {
+        align: "center",
+        fontSize: 8.2,
         borderColor: "#d9e2ec"
       });
-    } else {
-      let x = margin;
-      row.forEach((cell, index) => {
-        const column = columns[index];
-        if (!column) return;
-        drawPdfTableCell(doc, cell.value, x, y, column.width, rowHeight, {
-          align: cell.align ?? column.align,
-          fontSize: 7.6,
-          borderColor: "#d9e2ec"
-        });
-        x += column.width;
-      });
-    }
+      x += column.width;
+    });
     y += rowHeight;
   }
   doc.y = y + 14;
 }
 
-function drawBeverageDepotReadingNotes(doc: PDFKit.PDFDocument): void {
+function drawBeverageDepotReadingNotes(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
   const margin = PDF_PAGE_MARGIN;
   const width = doc.page.width - margin * 2;
-  const height = 46;
-  if (needsPdfPageBreak(doc, height)) {
+  const height = 50;
+  if (needsPdfPageBreak(doc, height + 12)) {
     doc.addPage();
-    doc.y = PDF_CONTENT_TOP;
+    drawBeverageDepotContinuationHeader(doc, report);
   }
   const y = doc.y;
   doc.roundedRect(margin, y, width, height, 4).fill("#f8fafc");
   doc.rect(margin, y, width, height).strokeColor("#d9e2ec").lineWidth(0.8).stroke();
   doc.fillColor("#334e68").font("Helvetica").fontSize(8.5)
     .text(
-      "Lecture : la marge brute est calculée sur les ventes disposant d'une quantité et de prix d'achat et de vente. Les versements servent au rapprochement des ventes et ne sont pas ajoutés une seconde fois aux recettes. La valeur d'inventaire reste hors caisse.",
+      "Lecture : la marge brute ne retient que les ventes avec quantité et prix d'achat et de vente renseignés. La valeur du stock reprend le dernier inventaire clôturé sur la période pour chaque produit. Les versements sont suivis dans le rapprochement et ne sont pas ajoutés une seconde fois aux recettes.",
       margin + 10,
       y + 9,
       { width: width - 20, height: height - 14 }
@@ -2238,19 +2669,42 @@ function renderBeverageDepotReportsPdf(
   doc.on("pageAdded", () => {
     doc.y = PDF_CONTENT_TOP;
   });
-  doc.y = PDF_CONTENT_TOP;
+  drawBeverageDepotReportHeader(doc, report);
   drawBeverageDepotMetadataStrip(doc, report, generatedAt);
   drawBeverageDepotMetricCards(doc, report);
 
+  const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const summaryColumns: PdfTableColumn[] = [
+    { label: "POSTE", width: availableWidth * 0.55, align: "center" },
+    { label: "OPÉRATIONS", width: availableWidth * 0.18, align: "center" },
+    { label: "MONTANT", width: availableWidth * 0.27, align: "center" }
+  ];
+  const countCategory = (category: BeverageDepotReport["transactions"][number]["category"]): number =>
+    report.transactions.filter((row) => row.category === category).length;
+  drawBeverageDepotTable(
+    doc,
+    report,
+    "Synthèse financière",
+    summaryColumns,
+    [
+      [{ value: "Ventes" }, { value: formatPdfNumber(countCategory("VENTE")) }, { value: formatPdfMoney(report.totals.salesAmount) }],
+      [{ value: "Achats de stock" }, { value: formatPdfNumber(countCategory("ACHAT_STOCK")) }, { value: formatPdfMoney(report.totals.purchasesAmount) }],
+      [{ value: "Dépenses courantes" }, { value: formatPdfNumber(countCategory("DEPENSE")) }, { value: formatPdfMoney(report.totals.expensesAmount) }],
+      [{ value: "Autres recettes" }, { value: formatPdfNumber(countCategory("AUTRE_RECETTE")) }, { value: formatPdfMoney(report.totals.otherIncomeAmount) }]
+    ],
+    "Aucune opération financière sur la période sélectionnée."
+  );
+
+  const transactionFixedWidths = [58, 82, 132, 50, 92, 92, 100];
   const transactionColumns: PdfTableColumn[] = [
-    { label: "DATE", width: 62, align: "center" },
-    { label: "NATURE", width: 91, align: "left" },
-    { label: "PRODUIT", width: 117, align: "left" },
-    { label: "QTÉ", width: 48, align: "right" },
-    { label: "PRIX ACHAT", width: 92, align: "right" },
-    { label: "PRIX VENTE", width: 92, align: "right" },
-    { label: "MONTANT", width: 96, align: "right" },
-    { label: "RÉFÉRENCE / MOTIF", width: 164, align: "left" }
+    { label: "DATE", width: transactionFixedWidths[0], align: "center" },
+    { label: "NATURE", width: transactionFixedWidths[1], align: "center" },
+    { label: "PRODUIT", width: transactionFixedWidths[2], align: "center" },
+    { label: "QTÉ", width: transactionFixedWidths[3], align: "center" },
+    { label: "PRIX ACHAT", width: transactionFixedWidths[4], align: "center" },
+    { label: "PRIX VENTE", width: transactionFixedWidths[5], align: "center" },
+    { label: "MONTANT", width: transactionFixedWidths[6], align: "center" },
+    { label: "RÉFÉRENCE / MOTIF", width: availableWidth - transactionFixedWidths.reduce((sum, item) => sum + item, 0), align: "center" }
   ];
   const categoryLabel = (category: BeverageDepotReport["transactions"][number]["category"]): string => {
     switch (category) {
@@ -2262,67 +2716,72 @@ function renderBeverageDepotReportsPdf(
   };
   drawBeverageDepotTable(
     doc,
+    report,
     `Transactions détaillées (${formatPdfNumber(report.transactions.length)} ligne(s))`,
     transactionColumns,
     report.transactions.map((row) => [
       { value: formatPdfDate(row.date), align: "center" },
       { value: categoryLabel(row.category) },
       { value: truncatePdfText(row.productName, 24) },
-      { value: row.quantity === null ? "-" : formatPdfNumber(row.quantity, 2), align: "right" },
-      { value: row.purchaseUnitPrice ? formatPdfMoney(row.purchaseUnitPrice) : "-", align: "right" },
-      { value: row.saleUnitPrice ? formatPdfMoney(row.saleUnitPrice) : "-", align: "right" },
-      { value: formatPdfMoney(row.amount), align: "right" },
+      { value: row.quantity === null ? "—" : formatPdfNumber(row.quantity, 2), align: "center" },
+      { value: row.purchaseUnitPrice ? formatPdfMoney(row.purchaseUnitPrice) : "—", align: "center" },
+      { value: row.saleUnitPrice ? formatPdfMoney(row.saleUnitPrice) : "—", align: "center" },
+      { value: formatPdfMoney(row.amount), align: "center" },
       { value: truncatePdfText(row.description, 32) }
     ]),
     "Aucune transaction sur la période sélectionnée."
   );
 
+  const inventoryFixedWidths = [75, 195, 78, 128, 135];
   const inventoryColumns: PdfTableColumn[] = [
-    { label: "DATE", width: 75, align: "center" },
-    { label: "PRODUIT", width: 220, align: "left" },
-    { label: "QUANTITÉ", width: 78, align: "right" },
-    { label: "COÛT UNITAIRE", width: 128, align: "right" },
-    { label: "VALEUR DU STOCK", width: 135, align: "right" },
-    { label: "ÉTAT", width: 126, align: "left" }
+    { label: "DATE", width: inventoryFixedWidths[0], align: "center" },
+    { label: "PRODUIT", width: inventoryFixedWidths[1], align: "center" },
+    { label: "QUANTITÉ", width: inventoryFixedWidths[2], align: "center" },
+    { label: "COÛT UNITAIRE", width: inventoryFixedWidths[3], align: "center" },
+    { label: "VALEUR DU STOCK", width: inventoryFixedWidths[4], align: "center" },
+    { label: "ÉTAT", width: availableWidth - inventoryFixedWidths.reduce((sum, item) => sum + item, 0), align: "center" }
   ];
   drawBeverageDepotTable(
     doc,
+    report,
     `Inventaire hors caisse (${formatPdfNumber(report.inventory.length)} ligne(s))`,
     inventoryColumns,
     report.inventory.map((row) => [
-      { value: row.date ? formatPdfDate(row.date) : "-", align: "center" },
+      { value: row.date ? formatPdfDate(row.date) : "—", align: "center" },
       { value: truncatePdfText(row.productName, 38) },
-      { value: row.quantity === null ? "-" : formatPdfNumber(row.quantity, 2), align: "right" },
-      { value: row.purchaseUnitPrice ? formatPdfMoney(row.purchaseUnitPrice) : "-", align: "right" },
-      { value: row.stockValue ? formatPdfMoney(row.stockValue) : "-", align: "right" },
+      { value: row.quantity === null ? "—" : formatPdfNumber(row.quantity, 2), align: "center" },
+      { value: row.purchaseUnitPrice ? formatPdfMoney(row.purchaseUnitPrice) : "—", align: "center" },
+      { value: row.stockValue ? formatPdfMoney(row.stockValue) : "—", align: "center" },
       { value: toDisplayTaskStatusLabel(row.status) }
     ]),
     "Aucun inventaire enregistré sur la période sélectionnée."
   );
 
+  const reconciliationFixedWidths = [90, 125, 125, 125, 125];
   const reconciliationColumns: PdfTableColumn[] = [
-    { label: "DATE", width: 90, align: "center" },
-    { label: "VENTES", width: 125, align: "right" },
-    { label: "VERSEMENTS", width: 125, align: "right" },
-    { label: "RELIQUAT", width: 125, align: "right" },
-    { label: "DÉPENSES", width: 125, align: "right" },
-    { label: "ÉTAT", width: 172, align: "left" }
+    { label: "DATE", width: reconciliationFixedWidths[0], align: "center" },
+    { label: "VENTES", width: reconciliationFixedWidths[1], align: "center" },
+    { label: "VERSEMENTS", width: reconciliationFixedWidths[2], align: "center" },
+    { label: "RELIQUAT", width: reconciliationFixedWidths[3], align: "center" },
+    { label: "DÉPENSES", width: reconciliationFixedWidths[4], align: "center" },
+    { label: "ÉTAT", width: availableWidth - reconciliationFixedWidths.reduce((sum, item) => sum + item, 0), align: "center" }
   ];
   drawBeverageDepotTable(
     doc,
+    report,
     `Rapprochement journalier (${formatPdfNumber(report.reconciliations.length)} journée(s))`,
     reconciliationColumns,
     report.reconciliations.map((row) => [
-      { value: row.date ? formatPdfDate(row.date) : "-", align: "center" },
-      { value: formatPdfMoney(row.dailySales), align: "right" },
-      { value: formatPdfMoney(row.dailyDeposits), align: "right" },
-      { value: formatPdfMoney(row.dailyBalance), align: "right" },
-      { value: formatPdfMoney(row.dailyExpenses), align: "right" },
+      { value: row.date ? formatPdfDate(row.date) : "—", align: "center" },
+      { value: formatPdfMoney(row.dailySales), align: "center" },
+      { value: formatPdfMoney(row.dailyDeposits), align: "center" },
+      { value: formatPdfMoney(row.dailyBalance), align: "center" },
+      { value: formatPdfMoney(row.dailyExpenses), align: "center" },
       { value: toDisplayTaskStatusLabel(row.status) }
     ]),
     "Aucun rapprochement enregistré sur la période sélectionnée."
   );
-  drawBeverageDepotReadingNotes(doc);
+  drawBeverageDepotReadingNotes(doc, report);
 }
 
 function renderGeneralExpensesReportsPdf(
@@ -2468,9 +2927,7 @@ function drawAgricultureMetadataStrip(
   const pageWidth = doc.page.width;
   const width = pageWidth - margin * 2;
   const y = doc.y;
-  const period = filters.dateFrom || filters.dateTo
-    ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
-    : report.periodLabel;
+  const period = report.periodLabel;
 
   doc.roundedRect(margin, y, width, 42, 4).fill("#f8fafc");
   doc.rect(margin, y, width, 42).strokeColor("#bbf7d0").lineWidth(0.8).stroke();
@@ -2932,7 +3389,7 @@ function drawGeneralStoreMetadataStrip(
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Situation au", margin + 205, y + 8, { width: 120 });
   doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(report.asOfLabel, margin + 205, y + 21, { width: 140 });
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Généré le", pageWidth - margin - 150, y + 8, {
     width: 140,
     align: "right"
   });
@@ -3575,20 +4032,35 @@ function buildEmptyRentalOperationsReport(filters: ReportPeriodFilter): RentalOp
 }
 
 const RENTAL_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "LOCATAIRE", width: 170, align: "left" },
-  { label: "LOGEMENT OCCUPE", width: 170, align: "left" },
-  { label: "LOYER MENSUEL", width: 100, align: "right" },
+  { label: "LOCATAIRE", width: 170, align: "center" },
+  { label: "LOGEMENT OCCUPÉ", width: 170, align: "center" },
+  { label: "LOYER MENSUEL", width: 100, align: "center" },
   { label: "STATUT", width: 90, align: "center" },
-  { label: "MONTANT", width: 100, align: "right" },
-  { label: "MOIS", width: 132, align: "center" }
+  { label: "SOLDE", width: 100, align: "center" },
+  { label: "MOIS DE RÉFÉRENCE", width: 132, align: "center" }
 ];
+
+function toRentalPdfPeriodLabel(filters: ReportPeriodFilter): string {
+  const from = filters.dateFrom ? formatPdfDate(filters.dateFrom) : null;
+  const to = filters.dateTo ? formatPdfDate(filters.dateTo) : null;
+  if (from && to) {
+    return `Du ${from} au ${to}`;
+  }
+  if (from) {
+    return `Depuis le ${from}`;
+  }
+  if (to) {
+    return `Jusqu'au ${to}`;
+  }
+  return "Toutes périodes";
+}
 
 function toRentalStatusLabel(status: RentalOperationsReport["rows"][number]["status"]): string {
   if (status === "EN_RETARD") {
     return "En retard";
   }
   if (status === "AVANCE") {
-    return "Avance";
+    return "En avance";
   }
   return "À jour";
 }
@@ -3604,7 +4076,7 @@ function toRentalPivotMonthLabel(row: RentalOperationsReport["rows"][number]): s
 }
 
 function toRentalPdfTitle(report: RentalOperationsReport): string {
-  return `SITUATION LOYER - AU ${report.asOfLabel.toUpperCase()}`;
+  return `SITUATION DES LOYERS - AU ${report.asOfLabel.toUpperCase()}`;
 }
 
 function drawRentalPropertyMark(doc: PDFKit.PDFDocument, x: number, y: number): void {
@@ -3728,7 +4200,7 @@ function drawRentalMetadataStrip(
     .fillColor("#486581")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Genere le", pageWidth - margin - 160, y + 10, {
+    .text("Généré le", pageWidth - margin - 160, y + 10, {
       width: 150,
       align: "right"
     });
@@ -3751,12 +4223,12 @@ function drawRentalMetricCards(doc: PDFKit.PDFDocument, report: RentalOperations
   const y = doc.y;
   const metrics = [
     {
-      label: "Locataires a jour",
+      label: "À jour / locataires",
       value: `${formatPdfNumber(report.totals.upToDateTenantsCount)} / ${formatPdfNumber(report.totals.tenantsCount)}`
     },
-    { label: "Arrieres cumules", value: formatPdfMoney(report.totals.totalArrearsAmount) },
-    { label: "Loyers encaisses (periode)", value: formatPdfMoney(report.totals.collectedAmount) },
-    { label: "Cautions percues (periode)", value: formatPdfMoney(report.totals.depositAmount) }
+    { label: "En retard", value: formatPdfNumber(report.totals.lateTenantsCount) },
+    { label: "Arriérés cumulés", value: formatPdfMoney(report.totals.totalArrearsAmount) },
+    { label: "Loyers encaissés (période)", value: formatPdfMoney(report.totals.collectedAmount) }
   ];
 
   metrics.forEach((metric, index) => {
@@ -3775,24 +4247,11 @@ function drawRentalMetricCards(doc: PDFKit.PDFDocument, report: RentalOperations
       .font("Helvetica-Bold")
       .fontSize(13)
       .text(metric.value, x + 8, y + 27, {
-        width: cardWidth - 16
+        width: cardWidth - 16,
+        align: "center"
       });
   });
-  doc
-    .fillColor("#486581")
-    .font("Helvetica-Bold")
-    .fontSize(10)
-    .text(
-      `${formatPdfNumber(report.totals.lateTenantsCount)} locataire(s) en retard de paiement sur ${formatPdfNumber(report.totals.tenantsCount)}.`,
-      margin,
-      y + 62,
-      {
-        width: pageWidth - margin * 2,
-        align: "center"
-      }
-    );
-  doc.y = y + 72;
-  doc.moveDown(0.4);
+  doc.y = y + 64;
 }
 
 function drawRentalTableHeader(doc: PDFKit.PDFDocument, y: number): number {
@@ -3816,13 +4275,13 @@ function drawRentalDataRow(
 ): number {
   const balanceValue = toNumberAmount(row.balanceAmount);
   const values = [
-    { value: truncatePdfText(row.tenantRef, 28), align: "left" as const },
-    { value: truncatePdfText(row.unitRef, 28), align: "left" as const },
-    { value: formatPdfMoney(row.monthlyRent), align: "right" as const },
+    { value: truncatePdfText(row.tenantRef, 28), align: "center" as const },
+    { value: truncatePdfText(row.unitRef, 28), align: "center" as const },
+    { value: formatPdfMoney(row.monthlyRent), align: "center" as const },
     { value: toRentalStatusLabel(row.status), align: "center" as const },
     {
-      value: row.status === "A_JOUR" ? "-" : formatPdfMoney(Math.abs(balanceValue)),
-      align: "right" as const
+      value: row.status === "A_JOUR" ? "—" : formatPdfMoney(balanceValue),
+      align: "center" as const
     },
     { value: truncatePdfText(toRentalPivotMonthLabel(row), 22), align: "center" as const }
   ];
@@ -3844,7 +4303,7 @@ function drawRentalTotalsRow(doc: PDFKit.PDFDocument, report: RentalOperationsRe
   const firstColumnsWidth =
     RENTAL_PDF_COLUMNS[0].width + RENTAL_PDF_COLUMNS[1].width + RENTAL_PDF_COLUMNS[2].width;
   let x = PDF_PAGE_MARGIN;
-  drawPdfTableCell(doc, "TOTAL ARRIERES", x, y, firstColumnsWidth, 28, {
+  drawPdfTableCell(doc, "TOTAL DES ARRIÉRÉS", x, y, firstColumnsWidth, 28, {
     align: "center",
     fill: "#f8fafc",
     font: "Helvetica-Bold",
@@ -3854,7 +4313,7 @@ function drawRentalTotalsRow(doc: PDFKit.PDFDocument, report: RentalOperationsRe
 
   drawPdfTableCell(
     doc,
-    `${formatPdfNumber(report.totals.lateTenantsCount)} locataire(s)`,
+    `${formatPdfNumber(report.totals.lateTenantsCount)} en retard`,
     x,
     y,
     RENTAL_PDF_COLUMNS[3].width,
@@ -3869,7 +4328,7 @@ function drawRentalTotalsRow(doc: PDFKit.PDFDocument, report: RentalOperationsRe
   x += RENTAL_PDF_COLUMNS[3].width;
 
   drawPdfTableCell(doc, formatPdfMoney(report.totals.totalArrearsAmount), x, y, RENTAL_PDF_COLUMNS[4].width, 28, {
-    align: "right",
+    align: "center",
     fill: "#ecfeff",
     font: "Helvetica-Bold",
     fontSize: 11
@@ -3891,7 +4350,7 @@ function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(11)
-    .text("Aucun locataire enregistré", margin + 14, y + 16, {
+    .text("Aucun locataire actif à afficher", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -3899,7 +4358,7 @@ function drawRentalEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(9.2)
     .text(
-      "Ajoutez vos locataires (nom, logement occupé et loyer mensuel) pour faire apparaître la situation loyer du mois.",
+      "La situation des loyers apparaîtra ici lorsque des locataires actifs seront enregistrés.",
       margin + 14,
       y + 34,
       {
@@ -3916,7 +4375,7 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
   }
 
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (needsPdfPageBreak(doc, 78)) {
+  if (needsPdfPageBreak(doc, 106)) {
     doc.addPage();
     drawRentalContinuationHeader(doc, report);
   }
@@ -3924,7 +4383,7 @@ function drawRentalOperationsTable(doc: PDFKit.PDFDocument, report: RentalOperat
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(12)
-    .text("Solde de chaque locataire, à jour ou en retard", PDF_PAGE_MARGIN, doc.y, {
+    .text("Situation des loyers par locataire", PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -3952,7 +4411,7 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
     return;
   }
 
-  const breakdownHeight = 34 + 24 + report.operationRows.length * 24;
+  const breakdownHeight = 34 + 24 + report.operationRows.length * 24 + 28;
   if (needsPdfPageBreak(doc, breakdownHeight)) {
     doc.addPage();
     drawRentalContinuationHeader(doc, report);
@@ -3962,15 +4421,15 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(13)
-    .text(`Loyers encaissés sur la période (${report.periodLabel})`, PDF_PAGE_MARGIN, doc.y, {
+    .text(`Récapitulatif des loyers encaissés — ${report.periodLabel}`, PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
 
   const columns: PdfTableColumn[] = [
-    { label: "MONTANT DU LOYER", width: 320, align: "left" },
-    { label: "NB LOYERS", width: 180, align: "right" },
-    { label: "SOUS-TOTAL", width: 262, align: "right" }
+    { label: "MONTANT REÇU", width: 320, align: "center" },
+    { label: "NOMBRE DE PAIEMENTS", width: 180, align: "center" },
+    { label: "TOTAL ENCAISSÉ", width: 262, align: "center" }
   ];
   let x = PDF_PAGE_MARGIN;
   let y = doc.y;
@@ -3986,7 +4445,7 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
   y += 24;
 
   for (const row of report.operationRows) {
-    if (y + 24 > doc.page.height - PDF_CONTENT_BOTTOM) {
+    if (y + 24 + 28 > doc.page.height - PDF_CONTENT_BOTTOM) {
       doc.addPage();
       drawRentalContinuationHeader(doc, report);
       y = doc.y;
@@ -4004,9 +4463,9 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
     }
     x = PDF_PAGE_MARGIN;
     const values = [
-      { value: row.operationLabel, align: "left" as const },
-      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
-      { value: formatPdfMoney(row.cashInAmount), align: "right" as const }
+      { value: formatPdfMoney(row.operationKind), align: "center" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "center" as const },
+      { value: formatPdfMoney(row.cashInAmount), align: "center" as const }
     ];
     values.forEach((item, index) => {
       const column = columns[index];
@@ -4018,19 +4477,51 @@ function drawRentalBreakdown(doc: PDFKit.PDFDocument, report: RentalOperationsRe
     });
     y += 24;
   }
-  doc.y = y + 10;
+  const breakdownTotal = report.operationRows.reduce(
+    (total, row) => total + toNumberAmount(row.transactionsCount),
+    0
+  );
+  if (y + 28 > doc.page.height - PDF_CONTENT_BOTTOM) {
+    doc.addPage();
+    drawRentalContinuationHeader(doc, report);
+    y = doc.y;
+    x = PDF_PAGE_MARGIN;
+    for (const column of columns) {
+      drawPdfTableCell(doc, column.label, x, y, column.width, 24, {
+        align: "center",
+        fill: "#ccfbf1",
+        font: "Helvetica-Bold",
+        fontSize: 10.5
+      });
+      x += column.width;
+    }
+    y += 24;
+  }
+  x = PDF_PAGE_MARGIN;
+  const totalValues = ["TOTAL ENCAISSÉ", formatPdfNumber(breakdownTotal), formatPdfMoney(report.totals.collectedAmount)];
+  totalValues.forEach((value, index) => {
+    const column = columns[index];
+    drawPdfTableCell(doc, value, x, y, column.width, 28, {
+      align: "center",
+      fill: "#ecfeff",
+      font: "Helvetica-Bold",
+      fontSize: 10.5
+    });
+    x += column.width;
+  });
+  doc.y = y + 34;
 }
 
 const RENTAL_DEPOSIT_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "LOCATAIRE", width: 190, align: "left" },
-  { label: "LOGEMENT OCCUPE", width: 190, align: "left" },
-  { label: "STATUT CAUTION", width: 130, align: "center" },
-  { label: "MONTANT VERSE", width: 100, align: "right" },
+  { label: "LOCATAIRE", width: 190, align: "center" },
+  { label: "LOGEMENT OCCUPÉ", width: 190, align: "center" },
+  { label: "VERSEMENT", width: 130, align: "center" },
+  { label: "MONTANT VERSÉ", width: 100, align: "center" },
   { label: "DERNIER VERSEMENT", width: 152, align: "center" }
 ];
 
 function toRentalDepositStatusLabel(status: RentalOperationsReport["depositRows"][number]["status"]): string {
-  return status === "PAYEE" ? "Payée" : "Non payée";
+  return status === "PAYEE" ? "Versement reçu" : "Aucun versement";
 }
 
 function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
@@ -4039,7 +4530,7 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
   }
 
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (needsPdfPageBreak(doc, 90)) {
+  if (needsPdfPageBreak(doc, 120)) {
     doc.addPage();
     drawRentalContinuationHeader(doc, report);
   }
@@ -4048,7 +4539,7 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
     .fillColor("#115e59")
     .font("Helvetica-Bold")
     .fontSize(12)
-    .text("Cautions locataires (indépendant du suivi des loyers)", PDF_PAGE_MARGIN, doc.y, {
+    .text(`Suivi des cautions au ${report.asOfLabel} (hors arriérés de loyer)`, PDF_PAGE_MARGIN, doc.y, {
       width: doc.page.width - PDF_PAGE_MARGIN * 2
     });
   doc.moveDown(0.4);
@@ -4060,14 +4551,14 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
       align: "center",
       fill: "#ccfbf1",
       font: "Helvetica-Bold",
-      fontSize: 11
+      fontSize: 9.5
     });
     x += column.width;
   }
   y += 27;
 
   for (const row of report.depositRows) {
-    if (y + 26 > tableBottom) {
+    if (y + 26 + 28 > tableBottom) {
       doc.addPage();
       drawRentalContinuationHeader(doc, report);
       y = doc.y;
@@ -4077,7 +4568,7 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
           align: "center",
           fill: "#ccfbf1",
           font: "Helvetica-Bold",
-          fontSize: 11
+          fontSize: 9.5
         });
         x += column.width;
       }
@@ -4085,10 +4576,10 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
     }
 
     const values = [
-      { value: truncatePdfText(row.tenantRef, 30), align: "left" as const },
-      { value: truncatePdfText(row.unitRef, 30), align: "left" as const },
+      { value: truncatePdfText(row.tenantRef, 30), align: "center" as const },
+      { value: truncatePdfText(row.unitRef, 30), align: "center" as const },
       { value: toRentalDepositStatusLabel(row.status), align: "center" as const },
-      { value: formatPdfMoney(row.depositPaidAmount), align: "right" as const },
+      { value: formatPdfMoney(row.depositPaidAmount), align: "center" as const },
       { value: row.lastPaymentLabel ?? "-", align: "center" as const }
     ];
     const fillColor = row.status === "NON_PAYEE" ? "#fef2f2" : undefined;
@@ -4105,7 +4596,46 @@ function drawRentalDepositTable(doc: PDFKit.PDFDocument, report: RentalOperation
     y += 26;
   }
 
-  doc.y = y + 10;
+  const depositTotal = report.depositRows.reduce(
+    (total, row) => total + toNumberAmount(row.depositPaidAmount),
+    0
+  );
+  if (y + 28 > tableBottom) {
+    doc.addPage();
+    drawRentalContinuationHeader(doc, report);
+    y = doc.y;
+    x = PDF_PAGE_MARGIN;
+    for (const column of RENTAL_DEPOSIT_PDF_COLUMNS) {
+      drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
+        align: "center",
+        fill: "#ccfbf1",
+        font: "Helvetica-Bold",
+        fontSize: 9.5
+      });
+      x += column.width;
+    }
+    y += 27;
+  }
+  x = PDF_PAGE_MARGIN;
+  const totalValues = [
+    "TOTAL CAUTIONS REÇUES",
+    "",
+    `${formatPdfNumber(report.totals.depositPaidTenantsCount)} avec versement`,
+    formatPdfMoney(depositTotal),
+    ""
+  ];
+  totalValues.forEach((value, index) => {
+    const column = RENTAL_DEPOSIT_PDF_COLUMNS[index];
+    drawPdfTableCell(doc, value, x, y, column.width, 28, {
+      align: "center",
+      fill: "#ecfeff",
+      font: "Helvetica-Bold",
+      fontSize: index === 2 ? 9 : 10.5
+    });
+    x += column.width;
+  });
+
+  doc.y = y + 34;
 }
 
 function drawRentalPdfFooter(
@@ -4131,7 +4661,7 @@ function drawRentalPdfFooter(
     .fillColor("#627d98")
     .font("Helvetica")
     .fontSize(8.5)
-    .text(`AMCCO - Situation loyer | ${periodLabel}`, margin, pageHeight - 32, {
+    .text(`AMCCO - Situation des loyers | ${periodLabel}`, margin, pageHeight - 32, {
       width: 330,
       lineBreak: false
     });
@@ -4153,7 +4683,10 @@ function renderRentalReportsPdf(
   overview: ReportsOverview,
   filters: ReportPeriodFilter
 ): void {
-  const report = overview.rentalOperationsReport ?? buildEmptyRentalOperationsReport(filters);
+  const report = {
+    ...(overview.rentalOperationsReport ?? buildEmptyRentalOperationsReport(filters)),
+    periodLabel: toRentalPdfPeriodLabel(filters)
+  };
 
   drawRentalReportHeader(doc, report);
   drawRentalMetadataStrip(doc, report, filters, overview.generatedAt);
@@ -4605,11 +5138,11 @@ function drawWaterIcon(doc: PDFKit.PDFDocument, x: number, y: number): void {
 
 const WATER_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "DATE", width: 65, align: "center" },
-  { label: "CATEGORIE", width: 205, align: "left" },
-  { label: "DESIGNATION", width: 205, align: "left" },
-  { label: "PAQUETS", width: 60, align: "right" },
-  { label: "PRIX / PAQUET", width: 105, align: "right" },
-  { label: "MONTANT", width: 121, align: "right" }
+  { label: "CATÉGORIE", width: 205, align: "center" },
+  { label: "DÉSIGNATION", width: 205, align: "center" },
+  { label: "PAQUETS", width: 60, align: "center" },
+  { label: "PRIX / PAQUET", width: 105, align: "center" },
+  { label: "MONTANT", width: 121, align: "center" }
 ];
 
 function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
@@ -4665,7 +5198,7 @@ function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsR
     .fillColor("#111827")
     .font("Helvetica-Bold")
     .fontSize(16)
-    .text(`PRODUCTION D'EAU - ${report.periodLabel.toUpperCase()}`, margin, 116, {
+    .text(`PRODUCTION D'EAU POTABLE - ${report.periodLabel.toUpperCase()}`, margin, 116, {
       width: pageWidth - margin * 2,
       align: "center"
     });
@@ -4673,7 +5206,7 @@ function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsR
 }
 
 function drawWaterContinuationHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
-  drawSectorContinuationHeader(doc, "PRODUCTION D'EAU", report.periodLabel);
+  drawSectorContinuationHeader(doc, "PRODUCTION D'EAU POTABLE", report.periodLabel);
 }
 
 function drawWaterMetadataStrip(
@@ -4707,12 +5240,12 @@ function drawWaterMetadataStrip(
     .fillColor("#111827")
     .font("Helvetica-Bold")
     .fontSize(11.5)
-    .text("Production d'eau", margin + 220, y + 26, { width: 190 });
+    .text("Production d'eau potable", margin + 220, y + 26, { width: 190 });
   doc
     .fillColor("#1e3a8a")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Genere le", pageWidth - margin - 160, y + 10, {
+    .text("Généré le", pageWidth - margin - 160, y + 10, {
       width: 150,
       align: "right"
     });
@@ -4731,7 +5264,7 @@ function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsRe
   const cards = [
     { label: "Paquets vendus", value: formatPdfNumber(report.totals.packagesSold) },
     { label: "Prix moyen / paquet", value: formatPdfMoney(report.totals.averagePackagePrice) },
-    { label: "Ventes", value: formatPdfMoney(report.totals.salesAmount) },
+    { label: "Recettes", value: formatPdfMoney(report.totals.salesAmount) },
     { label: "Dépenses", value: formatPdfMoney(report.totals.expensesAmount) },
     { label: "Solde net", value: formatPdfMoney(report.totals.netAmount) }
   ];
@@ -4743,11 +5276,13 @@ function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsRe
     const x = margin + index * (width + gap);
     doc.roundedRect(x, y, width, 54, 4).fill("#f8fafc");
     doc.rect(x, y, width, 54).strokeColor("#bfdbfe").lineWidth(0.6).stroke();
-    doc.fillColor("#64748b").font("Helvetica-Bold").fontSize(7).text(card.label.toUpperCase(), x + 8, y + 10, {
-      width: width - 16
+    doc.fillColor("#64748b").font("Helvetica-Bold").fontSize(8.5).text(card.label, x + 8, y + 10, {
+      width: width - 16,
+      align: "center"
     });
     doc.fillColor("#0f172a").font("Helvetica-Bold").fontSize(12).text(card.value, x + 8, y + 28, {
-      width: width - 16
+      width: width - 16,
+      align: "center"
     });
   });
   doc.y = y + 70;
@@ -4756,7 +5291,7 @@ function drawWaterMetricCards(doc: PDFKit.PDFDocument, report: WaterOperationsRe
     .font("Helvetica")
     .fontSize(8.2)
     .text(
-      `${formatPdfNumber(report.totals.transactionsCount)} ligne(s) enregistrée(s) sur la période.`,
+      `${formatPdfNumber(report.totals.transactionsCount)} opération${report.totals.transactionsCount > 1 ? "s" : ""} enregistrée${report.totals.transactionsCount > 1 ? "s" : ""} sur la période.`,
       margin,
       doc.y,
       { width: doc.page.width - margin * 2 }
@@ -4785,11 +5320,11 @@ function drawWaterDataRow(
 ): number {
   const values = [
     { value: formatPdfDate(row.date), align: "center" as const },
-    { value: truncatePdfText(row.categoryLabel, 40), align: "left" as const },
-    { value: truncatePdfText(row.designation, 28), align: "left" as const },
-    { value: row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "-", align: "right" as const },
-    { value: row.quantity > 0 ? formatPdfMoney(row.unitPrice) : "-", align: "right" as const },
-    { value: formatPdfMoney(row.amount), align: "right" as const }
+    { value: truncatePdfText(row.categoryLabel, 40), align: "center" as const },
+    { value: truncatePdfText(row.designation, 28), align: "center" as const },
+    { value: row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "—", align: "center" as const },
+    { value: row.quantity > 0 ? formatPdfMoney(row.unitPrice) : "—", align: "center" as const },
+    { value: formatPdfMoney(row.amount), align: "center" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
@@ -4822,7 +5357,7 @@ function drawWaterTotalsRow(doc: PDFKit.PDFDocument, y: number, label: string, a
     amountColumn.width,
     27,
     {
-      align: "right",
+      align: "center",
       fill: "#dbeafe",
       font: "Helvetica-Bold",
       fontSize: 11
@@ -4842,7 +5377,7 @@ function drawWaterEmptyState(doc: PDFKit.PDFDocument): void {
     .fillColor("#1e3a8a")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Aucune vente ni dépense eau reportable", margin + 14, y + 16, {
+    .text("Aucune recette ni dépense sur la période", margin + 14, y + 16, {
       width: pageWidth - margin * 2 - 28
     });
   doc
@@ -4850,7 +5385,7 @@ function drawWaterEmptyState(doc: PDFKit.PDFDocument): void {
     .font("Helvetica")
     .fontSize(8.5)
     .text(
-      "Le rapport reprend les ventes de paquets d'eau et les dépenses courantes comptabilisées sur la période. Vérifiez la période filtrée si le tableau doit être alimenté.",
+      "Les ventes de paquets, autres recettes et dépenses apparaîtront ici une fois enregistrées sur la période sélectionnée.",
       margin + 14,
       y + 34,
       {
@@ -4862,12 +5397,13 @@ function drawWaterEmptyState(doc: PDFKit.PDFDocument): void {
 
 function drawWaterSectionTitle(doc: PDFKit.PDFDocument, title: string): void {
   const pageWidth = doc.page.width;
+  const y = doc.y;
   doc
     .fillColor("#1e3a8a")
     .font("Helvetica-Bold")
     .fontSize(12.5)
-    .text(title, PDF_PAGE_MARGIN, doc.y, { width: pageWidth - PDF_PAGE_MARGIN * 2 });
-  doc.y += 18;
+    .text(title, PDF_PAGE_MARGIN, y, { width: pageWidth - PDF_PAGE_MARGIN * 2 });
+  doc.y = y + 18;
 }
 
 function drawWaterKindTable(
@@ -4878,6 +5414,13 @@ function drawWaterKindTable(
   totalLabel: string,
   totalAmount: string
 ): void {
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  const initialBlockHeight = rows.length === 0 ? 38 : 18 + 27 + 24 + 27;
+  if (needsPdfPageBreak(doc, initialBlockHeight)) {
+    doc.addPage();
+    drawWaterContinuationHeader(doc, report);
+  }
+
   drawWaterSectionTitle(doc, title);
 
   if (rows.length === 0) {
@@ -4885,22 +5428,18 @@ function drawWaterKindTable(
       .fillColor("#334155")
       .font("Helvetica")
       .fontSize(9)
-      .text("Aucune ligne sur la période.", PDF_PAGE_MARGIN, doc.y);
+      .text("Aucune opération dans cette section sur la période.", PDF_PAGE_MARGIN, doc.y);
     doc.y += 20;
     return;
   }
 
-  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (doc.y + 27 + 24 + 27 > tableBottom) {
-    doc.addPage();
-    drawWaterContinuationHeader(doc, report);
-  }
   let y = drawWaterTableHeader(doc, doc.y);
 
   for (const row of rows) {
     if (y + 24 + 27 > tableBottom) {
       doc.addPage();
       drawWaterContinuationHeader(doc, report);
+      drawWaterSectionTitle(doc, title);
       y = drawWaterTableHeader(doc, doc.y);
     }
     y = drawWaterDataRow(doc, row, y);
@@ -4909,6 +5448,7 @@ function drawWaterKindTable(
   if (y + 27 > tableBottom) {
     doc.addPage();
     drawWaterContinuationHeader(doc, report);
+    drawWaterSectionTitle(doc, title);
     y = drawWaterTableHeader(doc, doc.y);
   }
   doc.y = drawWaterTotalsRow(doc, y, totalLabel, totalAmount) + 18;
@@ -4920,42 +5460,36 @@ function drawWaterOperationsTable(doc: PDFKit.PDFDocument, report: WaterOperatio
     return;
   }
 
-  const salesRows = report.rows.filter((row) => row.kind === "IN");
+  const incomeRows = report.rows.filter((row) => row.kind === "IN");
   const expenseRows = report.rows.filter((row) => row.kind === "OUT");
 
-  drawWaterKindTable(doc, report, salesRows, "VENTES", "TOTAL VENTES", report.totals.salesAmount);
-  drawWaterKindTable(doc, report, expenseRows, "DEPENSES", "TOTAL DEPENSES", report.totals.expensesAmount);
+  drawWaterKindTable(doc, report, incomeRows, "RECETTES", "TOTAL RECETTES", report.totals.salesAmount);
+  drawWaterKindTable(doc, report, expenseRows, "DÉPENSES", "TOTAL DÉPENSES", report.totals.expensesAmount);
 }
 
 function drawWaterBreakdownTable(
   doc: PDFKit.PDFDocument,
   report: WaterOperationsReport,
   rows: WaterOperationsReport["breakdownRows"],
-  title: string
+  title: string,
+  totalLabel: string
 ): void {
   if (rows.length === 0) {
     return;
   }
 
-  const breakdownHeight = 20 + 24 + rows.length * 24;
-  if (needsPdfPageBreak(doc, breakdownHeight)) {
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  if (needsPdfPageBreak(doc, 18 + 24 + 24 + 27)) {
     doc.addPage();
     drawWaterContinuationHeader(doc, report);
   }
 
-  doc
-    .fillColor("#1e3a8a")
-    .font("Helvetica-Bold")
-    .fontSize(11.5)
-    .text(title, PDF_PAGE_MARGIN, doc.y, {
-      width: doc.page.width - PDF_PAGE_MARGIN * 2
-    });
-  doc.moveDown(0.3);
+  drawWaterSectionTitle(doc, title);
 
   const columns: PdfTableColumn[] = [
-    { label: "CATEGORIE", width: 400, align: "left" },
-    { label: "LIGNES", width: 130, align: "right" },
-    { label: "MONTANT", width: 232, align: "right" }
+    { label: "CATÉGORIE", width: 400, align: "center" },
+    { label: "OPÉRATIONS", width: 130, align: "center" },
+    { label: "TOTAL", width: 232, align: "center" }
   ];
   const drawHeaderRow = (headerY: number): number => {
     let headerX = PDF_PAGE_MARGIN;
@@ -4970,20 +5504,24 @@ function drawWaterBreakdownTable(
     }
     return headerY + 24;
   };
+  const drawContinuedTableHeader = (): number => {
+    drawWaterSectionTitle(doc, title);
+    return drawHeaderRow(doc.y);
+  };
 
   let y = drawHeaderRow(doc.y);
 
   for (const row of rows) {
-    if (y + 24 > doc.page.height - PDF_CONTENT_BOTTOM) {
+    if (y + 24 + 27 > tableBottom) {
       doc.addPage();
       drawWaterContinuationHeader(doc, report);
-      y = drawHeaderRow(doc.y);
+      y = drawContinuedTableHeader();
     }
     let x = PDF_PAGE_MARGIN;
     const values = [
-      { value: row.categoryLabel, align: "left" as const },
-      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
-      { value: formatPdfMoney(row.amount), align: "right" as const }
+      { value: row.categoryLabel, align: "center" as const },
+      { value: formatPdfNumber(row.transactionsCount), align: "center" as const },
+      { value: formatPdfMoney(row.amount), align: "center" as const }
     ];
     values.forEach((item, index) => {
       const column = columns[index];
@@ -4995,7 +5533,25 @@ function drawWaterBreakdownTable(
     });
     y += 24;
   }
-  doc.y = y + 14;
+  const totalAmount = rows.reduce((sum, row) => sum + toNumberAmount(row.amount), 0);
+  if (y + 27 > tableBottom) {
+    doc.addPage();
+    drawWaterContinuationHeader(doc, report);
+    y = drawContinuedTableHeader();
+  }
+  let x = PDF_PAGE_MARGIN;
+  const transactionCount = rows.reduce((sum, row) => sum + row.transactionsCount, 0);
+  const totalValues = [totalLabel, formatPdfNumber(transactionCount), formatPdfMoney(totalAmount)];
+  totalValues.forEach((value, index) => {
+    drawPdfTableCell(doc, value, x, y, columns[index].width, 27, {
+      align: "center",
+      fill: "#dbeafe",
+      font: "Helvetica-Bold",
+      fontSize: 10.5
+    });
+    x += columns[index].width;
+  });
+  doc.y = y + 27 + 14;
 }
 
 function drawWaterBreakdown(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
@@ -5003,20 +5559,11 @@ function drawWaterBreakdown(doc: PDFKit.PDFDocument, report: WaterOperationsRepo
     return;
   }
 
-  doc
-    .fillColor("#1e3a8a")
-    .font("Helvetica-Bold")
-    .fontSize(13)
-    .text("Répartition par catégorie", PDF_PAGE_MARGIN, doc.y, {
-      width: doc.page.width - PDF_PAGE_MARGIN * 2
-    });
-  doc.moveDown(0.4);
-
   const salesBreakdown = report.breakdownRows.filter((row) => row.kind === "IN");
   const expenseBreakdown = report.breakdownRows.filter((row) => row.kind === "OUT");
 
-  drawWaterBreakdownTable(doc, report, salesBreakdown, "Répartition ventes");
-  drawWaterBreakdownTable(doc, report, expenseBreakdown, "Répartition dépenses");
+  drawWaterBreakdownTable(doc, report, salesBreakdown, "Répartition des recettes", "TOTAL RECETTES");
+  drawWaterBreakdownTable(doc, report, expenseBreakdown, "Répartition des dépenses", "TOTAL DÉPENSES");
 }
 
 function drawWaterPdfFooter(
@@ -5042,7 +5589,7 @@ function drawWaterPdfFooter(
     .fillColor("#627d98")
     .font("Helvetica")
     .fontSize(8)
-    .text(`AMCCO - Production d'eau | ${periodLabel}`, margin, pageHeight - 32, {
+    .text(`AMCCO - Production d'eau potable | ${periodLabel}`, margin, pageHeight - 32, {
       width: 300,
       lineBreak: false
     });
@@ -5357,7 +5904,7 @@ function renderAgencyReportsPdf(
 function buildEmptyBtpOperationsReport(filters: ReportPeriodFilter): BtpOperationsReport {
   return {
     periodLabel: toDisplayPeriodLabel(filters),
-    asOfLabel: formatPdfDate(new Date().toISOString()),
+    asOfLabel: formatPdfDate(resolveBtpAsOfDate(filters).toISOString()),
     rows: [],
     totals: {
       projectsCount: 0,
@@ -5376,11 +5923,13 @@ function buildEmptyBtpOperationsReport(filters: ReportPeriodFilter): BtpOperatio
 }
 
 const BTP_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "CHANTIER", width: 210, align: "left" },
-  { label: "TOTAL ENCAISSE", width: 130, align: "right" },
-  { label: "TOTAL DEPENSES", width: 130, align: "right" },
-  { label: "MARGE", width: 130, align: "right" },
-  { label: "AVANCEMENT", width: 130, align: "center" }
+  { label: "CHANTIER / DERNIÈRE OPÉRATION", width: 172, align: "left" },
+  { label: "CLIENT / MARCHÉ / LIEU", width: 145, align: "left" },
+  { label: "ENCAISSÉ", width: 93, align: "right" },
+  { label: "DÉPENSÉ", width: 93, align: "right" },
+  { label: "MARGE NETTE", width: 93, align: "right" },
+  { label: "RETENUE", width: 76, align: "right" },
+  { label: "AVANCEMENT", width: 90, align: "center" }
 ];
 
 function drawBtpReportHeader(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
@@ -5421,7 +5970,7 @@ function drawBtpReportHeader(doc: PDFKit.PDFDocument, report: BtpOperationsRepor
     align: "center"
   });
   doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#d97706").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION DES CHANTIERS - ${report.periodLabel.toUpperCase()}`, margin, 114, {
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION CUMULÉE DES CHANTIERS AU ${report.asOfLabel.toUpperCase()}`, margin, 114, {
     width: pageWidth - margin * 2,
     align: "center"
   });
@@ -5429,29 +5978,24 @@ function drawBtpReportHeader(doc: PDFKit.PDFDocument, report: BtpOperationsRepor
 }
 
 function drawBtpContinuationHeader(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
-  drawSectorContinuationHeader(doc, "SITUATION DES CHANTIERS", report.periodLabel);
+  drawSectorContinuationHeader(doc, "SITUATION CUMULÉE DES CHANTIERS", report.asOfLabel);
 }
 
 function drawBtpMetadataStrip(
   doc: PDFKit.PDFDocument,
   report: BtpOperationsReport,
-  filters: ReportPeriodFilter,
   generatedAt: string
 ): void {
   const margin = PDF_PAGE_MARGIN;
   const pageWidth = doc.page.width;
   const width = pageWidth - margin * 2;
   const y = doc.y;
-  const period = filters.dateFrom || filters.dateTo
-    ? `${filters.dateFrom ? formatPdfDate(filters.dateFrom) : "..."} - ${filters.dateTo ? formatPdfDate(filters.dateTo) : "..."}`
-    : report.periodLabel;
-
   doc.roundedRect(margin, y, width, 42, 4).fill("#fff7ed");
   doc.rect(margin, y, width, 42).strokeColor("#fed7aa").lineWidth(0.8).stroke();
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Période", margin + 10, y + 8, { width: 155 });
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(period, margin + 10, y + 21, { width: 175 });
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Situation au", margin + 205, y + 8, { width: 120 });
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(report.asOfLabel, margin + 205, y + 21, { width: 140 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Périmètre", margin + 10, y + 8, { width: 190 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text("Cumul des opérations", margin + 10, y + 21, { width: 210 });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Date d'arrêté", margin + 245, y + 8, { width: 130 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(report.asOfLabel, margin + 245, y + 21, { width: 140 });
   doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text("Genere le", pageWidth - margin - 150, y + 8, {
     width: 140,
     align: "right"
@@ -5466,31 +6010,44 @@ function drawBtpMetadataStrip(
 function drawBtpMetricCards(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
   const margin = PDF_PAGE_MARGIN;
   const pageWidth = doc.page.width;
-  const gap = 8;
-  const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
+  const gap = 7;
+  const cardWidth = (pageWidth - margin * 2 - gap * 4) / 5;
   const y = doc.y;
   const metrics = [
-    { label: "Chantiers suivis", value: formatPdfNumber(report.totals.projectsCount) },
-    { label: "Total encaissé", value: formatPdfMoney(report.totals.cashInAmount) },
-    { label: "Total dépensé", value: formatPdfMoney(report.totals.totalCostAmount) },
-    { label: "Marge totale", value: formatPdfMoney(report.totals.netAmount) }
+    { label: "Chantiers", value: formatPdfNumber(report.totals.projectsCount) },
+    { label: "Opérations", value: formatPdfNumber(report.totals.transactionsCount) },
+    { label: "Encaissé", value: formatPdfMoney(report.totals.cashInAmount) },
+    { label: "Dépensé", value: formatPdfMoney(report.totals.totalCostAmount) },
+    { label: "Marge nette", value: formatPdfMoney(report.totals.netAmount) }
   ];
 
   metrics.forEach((metric, index) => {
     const x = margin + index * (cardWidth + gap);
     doc.roundedRect(x, y, cardWidth, 45, 4).fill("#fff7ed");
     doc.rect(x, y, cardWidth, 45).strokeColor("#fed7aa").lineWidth(0.8).stroke();
-    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 8, y + 8, { width: cardWidth - 16 });
-    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11.2).text(metric.value, x + 8, y + 23, { width: cardWidth - 16 });
+    doc.fillColor("#486581").font("Helvetica").fontSize(8.3).text(metric.label, x + 7, y + 8, { width: cardWidth - 14 });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10.5).text(metric.value, x + 7, y + 23, { width: cardWidth - 14, lineBreak: false });
   });
   doc.y = y + 60;
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.8).text(
-    `Dépenses par nature: matériaux ${formatPdfMoney(report.totals.materialAmount)} | main-d'oeuvre ${formatPdfMoney(report.totals.laborAmount)} | engins ${formatPdfMoney(report.totals.equipmentAmount)} | sous-traitance ${formatPdfMoney(report.totals.subcontractingAmount)} | charges ${formatPdfMoney(report.totals.siteExpenseAmount)}.`,
-    margin,
-    doc.y - 8,
-    { width: pageWidth - margin * 2, align: "center" }
-  );
-  doc.moveDown(0.8);
+  const categories = [
+    ["Matériaux", report.totals.materialAmount],
+    ["Main-d'œuvre", report.totals.laborAmount],
+    ["Engins", report.totals.equipmentAmount],
+    ["Sous-traitance", report.totals.subcontractingAmount],
+    ["Charges chantier", report.totals.siteExpenseAmount]
+  ] as const;
+  const categoryGap = 7;
+  const categoryWidth = (pageWidth - margin * 2 - categoryGap * 4) / 5;
+  categories.forEach(([label, amount], index) => {
+    const x = margin + index * (categoryWidth + categoryGap);
+    doc.fillColor("#486581").font("Helvetica").fontSize(7.7).text(label, x, doc.y, {
+      width: categoryWidth, align: "center", lineBreak: false
+    });
+    doc.fillColor("#1f2937").font("Helvetica-Bold").fontSize(8.5).text(formatPdfMoney(amount), x, doc.y + 11, {
+      width: categoryWidth, align: "center", lineBreak: false
+    });
+  });
+  doc.y += 32;
 }
 
 function drawBtpTableHeader(doc: PDFKit.PDFDocument, y: number): number {
@@ -5500,7 +6057,7 @@ function drawBtpTableHeader(doc: PDFKit.PDFDocument, y: number): number {
       align: "center",
       fill: "#ffedd5",
       font: "Helvetica-Bold",
-      fontSize: 11
+      fontSize: 8.5
     });
     x += column.width;
   }
@@ -5513,22 +6070,31 @@ function drawBtpDataRow(
   y: number
 ): number {
   const values = [
-    { value: truncatePdfText(row.projectRef, 30), align: "left" as const },
+    {
+      value: `${truncatePdfText(row.projectRef, 25)}\n${row.lastOperationDate ? `Dernière op. : ${formatPdfDate(row.lastOperationDate)}` : "Aucune opération"} · ${formatPdfNumber(row.transactionsCount)} op.`,
+      align: "left" as const
+    },
+    {
+      value: `${truncatePdfText(row.clientRef || "Client non renseigné", 22)}\n${truncatePdfText(row.contractRef || "Marché non renseigné", 22)}\n${truncatePdfText(row.location || "Localisation non renseignée", 22)}`,
+      align: "left" as const
+    },
     { value: formatPdfMoney(row.cashInAmount), align: "right" as const },
     { value: formatPdfMoney(row.totalCostAmount), align: "right" as const },
     { value: formatPdfMoney(row.netAmount), align: "right" as const },
+    { value: formatPdfMoney(row.retentionAmount), align: "right" as const },
     { value: row.lastProgressPercent !== null ? `${formatPdfNumber(row.lastProgressPercent, 0)}%` : "-", align: "center" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
     const column = BTP_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
+    drawPdfTableCell(doc, item.value, x, y, column.width, 42, {
       align: item.align,
-      fontSize: 10.5
+      fontSize: index < 2 ? 7.5 : 8.5,
+      verticalAlign: index < 2 ? "top" : "center"
     });
     x += column.width;
   });
-  return y + 24;
+  return y + 42;
 }
 
 function drawBtpTotalsRow(doc: PDFKit.PDFDocument, report: BtpOperationsReport, y: number): number {
@@ -5537,28 +6103,30 @@ function drawBtpTotalsRow(doc: PDFKit.PDFDocument, report: BtpOperationsReport, 
     align: "center",
     fill: "#f8fafc",
     font: "Helvetica-Bold",
-    fontSize: 11
+    fontSize: 9
   });
   x += BTP_PDF_COLUMNS[0].width;
+  drawPdfTableCell(doc, "", x, y, BTP_PDF_COLUMNS[1].width, 27, { fill: "#f8fafc" });
+  x += BTP_PDF_COLUMNS[1].width;
 
   const values = [
     formatPdfMoney(report.totals.cashInAmount),
     formatPdfMoney(report.totals.totalCostAmount),
-    formatPdfMoney(report.totals.netAmount)
+    formatPdfMoney(report.totals.netAmount),
+    formatPdfMoney(report.rows.reduce((total, row) => total + toNumberAmount(row.retentionAmount), 0).toFixed(2))
   ];
   for (let index = 0; index < values.length; index += 1) {
-    const column = BTP_PDF_COLUMNS[index + 1];
+    const column = BTP_PDF_COLUMNS[index + 2];
     drawPdfTableCell(doc, values[index], x, y, column.width, 27, {
       align: "right",
       fill: "#fff7ed",
       font: "Helvetica-Bold",
-      fontSize: 11
+      fontSize: 9
     });
     x += column.width;
   }
 
-  const lastColumn = BTP_PDF_COLUMNS[4];
-  drawPdfTableCell(doc, "", x, y, lastColumn.width, 27, { fill: "#fff7ed" });
+  drawPdfTableCell(doc, "", x, y, BTP_PDF_COLUMNS[6].width, 27, { fill: "#fff7ed" });
 
   return y + 27;
 }
@@ -5574,7 +6142,7 @@ function drawBtpEmptyState(doc: PDFKit.PDFDocument): void {
     width: pageWidth - margin * 2 - 28
   });
   doc.fillColor("#92400e").font("Helvetica").fontSize(9.2).text(
-    "Le rapport reprend les encaissements et dépenses comptabilisés par chantier. Ajoutez un chantier et saisissez une opération pour alimenter le suivi.",
+    "Le suivi par chantier apparaîtra ici dès qu'une opération sera comptabilisée sur la période sélectionnée.",
     margin + 14,
     y + 34,
     { width: pageWidth - margin * 2 - 28 }
@@ -5589,14 +6157,14 @@ function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsRe
   }
 
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (doc.y + 27 + 24 + 27 > tableBottom) {
+  if (doc.y + 27 + 42 + 27 > tableBottom) {
     doc.addPage();
     drawBtpContinuationHeader(doc, report);
   }
   let y = drawBtpTableHeader(doc, doc.y);
 
   for (const row of report.rows) {
-    if (y + 24 + 27 > tableBottom) {
+    if (y + 42 + 27 > tableBottom) {
       doc.addPage();
       drawBtpContinuationHeader(doc, report);
       y = drawBtpTableHeader(doc, doc.y);
@@ -5612,11 +6180,120 @@ function drawBtpOperationsTable(doc: PDFKit.PDFDocument, report: BtpOperationsRe
   doc.y = drawBtpTotalsRow(doc, report, y) + 12;
 }
 
+const BTP_COST_BREAKDOWN_COLUMNS: PdfTableColumn[] = [
+  { label: "CHANTIER", width: 175, align: "left" },
+  { label: "MATÉRIAUX", width: 99, align: "right" },
+  { label: "MAIN-D'ŒUVRE", width: 99, align: "right" },
+  { label: "ENGINS", width: 89, align: "right" },
+  { label: "SOUS-TRAITANCE", width: 99, align: "right" },
+  { label: "CHARGES", width: 101, align: "right" },
+  { label: "TOTAL", width: 100, align: "right" }
+];
+
+function drawBtpCostBreakdown(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
+  if (report.rows.length === 0) return;
+
+  const margin = PDF_PAGE_MARGIN;
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  const titleHeight = 22;
+  const headerHeight = 27;
+  const rowHeight = 25;
+  const totalHeight = 27;
+
+  if (doc.y + titleHeight + headerHeight + rowHeight + totalHeight > tableBottom) {
+    doc.addPage();
+    drawBtpContinuationHeader(doc, report);
+  }
+
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11).text(
+    "DÉTAIL DES DÉPENSES PAR CHANTIER",
+    margin,
+    doc.y,
+    { width: doc.page.width - margin * 2 }
+  );
+  doc.y += titleHeight;
+
+  const drawHeader = (y: number): number => {
+    let x = margin;
+    for (const column of BTP_COST_BREAKDOWN_COLUMNS) {
+      drawPdfTableCell(doc, column.label, x, y, column.width, headerHeight, {
+        align: "center", fill: "#ffedd5", font: "Helvetica-Bold", fontSize: 8
+      });
+      x += column.width;
+    }
+    return y + headerHeight;
+  };
+
+  let y = drawHeader(doc.y);
+  for (const row of report.rows) {
+    if (y + rowHeight + totalHeight > tableBottom) {
+      doc.addPage();
+      drawBtpContinuationHeader(doc, report);
+      doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(
+        "DÉTAIL DES DÉPENSES PAR CHANTIER (SUITE)", margin, doc.y,
+        { width: doc.page.width - margin * 2 }
+      );
+      y = drawHeader(doc.y + titleHeight);
+    }
+
+    const values = [
+      truncatePdfText(row.projectRef, 30),
+      formatPdfMoney(row.materialAmount),
+      formatPdfMoney(row.laborAmount),
+      formatPdfMoney(row.equipmentAmount),
+      formatPdfMoney(row.subcontractingAmount),
+      formatPdfMoney(row.siteExpenseAmount),
+      formatPdfMoney(row.totalCostAmount)
+    ];
+    let x = margin;
+    values.forEach((value, index) => {
+      const column = BTP_COST_BREAKDOWN_COLUMNS[index];
+      drawPdfTableCell(doc, value, x, y, column.width, rowHeight, {
+        align: index === 0 ? "left" : "right", fontSize: 8
+      });
+      x += column.width;
+    });
+    y += rowHeight;
+  }
+
+  if (y + totalHeight > tableBottom) {
+    doc.addPage();
+    drawBtpContinuationHeader(doc, report);
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10).text(
+      "DÉTAIL DES DÉPENSES PAR CHANTIER (SUITE)", margin, doc.y,
+      { width: doc.page.width - margin * 2 }
+    );
+    y = drawHeader(doc.y + titleHeight);
+  }
+
+  const totalValues = [
+    "TOTAL",
+    report.totals.materialAmount,
+    report.totals.laborAmount,
+    report.totals.equipmentAmount,
+    report.totals.subcontractingAmount,
+    report.totals.siteExpenseAmount,
+    report.totals.totalCostAmount
+  ];
+  let x = margin;
+  totalValues.forEach((value, index) => {
+    const column = BTP_COST_BREAKDOWN_COLUMNS[index];
+    drawPdfTableCell(doc, index === 0 ? value : formatPdfMoney(value), x, y, column.width, totalHeight, {
+      align: index === 0 ? "center" : "right",
+      fill: "#fff7ed",
+      font: "Helvetica-Bold",
+      fontSize: 8.5
+    });
+    x += column.width;
+  });
+  doc.y = y + totalHeight + 12;
+}
+
 function drawBtpPdfFooter(
   doc: PDFKit.PDFDocument,
   pageNumber: number,
   totalPages: number,
-  periodLabel: string
+  asOfLabel: string
 ): void {
   const pageWidth = doc.page.width;
   const pageHeight = doc.page.height;
@@ -5626,7 +6303,7 @@ function drawBtpPdfFooter(
   doc.save();
   doc.page.margins.bottom = 0;
   doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#fed7aa").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport BTP | ${periodLabel}`, margin, pageHeight - 32, {
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport BTP | Cumul au ${asOfLabel}`, margin, pageHeight - 32, {
     width: 330,
     lineBreak: false
   });
@@ -5647,19 +6324,20 @@ function renderBtpReportsPdf(
   const report = overview.btpOperationsReport ?? buildEmptyBtpOperationsReport(filters);
 
   drawBtpReportHeader(doc, report);
-  drawBtpMetadataStrip(doc, report, filters, overview.generatedAt);
+  drawBtpMetadataStrip(doc, report, overview.generatedAt);
   drawBtpMetricCards(doc, report);
   drawBtpOperationsTable(doc, report);
+  drawBtpCostBreakdown(doc, report);
 
   const note =
-    "Lecture: la marge correspond au total encaissé moins le total des dépenses (matériaux, main-d'oeuvre, engins, sous-traitance, charges) du chantier.";
+    `Montants cumulés jusqu'au ${report.asOfLabel}. La marge nette correspond aux encaissements moins les dépenses. La retenue est affichée séparément et n'est pas déduite de cette marge.`;
   const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
   const noteHeight = doc.heightOfString(note, { width: noteWidth });
-  if (doc.y + noteHeight <= doc.page.height - PDF_CONTENT_BOTTOM) {
-    doc.fillColor("#486581").font("Helvetica-Bold").fontSize(10).text(note, PDF_PAGE_MARGIN, doc.y, {
-      width: noteWidth
-    });
+  if (doc.y + noteHeight > doc.page.height - PDF_CONTENT_BOTTOM) {
+    doc.addPage();
+    drawBtpContinuationHeader(doc, report);
   }
+  doc.fillColor("#486581").font("Helvetica-Bold").fontSize(9).text(note, PDF_PAGE_MARGIN, doc.y, { width: noteWidth });
 }
 
 function buildEmptyFishFarmingOperationsReport(filters: ReportPeriodFilter): FishFarmingOperationsReport {
@@ -7570,6 +8248,90 @@ function getMetadataNumber(metadata: Record<string, string>, key: string): numbe
   return toNumberAmount(metadata[key]);
 }
 
+function buildHydrocarbonOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): HydrocarbonOperationsReport {
+  const sectorTransactions = transactions
+    .filter((item) => item.activityCode === "HYDROCARBON" && isReportableFinancialStatus(item.status))
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt));
+  const totalsByCurrency = new Map<string, { count: number; cashIn: number; cashOut: number }>();
+
+  const rows: HydrocarbonOperationsReport["rows"] = sectorTransactions.map((item) => {
+    const currency = item.currency.trim().toUpperCase() || "—";
+    const amount = toNumberAmount(item.amount);
+    const summary = totalsByCurrency.get(currency) ?? { count: 0, cashIn: 0, cashOut: 0 };
+    summary.count += 1;
+    if (item.type === "CASH_IN") summary.cashIn += amount;
+    else summary.cashOut += amount;
+    totalsByCurrency.set(currency, summary);
+
+    return {
+      date: toReportDate(item.occurredAt),
+      direction: item.type,
+      description: item.description?.trim() || "—",
+      status: item.status as "SUBMITTED" | "APPROVED",
+      amount: toMoneyString(amount),
+      currency
+    };
+  });
+
+  const currencyOrder = ["XOF", "EUR", "USD"];
+  const currencySummaries: HydrocarbonOperationsReport["currencySummaries"] = Array.from(totalsByCurrency)
+    .sort(([left], [right]) => {
+      const leftOrder = currencyOrder.indexOf(left);
+      const rightOrder = currencyOrder.indexOf(right);
+      if (leftOrder >= 0 || rightOrder >= 0) {
+        return (leftOrder < 0 ? currencyOrder.length : leftOrder) -
+          (rightOrder < 0 ? currencyOrder.length : rightOrder);
+      }
+      return left.localeCompare(right);
+    })
+    .map(([currency, summary]) => ({
+      currency,
+      transactionsCount: summary.count,
+      cashInAmount: toMoneyString(summary.cashIn),
+      cashOutAmount: toMoneyString(summary.cashOut),
+      netAmount: toMoneyString(summary.cashIn - summary.cashOut)
+    }));
+
+  const sectorTasks = tasks.filter((item) => item.activityCode === "HYDROCARBON");
+  const reportTasks: HydrocarbonOperationsReport["tasks"] = sectorTasks.map((task) => ({
+    dueDate: task.dueDate ? toReportDate(task.dueDate) : null,
+    title: task.title?.trim() || "Action sans titre",
+    description: task.description?.trim() || "—",
+    status: task.status
+  }));
+  const taskStatuses: HydrocarbonOperationsReport["taskStatusSummary"][number]["status"][] = [
+    "TODO", "IN_PROGRESS", "DONE", "BLOCKED"
+  ];
+  const taskStatusSummary = taskStatuses.map((status) => ({
+    status,
+    count: sectorTasks.filter((item) => item.status === status).length
+  }));
+  const doneTasksCount = taskStatusSummary.find((item) => item.status === "DONE")?.count ?? 0;
+  const blockedTasksCount = taskStatusSummary.find((item) => item.status === "BLOCKED")?.count ?? 0;
+  const openTasksCount = taskStatusSummary
+    .filter((item) => item.status === "TODO" || item.status === "IN_PROGRESS")
+    .reduce((total, item) => total + item.count, 0);
+
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    rows,
+    currencySummaries,
+    tasks: reportTasks,
+    taskStatusSummary,
+    totals: {
+      transactionsCount: rows.length,
+      tasksCount: sectorTasks.length,
+      doneTasksCount,
+      openTasksCount,
+      blockedTasksCount
+    }
+  };
+}
+
 function buildBeverageDepotReport(
   transactions: ReportOperationalTransaction[],
   tasks: ReportOperationalTask[],
@@ -7578,18 +8340,29 @@ function buildBeverageDepotReport(
   const sectorTransactions = transactions.filter((item) =>
     item.activityCode === "BEVERAGE_DEPOT" && item.currency === "XOF" && isReportableFinancialStatus(item.status)
   );
+  const getCategory = (item: ReportOperationalTransaction): BeverageDepotReport["transactions"][number]["category"] => {
+    const configuredCategory = item.metadata.beverageOperationKind;
+    if (item.type === "CASH_IN" && configuredCategory === "VENTE") return "VENTE";
+    if (item.type === "CASH_OUT" && configuredCategory === "ACHAT_STOCK") return "ACHAT_STOCK";
+    if (item.type === "CASH_OUT" && configuredCategory === "DEPENSE") return "DEPENSE";
+    if (item.type === "CASH_IN" && configuredCategory === "AUTRE_RECETTE") return "AUTRE_RECETTE";
+    return item.type === "CASH_IN" ? "AUTRE_RECETTE" : "DEPENSE";
+  };
   const sectorTasks = tasks.filter((item) => item.activityCode === "BEVERAGE_DEPOT");
-  const sales = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "VENTE");
-  const purchases = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "ACHAT_STOCK");
-  const expenses = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "DEPENSE");
-  const otherIncome = sectorTransactions.filter((item) => item.metadata.beverageOperationKind === "AUTRE_RECETTE");
+  const sales = sectorTransactions.filter((item) => getCategory(item) === "VENTE");
+  const purchases = sectorTransactions.filter((item) => getCategory(item) === "ACHAT_STOCK");
+  const expenses = sectorTransactions.filter((item) => getCategory(item) === "DEPENSE");
+  const otherIncome = sectorTransactions.filter((item) => getCategory(item) === "AUTRE_RECETTE");
   const inventoryTasks = sectorTasks.filter((item) => item.metadata.beverageTaskKind === "INVENTAIRE");
   const reconciliationTasks = sectorTasks.filter((item) => item.metadata.beverageTaskKind === "RAPPROCHEMENT");
   const inventoryDate = (task: ReportOperationalTask) =>
     task.metadata.periodDate?.trim().slice(0, 10) || (task.dueDate ? toReportDate(task.dueDate) : "");
   const latestInventoryByProduct = new Map<string, ReportOperationalTask>();
   for (const task of inventoryTasks) {
-    const key = task.metadata.productName?.trim() || "—";
+    if (task.status !== "DONE") continue;
+    const productName = task.metadata.productName?.trim();
+    if (!productName) continue;
+    const key = productName.toLocaleLowerCase("fr");
     const existing = latestInventoryByProduct.get(key);
     if (!existing || inventoryDate(task) >= inventoryDate(existing)) {
       latestInventoryByProduct.set(key, task);
@@ -7597,21 +8370,19 @@ function buildBeverageDepotReport(
   }
   const sum = (items: ReportOperationalTransaction[]) => items.reduce((total, item) => total + toNumberAmount(item.amount), 0);
   const grossMargin = sales.reduce((total, item) => {
-    if (!item.metadata.purchaseUnitPrice) return total;
     const quantity = getMetadataNumber(item.metadata, "quantity");
     const salePrice = getMetadataNumber(item.metadata, "saleUnitPrice");
     const purchasePrice = getMetadataNumber(item.metadata, "purchaseUnitPrice");
+    if (quantity <= 0 || salePrice <= 0 || purchasePrice <= 0) return total;
     return total + (salePrice - purchasePrice) * quantity;
   }, 0);
   const taskDate = inventoryDate;
   return {
     periodLabel: toDisplayPeriodLabel(filters),
-    transactions: sectorTransactions.map((item) => {
-      const category = item.metadata.beverageOperationKind;
+    transactions: [...sectorTransactions].sort((left, right) => left.occurredAt.localeCompare(right.occurredAt)).map((item) => {
       return {
         date: toReportDate(item.occurredAt),
-        category: category === "VENTE" || category === "ACHAT_STOCK" || category === "DEPENSE" || category === "AUTRE_RECETTE"
-          ? category : item.type === "CASH_IN" ? "AUTRE_RECETTE" : "DEPENSE",
+        category: getCategory(item),
         productName: item.metadata.productName?.trim() || "—",
         quantity: item.metadata.quantity ? getMetadataNumber(item.metadata, "quantity") : null,
         purchaseUnitPrice: item.metadata.purchaseUnitPrice ? toMoneyString(getMetadataNumber(item.metadata, "purchaseUnitPrice")) : null,
@@ -7621,20 +8392,24 @@ function buildBeverageDepotReport(
         currency: "XOF" as const
       };
     }),
-    inventory: inventoryTasks.map((item) => ({
-      date: taskDate(item), status: item.status,
-      productName: item.metadata.productName?.trim() || "—",
-      quantity: item.metadata.quantity ? getMetadataNumber(item.metadata, "quantity") : null,
-      purchaseUnitPrice: item.metadata.purchaseUnitPrice ? toMoneyString(getMetadataNumber(item.metadata, "purchaseUnitPrice")) : null,
-      stockValue: item.metadata.stockValue ? toMoneyString(getMetadataNumber(item.metadata, "stockValue")) : null
-    })),
-    reconciliations: reconciliationTasks.map((item) => ({
-      date: taskDate(item), status: item.status,
-      dailySales: toMoneyString(getMetadataNumber(item.metadata, "dailySales")),
-      dailyDeposits: toMoneyString(getMetadataNumber(item.metadata, "dailyDeposits")),
-      dailyBalance: toMoneyString(getMetadataNumber(item.metadata, "dailyBalance")),
-      dailyExpenses: toMoneyString(getMetadataNumber(item.metadata, "dailyExpenses"))
-    })),
+    inventory: inventoryTasks
+      .map((item) => ({
+        date: taskDate(item), status: item.status,
+        productName: item.metadata.productName?.trim() || "—",
+        quantity: item.metadata.quantity ? getMetadataNumber(item.metadata, "quantity") : null,
+        purchaseUnitPrice: item.metadata.purchaseUnitPrice ? toMoneyString(getMetadataNumber(item.metadata, "purchaseUnitPrice")) : null,
+        stockValue: item.metadata.stockValue ? toMoneyString(getMetadataNumber(item.metadata, "stockValue")) : null
+      }))
+      .sort((left, right) => left.date.localeCompare(right.date)),
+    reconciliations: reconciliationTasks
+      .map((item) => ({
+        date: taskDate(item), status: item.status,
+        dailySales: toMoneyString(getMetadataNumber(item.metadata, "dailySales")),
+        dailyDeposits: toMoneyString(getMetadataNumber(item.metadata, "dailyDeposits")),
+        dailyBalance: toMoneyString(getMetadataNumber(item.metadata, "dailyBalance")),
+        dailyExpenses: toMoneyString(getMetadataNumber(item.metadata, "dailyExpenses"))
+      }))
+      .sort((left, right) => left.date.localeCompare(right.date)),
     totals: {
       salesAmount: toMoneyString(sum(sales)),
       purchasesAmount: toMoneyString(sum(purchases)),
@@ -8153,15 +8928,16 @@ function toAgriculturePeriodLabel(
   }
 
   const sameMonth =
-    fromDate.getFullYear() === toDate.getFullYear() &&
-    fromDate.getMonth() === toDate.getMonth();
+    fromDate.getUTCFullYear() === toDate.getUTCFullYear() &&
+    fromDate.getUTCMonth() === toDate.getUTCMonth();
   if (!sameMonth) {
     return toDisplayPeriodLabel(filters);
   }
 
   return fromDate.toLocaleDateString("fr-FR", {
     month: "long",
-    year: "numeric"
+    year: "numeric",
+    timeZone: "UTC"
   });
 }
 
@@ -9594,15 +10370,16 @@ function toWaterPeriodLabel(filters: ReportPeriodFilter): string {
   }
 
   const sameMonth =
-    fromDate.getFullYear() === toDate.getFullYear() &&
-    fromDate.getMonth() === toDate.getMonth();
+    fromDate.getUTCFullYear() === toDate.getUTCFullYear() &&
+    fromDate.getUTCMonth() === toDate.getUTCMonth();
   if (!sameMonth) {
     return toDisplayPeriodLabel(filters);
   }
 
   return fromDate.toLocaleDateString("fr-FR", {
     month: "long",
-    year: "numeric"
+    year: "numeric",
+    timeZone: "UTC"
   });
 }
 
@@ -10262,6 +11039,7 @@ function buildBtpOperationsReport(
   function buildRow(
     projectKey: string,
     clientRef: string,
+    contractRef: string,
     location: string,
     ledger: BtpProjectLedger | undefined
   ): BtpOperationsReport["rows"][number] {
@@ -10276,6 +11054,7 @@ function buildBtpOperationsReport(
     return {
       projectRef: projectKey,
       clientRef,
+      contractRef,
       location,
       cashInAmount: toMoneyString(cashInValue),
       materialAmount: toMoneyString(materialValue),
@@ -10294,14 +11073,14 @@ function buildBtpOperationsReport(
   }
 
   const rows: BtpOperationsReport["rows"] = activeProjects.map((project) =>
-    buildRow(project.name, project.clientRef ?? "", project.location ?? "", ledgerByProject.get(project.name))
+    buildRow(project.name, project.clientRef ?? "", project.contractRef ?? "", project.location ?? "", ledgerByProject.get(project.name))
   );
 
   for (const [projectKey, ledger] of ledgerByProject.entries()) {
     if (knownProjectNames.has(projectKey)) {
       continue;
     }
-    rows.push(buildRow(projectKey, "", "", ledger));
+    rows.push(buildRow(projectKey, "", "", "", ledger));
   }
 
   rows.sort((left, right) => left.projectRef.localeCompare(right.projectRef));
@@ -11470,6 +12249,9 @@ export async function getCompanyReportsOverview(
     beverageDepotReport: filters.activityCode === "BEVERAGE_DEPOT"
       ? buildBeverageDepotReport(operationalTransactions, operationalTasks, filters)
       : null,
+    hydrocarbonOperationsReport: filters.activityCode === "HYDROCARBON"
+      ? buildHydrocarbonOperationsReport(operationalTransactions, operationalTasks, filters)
+      : null,
     agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
     generalExpensesReport: buildGeneralExpensesReport(operationalTransactions, filters),
     roleDistribution: [],
@@ -12619,7 +13401,7 @@ export async function exportCompanyReportsPdf(
         doc,
         pageNumber,
         totalPages,
-        overview.rentalOperationsReport?.periodLabel ?? periodLabel
+        toRentalPdfPeriodLabel(filters)
       );
     }, { layout: "landscape" });
   }
@@ -12655,7 +13437,16 @@ export async function exportCompanyReportsPdf(
     return buildPdfBuffer((doc) => {
       renderBeverageDepotReportsPdf(doc, report, overview.generatedAt);
     }, (doc, pageNumber, totalPages) => {
-      drawPdfBrandingFrame(doc, pageNumber, totalPages, report.periodLabel, BEVERAGE_DEPOT_PDF_TITLE);
+      drawBeverageDepotPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
+    }, { layout: "landscape" });
+  }
+
+  if (filters.activityCode === "HYDROCARBON") {
+    const report = overview.hydrocarbonOperationsReport ?? buildHydrocarbonOperationsReport([], [], filters);
+    return buildPdfBuffer((doc) => {
+      renderHydrocarbonReportsPdf(doc, report, overview.generatedAt);
+    }, (doc, pageNumber, totalPages) => {
+      drawHydrocarbonPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
     }, { layout: "landscape" });
   }
 
@@ -12680,7 +13471,7 @@ export async function exportCompanyReportsPdf(
         doc,
         pageNumber,
         totalPages,
-        overview.btpOperationsReport?.periodLabel ?? periodLabel
+        overview.btpOperationsReport?.asOfLabel ?? formatPdfDate(resolveBtpAsOfDate(filters).toISOString())
       );
     }, { layout: "landscape" });
   }
