@@ -98,7 +98,7 @@ export function AdminActivitiesPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header">
+      <header className="section-header mobile-title-duplicate">
         <h2>Administration secteurs</h2>
         <p>Activation des domaines métier visibles dans les tâches, transactions, tableaux de bord et rapports.</p>
       </header>
@@ -136,7 +136,9 @@ export function AdminActivitiesPage(): JSX.Element {
         <div className="admin-section-header">
           <div>
             <h3>Configuration des secteurs</h3>
-            <p className="hint">{items.length} secteur(s) configuré(s) pour l'entreprise active.</p>
+            <p className="hint activity-admin-count-note">
+              {items.length} secteur(s) configuré(s) pour l'entreprise active.
+            </p>
           </div>
           <div className="admin-summary-strip">
             <article className="admin-summary-pill">
@@ -167,7 +169,7 @@ export function AdminActivitiesPage(): JSX.Element {
                       <p className="hint">
                         <strong>État:</strong> {item.isEnabled ? "Actif" : "Désactivé"}
                       </p>
-                      <p className="hint">
+                      <p className="hint activity-admin-impact-detail">
                         <strong>Impact:</strong>{" "}
                         {item.isEnabled
                           ? "Le secteur reste disponible pour nouvelles tâches et transactions."
@@ -176,7 +178,7 @@ export function AdminActivitiesPage(): JSX.Element {
                     </div>
                   </div>
                   {canManageActivities ? <div className="admin-actions-block">
-                    <p className="hint">
+                    <p className="hint activity-admin-action-label">
                       <strong>Action</strong>
                     </p>
                     <button

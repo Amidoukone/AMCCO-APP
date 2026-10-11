@@ -63,6 +63,7 @@ import {
 } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { financeStatusLabel } from "../utils/dashboardDisplay";
 import type { ActivityFieldDefinition } from "../types/activities";
 import type { ActivityArticle } from "../types/articles";
 import type { RentalTenant } from "../types/tenants";
@@ -3348,6 +3349,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isTransactionFormExpanded, setIsTransactionFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
+  const [isCompactScreen] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
+  );
 
   const [proofFiles, setProofFiles] = useState<Record<string, File | null>>({});
   const [proofsByTransaction, setProofsByTransaction] = useState<Record<string, TransactionProof[]>>(
@@ -4918,7 +4922,9 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   return (
     <>
-      <header className={isReadOnlyOwner ? "section-header owner-lite-header" : "section-header"}>
+      <header
+        className={`${isReadOnlyOwner ? "section-header owner-lite-header" : "section-header"} mobile-title-duplicate`}
+      >
         <h2>Transactions financières</h2>
         <p>Suivi financier opérationnel.</p>
       </header>
@@ -5692,6 +5698,9 @@ export function FinanceTransactionsPage(): JSX.Element {
           }}
         >
 
+          <details className="finance-transaction-type-filter" open={!isCompactScreen}>
+            <summary>Type de transaction</summary>
+            <div className="finance-transaction-type-filter-content">
           <label className="operations-inline-group">
             <span>Type de transaction</span>
             <select
@@ -5708,6 +5717,8 @@ export function FinanceTransactionsPage(): JSX.Element {
               <option value="CASH_OUT">Sortie</option>
             </select>
           </label>
+            </div>
+          </details>
           <label className="operations-inline-group">
             <span>Recherche rapide</span>
             <input
@@ -6556,7 +6567,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           </details>
 
           <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails}>
-            <summary>Informations complémentaires</summary>
+            <summary>Détails de l'opération</summary>
             <div className="finance-transaction-form-options-body">
               {selectedActivityCode === "HARDWARE" ? (
                 <p className="hint finance-form-mode-hint">
@@ -7227,7 +7238,12 @@ export function FinanceTransactionsPage(): JSX.Element {
                         tx.type === "CASH_IN" ? "is-cash-in" : "is-cash-out"
                       }`}
                     >
-                      <td data-label="Date">{new Date(tx.occurredAt).toLocaleString("fr-FR")}</td>
+                      <td data-label="Date">
+                        {new Date(tx.occurredAt).toLocaleString("fr-FR")}
+                        <span className={`finance-transaction-mobile-status is-${tx.status.toLowerCase()}`}>
+                          {financeStatusLabel(tx.status)}
+                        </span>
+                      </td>
                       <td data-label="Compte">
                         <strong>{tx.accountName}</strong>
                         <div className="hint">
@@ -7244,7 +7260,13 @@ export function FinanceTransactionsPage(): JSX.Element {
                         <div>
                           {tx.proofsCount} preuve{tx.proofsCount > 1 ? "s" : ""}
                         </div>
-                        <p className="hint">{tx.requiresProof ? "Justificatif requis" : "Justificatif libre"}</p>
+                        <p
+                          className={`hint finance-transaction-proof-requirement ${
+                            tx.requiresProof ? "is-required" : "is-optional"
+                          }`}
+                        >
+                          {tx.requiresProof ? "Justificatif requis" : "Justificatif libre"}
+                        </p>
                       </td>
                       <td data-label="Actions" className="finance-transaction-actions-cell">
                         <div className="actions-inline">
@@ -7277,7 +7299,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           ) : null}
                         </div>
                         <details className="table-inline-details">
-                          <summary className="table-inline-summary">Voir plus</summary>
+                          <summary className="table-inline-summary">Contexte et justificatifs</summary>
                           <div className="table-inline-content">
                             <p className="hint">
                               <strong>Portée du compte:</strong>{" "}
@@ -7416,6 +7438,18 @@ export function FinanceTransactionsPage(): JSX.Element {
             </button>
           </div>
 
+          <div className="finance-transaction-primary">
+            <span>Montant</span>
+            <strong>
+              {formatAmountForDisplay(selectedTransaction.amount)} {selectedTransaction.currency}
+            </strong>
+            <span className={`finance-transaction-detail-status is-${selectedTransaction.status.toLowerCase()}`}>
+              {financeStatusLabel(selectedTransaction.status)}
+            </span>
+          </div>
+
+          <details className="finance-transaction-detail-more" open={!isCompactScreen}>
+            <summary>Détails et justificatifs</summary>
           <div className="operations-task-meta">
             <p>
               <strong>Secteur:</strong>{" "}
@@ -7424,13 +7458,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 : "Charge transversale entreprise"}
             </p>
             <p>
-              <strong>Compte:</strong> {selectedTransaction.accountName}
-            </p>
-            <p>
               <strong>Type:</strong> {selectedTransaction.type === "CASH_IN" ? "Entrée" : "Sortie"}
-            </p>
-            <p>
-              <strong>Montant:</strong> {formatAmountForDisplay(selectedTransaction.amount)} {selectedTransaction.currency}
             </p>
             <p>
               <strong>Preuves:</strong> {selectedTransaction.proofsCount}
@@ -7438,10 +7466,6 @@ export function FinanceTransactionsPage(): JSX.Element {
             </p>
             <p>
               <strong>Createur:</strong> {selectedTransaction.createdByEmail}
-            </p>
-            <p>
-              <strong>Opération:</strong>{" "}
-              {new Date(selectedTransaction.occurredAt).toLocaleString("fr-FR")}
             </p>
             <p>
               <strong>Creee le:</strong>{" "}
@@ -7472,7 +7496,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               {selectedTransaction.description?.trim() ? (
                 <p className="hint">{selectedTransaction.description}</p>
               ) : (
-                <p className="hint">Aucune description fournie.</p>
+                <p className="hint mobile-generic-placeholder">Aucune description fournie.</p>
               )}
             </article>
 
@@ -7498,6 +7522,8 @@ export function FinanceTransactionsPage(): JSX.Element {
               </p>
             </article>
           </div>
+
+          </details>
 
           <div className="finance-transaction-detail-actions">
             <div className="actions-inline">

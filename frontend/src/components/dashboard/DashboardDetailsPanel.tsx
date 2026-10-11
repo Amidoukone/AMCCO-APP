@@ -18,7 +18,7 @@ export function DashboardDetailsPanel({
   return (
     <details className="panel dashboard-section-toggle">
       <summary className="dashboard-section-summary">
-        <span>Vue détaillée entreprise</span>
+        <span>Indicateurs détaillés</span>
         <small>Indicateurs globaux finance et opérations.</small>
       </summary>
 
@@ -82,12 +82,12 @@ export function DashboardDetailsPanel({
             <p className="hint">
               {selectedActivityCode
                 ? `${summary.finance.accountsSummary.incompatibleCount} compte(s) hors secteur actif.`
-                : "Lecture globale sans filtre de secteur."}
+                : <span className="mobile-generic-placeholder">Lecture globale sans filtre de secteur.</span>}
             </p>
 
             <div className="dashboard-currency-list">
               {summary.finance.totalsByCurrency.length === 0 ? (
-                <p className="hint">Aucun montant comptabilisé disponible.</p>
+                <p className="hint mobile-generic-placeholder">Aucun montant comptabilisé disponible.</p>
               ) : (
                 summary.finance.totalsByCurrency.map((item) => (
                   <article key={item.currency} className="dashboard-currency-card">
@@ -125,7 +125,7 @@ export function DashboardDetailsPanel({
             {canSeeWorkload ? (
               <div className="operations-member-grid">
                 {summary.workload.length === 0 ? (
-                  <p className="hint">Aucun membre assignable disponible.</p>
+                  <p className="hint mobile-generic-placeholder">Aucun membre assignable disponible.</p>
                 ) : (
                   summary.workload.map((item) => (
                     <article key={item.userId} className="operations-member-card">

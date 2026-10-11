@@ -66,7 +66,7 @@ export function MyWorkPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header my-work-header">
+      <header className="section-header my-work-header mobile-title-duplicate">
         <div>
           <p className="sidebar-section-label">Espace personnel</p>
           <h2>Mon travail</h2>
@@ -158,14 +158,23 @@ export function MyWorkPage(): JSX.Element {
                     >
                       <div className="dashboard-priority-main">
                         <strong>{task.title}</strong>
-                        <span>
-                          {task.activityCode ? getBusinessActivityLabel(task.activityCode) : "Sans activité"} |{" "}
-                          {task.assignedToFullName ?? "Non assignée"}
-                        </span>
+                        {task.activityCode || task.assignedToFullName ? (
+                          <span>
+                            {task.activityCode ? getBusinessActivityLabel(task.activityCode) : null}
+                            {task.activityCode && task.assignedToFullName ? " · " : null}
+                            {task.assignedToFullName ?? null}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="dashboard-priority-side">
                         <strong>{taskStatusLabel(task.status)}</strong>
-                        <span className={isOverdue(task.dueDate) ? "priority-danger-text" : undefined}>
+                        <span
+                          className={
+                            isOverdue(task.dueDate)
+                              ? "my-work-task-deadline priority-danger-text"
+                              : "my-work-task-deadline"
+                          }
+                        >
                           Échéance {formatDateTime(task.dueDate)}
                         </span>
                       </div>
@@ -204,8 +213,10 @@ export function MyWorkPage(): JSX.Element {
                       <div className="dashboard-priority-main">
                         <strong>{transaction.accountName}</strong>
                         <span>
-                          {transaction.type === "CASH_IN" ? "Entrée" : "Sortie"} |{" "}
-                          {transaction.activityCode ? getBusinessActivityLabel(transaction.activityCode) : "Sans activité"}
+                          {transaction.type === "CASH_IN" ? "Entrée" : "Sortie"}
+                          {transaction.activityCode
+                            ? ` · ${getBusinessActivityLabel(transaction.activityCode)}`
+                            : null}
                         </span>
                       </div>
                       <div className="dashboard-priority-side">

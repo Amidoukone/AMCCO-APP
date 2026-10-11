@@ -104,6 +104,9 @@ export function AdminCompaniesPage(): JSX.Element {
   const [isCompanyFormExpanded, setIsCompanyFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
+  const [isCompactScreen] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
+  );
   const [companyPendingDelete, setCompanyPendingDelete] = useState<AdminCompanyItem | null>(null);
 
   const canManageCompanies = useMemo(() => {
@@ -310,7 +313,7 @@ export function AdminCompaniesPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header">
+      <header className="section-header mobile-title-duplicate">
         <h2>Administration entreprises</h2>
         <p>Gestion des espaces de travail, de l'entreprise active et de leur disponibilité opérationnelle.</p>
       </header>
@@ -380,6 +383,20 @@ export function AdminCompaniesPage(): JSX.Element {
             {items.map((item) => {
               const isActive = activeCompany?.id === item.company.id;
               const isBusy = busyCompanyId === item.company.id;
+              const hasCompanyAddress = [
+                item.company.addressLine1,
+                item.company.addressLine2,
+                item.company.city,
+                item.company.stateRegion,
+                item.company.postalCode
+              ].some((value) => Boolean(value?.trim()));
+              const hasCompanyContactDetails = Boolean(
+                item.company.email?.trim() ||
+                  item.company.phone?.trim() ||
+                  item.company.website?.trim() ||
+                  item.company.contactFullName?.trim() ||
+                  hasCompanyAddress
+              );
               const updateLockMessage = getCompanyUpdateLockMessage(item);
               const deleteLockMessage = getCompanyDeleteLockMessage(item);
               return (
@@ -400,29 +417,46 @@ export function AdminCompaniesPage(): JSX.Element {
                   </div>
 
                   <div className="company-admin-details">
-                    <p>
-                      <strong>Secteur:</strong> {displayText(item.company.businessSector)}
-                    </p>
-                    <p className="company-admin-secondary-detail">
-                      <strong>Email:</strong> {item.company.email ?? "Non renseigné"}
-                    </p>
-                    <p className="company-admin-secondary-detail">
-                      <strong>Téléphone:</strong> {item.company.phone ?? "Non renseigné"}
-                    </p>
-                    <p className="company-admin-secondary-detail">
-                      <strong>Site web:</strong> {item.company.website ?? "Non renseigné"}
-                    </p>
-                    <p className="company-admin-secondary-detail">
-                      <strong>Contact:</strong>{" "}
-                      {item.company.contactFullName
-                        ? `${displayText(item.company.contactFullName, "")}${
-                            item.company.contactJobTitle ? ` (${displayText(item.company.contactJobTitle, "")})` : ""
-                          }`
-                        : "Non renseigné"}
-                    </p>
-                    <p className="company-admin-address company-admin-secondary-detail">
-                      <strong>Adresse:</strong> {formatCompanyAddress(item)}
-                    </p>
+                    {item.company.businessSector?.trim() ? (
+                      <p>
+                        <strong>Secteur:</strong> {displayText(item.company.businessSector)}
+                      </p>
+                    ) : null}
+                    {hasCompanyContactDetails ? (
+                      <details className="company-admin-secondary-disclosure" open={!isCompactScreen}>
+                        <summary>Coordonnées et adresse</summary>
+                        <div className="company-admin-secondary-content">
+                          {item.company.email?.trim() ? (
+                            <p className="company-admin-secondary-detail">
+                              <strong>Email:</strong> {item.company.email}
+                            </p>
+                          ) : null}
+                          {item.company.phone?.trim() ? (
+                            <p className="company-admin-secondary-detail">
+                              <strong>Téléphone:</strong> {item.company.phone}
+                            </p>
+                          ) : null}
+                          {item.company.website?.trim() ? (
+                            <p className="company-admin-secondary-detail">
+                              <strong>Site web:</strong> {item.company.website}
+                            </p>
+                          ) : null}
+                          {item.company.contactFullName?.trim() ? (
+                            <p className="company-admin-secondary-detail">
+                              <strong>Contact:</strong> {displayText(item.company.contactFullName, "")}
+                              {item.company.contactJobTitle?.trim()
+                                ? ` (${displayText(item.company.contactJobTitle, "")})`
+                                : ""}
+                            </p>
+                          ) : null}
+                          {hasCompanyAddress ? (
+                            <p className="company-admin-address company-admin-secondary-detail">
+                              <strong>Adresse:</strong> {formatCompanyAddress(item)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </details>
+                    ) : null}
                   </div>
 
                   <div className="admin-impact-block">
@@ -508,6 +542,12 @@ export function AdminCompaniesPage(): JSX.Element {
             onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
             disabled={isEditingCompany}
           />
+          <details
+            className="company-admin-extra-form"
+            open={!isCompactScreen || isEditingCompany}
+          >
+            <summary>Coordonnées et profil</summary>
+            <div className="company-admin-extra-form-fields">
           <input
             type="text"
             placeholder="Numéro RCCM / registre"
@@ -569,6 +609,8 @@ export function AdminCompaniesPage(): JSX.Element {
             <option value="Guinée">Guinée</option>
             <option value="Niger">Niger</option>
           </select>
+            </div>
+          </details>
           <div className="mobile-sticky-form-actions">
             <button
               type="button"

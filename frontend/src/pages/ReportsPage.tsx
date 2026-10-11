@@ -527,6 +527,9 @@ export function ReportsPage(): JSX.Element {
   const [isReportFiltersExpanded, setIsReportFiltersExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
+  const [isReportDetailsExpanded, setIsReportDetailsExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
   const [busyExport, setBusyExport] = useState<ExportTarget | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -565,6 +568,16 @@ export function ReportsPage(): JSX.Element {
       prev.activityCode === nextActivityCode ? prev : { ...prev, activityCode: nextActivityCode }
     );
   }, [selectedActivityCode]);
+
+  useEffect(() => {
+    const mobileViewport = window.matchMedia("(max-width: 640px)");
+    const updateReportDetails = (event: MediaQueryListEvent): void => {
+      setIsReportDetailsExpanded(!event.matches);
+    };
+
+    mobileViewport.addEventListener("change", updateReportDetails);
+    return () => mobileViewport.removeEventListener("change", updateReportDetails);
+  }, []);
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -667,7 +680,7 @@ export function ReportsPage(): JSX.Element {
           onToggle={(event) => setIsReportFiltersExpanded(event.currentTarget.open)}
         >
           <summary>
-            <span>Filtres du rapport</span>
+            <span>Période et secteur</span>
             <small>{selectedActivity?.label ?? "Choisir un secteur"} | {summarizePeriodForm(periodForm)}</small>
           </summary>
           <div className="reports-filter-content">
@@ -918,6 +931,13 @@ export function ReportsPage(): JSX.Element {
               </div>
             </div>
           </section>
+
+          <details
+            className="reports-details-disclosure"
+            open={isReportDetailsExpanded}
+            onToggle={(event) => setIsReportDetailsExpanded(event.currentTarget.open)}
+          >
+            <summary>Rentabilité et activité</summary>
 
           {!hasFocusedOperationsReport ? (
             <>
@@ -3423,6 +3443,7 @@ export function ReportsPage(): JSX.Element {
           {selectedActivityCode !== "HARDWARE" && !hasFocusedOperationsReport ? (
             <ReportReadingGuidePanel />
           ) : null}
+          </details>
           </div>
         </>
       ) : null}

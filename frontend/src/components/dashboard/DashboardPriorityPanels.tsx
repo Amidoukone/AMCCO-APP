@@ -68,8 +68,8 @@ export function DashboardPriorityPanels({
                 <div className="dashboard-priority-main">
                   <strong>{item.accountName}</strong>
                   <span>
-                    {item.type === "CASH_IN" ? "Entrée" : "Sortie"} |{" "}
-                    {item.activityCode ? getBusinessActivityLabel(item.activityCode) : "Sans activité"}
+                    {item.type === "CASH_IN" ? "Entrée" : "Sortie"}
+                    {item.activityCode ? ` · ${getBusinessActivityLabel(item.activityCode)}` : null}
                   </span>
                 </div>
                 <div className="dashboard-priority-side">
@@ -145,13 +145,21 @@ export function DashboardPriorityPanels({
               >
                 <div className="dashboard-priority-main">
                   <strong>{item.title}</strong>
-                  <span>
-                    {item.activityCode ? getBusinessActivityLabel(item.activityCode) : "Sans activité"} |{" "}
-                    {item.assignedToFullName ?? "Non assignée"}
-                  </span>
+                  {item.activityCode || item.assignedToFullName ? (
+                    <span>
+                      {item.activityCode ? getBusinessActivityLabel(item.activityCode) : null}
+                      {item.activityCode && item.assignedToFullName ? " · " : null}
+                      {item.assignedToFullName ?? null}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="dashboard-priority-side">
                   <strong>{taskStatusLabel(item.status)}</strong>
+                  {item.dueDate ? (
+                    <span className="dashboard-priority-mobile-deadline">
+                      Échéance {formatDateTime(item.dueDate)}
+                    </span>
+                  ) : null}
                   <span>
                     Échéance {formatDateTime(item.dueDate)} | Mise à jour {formatDateTime(item.updatedAt)}
                   </span>

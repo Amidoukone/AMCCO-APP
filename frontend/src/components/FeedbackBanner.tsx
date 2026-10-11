@@ -29,7 +29,7 @@ export function FeedbackBanner({
       ) : null}
       {isLoading ? (
         <p className="feedback-banner feedback-banner-loading" role="status">
-          {loadingLabel}
+          <span className="feedback-banner-loading-label">{loadingLabel}</span>
         </p>
       ) : null}
     </div>

@@ -170,14 +170,13 @@ export function AppLayout(): JSX.Element {
       "dashboard",
       "operationsTasks",
       "financeTransactions",
-      "reports",
       "alerts"
     ];
     const preferredItems = preferredKeys
       .map((key) => visibleNavigation.find((item) => item.key === key))
       .filter((item): item is typeof visibleNavigation[number] => item !== undefined);
 
-    return (preferredItems.length > 0 ? preferredItems : visibleNavigation).slice(0, 5);
+    return (preferredItems.length > 0 ? preferredItems : visibleNavigation).slice(0, 4);
   }, [visibleNavigation]);
   const mobileSecondaryNavigationSections = useMemo(() => {
     const bottomNavigationKeys = new Set(mobilePrimaryNavigation.map((item) => item.key));

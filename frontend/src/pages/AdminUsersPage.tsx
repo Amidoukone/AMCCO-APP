@@ -58,6 +58,9 @@ export function AdminUsersPage(): JSX.Element {
   const [isCreateFormExpanded, setIsCreateFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
+  const [isCompactScreen] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
+  );
 
   const canManageUser = useMemo(() => {
     return user?.role === "SYS_ADMIN";
@@ -272,7 +275,7 @@ export function AdminUsersPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header">
+      <header className="section-header mobile-title-duplicate">
         <h2>Administration utilisateurs</h2>
         <p>Gestion des accès, des rôles et de l'état des membres de l'entreprise.</p>
       </header>
@@ -408,16 +411,19 @@ export function AdminUsersPage(): JSX.Element {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as "ALL" | "ACTIVE" | "INACTIVE")
-            }
-          >
-            <option value="ALL">Tous les statuts</option>
-            <option value="ACTIVE">Actifs</option>
-            <option value="INACTIVE">Inactifs</option>
-          </select>
+          <details className="admin-users-filter-disclosure" open={!isCompactScreen}>
+            <summary>Rôle et statut</summary>
+            <div className="admin-users-filter-disclosure-content">
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as "ALL" | "ACTIVE" | "INACTIVE")
+                }
+              >
+                <option value="ALL">Tous les statuts</option>
+                <option value="ACTIVE">Actifs</option>
+                <option value="INACTIVE">Inactifs</option>
+              </select>
           <select
             value={roleFilter}
             onChange={(event) => setRoleFilter(event.target.value as "ALL" | RoleCode)}
@@ -429,6 +435,8 @@ export function AdminUsersPage(): JSX.Element {
               </option>
             ))}
           </select>
+            </div>
+          </details>
         </div>
         {!isLoading && items.length === 0 ? (
           <EmptyState
@@ -560,7 +568,7 @@ export function AdminUsersPage(): JSX.Element {
                           </button>
                         </div>
                         <details className="admin-user-security-toggle">
-                          <summary>Sécurité</summary>
+                          <summary>Mot de passe</summary>
                           <div className="password-reset-inline admin-user-password-row">
                             <input
                               type="password"

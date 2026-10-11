@@ -152,6 +152,9 @@ export function FinanceSalariesPage(): JSX.Element {
   const [salarySummary, setSalarySummary] = useState<SalarySummary | null>(null);
   const [selectedSalaryId, setSelectedSalaryId] = useState<string | null>(null);
   const [editingSalaryId, setEditingSalaryId] = useState<string | null>(null);
+  const [isCompactScreen] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
+  );
   const [isSavingSalary, setIsSavingSalary] = useState(false);
   const [isSalaryFormExpanded, setIsSalaryFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
@@ -789,7 +792,7 @@ export function FinanceSalariesPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header salaries-page-header">
+      <header className="section-header salaries-page-header mobile-title-duplicate">
         <h2>Salaires</h2>
         <p>
           Espace dédié au cycle de paie: préparation, enregistrement, justificatifs et suivi
@@ -830,8 +833,7 @@ export function FinanceSalariesPage(): JSX.Element {
         ))}
       </section>
 
-      <section className="panel">
-        <h3>Filtres</h3>
+      <section className="panel salary-filters-panel">
         <form
           className="operations-filter-form salaries-filter-form"
           onSubmit={(event) => {
@@ -847,35 +849,40 @@ export function FinanceSalariesPage(): JSX.Element {
             onChange={(event) => setSearchQuery(event.target.value)}
           />
 
-          <input
-            type="month"
-            value={salaryFilters.payPeriod}
-            onChange={(event) =>
-              setSalaryFilters((prev) => ({
-                ...prev,
-                payPeriod: event.target.value
-              }))
-            }
-          />
-          {canManageSalaries ? (
-            <select
-              value={salaryFilters.employeeUserId}
-              onChange={(event) =>
-                setSalaryFilters((prev) => ({
-                  ...prev,
-                  employeeUserId: event.target.value
-                }))
-              }
-            >
-              <option value="">Tous les collaborateurs</option>
-              {salaryMembers.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {member.fullName}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          <button type="submit" className="mobile-hide-redundant-action">Actualiser</button>
+          <details className="salary-filter-disclosure" open={!isCompactScreen}>
+            <summary>Période et membre</summary>
+            <div className="salary-filter-disclosure-content">
+              <input
+                type="month"
+                value={salaryFilters.payPeriod}
+                onChange={(event) =>
+                  setSalaryFilters((prev) => ({
+                    ...prev,
+                    payPeriod: event.target.value
+                  }))
+                }
+              />
+              {canManageSalaries ? (
+                <select
+                  value={salaryFilters.employeeUserId}
+                  onChange={(event) =>
+                    setSalaryFilters((prev) => ({
+                      ...prev,
+                      employeeUserId: event.target.value
+                    }))
+                  }
+                >
+                  <option value="">Tous les collaborateurs</option>
+                  {salaryMembers.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.fullName}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <button type="submit" className="mobile-hide-redundant-action">Actualiser</button>
+            </div>
+          </details>
         </form>
       </section>
 
@@ -1226,7 +1233,7 @@ export function FinanceSalariesPage(): JSX.Element {
                           ) : null}
                         </div>
                         <details className="table-inline-details">
-                          <summary className="table-inline-summary">Voir plus</summary>
+                          <summary className="table-inline-summary">Compte, montants et preuves</summary>
                           <div className="table-inline-content">
                             <p className="hint">
                               <strong>Compte:</strong> {item.accountName}
@@ -1363,39 +1370,41 @@ export function FinanceSalariesPage(): JSX.Element {
             </button>
           </div>
 
-          <div className="operations-task-meta">
-            <p>
-              <strong>Collaborateur:</strong> {selectedSalary.employeeFullName} ({selectedSalary.employeeEmail})
-            </p>
-            <p>
-              <strong>Rôle:</strong>{" "}
-              {ROLE_LABELS[selectedSalary.employeeRole as keyof typeof ROLE_LABELS] ?? selectedSalary.employeeRole}
-            </p>
-            <p>
-              <strong>Période:</strong> {formatPayPeriod(selectedSalary.payPeriod)}
-            </p>
-            <p>
-              <strong>Compte:</strong> {selectedSalary.accountName}
-            </p>
-            <p>
-              <strong>Net:</strong> {formatMoneyForDisplay(selectedSalary.netAmount)} {selectedSalary.currency}
-            </p>
-            <p>
-              <strong>Brut:</strong> {formatMoneyForDisplay(selectedSalary.grossAmount)} {selectedSalary.currency}
-            </p>
-            <p>
-              <strong>Prime:</strong> {formatMoneyForDisplay(selectedSalary.bonusAmount)} {selectedSalary.currency}
-            </p>
-            <p>
-              <strong>Retenue:</strong> {formatMoneyForDisplay(selectedSalary.deductionAmount)} {selectedSalary.currency}
-            </p>
-            <p>
-              <strong>Mode:</strong> {salaryPaymentMethodLabel(selectedSalary.paymentMethod)}
-            </p>
-            <p>
-              <strong>Créateur:</strong> {selectedSalary.createdByEmail}
-            </p>
+          <div className="salary-detail-primary">
+            <span>Net à payer</span>
+            <strong>{formatMoneyForDisplay(selectedSalary.netAmount)} {selectedSalary.currency}</strong>
           </div>
+
+          <details className="salary-detail-disclosure" open={!isCompactScreen}>
+            <summary>Détails de la paie</summary>
+            <div className="operations-task-meta">
+              <p>
+                <strong>Email:</strong> {selectedSalary.employeeEmail}
+              </p>
+              <p>
+                <strong>Rôle:</strong>{" "}
+                {ROLE_LABELS[selectedSalary.employeeRole as keyof typeof ROLE_LABELS] ?? selectedSalary.employeeRole}
+              </p>
+              <p>
+                <strong>Compte:</strong> {selectedSalary.accountName}
+              </p>
+              <p>
+                <strong>Brut:</strong> {formatMoneyForDisplay(selectedSalary.grossAmount)} {selectedSalary.currency}
+              </p>
+              <p>
+                <strong>Prime:</strong> {formatMoneyForDisplay(selectedSalary.bonusAmount)} {selectedSalary.currency}
+              </p>
+              <p>
+                <strong>Retenue:</strong> {formatMoneyForDisplay(selectedSalary.deductionAmount)} {selectedSalary.currency}
+              </p>
+              <p>
+                <strong>Mode:</strong> {salaryPaymentMethodLabel(selectedSalary.paymentMethod)}
+              </p>
+              <p>
+                <strong>Créateur:</strong> {selectedSalary.createdByEmail}
+              </p>
+            </div>
+          </details>
 
           {selectedSalary.note?.trim() ? (
             <div className="metadata-detail-list">

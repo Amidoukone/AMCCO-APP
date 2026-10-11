@@ -102,6 +102,9 @@ export function AlertsPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedAlertIds, setSelectedAlertIds] = useState<string[]>([]);
+  const [isAdvancedAlertFilterExpanded, setIsAdvancedAlertFilterExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
   const alertsViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("alerts", activeCompany?.id, user?.id);
   }, [activeCompany?.id, user?.id]);
@@ -113,6 +116,16 @@ export function AlertsPage(): JSX.Element {
     [isReadOnlyOwner, searchParams]
   );
   const [filters, setFilters] = usePersistedViewState(alertsViewStorageKey, initialFilters);
+
+  useEffect(() => {
+    const mobileViewport = window.matchMedia("(max-width: 640px)");
+    const updateAdvancedFilter = (event: MediaQueryListEvent): void => {
+      setIsAdvancedAlertFilterExpanded(!event.matches);
+    };
+
+    mobileViewport.addEventListener("change", updateAdvancedFilter);
+    return () => mobileViewport.removeEventListener("change", updateAdvancedFilter);
+  }, []);
 
   useEffect(() => {
     setFilters((prev) => ({
@@ -283,7 +296,9 @@ export function AlertsPage(): JSX.Element {
     items.length > 0 && items.every((item) => selectedAlertIds.includes(item.id));
   return (
     <>
-      <header className={isReadOnlyOwner ? "section-header owner-lite-header" : "section-header"}>
+      <header
+        className={`${isReadOnlyOwner ? "section-header owner-lite-header" : "section-header"} mobile-title-duplicate`}
+      >
         <h2>Alertes</h2>
         <p>
           {isReadOnlyOwner
@@ -377,17 +392,24 @@ export function AlertsPage(): JSX.Element {
           </label>
 
           {!isReadOnlyOwner ? (
-            <input
-              type="text"
-              placeholder="Type entité (ex: TRANSACTION)"
-              value={filters.entityType}
-              onChange={(event) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  entityType: event.target.value
-                }))
-              }
-            />
+            <details
+              className="alerts-advanced-filter"
+              open={isAdvancedAlertFilterExpanded}
+              onToggle={(event) => setIsAdvancedAlertFilterExpanded(event.currentTarget.open)}
+            >
+              <summary>Filtrer par type d'entité</summary>
+              <input
+                type="text"
+                placeholder="Ex. transaction"
+                value={filters.entityType}
+                onChange={(event) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    entityType: event.target.value
+                  }))
+                }
+              />
+            </details>
           ) : null}
 
           <button type="submit">Actualiser</button>

@@ -11681,7 +11681,7 @@ textarea {
     width: min(520px, calc(100vw - 20px));
     max-width: calc(100vw - 20px);
     margin-inline: auto;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
   }
 
   .mobile-bottom-nav-label {
@@ -13591,5 +13591,708 @@ textarea {
 
   .task-timeline-content {
     padding-top: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Keep the report focused on its filters, key figures and useful details. */
+  .reports-page > .section-header,
+  .reports-scroll-hint,
+  .reports-export-panel .dashboard-panel-header > div:first-child,
+  .reports-export-card-title,
+  .reports-summary-grid .reports-kpi-card small {
+    display: none;
+  }
+
+  .reports-result-scroll {
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    overscroll-behavior: auto;
+    padding: 0;
+  }
+
+  .reports-overview-panel,
+  .reports-export-panel {
+    padding: 14px;
+  }
+
+  .reports-export-panel .dashboard-panel-header {
+    display: block;
+  }
+
+  .reports-export-grid {
+    margin: 0;
+  }
+
+  .reports-details-disclosure {
+    display: grid;
+    gap: 10px;
+  }
+
+  .reports-details-disclosure > summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.045);
+    color: var(--mobile-text);
+    font-weight: 750;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .reports-details-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .reports-details-disclosure[open] > summary {
+    border-color: rgba(244, 197, 66, 0.4);
+  }
+}
+
+@media (min-width: 641px) {
+  .reports-details-disclosure > summary {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Put actionable task risks ahead of secondary dashboard activity. */
+  .operations-task-card .operations-task-metadata {
+    display: none;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-card:nth-child(2) {
+    order: 1;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-card:first-child {
+    order: 2;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-priority-card:first-child
+    .dashboard-priority-list .dashboard-priority-item:nth-child(n + 2) {
+    display: none;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-kpi-grid > :first-child,
+  .dashboard-priority-grid:not(.my-work-grid) .dashboard-kpi-grid > :nth-child(n + 3) {
+    display: none;
+  }
+
+  .dashboard-priority-side .dashboard-priority-mobile-deadline {
+    display: block;
+    color: var(--mobile-muted);
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .dashboard-overview-panel .dashboard-action-eyebrow {
+    display: none;
+  }
+}
+
+.finance-transaction-mobile-status {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .finance-transaction-mobile-status {
+    width: fit-content;
+    display: inline-flex;
+    margin-top: 5px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 999px;
+    padding: 3px 8px;
+    color: var(--mobile-text);
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+  }
+
+  .finance-transaction-mobile-status.is-draft {
+    color: #dbe3f2;
+  }
+
+  .finance-transaction-mobile-status.is-submitted {
+    color: #ffe18a;
+  }
+
+  .finance-transaction-mobile-status.is-approved {
+    color: #9df2d4;
+  }
+
+  .finance-transaction-mobile-status.is-rejected {
+    color: #ffbec9;
+  }
+
+  .alerts-advanced-filter {
+    display: grid;
+    gap: 8px;
+  }
+
+  .alerts-advanced-filter > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 9px 10px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--mobile-muted);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .alerts-advanced-filter > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .alert-card > .actions-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .alert-card > .actions-inline .secondary-btn,
+  .alert-card > .actions-inline .danger-btn {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 135px;
+  }
+}
+
+@media (max-width: 640px) {
+  .my-work-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+    padding: 0;
+    scroll-snap-type: none;
+  }
+
+  .my-work-metrics > * {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+    scroll-snap-align: none;
+  }
+
+  .my-work-metrics > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .my-work-grid .dashboard-priority-side .my-work-task-deadline {
+    display: block;
+    color: var(--mobile-muted);
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .finance-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+    padding: 0;
+    scroll-snap-type: none;
+  }
+
+  .finance-summary-grid > * {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex: none;
+    scroll-snap-align: none;
+  }
+
+  .finance-summary-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .finance-summary-grid .finance-overview-card .metric-note {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-users-table-wrap .admin-user-role-badge {
+    display: none;
+  }
+
+  .admin-user-actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-user-actions-row .secondary-btn,
+  .admin-user-actions-row .danger-btn {
+    min-height: 40px;
+    padding-inline: 7px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .salary-detail-primary {
+    display: grid;
+    gap: 3px;
+    padding: 12px;
+    border: 1px solid rgba(244, 197, 66, 0.28);
+    border-radius: 14px;
+    background: rgba(244, 197, 66, 0.07);
+  }
+
+  .salary-detail-primary span {
+    color: var(--mobile-muted);
+    font-size: 12px;
+  }
+
+  .salary-detail-primary strong {
+    color: var(--mobile-text);
+    font-size: 20px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .salary-detail-disclosure > summary {
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    padding: 9px 11px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    color: var(--mobile-text);
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .salary-detail-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .salary-detail-disclosure[open] > summary {
+    margin-bottom: 10px;
+    border-color: rgba(244, 197, 66, 0.35);
+  }
+
+  .salary-detail-panel .finance-transaction-detail-actions > .actions-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .salary-detail-panel .finance-transaction-detail-actions > .actions-inline button {
+    min-height: 40px;
+    padding-inline: 7px;
+    font-size: 12px;
+  }
+}
+
+.salary-filter-disclosure > summary {
+  display: none;
+}
+
+.salary-filter-disclosure-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .salaries-filter-form .salary-filter-disclosure-content select:last-of-type {
+    display: block;
+  }
+
+  .salary-filter-disclosure > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 9px 11px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    color: var(--mobile-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .salary-filter-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .salary-filter-disclosure[open] > summary {
+    margin-bottom: 8px;
+  }
+
+  .salary-filter-disclosure-content {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.admin-users-filter-disclosure,
+.admin-users-filter-disclosure-content {
+  display: contents;
+}
+
+.admin-users-filter-disclosure > summary {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .admin-users-filter-disclosure {
+    display: block;
+  }
+
+  .admin-users-filter-disclosure > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 9px 11px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    color: var(--mobile-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .admin-users-filter-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .admin-users-filter-disclosure-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding-top: 8px;
+  }
+}
+
+.finance-transaction-type-filter,
+.finance-transaction-type-filter-content {
+  display: contents;
+}
+
+.finance-transaction-type-filter > summary {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .finance-transactions-filters > h3 {
+    display: none;
+  }
+
+  .finance-transaction-type-filter {
+    display: block;
+  }
+
+  .finance-transaction-type-filter > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 9px 11px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    color: var(--mobile-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .finance-transaction-type-filter > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .finance-transaction-type-filter-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding-top: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .finance-transaction-proof-requirement.is-optional {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .my-work-header-actions {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .operations-task-card .operations-task-description {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+.company-admin-extra-form,
+.company-admin-extra-form-fields {
+  display: contents;
+}
+
+.company-admin-extra-form > summary {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .company-admin-extra-form {
+    display: grid;
+    gap: 8px;
+  }
+
+  .company-admin-extra-form > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 9px 11px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    color: var(--mobile-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .company-admin-extra-form > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .company-admin-extra-form-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding-top: 2px;
+  }
+}
+
+.company-admin-secondary-disclosure,
+.company-admin-secondary-content {
+  display: contents;
+}
+
+.company-admin-secondary-disclosure > summary {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .company-admin-secondary-disclosure {
+    display: grid;
+    gap: 8px;
+  }
+
+  .company-admin-secondary-disclosure > summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 9px 11px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    color: var(--mobile-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .company-admin-secondary-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .company-admin-secondary-content {
+    display: grid;
+    gap: 8px;
+  }
+
+  .company-admin-secondary-disclosure[open] .company-admin-secondary-detail {
+    display: grid;
+  }
+}
+
+@media (max-width: 640px) {
+  .finance-transaction-primary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 12px;
+    border: 1px solid rgba(244, 197, 66, 0.28);
+    border-radius: 14px;
+    background: rgba(244, 197, 66, 0.07);
+  }
+
+  .finance-transaction-primary > span:first-child {
+    color: var(--mobile-muted);
+    font-size: 12px;
+  }
+
+  .finance-transaction-primary > strong {
+    grid-column: 1;
+    color: var(--mobile-text);
+    font-size: 20px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .finance-transaction-detail-status {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: fit-content;
+    border: 1px solid var(--mobile-border);
+    border-radius: 999px;
+    padding: 4px 8px;
+    color: var(--mobile-text);
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .finance-transaction-detail-status.is-draft {
+    color: #dbe3f2;
+  }
+
+  .finance-transaction-detail-status.is-submitted {
+    color: #ffe18a;
+  }
+
+  .finance-transaction-detail-status.is-approved {
+    color: #9df2d4;
+  }
+
+  .finance-transaction-detail-status.is-rejected {
+    color: #ffbec9;
+  }
+
+  .finance-transaction-detail-more {
+    display: grid;
+    gap: 10px;
+  }
+
+  .finance-transaction-detail-more > summary {
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    padding: 9px 11px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 13px;
+    color: var(--mobile-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .finance-transaction-detail-more > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .finance-transaction-detail-more[open] > summary {
+    border-color: rgba(244, 197, 66, 0.35);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-content .section-header > p,
+  .app-content .page-guide {
+    display: none;
+  }
+
+  .app-content .mobile-title-duplicate {
+    display: none;
+  }
+
+  .app-content .section-header > .task-detail-back-link-row {
+    display: block;
+  }
+
+  .app-content .empty-state {
+    justify-items: start;
+    gap: 8px;
+    padding: 12px;
+    text-align: left;
+  }
+
+  .app-content .empty-state-mark,
+  .app-content .empty-state p {
+    display: none;
+  }
+
+  .app-content .empty-state h3 {
+    font-size: 15px;
+  }
+
+  .app-content .mobile-generic-placeholder {
+    display: none;
+  }
+
+  .app-content .mobile-empty-description {
+    display: none;
+  }
+
+  .app-content .dashboard-section-summary small {
+    display: none;
+  }
+
+  .activity-admin-impact-detail,
+  .activity-admin-action-label,
+  .activity-admin-count-note {
+    display: none;
+  }
+
+  .app-content .alert-meta-row {
+    display: none;
+  }
+
+  .app-content .mobile-card-table .admin-table td[data-label="Actions"]::before {
+    display: none;
+  }
+
+  .confirm-dialog-eyebrow {
+    display: none;
+  }
+
+  .feedback-banner-loading {
+    min-height: 40px;
+    padding: 9px 11px;
+  }
+
+  .feedback-banner-loading-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .finance-transaction-form-context .scope-field-label {
+    display: none;
+  }
+
+  .task-attachment-callout > legend {
+    display: none;
   }
 }

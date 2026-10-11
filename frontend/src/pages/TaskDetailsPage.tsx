@@ -187,6 +187,15 @@ export function TaskDetailsPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingMoreTimeline, setIsLoadingMoreTimeline] = useState(false);
+  const [isCompactScreen] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
+  );
+  const [isAttachmentUploadExpanded, setIsAttachmentUploadExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
+  const [isCommentFormExpanded, setIsCommentFormExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
   const [isTimelineExpanded, setIsTimelineExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
@@ -433,6 +442,9 @@ export function TaskDetailsPage(): JSX.Element {
       setAttachmentFile(null);
       setAttachments(items);
       setSuccessMessage("Pièce jointe ajoutee.");
+      if (isCompactScreen) {
+        setIsAttachmentUploadExpanded(false);
+      }
       await loadData();
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -501,7 +513,7 @@ export function TaskDetailsPage(): JSX.Element {
   return (
     <>
       <header className="section-header">
-        <p>
+        <p className="task-detail-back-link-row">
           <Link to="/operations/tasks" className="task-back-link">
             Retour à la liste des tâches
           </Link>
@@ -546,7 +558,17 @@ export function TaskDetailsPage(): JSX.Element {
               </button>
             </div>
           ) : null}
-          <p className="operations-task-description">{task.description?.trim() || "Aucune description fournie."}</p>
+          <p
+            className={
+              task.description?.trim()
+                ? "operations-task-description"
+                : "operations-task-description mobile-empty-description"
+            }
+          >
+            {task.description?.trim() || (
+              <span className="mobile-generic-placeholder">Aucune description fournie.</span>
+            )}
+          </p>
 
           <div className="operations-task-meta">
             <p>
@@ -679,31 +701,42 @@ export function TaskDetailsPage(): JSX.Element {
           </div>
 
           {canManageTaskContent ? (
-            <div className="proof-inline-form task-attachment-inline-form">
-              <input
-                key={`${attachmentFile?.name ?? "empty"}-${attachmentFile?.size ?? 0}`}
-                type="file"
-                aria-label="Pièce jointe pour la tâche"
-                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
-                disabled={isSaving}
-              />
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => void handleAddAttachment()}
-                disabled={isSaving || !attachmentFile}
-              >
-                Ajouter une pièce jointe
-              </button>
-            </div>
+            <details
+              className="mobile-create-disclosure task-attachment-upload-disclosure"
+              open={isAttachmentUploadExpanded}
+              onToggle={(event) => setIsAttachmentUploadExpanded(event.currentTarget.open)}
+            >
+              <summary>Ajouter une pièce jointe</summary>
+              <div className="proof-inline-form task-attachment-inline-form">
+                <input
+                  key={`${attachmentFile?.name ?? "empty"}-${attachmentFile?.size ?? 0}`}
+                  type="file"
+                  aria-label="Pièce jointe pour la tâche"
+                  accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                  onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
+                  disabled={isSaving}
+                />
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => void handleAddAttachment()}
+                  disabled={isSaving || !attachmentFile}
+                >
+                  Ajouter une pièce jointe
+                </button>
+              </div>
+            </details>
           ) : null}
         </section>
       ) : null}
 
       {!isLoading && task && canManageTaskContent ? (
-        <section className="panel">
-          <h3>Ajouter un commentaire</h3>
+        <details
+          className="panel mobile-create-disclosure task-comment-disclosure"
+          open={isCommentFormExpanded}
+          onToggle={(event) => setIsCommentFormExpanded(event.currentTarget.open)}
+        >
+          <summary>Ajouter un commentaire</summary>
           <div className="task-comment-form">
             <textarea
               value={newComment}
@@ -721,7 +754,7 @@ export function TaskDetailsPage(): JSX.Element {
               Ajouter le commentaire
             </button>
           </div>
-        </section>
+        </details>
       ) : null}
 
       {!isLoading && task ? (
@@ -731,7 +764,7 @@ export function TaskDetailsPage(): JSX.Element {
             open={isTimelineExpanded}
             onToggle={(event) => setIsTimelineExpanded(event.currentTarget.open)}
           >
-          <summary>{canManageTasks ? "Timeline opérationnelle" : "Historique"}</summary>
+          <summary>{canManageTasks ? "Historique et commentaires" : "Historique"}</summary>
           <div className="task-timeline-content">
           {timelineEntries.length === 0 ? <p>Aucun événement pour le moment.</p> : null}
           {timelineEntries.length > 0 ? (

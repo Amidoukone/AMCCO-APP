@@ -77,7 +77,7 @@ export function SecuritySettingsPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header">
+      <header className="section-header mobile-title-duplicate">
         <h2>{SECURITY_PAGE_TITLE}</h2>
       </header>
 

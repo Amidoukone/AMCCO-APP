@@ -584,6 +584,19 @@ export function OperationsTasksPage(): JSX.Element {
   const [isTaskFormExpanded, setIsTaskFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
+  const [isTaskAttachmentExpanded, setIsTaskAttachmentExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+  );
+
+  useEffect(() => {
+    const mobileViewport = window.matchMedia("(max-width: 640px)");
+    const updateTaskAttachment = (event: MediaQueryListEvent): void => {
+      setIsTaskAttachmentExpanded(!event.matches);
+    };
+
+    mobileViewport.addEventListener("change", updateTaskAttachment);
+    return () => mobileViewport.removeEventListener("change", updateTaskAttachment);
+  }, []);
 
   const tasksViewStorageKey = useMemo(() => {
     return buildPersistedViewStorageKey("operations-tasks", activeCompany?.id, user?.id);
@@ -1381,7 +1394,7 @@ export function OperationsTasksPage(): JSX.Element {
 
   return (
     <>
-      <header className="section-header">
+      <header className="section-header mobile-title-duplicate">
         <h2>Suivi des tâches</h2>
       </header>
 
@@ -1509,8 +1522,8 @@ export function OperationsTasksPage(): JSX.Element {
               <textarea
                 placeholder={
                   selectedProfile?.tasks.requiresDescription
-                    ? "Description requise: détaillez le contexte, les étapes ou les points d'attention."
-                    : "Description (optionnelle): détaillez le contexte, les étapes ou les points d'attention."
+                    ? "Description requise"
+                    : "Description facultative"
                 }
                 value={createForm.description}
                 onChange={(event) =>
@@ -1544,9 +1557,8 @@ export function OperationsTasksPage(): JSX.Element {
             </label>
             {canAssignTasks ? (
               <div className="scope-field">
-                <span className="scope-field-label">Assignation initiale</span>
                 <label className="operations-inline-group">
-                  <span>Responsable au démarrage</span>
+                  <span>Responsable</span>
                   <select
                     value={createForm.assignedToId}
                     onChange={(event) =>
@@ -1568,13 +1580,12 @@ export function OperationsTasksPage(): JSX.Element {
               </div>
             ) : (
               <div className="scope-field">
-                <span className="scope-field-label">Assignation initiale</span>
                 <strong>Cette tâche vous sera attribuée.</strong>
               </div>
             )}
             {taskMetadataFields.length > 0 ? (
               <details className="operations-task-form-options" open={hasRequiredTaskMetadata}>
-                <summary>Champs avancés</summary>
+                <summary>Champs liés au secteur</summary>
                 <div className="operations-task-form-options-body">
                   {taskMetadataFields.filter((field) => {
                     if (selectedActivityCode !== "DAILY_ACTIVITIES") return true;
@@ -2056,45 +2067,58 @@ export function OperationsTasksPage(): JSX.Element {
               </details>
             ) : null}
             {!editingTaskId ? (
-              <fieldset className="task-attachment-callout">
-                <legend>Pièce jointe</legend>
-                <div className="task-attachment-callout-copy">
-                  <strong>Ajouter un document ou une image maintenant</strong>
-                  <p className="hint">
-                    Le fichier sera envoyé automatiquement après l'enregistrement de la tâche.
-                    Formats acceptés: PDF, JPG ou PNG.
-                  </p>
-                </div>
-                <label className="task-attachment-upload" htmlFor="task-attachment-file">
-                  <span>Fichier joint</span>
-                  <input
-                    key={`${taskAttachmentFile?.name ?? "empty"}-${taskAttachmentFile?.size ?? 0}`}
-                    id="task-attachment-file"
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                    onChange={(event) => setTaskAttachmentFile(event.target.files?.[0] ?? null)}
-                    disabled={isSavingTaskForm}
-                  />
-                </label>
-                <div className="task-attachment-selected">
-                  {taskAttachmentFile ? (
-                    <>
-                      <strong>{taskAttachmentFile.name}</strong>
-                      <span>{formatFileSize(taskAttachmentFile.size)}</span>
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={() => setTaskAttachmentFile(null)}
-                        disabled={isSavingTaskForm}
-                      >
-                        Retirer
-                      </button>
-                    </>
-                  ) : (
-                    <span>Aucun fichier sélectionné.</span>
-                  )}
-                </div>
-              </fieldset>
+              <details
+                className="operations-task-form-options operations-task-attachment-disclosure"
+                open={isTaskAttachmentExpanded}
+                onToggle={(event) => setIsTaskAttachmentExpanded(event.currentTarget.open)}
+              >
+                <summary>
+                  {taskAttachmentFile ? `Pièce jointe · ${taskAttachmentFile.name}` : "Pièce jointe (facultatif)"}
+                </summary>
+                <fieldset className="task-attachment-callout">
+                  <legend>Ajouter un fichier</legend>
+                  <div className="task-attachment-callout-copy">
+                    <p className="hint">
+                      Le fichier sera envoyé après l'enregistrement. Formats acceptés : PDF, JPG ou PNG.
+                    </p>
+                  </div>
+                  <label className="task-attachment-upload" htmlFor="task-attachment-file">
+                    <span>Fichier joint</span>
+                    <input
+                      key={`${taskAttachmentFile?.name ?? "empty"}-${taskAttachmentFile?.size ?? 0}`}
+                      id="task-attachment-file"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                      onChange={(event) => {
+                        const selectedFile = event.target.files?.[0] ?? null;
+                        setTaskAttachmentFile(selectedFile);
+                        if (selectedFile) {
+                          setIsTaskAttachmentExpanded(true);
+                        }
+                      }}
+                      disabled={isSavingTaskForm}
+                    />
+                  </label>
+                  <div className="task-attachment-selected">
+                    {taskAttachmentFile ? (
+                      <>
+                        <strong>{taskAttachmentFile.name}</strong>
+                        <span>{formatFileSize(taskAttachmentFile.size)}</span>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => setTaskAttachmentFile(null)}
+                          disabled={isSavingTaskForm}
+                        >
+                          Retirer
+                        </button>
+                      </>
+                    ) : (
+                      <span>Aucun fichier sélectionné.</span>
+                    )}
+                  </div>
+                </fieldset>
+              </details>
             ) : null}
             <div className="mobile-sticky-form-actions">
               <button
@@ -2351,8 +2375,16 @@ export function OperationsTasksPage(): JSX.Element {
                   </div>
 
                   <h4 className="operations-task-title">{task.title}</h4>
-                  <p className="operations-task-description">
-                    {task.description?.trim() || "Aucune description fournie."}
+                  <p
+                    className={
+                      task.description?.trim()
+                        ? "operations-task-description"
+                        : "operations-task-description mobile-empty-description"
+                    }
+                  >
+                    {task.description?.trim() || (
+                      <span className="mobile-generic-placeholder">Aucune description fournie.</span>
+                    )}
                   </p>
 
                   <div className="operations-task-meta">
@@ -2455,7 +2487,7 @@ export function OperationsTasksPage(): JSX.Element {
                       </div>
                     ) : (
                       <details className="operations-actions-secondary">
-                        <summary>Plus d'actions</summary>
+                        <summary>Statut et assignation</summary>
                         <div className="operations-actions-secondary-content">
                         {canUpdate ? (
                           <div className="operations-inline-group">
