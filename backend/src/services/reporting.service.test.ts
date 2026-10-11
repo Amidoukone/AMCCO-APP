@@ -11,6 +11,8 @@ import {
   getDashboardFinanceSummary,
   getDashboardOperationsSummary,
   listDashboardFinanceActivitySummary,
+  listDashboardOperationalTasks,
+  listDashboardOperationalTransactions,
   listDashboardRecentTasks,
   listDashboardRecentTransactions,
   listDashboardTaskActivitySummary,
@@ -31,7 +33,10 @@ import {
   listTransactionsForExport,
   toTransactionExportRecord
 } from "../repositories/reporting.repository.js";
-import { listFinancialAccounts } from "../repositories/finance.repository.js";
+import {
+  getFinancialAccountsSummary,
+  listFinancialAccounts
+} from "../repositories/finance.repository.js";
 import { listRentalTenants } from "../repositories/rental-tenants.repository.js";
 import { listGeneralStoreShops } from "../repositories/general-store-shops.repository.js";
 import { listBtpProjects } from "../repositories/btp-projects.repository.js";
@@ -39,6 +44,8 @@ import { listBtpProjects } from "../repositories/btp-projects.repository.js";
 vi.mock("../repositories/reporting.repository.js", () => ({
   getDashboardCompanySummary: vi.fn(),
   listDashboardFinanceActivitySummary: vi.fn(),
+  listDashboardOperationalTasks: vi.fn(),
+  listDashboardOperationalTransactions: vi.fn(),
   getDashboardFinanceSummary: vi.fn(),
   getDashboardOperationsSummary: vi.fn(),
   listDashboardRecentTasks: vi.fn(),
@@ -65,6 +72,7 @@ vi.mock("../repositories/reporting.repository.js", () => ({
 }));
 
 vi.mock("../repositories/finance.repository.js", () => ({
+  getFinancialAccountsSummary: vi.fn(),
   listFinancialAccounts: vi.fn()
 }));
 
@@ -108,9 +116,21 @@ describe("reporting.service", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getFinancialAccountsSummary).mockResolvedValue({
+      totalCount: 0,
+      globalCount: 0,
+      dedicatedCount: 0,
+      restrictedCount: 0,
+      compatibleCount: 0,
+      incompatibleCount: 0,
+      dedicatedToSelectedActivityCount: 0,
+      restrictedToSelectedActivityCount: 0
+    });
     vi.mocked(listFinancialAccounts).mockResolvedValue([]);
     vi.mocked(listReportOperationalTransactions).mockResolvedValue([]);
     vi.mocked(listReportOperationalTasks).mockResolvedValue([]);
+    vi.mocked(listDashboardOperationalTransactions).mockResolvedValue([]);
+    vi.mocked(listDashboardOperationalTasks).mockResolvedValue([]);
     vi.mocked(listReportRentalTransactions).mockResolvedValue([]);
     vi.mocked(listRentalTenants).mockResolvedValue([]);
     vi.mocked(listReportGeneralStoreTransactions).mockResolvedValue([]);
@@ -154,30 +174,16 @@ describe("reporting.service", () => {
     vi.mocked(listDashboardRecentTransactions).mockResolvedValue([]);
     vi.mocked(listDashboardRecentTasks).mockResolvedValue([]);
     vi.mocked(listDashboardWorkload).mockResolvedValue([]);
-    vi.mocked(listFinancialAccounts).mockResolvedValue([
-      {
-        id: "account-1",
-        companyId: actor.companyId,
-        name: "Caisse mine",
-        accountRef: "MIN-01",
-        balance: "2000.00",
-        scopeType: "DEDICATED",
-        primaryActivityCode: "MINING",
-        allowedActivityCodes: ["MINING"],
-        createdAt: "2026-04-21T08:00:00.000Z"
-      },
-      {
-        id: "account-2",
-        companyId: actor.companyId,
-        name: "Caisse globale",
-        accountRef: "GLB-01",
-        balance: "5000.00",
-        scopeType: "GLOBAL",
-        primaryActivityCode: null,
-        allowedActivityCodes: [],
-        createdAt: "2026-04-21T08:05:00.000Z"
-      }
-    ]);
+    vi.mocked(getFinancialAccountsSummary).mockResolvedValue({
+      totalCount: 2,
+      globalCount: 1,
+      dedicatedCount: 1,
+      restrictedCount: 0,
+      compatibleCount: 2,
+      incompatibleCount: 0,
+      dedicatedToSelectedActivityCount: 1,
+      restrictedToSelectedActivityCount: 0
+    });
     vi.mocked(listDashboardFinanceActivitySummary).mockResolvedValue([
       {
         activityCode: "MINING",
@@ -1040,13 +1046,17 @@ describe("reporting.service", () => {
 
   it("reports agreement partners and actual protocol movements in the overview and PDF", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
-      { status: "APPROVED", currency: "XOF", count: 1, totalAmount: "500000.00" }
+      { status: "APPROVED", currency: "XOF", count: 2, totalAmount: "510000.00" },
+      { status: "APPROVED", currency: "EUR", count: 1, totalAmount: "25000.00" },
+      { status: "SUBMITTED", currency: "USD", count: 1, totalAmount: "9000.00" }
     ]);
     vi.mocked(listReportFinanceByType).mockResolvedValue([
-      { type: "CASH_IN", currency: "XOF", count: 1, totalAmount: "500000.00", approvedAmount: "500000.00" }
+      { type: "CASH_IN", currency: "XOF", count: 2, totalAmount: "510000.00", approvedAmount: "510000.00" },
+      { type: "CASH_OUT", currency: "EUR", count: 1, totalAmount: "25000.00", approvedAmount: "25000.00" },
+      { type: "CASH_IN", currency: "USD", count: 1, totalAmount: "9000.00", approvedAmount: "0.00" }
     ]);
     vi.mocked(listReportFinanceByActivity).mockResolvedValue([
-      { activityCode: "DAILY_ACTIVITIES", count: 1, totalAmount: "500000.00", approvedAmount: "500000.00" }
+      { activityCode: "DAILY_ACTIVITIES", count: 4, totalAmount: "544000.00", approvedAmount: "535000.00" }
     ]);
     vi.mocked(listReportTaskByStatus).mockResolvedValue([{ status: "IN_PROGRESS", count: 1 }]);
     vi.mocked(listReportTaskByActivity).mockResolvedValue([
@@ -1054,19 +1064,45 @@ describe("reporting.service", () => {
     ]);
     vi.mocked(listReportRoleDistribution).mockResolvedValue([]);
     vi.mocked(listDashboardWorkload).mockResolvedValue([]);
-    vi.mocked(listReportOperationalTransactions).mockResolvedValue([{
-      activityCode: "DAILY_ACTIVITIES", status: "APPROVED", type: "CASH_IN", amount: "500000.00",
-      currency: "XOF", occurredAt: "2026-05-24T10:00:00.000Z",
-      metadata: {
-        dailyActivityKind: "Protocole d'accord", agreementRef: "NA-2026-01", partnerName: "Nouhoum Samake",
-        financialOperationKind: "PARTNER_PAYMENT", paymentReference: "BOA-02-001"
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      {
+        activityCode: "DAILY_ACTIVITIES", status: "APPROVED", type: "CASH_IN", amount: "500000.00",
+        currency: "XOF", occurredAt: "2026-05-24T10:00:00.000Z",
+        metadata: {
+          dailyActivityKind: "Protocole d'accord", agreementRef: "NA-2026-01", partnerName: "Nouhoum Samake",
+          financialOperationKind: "PARTNER_PAYMENT", paymentReference: "BOA-02-001"
+        }
+      },
+      {
+        activityCode: "DAILY_ACTIVITIES", status: "APPROVED", type: "CASH_OUT", amount: "25000.00",
+        currency: "EUR", occurredAt: "2026-05-25T10:00:00.000Z",
+        metadata: {
+          dailyActivityKind: "Protocole d'accord", agreementRef: "NA-2026-01", partnerName: "Nouhoum Samake",
+          financialOperationKind: "AGREEMENT_EXPENSE", paymentReference: "EUR-EXP-01"
+        }
+      },
+      {
+        activityCode: "DAILY_ACTIVITIES", status: "APPROVED", type: "CASH_IN", amount: "10000.00",
+        currency: "XOF", occurredAt: "2026-05-26T10:00:00.000Z",
+        metadata: {
+          dailyActivityKind: "Protocole d'accord", agreementRef: "SANS-FICHE-01", partnerName: "Partenaire sans fiche",
+          financialOperationKind: "PARTNER_PAYMENT", paymentReference: "CASH-ORPHAN-01"
+        }
+      },
+      {
+        activityCode: "DAILY_ACTIVITIES", status: "SUBMITTED", type: "CASH_IN", amount: "9000.00",
+        currency: "USD", occurredAt: "2026-05-27T10:00:00.000Z",
+        metadata: {
+          dailyActivityKind: "Protocole d'accord", agreementRef: "NA-2026-01", partnerName: "Nouhoum Samake",
+          financialOperationKind: "PARTNER_PAYMENT", paymentReference: "USD-PENDING-01"
+        }
       }
-    }]);
+    ]);
     vi.mocked(listReportOperationalTasks).mockResolvedValue([{
       activityCode: "DAILY_ACTIVITIES", status: "IN_PROGRESS", dueDate: null,
       metadata: {
         dailyActivityKind: "Protocole d'accord", agreementRef: "NA-2026-01", partnerName: "Nouhoum Samake",
-        agreementType: "Financier", agreementCapitalAmount: "1500000", agreementProfitAmount: "120000"
+        agreementType: "Financier", agreementDate: "2026-05-18", agreementCapitalAmount: "1500000", agreementProfitAmount: "120000"
       }
     }]);
 
@@ -1076,13 +1112,45 @@ describe("reporting.service", () => {
       dateTo: "2026-05-31T23:59:59.999Z"
     };
     const overview = await getCompanyReportsOverview(actor, filters);
+    expect(overview.dailyActivitiesReport).toMatchObject({
+      totals: {
+        activitiesCount: 1,
+        openCount: 1,
+        doneCount: 0,
+        blockedCount: 0,
+        agreementsCount: 2,
+        transactionsCount: 4
+      },
+      agreements: [expect.objectContaining({
+        agreementRef: "NA-2026-01",
+        partnerName: "Nouhoum Samake",
+        agreementType: "Financier",
+        agreementDate: "2026-05-18",
+        capitalAmount: "1500000.00",
+        profitAmount: "120000.00"
+      }), expect.objectContaining({
+        agreementRef: "SANS-FICHE-01",
+        status: null
+      })],
+      transactions: expect.arrayContaining([
+        expect.objectContaining({ operationLabel: "Versement partenaire", agreementRef: "NA-2026-01", amount: "500000.00", currency: "XOF" }),
+        expect.objectContaining({ operationLabel: "Dépense d'accord", agreementRef: "NA-2026-01", amount: "25000.00", currency: "EUR" }),
+        expect.objectContaining({ agreementRef: "SANS-FICHE-01", amount: "10000.00", currency: "XOF" }),
+        expect.objectContaining({ agreementRef: "NA-2026-01", status: "SUBMITTED", amount: "9000.00", currency: "USD" })
+      ]),
+      currencySummaries: expect.arrayContaining([
+        expect.objectContaining({ currency: "XOF", approvedTransactionsCount: 2, pendingTransactionsCount: 0, cashInAmount: "510000.00", cashOutAmount: "0.00", netAmount: "510000.00" }),
+        expect.objectContaining({ currency: "EUR", approvedTransactionsCount: 1, pendingTransactionsCount: 0, cashInAmount: "0.00", cashOutAmount: "25000.00", netAmount: "-25000.00" }),
+        expect.objectContaining({ currency: "USD", approvedTransactionsCount: 0, pendingTransactionsCount: 1, cashInAmount: "0.00", cashOutAmount: "0.00", netAmount: "0.00" })
+      ])
+    });
     expect(overview.operationalPerformance).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        scope: "ACTIVITY", activityCode: "DAILY_ACTIVITIES", transactionsCount: 1,
-        approvedCashIn: "500000.00", totalTasksCount: 1, openTasksCount: 1
+        scope: "ACTIVITY", activityCode: "DAILY_ACTIVITIES", transactionsCount: 4,
+        approvedCashIn: "510000.00", totalTasksCount: 1, openTasksCount: 1
       }),
       expect.objectContaining({
-        scope: "SUBSECTION", dimensionKey: "agreementRef", itemLabel: "NA-2026-01",
+        scope: "SUBSECTION", dimensionKey: "agreementRef", itemLabel: "NA-2026-01", transactionsCount: 3,
         approvedCashIn: "500000.00", totalTasksCount: 1
       }),
       expect.objectContaining({
@@ -1091,14 +1159,14 @@ describe("reporting.service", () => {
       }),
       expect.objectContaining({
         scope: "SUBSECTION", dimensionKey: "financialOperationKind", itemLabel: "PARTNER_PAYMENT",
-        approvedCashIn: "500000.00"
+        approvedCashIn: "510000.00"
       })
     ]));
 
     const pdf = await exportCompanyReportsPdf(actor, filters);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
-    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(0);
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBe(3);
     const pdfLatin1 = pdf.toString("latin1");
     const decodedStreams = [...pdfLatin1.matchAll(/stream\r?\n/g)].map((match) => {
       const start = (match.index ?? 0) + match[0].length;
@@ -1115,7 +1183,17 @@ describe("reporting.service", () => {
       .join("");
     expect(extractedPdfText).toContain("Nouhoum Samake");
     expect(extractedPdfText).toContain("NA-2026-01");
-    expect(extractedPdfText).toContain("500000.00 XOF");
+    expect(extractedPdfText).toContain("510 000 F CFA");
+    expect(extractedPdfText).toContain("25 000 EUR");
+    expect(extractedPdfText).toContain("Activités par catégorie");
+    expect(extractedPdfText).toContain("Protocoles d'accord");
+    expect(extractedPdfText).toContain("Mouvements financiers");
+    expect(extractedPdfText).toContain("Fiche absente");
+    expect(extractedPdfText).toContain("Flux validés par devise");
+    expect(extractedPdfText).toContain("VALIDÉS / ATTENTE");
+    expect(extractedPdfText).toContain("Les montants indicatifs ou prévisionnels sans devise déclarée sont exclus");
+    expect(extractedPdfText).toContain("USD-PENDING-01");
+    expect(extractedPdfText).toContain("9 000 USD");
   });
 
   it("reports beverage sales, stock purchases, expenses and inventory tasks without treating deposits as sales", async () => {

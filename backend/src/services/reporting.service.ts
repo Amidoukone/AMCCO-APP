@@ -6,7 +6,6 @@ import * as XLSX from "xlsx";
 import {
   buildActivityReportHighlights,
   getBusinessActivityProfile,
-  listBusinessActivityProfiles
 } from "../config/business-activity-profiles.js";
 import { HttpError } from "../errors/http-error.js";
 import {
@@ -14,6 +13,9 @@ import {
   listDashboardFinanceActivitySummary,
   getDashboardFinanceSummary,
   getDashboardOperationsSummary,
+  listGeneralStoreLedgerTransactions,
+  listDashboardOperationalTasks,
+  listDashboardOperationalTransactions,
   listDashboardRecentTasks,
   listDashboardRecentTransactions,
   listDashboardTaskActivitySummary,
@@ -38,13 +40,18 @@ import {
   type AgricultureOperationsReport,
   type AgencyOperationsReport,
   type BtpOperationsReport,
+  type DailyActivitiesReport,
   type BeverageDepotReport,
   type DashboardSummary,
+  type DashboardOperationalMetadataKeys,
+  type DashboardOperationalTask,
+  type DashboardOperationalTransaction,
   type FishFarmingOperationsReport,
   type FoodOperationsReport,
   type GeneralExpensesReport,
   type GeneralStoreInventorySnapshot,
   type GeneralStoreOperationsReport,
+  type GeneralStoreOperationsReportRow,
   type HardwareMonthlyReport,
   type HydrocarbonOperationsReport,
   type HotelOperationsReport,
@@ -56,7 +63,11 @@ import {
   type ReportOperationalTransaction,
   type ReportsOverview
 } from "../repositories/reporting.repository.js";
-import { listFinancialAccounts, type FinancialAccount } from "../repositories/finance.repository.js";
+import {
+  getFinancialAccountsSummary,
+  listFinancialAccounts,
+  type FinancialAccount
+} from "../repositories/finance.repository.js";
 import { listRentalTenants, type RentalTenant } from "../repositories/rental-tenants.repository.js";
 import {
   listGeneralStoreShops,
@@ -88,6 +99,21 @@ type ReportFiltersInput = {
 
 const DASHBOARD_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"];
 const REPORTING_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"];
+type DashboardOperationalDimensions = NonNullable<
+  ReturnType<typeof getBusinessActivityProfile>["reporting"]["operationalDimensions"]
+>;
+const DASHBOARD_OPERATIONAL_DIMENSIONS_BY_ACTIVITY = Object.fromEntries(
+  BUSINESS_ACTIVITIES.map(({ code }) => [
+    code,
+    getBusinessActivityProfile(code).reporting.operationalDimensions ?? []
+  ])
+) as Record<BusinessActivityCode, DashboardOperationalDimensions>;
+const DASHBOARD_OPERATIONAL_METADATA_KEYS = Object.fromEntries(
+  BUSINESS_ACTIVITIES.map(({ code }) => [
+    code,
+    DASHBOARD_OPERATIONAL_DIMENSIONS_BY_ACTIVITY[code].map(({ key }) => key)
+  ])
+) as DashboardOperationalMetadataKeys;
 const SECTOR_RULES_VERSION = "amcco-sector-rules-v2";
 const PDF_PAGE_MARGIN = 40;
 const PDF_CONTENT_TOP = 96;
@@ -2796,6 +2822,308 @@ function renderGeneralExpensesReportsPdf(
   drawGeneralExpensesMetricCards(doc, report);
   drawGeneralExpensesTable(doc, report);
   drawGeneralExpensesBreakdown(doc, report);
+}
+
+const DAILY_ACTIVITIES_REPORT_BRANDING = {
+  title: "ACTIVITÉS QUOTIDIENNES",
+  agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
+  brand: "AMCCO",
+  fiscal: "N Fiscal 084126139L",
+  phone: "TEL: 79 07 24 40"
+};
+
+function drawDailyActivitiesReportHeader(doc: PDFKit.PDFDocument, report: DailyActivitiesReport): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 94;
+  const centerWidth = pageWidth - margin * 2 - 188;
+
+  doc.save();
+  doc.roundedRect(margin, 21, 80, 58, 6).fill("#ecfeff");
+  doc.roundedRect(margin, 21, 80, 58, 6).strokeColor("#0f766e").lineWidth(1).stroke();
+  doc.roundedRect(margin + 21, 32, 38, 34, 3).fill("#ffffff");
+  doc.roundedRect(margin + 21, 32, 38, 34, 3).strokeColor("#0f766e").lineWidth(1).stroke();
+  doc.rect(margin + 21, 32, 38, 9).fill("#0f766e");
+  doc.moveTo(margin + 28, 50).lineTo(margin + 34, 56).lineTo(margin + 50, 46)
+    .strokeColor("#0f766e").lineWidth(2).stroke();
+  doc.restore();
+
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(17)
+    .text(DAILY_ACTIVITIES_REPORT_BRANDING.title, centerX, 23, { width: centerWidth, align: "center" });
+  doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(10)
+    .text(DAILY_ACTIVITIES_REPORT_BRANDING.agency, centerX, 44, { width: centerWidth, align: "center" });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(12)
+    .text(`"${DAILY_ACTIVITIES_REPORT_BRANDING.brand}"`, centerX, 58, { width: centerWidth, align: "center" });
+  doc.fillColor("#334155").font("Helvetica-Bold").fontSize(9)
+    .text(`${DAILY_ACTIVITIES_REPORT_BRANDING.fiscal}     ${DAILY_ACTIVITIES_REPORT_BRANDING.phone}`, centerX, 74, {
+      width: centerWidth, align: "center"
+    });
+  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#0f766e").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(15)
+    .text(`SUIVI DES ACTIVITÉS — ${report.periodLabel.toUpperCase()}`, margin, 115, {
+      width: pageWidth - margin * 2, align: "center"
+    });
+  doc.y = 143;
+}
+
+function drawDailyActivitiesContinuationHeader(doc: PDFKit.PDFDocument, report: DailyActivitiesReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  drawAmccoPdfLogo(doc, margin, 20, 36);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11)
+    .text("ACTIVITÉS QUOTIDIENNES — suite", margin + 46, 26, { width: pageWidth - margin * 2 - 92 });
+  doc.fillColor("#486581").font("Helvetica-Bold").fontSize(9)
+    .text(`Période : ${report.periodLabel}`, margin + 46, 42, { width: pageWidth - margin * 2 - 92 });
+  doc.moveTo(margin, 62).lineTo(pageWidth - margin, 62).strokeColor("#cbd5e1").lineWidth(1).stroke();
+  doc.y = 76;
+}
+
+function drawDailyActivitiesMetadata(doc: PDFKit.PDFDocument, report: DailyActivitiesReport, generatedAt: string): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const width = pageWidth - margin * 2;
+  const y = doc.y;
+
+  doc.roundedRect(margin, y, width, 48, 4).fill("#f0fdfa");
+  doc.roundedRect(margin, y, width, 48, 4).strokeColor("#99f6e4").lineWidth(0.8).stroke();
+  doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(9).text("Période", margin + 10, y + 8, { width: 160 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11).text(report.periodLabel, margin + 10, y + 25, { width: 210 });
+  doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(9).text("Activité", margin + 245, y + 8, { width: 120 });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11).text("Suivi de bureau et protocoles", margin + 245, y + 25, { width: 220 });
+  doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(9).text("Généré le", pageWidth - margin - 155, y + 8, {
+    width: 145, align: "right"
+  });
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11).text(formatPdfDate(generatedAt), pageWidth - margin - 155, y + 25, {
+    width: 145, align: "right"
+  });
+  doc.y = y + 62;
+}
+
+function drawDailyActivitiesMetrics(doc: PDFKit.PDFDocument, report: DailyActivitiesReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const pageWidth = doc.page.width;
+  const gap = 8;
+  const cardWidth = (pageWidth - margin * 2 - gap * 4) / 5;
+  const y = doc.y;
+  const metrics = [
+    { label: "Activités", value: formatPdfNumber(report.totals.activitiesCount) },
+    { label: "À suivre", value: formatPdfNumber(report.totals.openCount) },
+    { label: "Bloquées", value: formatPdfNumber(report.totals.blockedCount) },
+    { label: "Protocoles", value: formatPdfNumber(report.totals.agreementsCount) },
+    { label: "Mouvements", value: formatPdfNumber(report.totals.transactionsCount) }
+  ];
+  metrics.forEach((metric, index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.roundedRect(x, y, cardWidth, 49, 4).fill("#f0fdfa");
+    doc.roundedRect(x, y, cardWidth, 49, 4).strokeColor("#99f6e4").lineWidth(0.8).stroke();
+    doc.fillColor("#0f766e").font("Helvetica").fontSize(8.5).text(metric.label, x + 8, y + 8, { width: cardWidth - 16 });
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13).text(metric.value, x + 8, y + 24, { width: cardWidth - 16 });
+  });
+  doc.y = y + 63;
+}
+
+type DailyActivitiesPdfCell = { value: string; align?: "left" | "center" | "right"; verticalAlign?: "center" | "top" };
+
+function formatDailyActivityMoney(value: string, currency: string): string {
+  const amount = formatPdfNumber(value);
+  return currency === "XOF" ? `${amount} F CFA` : `${amount} ${currency}`;
+}
+
+function drawDailyActivitiesTable(
+  doc: PDFKit.PDFDocument,
+  report: DailyActivitiesReport,
+  title: string,
+  columns: PdfTableColumn[],
+  rows: DailyActivitiesPdfCell[][],
+  emptyMessage: string,
+  rowHeight = 30
+): void {
+  const margin = PDF_PAGE_MARGIN;
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  const width = doc.page.width - margin * 2;
+  const sectionHeight = 20;
+  const headerHeight = 27;
+
+  if (doc.y + sectionHeight + headerHeight + rowHeight > tableBottom) {
+    doc.addPage();
+    drawDailyActivitiesContinuationHeader(doc, report);
+  }
+  doc.fillColor("#115e59").font("Helvetica-Bold").fontSize(11.5).text(title, margin, doc.y, { width });
+  doc.y += sectionHeight;
+
+  if (rows.length === 0) {
+    doc.roundedRect(margin, doc.y, width, 34, 3).fill("#f8fafc");
+    doc.roundedRect(margin, doc.y, width, 34, 3).strokeColor("#cbd5e1").lineWidth(0.7).stroke();
+    doc.fillColor("#64748b").font("Helvetica").fontSize(9).text(emptyMessage, margin + 10, doc.y + 11, { width: width - 20 });
+    doc.y += 44;
+    return;
+  }
+
+  const drawHeader = (y: number): number => {
+    let x = margin;
+    columns.forEach((column) => {
+      drawPdfTableCell(doc, column.label, x, y, column.width, headerHeight, {
+        align: "center", fill: "#ccfbf1", font: "Helvetica-Bold", fontSize: 8
+      });
+      x += column.width;
+    });
+    return y + headerHeight;
+  };
+
+  let y = drawHeader(doc.y);
+  for (const row of rows) {
+    if (y + rowHeight > tableBottom) {
+      doc.addPage();
+      drawDailyActivitiesContinuationHeader(doc, report);
+      doc.fillColor("#115e59").font("Helvetica-Bold").fontSize(10).text(`${title} (suite)`, margin, doc.y, { width });
+      y = drawHeader(doc.y + sectionHeight);
+    }
+    let x = margin;
+    row.forEach((cell, index) => {
+      drawPdfTableCell(doc, cell.value, x, y, columns[index].width, rowHeight, {
+        align: cell.align ?? columns[index].align,
+        fontSize: rowHeight > 32 ? 7.7 : 8,
+        verticalAlign: cell.verticalAlign ?? (rowHeight > 32 ? "top" : "center")
+      });
+      x += columns[index].width;
+    });
+    y += rowHeight;
+  }
+  doc.y = y + 12;
+}
+
+function drawDailyActivitiesReadingNote(doc: PDFKit.PDFDocument, report: DailyActivitiesReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const height = 34;
+  if (doc.y + height > doc.page.height - PDF_CONTENT_BOTTOM) {
+    doc.addPage();
+    drawDailyActivitiesContinuationHeader(doc, report);
+  }
+  const y = doc.y;
+  doc.roundedRect(margin, y, width, height, 3).fill("#f8fafc");
+  doc.roundedRect(margin, y, width, height, 3).strokeColor("#cbd5e1").lineWidth(0.7).stroke();
+  doc.fillColor("#475569").font("Helvetica").fontSize(8)
+    .text("¹ Les montants indicatifs ou prévisionnels sans devise déclarée sont exclus des totaux validés. Ceux-ci incluent uniquement les mouvements validés; les opérations en attente restent visibles dans le détail.",
+      margin + 8, y + 7, { width: width - 16, height: height - 10 });
+  doc.y = y + height + 8;
+}
+
+function renderDailyActivitiesReportsPdf(doc: PDFKit.PDFDocument, overview: ReportsOverview, filters: ReportPeriodFilter): void {
+  const report = overview.dailyActivitiesReport ?? buildDailyActivitiesReport([], [], filters)!;
+  doc.on("pageAdded", () => { doc.y = PDF_CONTENT_TOP; });
+  drawDailyActivitiesReportHeader(doc, report);
+  drawDailyActivitiesMetadata(doc, report, overview.generatedAt);
+  drawDailyActivitiesMetrics(doc, report);
+
+  const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const currencyColumns: PdfTableColumn[] = [
+    { label: "DEVISE", width: availableWidth * 0.13, align: "center" },
+    { label: "VALIDÉS / ATTENTE", width: availableWidth * 0.16, align: "center" },
+    { label: "ENTRÉES VALIDÉES", width: availableWidth * 0.24, align: "right" },
+    { label: "SORTIES VALIDÉES", width: availableWidth * 0.24, align: "right" },
+    { label: "SOLDE VALIDÉ", width: availableWidth * 0.23, align: "right" }
+  ];
+  drawDailyActivitiesTable(doc, report, "Flux validés par devise", currencyColumns,
+    report.currencySummaries.map((row) => [
+      { value: row.currency }, {
+        value: `${formatPdfNumber(row.approvedTransactionsCount)} / ${formatPdfNumber(row.pendingTransactionsCount)}`
+      },
+      { value: formatDailyActivityMoney(row.cashInAmount, row.currency) },
+      { value: formatDailyActivityMoney(row.cashOutAmount, row.currency) },
+      { value: formatDailyActivityMoney(row.netAmount, row.currency) }
+    ]), "Aucun mouvement financier validé sur la période.");
+  drawDailyActivitiesReadingNote(doc, report);
+
+  const categoryColumns: PdfTableColumn[] = [
+    { label: "CATÉGORIE", width: availableWidth * 0.40, align: "left" },
+    { label: "ACTIVITÉS", width: availableWidth * 0.15, align: "center" },
+    { label: "À SUIVRE", width: availableWidth * 0.15, align: "center" },
+    { label: "TERMINÉES", width: availableWidth * 0.15, align: "center" },
+    { label: "BLOQUÉES", width: availableWidth * 0.15, align: "center" }
+  ];
+  drawDailyActivitiesTable(doc, report, "Activités par catégorie", categoryColumns,
+    report.categories.map((row) => [
+      { value: row.categoryLabel }, { value: formatPdfNumber(row.activitiesCount) },
+      { value: formatPdfNumber(row.openCount) }, { value: formatPdfNumber(row.doneCount) },
+      { value: formatPdfNumber(row.blockedCount) }
+    ]), "Aucune activité enregistrée sur la période.");
+
+  const taskColumns: PdfTableColumn[] = [
+    { label: "ÉCHÉANCE", width: 65, align: "center" },
+    { label: "CATÉGORIE", width: 110, align: "left" },
+    { label: "ACTIVITÉ / DÉTAIL", width: 270, align: "left" },
+    { label: "ACCORD / PARTENAIRE", width: 160, align: "left" },
+    { label: "STATUT", width: 75, align: "center" },
+    { label: "MONTANT INDICATIF¹", width: availableWidth - 680, align: "right" }
+  ];
+  drawDailyActivitiesTable(doc, report, `Suivi des activités (${formatPdfNumber(report.activities.length)} ligne(s))`, taskColumns,
+    report.activities.map((row) => [
+      { value: row.dueDate ? formatPdfDate(row.dueDate) : "—", align: "center" },
+      { value: truncatePdfText(row.categoryLabel, 20) },
+      { value: `${truncatePdfText(row.title, 44)}\n${truncatePdfText(row.description || "Aucun détail fourni", 48)}`, verticalAlign: "top" },
+      { value: `${truncatePdfText(row.agreementRef || "—", 20)}\n${truncatePdfText(row.partnerName || "—", 20)}`, verticalAlign: "top" },
+      { value: toDisplayTaskStatusLabel(row.status), align: "center" },
+      { value: row.indicativeAmount ? formatPdfNumber(row.indicativeAmount) : "—", align: "right" }
+    ]), "Aucune activité enregistrée sur la période.", 34);
+
+  const agreementColumns: PdfTableColumn[] = [
+    { label: "RÉFÉRENCE", width: 92, align: "left" },
+    { label: "PARTENAIRE", width: 120, align: "left" },
+    { label: "TYPE / STATUT", width: 75, align: "left" },
+    { label: "DATE", width: 75, align: "center" },
+    { label: "OBJET", width: 160, align: "left" },
+    { label: "CAPITAL CONVENU¹", width: 80, align: "right" },
+    { label: "BÉNÉFICE PRÉVU¹", width: 80, align: "right" },
+    { label: "COMPTE PRÉVU", width: availableWidth - 682, align: "left" }
+  ];
+  drawDailyActivitiesTable(doc, report, `Protocoles d'accord (${formatPdfNumber(report.agreements.length)} ligne(s))`, agreementColumns,
+    report.agreements.map((row) => [
+      { value: truncatePdfText(row.agreementRef, 18) },
+      { value: truncatePdfText(row.partnerName, 24) },
+      { value: `${truncatePdfText(row.agreementType, 16)}\n${row.status ? toDisplayTaskStatusLabel(row.status) : "Fiche absente"}`, verticalAlign: "top" },
+      { value: row.agreementDate ? formatPdfDate(row.agreementDate) : "—", align: "center" },
+      { value: truncatePdfText(row.purpose, 34) },
+      { value: row.capitalAmount ? formatPdfNumber(row.capitalAmount) : "—", align: "right" },
+      { value: row.profitAmount ? formatPdfNumber(row.profitAmount) : "—", align: "right" },
+      { value: truncatePdfText(row.paymentAccount || "—", 20) }
+    ]), "Aucun protocole d'accord référencé sur la période.", 32);
+
+  const transactionColumns: PdfTableColumn[] = [
+    { label: "DATE", width: 64, align: "center" },
+    { label: "MOUVEMENT", width: 133, align: "left" },
+    { label: "ACCORD / PARTENAIRE", width: 165, align: "left" },
+    { label: "RÉFÉRENCE / DÉTAIL", width: 205, align: "left" },
+    { label: "MONTANT", width: 110, align: "right" },
+    { label: "STATUT", width: availableWidth - 677, align: "center" }
+  ];
+  drawDailyActivitiesTable(doc, report, `Mouvements financiers (${formatPdfNumber(report.transactions.length)} ligne(s))`, transactionColumns,
+    report.transactions.map((row) => [
+      { value: formatPdfDate(row.date), align: "center" },
+      { value: `${row.operationLabel}\n${row.direction === "CASH_IN" ? "Entrée" : "Sortie"}`, verticalAlign: "top" },
+      { value: `${truncatePdfText(row.agreementRef || "—", 23)}\n${truncatePdfText(row.partnerName || "—", 23)}`, verticalAlign: "top" },
+      { value: `${truncatePdfText(row.paymentReference || row.description || "—", 34)}\n${truncatePdfText(row.description || "", 34)}`, verticalAlign: "top" },
+      { value: formatDailyActivityMoney(row.amount, row.currency), align: "right" },
+      { value: toDisplayTransactionStatusLabel(row.status), align: "center" }
+    ]), "Aucun mouvement financier enregistré sur la période.", 34);
+
+}
+
+function drawDailyActivitiesPdfFooter(doc: PDFKit.PDFDocument, pageNumber: number, totalPages: number, periodLabel: string): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
+  doc.save();
+  doc.page.margins.bottom = 0;
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#99f6e4").lineWidth(1).stroke();
+  doc.fillColor("#64748b").font("Helvetica").fontSize(8)
+    .text(`AMCCO - Activités quotidiennes | ${periodLabel}`, margin, pageHeight - 32, { width: 420, lineBreak: false });
+  doc.fillColor("#64748b").font("Helvetica").fontSize(8)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 85, pageHeight - 32, { width: 85, align: "right", lineBreak: false });
+  doc.page.margins.bottom = bottomMargin;
+  doc.restore();
 }
 
 const AGRICULTURE_PDF_COLUMNS: PdfTableColumn[] = [
@@ -8143,30 +8471,6 @@ function buildDashboardActivitySummary(
   }));
 }
 
-function buildActivityHighlightsByCode(
-  rows: Array<{
-    activityCode: BusinessActivityCode;
-    transactionsCount: number;
-    submittedTransactionsCount: number;
-    totalTasksCount: number;
-    openTasksCount: number;
-    blockedTasksCount: number;
-  }>
-) {
-  const items = rows.map((row) => [
-    row.activityCode,
-    buildActivityReportHighlights(row.activityCode, {
-      transactionsCount: row.transactionsCount,
-      submittedTransactionsCount: row.submittedTransactionsCount,
-      totalTasksCount: row.totalTasksCount,
-      openTasksCount: row.openTasksCount,
-      blockedTasksCount: row.blockedTasksCount
-    })
-  ]);
-
-  return Object.fromEntries(items) as Partial<Record<BusinessActivityCode, ReturnType<typeof buildActivityReportHighlights>>>;
-}
-
 function buildReportFinanceByActivitySummary(
   rows: Array<{
     activityCode: BusinessActivityCode | null;
@@ -8790,6 +9094,211 @@ function buildGeneralExpensesReport(
   };
 }
 
+function normalizeDailyActivityKind(value: string | undefined): string {
+  return (value ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("fr");
+}
+
+function isDailyAgreement(task: ReportOperationalTask): boolean {
+  return normalizeDailyActivityKind(task.metadata.dailyActivityKind) === "protocole d'accord";
+}
+
+function toDailyAgreementAmount(value: string | undefined): string | null {
+  if (!value?.trim()) return null;
+  const amount = toNumberAmount(value);
+  return amount > 0 ? toMoneyString(amount) : null;
+}
+
+function getDailyAgreementOperationLabel(metadata: Record<string, string>, direction: "CASH_IN" | "CASH_OUT"): string {
+  switch (metadata.financialOperationKind?.trim()) {
+    case "PARTNER_PAYMENT": return "Versement partenaire";
+    case "AGREEMENT_PROFIT": return "Bénéfice reçu";
+    case "CAPITAL_RETURN": return "Retour de capital";
+    case "AGREEMENT_EXPENSE": return "Dépense d'accord";
+    default: return direction === "CASH_IN" ? "Entrée" : "Sortie";
+  }
+}
+
+function buildDailyActivitiesReport(
+  transactions: ReportOperationalTransaction[],
+  tasks: ReportOperationalTask[],
+  filters: ReportPeriodFilter
+): DailyActivitiesReport | null {
+  if (filters.activityCode && filters.activityCode !== "DAILY_ACTIVITIES") return null;
+
+  const sectorTasks = tasks.filter((task) => task.activityCode === "DAILY_ACTIVITIES");
+  const sectorTransactions = transactions
+    .filter((transaction) =>
+      transaction.activityCode === "DAILY_ACTIVITIES" && isReportableFinancialStatus(transaction.status)
+    )
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt));
+
+  if (!filters.activityCode && sectorTasks.length === 0 && sectorTransactions.length === 0) {
+    return null;
+  }
+
+  const activities = sectorTasks
+    .map((task) => ({
+      dueDate: task.dueDate ? toReportDate(task.dueDate) : null,
+      categoryLabel: task.metadata.dailyActivityKind?.trim() || "Catégorie non renseignée",
+      title: task.title?.trim() || "Activité sans titre",
+      description: task.description?.trim() || "",
+      status: task.status,
+      indicativeAmount: toDailyAgreementAmount(task.metadata.amount),
+      agreementRef: task.metadata.agreementRef?.trim() || "",
+      partnerName: task.metadata.partnerName?.trim() || ""
+    }))
+    .sort((left, right) =>
+      (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31") ||
+      left.categoryLabel.localeCompare(right.categoryLabel) || left.title.localeCompare(right.title)
+    );
+
+  const categoryMap = new Map<string, DailyActivitiesReport["categories"][number]>();
+  for (const activity of activities) {
+    const categoryKey = normalizeDailyActivityKind(activity.categoryLabel);
+    const category = categoryMap.get(categoryKey) ?? {
+      categoryLabel: activity.categoryLabel,
+      activitiesCount: 0,
+      openCount: 0,
+      doneCount: 0,
+      blockedCount: 0
+    };
+    category.activitiesCount += 1;
+    if (activity.status === "DONE") category.doneCount += 1;
+    else category.openCount += 1;
+    if (activity.status === "BLOCKED") category.blockedCount += 1;
+    categoryMap.set(categoryKey, category);
+  }
+
+  const agreementMap = new Map<string, DailyActivitiesReport["agreements"][number]>();
+  for (const task of sectorTasks.filter(isDailyAgreement)) {
+    const agreementRef = task.metadata.agreementRef?.trim();
+    if (!agreementRef) continue;
+    const agreement = {
+      agreementRef,
+      partnerName: task.metadata.partnerName?.trim() || "Partenaire non renseigné",
+      agreementType: task.metadata.agreementType?.trim() || "Type non renseigné",
+      agreementDate: task.metadata.agreementDate?.trim() || "",
+      purpose: task.metadata.agreementPurpose?.trim() || task.title?.trim() || "Objet non renseigné",
+      capitalAmount: toDailyAgreementAmount(task.metadata.agreementCapitalAmount),
+      profitAmount: toDailyAgreementAmount(task.metadata.agreementProfitAmount),
+      paymentAccount: task.metadata.agreementPaymentAccount?.trim() || "",
+      status: task.status
+    };
+    const existing = agreementMap.get(agreementRef);
+    if (!existing || (existing.purpose === "Objet non renseigné" && agreement.purpose !== existing.purpose)) {
+      agreementMap.set(agreementRef, agreement);
+    }
+  }
+
+  const currencyMap = new Map<string, {
+    transactionsCount: number;
+    approvedTransactionsCount: number;
+    pendingTransactionsCount: number;
+    cashIn: number;
+    cashOut: number;
+  }>();
+  const reportTransactions: DailyActivitiesReport["transactions"] = sectorTransactions.map((transaction) => {
+    const currency = transaction.currency.trim().toUpperCase() || "—";
+    const amount = toNumberAmount(transaction.amount);
+    const totals = currencyMap.get(currency) ?? {
+      transactionsCount: 0,
+      approvedTransactionsCount: 0,
+      pendingTransactionsCount: 0,
+      cashIn: 0,
+      cashOut: 0
+    };
+    totals.transactionsCount += 1;
+    if (transaction.status === "APPROVED") {
+      totals.approvedTransactionsCount += 1;
+      if (transaction.type === "CASH_IN") totals.cashIn += amount;
+      else totals.cashOut += amount;
+    } else {
+      totals.pendingTransactionsCount += 1;
+    }
+    currencyMap.set(currency, totals);
+
+    const metadata = transaction.metadata;
+    const agreementRef = metadata.agreementRef?.trim() || "";
+    const partnerName = metadata.partnerName?.trim() || "";
+    if (agreementRef && !agreementMap.has(agreementRef)) {
+      agreementMap.set(agreementRef, {
+        agreementRef,
+        partnerName: partnerName || "Partenaire non renseigné",
+        agreementType: "Type inconnu",
+        agreementDate: "",
+        purpose: "",
+        capitalAmount: null,
+        profitAmount: null,
+        paymentAccount: "",
+        status: null
+      });
+    }
+
+    return {
+      date: toReportDate(transaction.occurredAt),
+      categoryLabel: metadata.dailyActivityKind?.trim() || "Protocole d'accord",
+      operationLabel: getDailyAgreementOperationLabel(metadata, transaction.type),
+      agreementRef,
+      partnerName,
+      paymentReference: metadata.paymentReference?.trim() || "",
+      description: transaction.description?.trim() || "",
+      direction: transaction.type,
+      status: transaction.status as "SUBMITTED" | "APPROVED",
+      amount: toMoneyString(amount),
+      currency
+    };
+  });
+
+  const currencyOrder = ["XOF", "EUR", "USD"];
+  const currencySummaries: DailyActivitiesReport["currencySummaries"] = Array.from(currencyMap)
+    .sort(([left], [right]) => {
+      const leftIndex = currencyOrder.indexOf(left);
+      const rightIndex = currencyOrder.indexOf(right);
+      return leftIndex >= 0 || rightIndex >= 0
+        ? (leftIndex < 0 ? currencyOrder.length : leftIndex) - (rightIndex < 0 ? currencyOrder.length : rightIndex)
+        : left.localeCompare(right);
+    })
+    .map(([currency, totals]) => ({
+      currency,
+      transactionsCount: totals.transactionsCount,
+      approvedTransactionsCount: totals.approvedTransactionsCount,
+      pendingTransactionsCount: totals.pendingTransactionsCount,
+      cashInAmount: toMoneyString(totals.cashIn),
+      cashOutAmount: toMoneyString(totals.cashOut),
+      netAmount: toMoneyString(totals.cashIn - totals.cashOut)
+    }));
+
+  const statusTotals = activities.reduce((totals, activity) => {
+    if (activity.status === "DONE") totals.doneCount += 1;
+    else totals.openCount += 1;
+    if (activity.status === "BLOCKED") totals.blockedCount += 1;
+    return totals;
+  }, { openCount: 0, doneCount: 0, blockedCount: 0 });
+
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    activities,
+    categories: Array.from(categoryMap.values()).sort((left, right) =>
+      right.activitiesCount - left.activitiesCount || left.categoryLabel.localeCompare(right.categoryLabel)
+    ),
+    agreements: Array.from(agreementMap.values()).sort((left, right) =>
+      left.agreementRef.localeCompare(right.agreementRef)
+    ),
+    transactions: reportTransactions,
+    currencySummaries,
+    totals: {
+      activitiesCount: activities.length,
+      ...statusTotals,
+      agreementsCount: agreementMap.size,
+      transactionsCount: reportTransactions.length
+    }
+  };
+}
+
 type AgricultureReportBucket = {
   campaignRef: string;
   parcelRef: string;
@@ -9261,6 +9770,25 @@ function buildGeneralStoreOperationsReport(
       currency: "XOF" as const
     }
   };
+}
+
+export async function getCompanyGeneralStoreLedgerRows(
+  actor: ActorContext
+): Promise<{ shops: GeneralStoreShop[]; rows: GeneralStoreOperationsReportRow[] }> {
+  ensureReportingAccess(actor.role);
+  const [transactions, shops, inventorySnapshots] = await Promise.all([
+    listGeneralStoreLedgerTransactions(actor.companyId),
+    listGeneralStoreShops({ companyId: actor.companyId, activeOnly: true }),
+    listReportGeneralStoreInventorySnapshots(actor.companyId)
+  ]);
+  const report = buildGeneralStoreOperationsReport(
+    transactions,
+    shops,
+    inventorySnapshots,
+    { activityCode: "GENERAL_STORE" }
+  );
+
+  return { shops, rows: report?.rows ?? [] };
 }
 
 type FoodReportBucket = {
@@ -11828,12 +12356,7 @@ function getOperationalBucket(
     itemLabel: string;
   }
 ) {
-  const key = [
-    input.scope,
-    input.activityCode,
-    input.dimensionKey,
-    input.itemKey
-  ].join("|");
+  const key = `${input.scope}|${input.activityCode}|${input.dimensionKey}|${input.itemKey}`;
   const existing = buckets.get(key);
   if (existing) {
     return existing;
@@ -11863,8 +12386,8 @@ function getOperationalBucket(
 }
 
 function buildOperationalPerformance(
-  transactions: ReportOperationalTransaction[],
-  tasks: ReportOperationalTask[],
+  transactions: DashboardOperationalTransaction[],
+  tasks: DashboardOperationalTask[],
   now = new Date()
 ): ReportOperationalMetric[] {
   const buckets = new Map<
@@ -11883,21 +12406,24 @@ function buildOperationalPerformance(
     });
   }
 
-  function getSubsectionBuckets(
+  function getBucketAtIndex(
     activityCode: BusinessActivityCode,
-    metadata: Record<string, string>
+    metadata: Record<string, string>,
+    index: number
   ) {
-    const profile = getBusinessActivityProfile(activityCode);
-    return (profile.reporting.operationalDimensions ?? []).map((item) => {
-      const value = normalizeOperationalItem(metadata[item.key]);
-      return getOperationalBucket(buckets, {
-        scope: "SUBSECTION",
-        activityCode,
-        dimensionKey: item.key,
-        dimensionLabel: item.label,
-        itemKey: value.itemKey,
-        itemLabel: value.itemLabel
-      });
+    if (index === -1) {
+      return getActivityBucket(activityCode);
+    }
+
+    const dimension = DASHBOARD_OPERATIONAL_DIMENSIONS_BY_ACTIVITY[activityCode][index];
+    const value = normalizeOperationalItem(metadata[dimension.key]);
+    return getOperationalBucket(buckets, {
+      scope: "SUBSECTION",
+      activityCode,
+      dimensionKey: dimension.key,
+      dimensionLabel: dimension.label,
+      itemKey: value.itemKey,
+      itemLabel: value.itemLabel
     });
   }
 
@@ -11906,15 +12432,14 @@ function buildOperationalPerformance(
       continue;
     }
 
-    const targetBuckets = [
-      getActivityBucket(transaction.activityCode),
-      ...getSubsectionBuckets(transaction.activityCode, transaction.metadata)
-    ];
-    for (const bucket of targetBuckets) {
+    const activityCode = transaction.activityCode;
+    const dimensions = DASHBOARD_OPERATIONAL_DIMENSIONS_BY_ACTIVITY[activityCode];
+    const amount = transaction.currency === "XOF" ? toNumberAmount(transaction.amount) : 0;
+    for (let index = -1; index < dimensions.length; index += 1) {
+      const bucket = getBucketAtIndex(activityCode, transaction.metadata, index);
       bucket.transactionsCount += 1;
       bucket.approvedTransactionsCount += 1;
       if (transaction.currency === "XOF") {
-        const amount = toNumberAmount(transaction.amount);
         if (transaction.type === "CASH_IN") {
           bucket.approvedCashInValue += amount;
         } else {
@@ -11925,14 +12450,13 @@ function buildOperationalPerformance(
   }
 
   for (const task of tasks) {
-    const targetBuckets = [
-      getActivityBucket(task.activityCode),
-      ...getSubsectionBuckets(task.activityCode, task.metadata)
-    ];
+    const activityCode = task.activityCode;
+    const dimensions = DASHBOARD_OPERATIONAL_DIMENSIONS_BY_ACTIVITY[activityCode];
     const dueDate = task.dueDate ? new Date(task.dueDate) : null;
     const isOpen = task.status !== "DONE";
     const isOverdue = Boolean(isOpen && dueDate && dueDate.getTime() < now.getTime());
-    for (const bucket of targetBuckets) {
+    for (let index = -1; index < dimensions.length; index += 1) {
+      const bucket = getBucketAtIndex(activityCode, task.metadata, index);
       bucket.totalTasksCount += 1;
       if (task.status === "DONE") {
         bucket.doneTasksCount += 1;
@@ -12066,10 +12590,10 @@ export async function getCompanyDashboardSummary(
   const filters = normalizeReportFilters(input);
 
   const [
-    company,
+    companySummary,
     finance,
     operations,
-    financialAccounts,
+    accountsSummary,
     recentTransactions,
     recentTasks,
     workload,
@@ -12081,22 +12605,32 @@ export async function getCompanyDashboardSummary(
     getDashboardCompanySummary(actor.companyId, actor.actorId),
     getDashboardFinanceSummary(actor.companyId, filters),
     getDashboardOperationsSummary(actor.companyId, actor.actorId, filters),
-    listFinancialAccounts({ companyId: actor.companyId }),
+    getFinancialAccountsSummary({
+      companyId: actor.companyId,
+      activityCode: filters.activityCode
+    }),
     listDashboardRecentTransactions(actor.companyId, 6, filters),
     listDashboardRecentTasks(actor.companyId, 6, actor.role, actor.actorId, filters),
     actor.role === "EMPLOYEE" ? Promise.resolve([]) : listDashboardWorkload(actor.companyId, 5, filters),
     listDashboardFinanceActivitySummary(actor.companyId),
     listDashboardTaskActivitySummary(actor.companyId),
-    listReportOperationalTransactions(actor.companyId, filters),
-    listReportOperationalTasks(actor.companyId, filters)
+    listDashboardOperationalTransactions(
+      actor.companyId,
+      filters,
+      DASHBOARD_OPERATIONAL_METADATA_KEYS
+    ),
+    listDashboardOperationalTasks(actor.companyId, filters, DASHBOARD_OPERATIONAL_METADATA_KEYS)
   ]);
 
-  if (!company) {
+  if (!companySummary) {
     throw new HttpError(404, "Entreprise introuvable.");
   }
 
+  const company = {
+    ...companySummary,
+    financialAccountsCount: accountsSummary.totalCount
+  };
   const activitySummary = buildDashboardActivitySummary(financeActivitySummary, taskActivitySummary);
-  const accountsSummary = buildFinancialAccountsSummary(financialAccounts, filters.activityCode);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -12108,8 +12642,6 @@ export async function getCompanyDashboardSummary(
     },
     operations,
     activitySummary,
-    activityProfiles: listBusinessActivityProfiles(),
-    activityHighlightsByCode: buildActivityHighlightsByCode(activitySummary),
     operationalPerformance: buildOperationalPerformance(operationalTransactions, operationalTasks),
     recentTransactions,
     recentTasks,
@@ -12254,6 +12786,7 @@ export async function getCompanyReportsOverview(
       : null,
     agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
     generalExpensesReport: buildGeneralExpensesReport(operationalTransactions, filters),
+    dailyActivitiesReport: buildDailyActivitiesReport(operationalTransactions, operationalTasks, filters),
     roleDistribution: [],
     topAssignees: []
   };
@@ -12362,8 +12895,10 @@ export async function exportCompanyTransactionsExcel(
   ensureReportingAccess(actor.role);
   const filters = normalizeReportFilters(input);
   ensureSectorReportFilter(filters);
-  const overview = await getCompanyReportsOverview(actor, input);
-  const rows = await listTransactionsForExport(actor.companyId, filters);
+  const [overview, rows] = await Promise.all([
+    getCompanyReportsOverview(actor, input),
+    listTransactionsForExport(actor.companyId, filters)
+  ]);
   const records = rows.map(toTransactionExportRecord);
 
   return buildWorkbookBuffer([
@@ -12852,8 +13387,10 @@ export async function exportCompanyTasksExcel(
   ensureReportingAccess(actor.role);
   const filters = normalizeReportFilters(input);
   ensureSectorReportFilter(filters);
-  const overview = await getCompanyReportsOverview(actor, input);
-  const rows = await listTasksForExport(actor.companyId, filters);
+  const [overview, rows] = await Promise.all([
+    getCompanyReportsOverview(actor, input),
+    listTasksForExport(actor.companyId, filters)
+  ]);
   const records = rows.map(toTaskExportRecord);
 
   return buildWorkbookBuffer([
@@ -13350,6 +13887,19 @@ export async function exportCompanyReportsPdf(
         pageNumber,
         totalPages,
         overview.generalExpensesReport?.periodLabel ?? periodLabel
+      );
+    }, { layout: "landscape" });
+  }
+
+  if (filters.activityCode === "DAILY_ACTIVITIES") {
+    return buildPdfBuffer((doc) => {
+      renderDailyActivitiesReportsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawDailyActivitiesPdfFooter(
+        doc,
+        pageNumber,
+        totalPages,
+        overview.dailyActivitiesReport?.periodLabel ?? periodLabel
       );
     }, { layout: "landscape" });
   }

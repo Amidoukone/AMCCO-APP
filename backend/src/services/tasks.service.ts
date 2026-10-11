@@ -26,7 +26,8 @@ import {
   type TaskStatus,
   updateOperationTask,
   updateOperationTaskAssignment,
-  updateOperationTaskStatus
+  updateOperationTaskStatus,
+  type OperationTaskMinimal
 } from "../repositories/tasks.repository.js";
 import {
   createTaskComment,
@@ -319,24 +320,28 @@ export async function assignCompanyTask(
     taskId: string;
     assignedToId: string | null;
     note?: string;
+  },
+  prepared?: {
+    task: OperationTaskMinimal;
+    assigneeId: string | null;
   }
 ) {
   if (!canManageTasks(actor.role)) {
     throw new HttpError(403, "Permissions insuffisantes pour assigner une tâche.");
   }
 
-  const task = await findOperationTaskMinimalById(actor.companyId, input.taskId);
+  const task = prepared?.task ?? await findOperationTaskMinimalById(actor.companyId, input.taskId);
   if (!task) {
     throw new HttpError(404, "Tâche introuvable.");
   }
 
   let nextAssignedToId: string | null = null;
   if (input.assignedToId) {
-    const assignee = await findCompanyTaskAssigneeByUserId(actor.companyId, input.assignedToId);
-    if (!assignee) {
+    const assignee = prepared ? null : await findCompanyTaskAssigneeByUserId(actor.companyId, input.assignedToId);
+    if (!assignee && !prepared) {
       throw new HttpError(400, "Utilisateur assigné invalide ou inactif.");
     }
-    nextAssignedToId = assignee.userId;
+    nextAssignedToId = prepared?.assigneeId ?? assignee?.userId ?? input.assignedToId;
   }
 
   if (task.activityCode) {
@@ -361,30 +366,21 @@ export async function assignCompanyTask(
     return current;
   }
 
-  await updateOperationTaskAssignment({
-    companyId: actor.companyId,
-    taskId: task.id,
-    assignedToId: nextAssignedToId
-  });
-
-  let previousStatus = task.status;
+  const previousStatus = task.status;
   let nextStatus = task.status;
 
   if (task.status === "TODO" && nextAssignedToId) {
     nextStatus = "IN_PROGRESS";
-    await updateOperationTaskStatus({
-      companyId: actor.companyId,
-      taskId: task.id,
-      status: nextStatus
-    });
   } else if (task.status === "IN_PROGRESS" && !nextAssignedToId) {
     nextStatus = "TODO";
-    await updateOperationTaskStatus({
-      companyId: actor.companyId,
-      taskId: task.id,
-      status: nextStatus
-    });
   }
+
+  await updateOperationTaskAssignment({
+    companyId: actor.companyId,
+    taskId: task.id,
+    assignedToId: nextAssignedToId,
+    status: nextStatus
+  });
 
   await createAuditLogRecord({
     auditId: randomUUID(),
@@ -451,6 +447,7 @@ export async function assignCompanyTasksBulk(
   }
 
   const tasks = await findOperationTasksMinimalByIds(actor.companyId, uniqueTaskIds);
+  const validatedAssigneeId = input.assignedToId;
   if (tasks.length !== uniqueTaskIds.length) {
     throw new HttpError(404, "Au moins une tâche est introuvable.");
   }
@@ -469,11 +466,16 @@ export async function assignCompanyTasksBulk(
   }
 
   const items = [];
+  const tasksById = new Map(tasks.map((task) => [task.id, task]));
   for (const taskId of uniqueTaskIds) {
+    const task = tasksById.get(taskId)!;
     const updated = await assignCompanyTask(actor, {
       taskId,
       assignedToId: input.assignedToId,
       note: input.note
+    }, {
+      task,
+      assigneeId: validatedAssigneeId
     });
     items.push(updated);
   }

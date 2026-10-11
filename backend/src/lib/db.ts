@@ -1,7 +1,9 @@
 import mysql, { type Pool, type PoolOptions, type RowDataPacket } from "mysql2/promise";
+import { performance } from "node:perf_hooks";
 import { env } from "../config/env.js";
 import { logger } from "./logger.js";
 
+const SLOW_QUERY_THRESHOLD_MS = 500;
 let pool: Pool | null = null;
 
 export function getDbPool(): Pool {
@@ -33,8 +35,28 @@ export async function queryRows<T extends RowDataPacket[]>(
   sql: string,
   values: unknown[] = []
 ): Promise<T> {
-  const [rows] = await getDbPool().query<T>(sql, values);
-  return rows;
+  const startedAt = performance.now();
+  try {
+    const [rows] = await getDbPool().query<T>(sql, values);
+    const durationMs = Math.round(performance.now() - startedAt);
+    if (durationMs >= SLOW_QUERY_THRESHOLD_MS) {
+      logger.warn({
+        durationMs,
+        rowCount: rows.length,
+        statement: sql.replace(/\s+/g, " ").trim().slice(0, 180)
+      }, "Slow database query");
+    }
+    return rows;
+  } catch (error) {
+    const durationMs = Math.round(performance.now() - startedAt);
+    if (durationMs >= SLOW_QUERY_THRESHOLD_MS) {
+      logger.warn({
+        durationMs,
+        statement: sql.replace(/\s+/g, " ").trim().slice(0, 180)
+      }, "Database query failed after a long wait");
+    }
+    throw error;
+  }
 }
 
 export async function checkDatabaseConnection(): Promise<void> {

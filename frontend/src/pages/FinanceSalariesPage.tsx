@@ -22,7 +22,7 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
-import { matchesQuickSearch } from "../lib/quickSearch";
+import { buildQuickSearchText, createQuickSearchMatcher } from "../lib/quickSearch";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -285,21 +285,24 @@ export function FinanceSalariesPage(): JSX.Element {
     () => salaryItems.find((item) => item.id === selectedSalaryId) ?? null,
     [salaryItems, selectedSalaryId]
   );
+  const salarySearchTextById = useMemo(() => new Map(salaryItems.map((item) => [
+    item.id,
+    buildQuickSearchText([
+      item.employeeFullName,
+      item.employeeEmail,
+      item.accountName,
+      item.note,
+      item.payPeriod,
+      item.netAmount,
+      item.currency,
+      item.employeeRole,
+      salaryPaymentMethodLabel(item.paymentMethod)
+    ])
+  ])), [salaryItems]);
   const displaySalaryItems = useMemo(() => {
-    return salaryItems.filter((item) =>
-      matchesQuickSearch(searchQuery, [
-        item.employeeFullName,
-        item.employeeEmail,
-        item.accountName,
-        item.note,
-        item.payPeriod,
-        item.netAmount,
-        item.currency,
-        item.employeeRole,
-        salaryPaymentMethodLabel(item.paymentMethod)
-      ])
-    );
-  }, [salaryItems, searchQuery]);
+    const matchesSearch = createQuickSearchMatcher(searchQuery);
+    return salaryItems.filter((item) => matchesSearch(salarySearchTextById.get(item.id) ?? ""));
+  }, [salaryItems, salarySearchTextById, searchQuery]);
   const totalVisibleSalaryPages = useMemo(() => {
     return Math.max(1, Math.ceil(displaySalaryItems.length / visibleSalariesPageSize));
   }, [displaySalaryItems.length, visibleSalariesPageSize]);
@@ -456,6 +459,14 @@ export function FinanceSalariesPage(): JSX.Element {
           };
         }
 
+        if (append) {
+          const salariesResp = await salariesPromise;
+          return {
+            salarySummary: undefined,
+            salaryItems: salariesResp.items
+          };
+        }
+
         const [salarySummaryResp, salariesResp] = await Promise.all([
           getFinanceSalarySummaryRequest(accessToken, {
             payPeriod: salaryFilters.payPeriod,
@@ -472,7 +483,9 @@ export function FinanceSalariesPage(): JSX.Element {
       if (requestId !== salariesLoadRequestRef.current) return;
 
       setHasMoreSalaries(payload.salaryItems.length === SALARIES_PAGE_SIZE);
-      setSalarySummary(payload.salarySummary);
+      if (payload.salarySummary !== undefined) {
+        setSalarySummary(payload.salarySummary);
+      }
       setSalaryItems((prev) => {
         if (!append) {
           return payload.salaryItems;

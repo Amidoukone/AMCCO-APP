@@ -89,7 +89,11 @@ function toUserRecord(row: UserRow): UserRecord {
   };
 }
 
-export async function listCompanyUsers(companyId: string): Promise<CompanyUser[]> {
+export async function listCompanyUsers(
+  companyId: string,
+  options: { activeOnly?: boolean } = {}
+): Promise<CompanyUser[]> {
+  const activeFilter = options.activeOnly ? "AND u.is_active = 1" : "";
   const rows = await queryRows<CompanyUserRow[]>(
     `
       SELECT
@@ -103,6 +107,7 @@ export async function listCompanyUsers(companyId: string): Promise<CompanyUser[]
       FROM memberships m
       INNER JOIN users u ON u.id = m.user_id
       WHERE m.company_id = ?
+        ${activeFilter}
       ORDER BY u.full_name ASC, u.email ASC
     `,
     [companyId]

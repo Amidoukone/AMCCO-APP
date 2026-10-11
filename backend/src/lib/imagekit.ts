@@ -3,6 +3,10 @@ import { HttpError } from "../errors/http-error.js";
 import { env } from "../config/env.js";
 
 let imagekitClient: unknown = null;
+const RESOLVED_PROOF_URL_TTL_MS = 15 * 60 * 1000;
+const MAX_RESOLVED_PROOF_URLS = 300;
+const resolvedProofUrls = new Map<string, { url: string; expiresAt: number }>();
+const pendingProofUrlLookups = new Map<string, Promise<string | null>>();
 
 type ImageKitConfig = {
   publicKey: string;
@@ -88,14 +92,50 @@ export async function resolveImageKitProofUrl(storageKey: string): Promise<strin
     return null;
   }
 
-  try {
-    const client = getClient();
-    const file = await client.files.get(key);
-    if (typeof file?.url === "string" && file.url.trim().length > 0) {
-      return file.url;
+  const cacheKey = `${config.urlEndpoint}:${key}`;
+  const cached = resolvedProofUrls.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.url;
+  }
+  if (cached) {
+    resolvedProofUrls.delete(cacheKey);
+  }
+
+  const pendingLookup = pendingProofUrlLookups.get(cacheKey);
+  if (pendingLookup) {
+    return pendingLookup;
+  }
+
+  const lookup = (async (): Promise<string | null> => {
+    try {
+      const client = getClient();
+      const file = await client.files.get(key);
+      const url = typeof file?.url === "string" ? file.url.trim() : "";
+      if (!url) {
+        return null;
+      }
+
+      resolvedProofUrls.set(cacheKey, {
+        url,
+        expiresAt: Date.now() + RESOLVED_PROOF_URL_TTL_MS
+      });
+      while (resolvedProofUrls.size > MAX_RESOLVED_PROOF_URLS) {
+        const oldestKey = resolvedProofUrls.keys().next().value as string | undefined;
+        if (!oldestKey) break;
+        resolvedProofUrls.delete(oldestKey);
+      }
+      return url;
+    } catch {
+      return null;
     }
-    return null;
-  } catch {
-    return null;
+  })();
+  pendingProofUrlLookups.set(cacheKey, lookup);
+
+  try {
+    return await lookup;
+  } finally {
+    if (pendingProofUrlLookups.get(cacheKey) === lookup) {
+      pendingProofUrlLookups.delete(cacheKey);
+    }
   }
 }

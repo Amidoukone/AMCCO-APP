@@ -33,6 +33,7 @@ import {
   deleteCompanyTransaction,
   exportCompanySalaryCsv,
   getCompanySalarySummary,
+  listCompanySalaryMembers,
   reviewCompanyTransaction,
   submitCompanyTransaction,
   updateCompanyAccount,
@@ -91,6 +92,26 @@ describe("finance.service", () => {
     vi.clearAllMocks();
     vi.mocked(ensureCompanyActivityEnabledOrThrow).mockResolvedValue(undefined);
     vi.mocked(listCompanyUsers).mockResolvedValue([]);
+  });
+
+  it("loads salary members with the active-user filter delegated to the repository", async () => {
+    vi.mocked(listCompanyUsers).mockResolvedValue([
+      {
+        membershipId: "membership-active",
+        userId: "employee-active",
+        email: "active@example.com",
+        fullName: "Employé actif",
+        isActive: true,
+        role: "EMPLOYEE",
+        membershipCreatedAt: "2026-10-01T00:00:00.000Z"
+      }
+    ]);
+
+    const result = await listCompanySalaryMembers(actor.companyId);
+
+    expect(listCompanyUsers).toHaveBeenCalledWith(actor.companyId, { activeOnly: true });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.userId).toBe("employee-active");
   });
 
   describe("createCompanySalaryTransaction", () => {

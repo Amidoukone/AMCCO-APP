@@ -20,9 +20,14 @@ type LegacyCountsRow = RowDataPacket & {
   unclassifiedTasksCount: number;
 };
 
-async function ensureCompanyActivitiesStorageReady(): Promise<void> {
-  await getDbPool().execute(
-    `
+let companyActivitiesStoragePromise: Promise<void> | null = null;
+const seededCompanyActivityIds = new Set<string>();
+const companyActivitySeedPromises = new Map<string, Promise<void>>();
+
+function ensureCompanyActivitiesStorageReady(): Promise<void> {
+  if (!companyActivitiesStoragePromise) {
+    companyActivitiesStoragePromise = getDbPool().execute(
+      `
       CREATE TABLE IF NOT EXISTS company_activities (
         company_id VARCHAR(36) NOT NULL,
         activity_code VARCHAR(32) NOT NULL,
@@ -34,26 +39,49 @@ async function ensureCompanyActivitiesStorageReady(): Promise<void> {
         CONSTRAINT fk_company_activities_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `
-  );
+    ).then(() => undefined).catch((error: unknown) => {
+      companyActivitiesStoragePromise = null;
+      throw error;
+    });
+  }
+
+  return companyActivitiesStoragePromise;
 }
 
 async function ensureCompanyActivitiesSeeded(companyId: string): Promise<void> {
-  await ensureCompanyActivitiesStorageReady();
-
-  const valuesSql = SELECTABLE_BUSINESS_ACTIVITIES.map(() => "(?, ?, 1)").join(", ");
-  const values: Array<string | number> = [];
-
-  for (const activity of SELECTABLE_BUSINESS_ACTIVITIES) {
-    values.push(companyId, activity.code);
+  if (seededCompanyActivityIds.has(companyId)) {
+    return;
   }
 
-  await getDbPool().execute<ResultSetHeader>(
-    `
-      INSERT IGNORE INTO company_activities (company_id, activity_code, is_enabled)
-      VALUES ${valuesSql}
-    `,
-    values
-  );
+  await ensureCompanyActivitiesStorageReady();
+  if (seededCompanyActivityIds.has(companyId)) {
+    return;
+  }
+
+  let seedPromise = companyActivitySeedPromises.get(companyId);
+  if (!seedPromise) {
+    const valuesSql = SELECTABLE_BUSINESS_ACTIVITIES.map(() => "(?, ?, 1)").join(", ");
+    const values: Array<string | number> = [];
+
+    for (const activity of SELECTABLE_BUSINESS_ACTIVITIES) {
+      values.push(companyId, activity.code);
+    }
+
+    seedPromise = getDbPool().execute<ResultSetHeader>(
+      `
+        INSERT IGNORE INTO company_activities (company_id, activity_code, is_enabled)
+        VALUES ${valuesSql}
+      `,
+      values
+    ).then(() => {
+      seededCompanyActivityIds.add(companyId);
+    }).finally(() => {
+      companyActivitySeedPromises.delete(companyId);
+    });
+    companyActivitySeedPromises.set(companyId, seedPromise);
+  }
+
+  await seedPromise;
 }
 
 function toCompanyActivityItems(rows: CompanyActivityRow[]): CompanyActivityItem[] {

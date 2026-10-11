@@ -23,7 +23,7 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
-import { matchesQuickSearch } from "../lib/quickSearch";
+import { buildQuickSearchText, createQuickSearchMatcher } from "../lib/quickSearch";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -3206,6 +3206,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   } = useBusinessActivity();
   const financeEnabledActivities = enabledActivities;
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [hasLoadedAccounts, setHasLoadedAccounts] = useState(false);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [isAccountListExpanded, setIsAccountListExpanded] = useState(false);
   const [dailyActivityCategories, setDailyActivityCategories] = useState<DailyActivityCategory[]>([]);
   const dailyCategoriesLoadRequestRef = useRef(0);
   const [articles, setArticles] = useState<ActivityArticle[]>([]);
@@ -3239,6 +3242,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [projectPendingDelete, setProjectPendingDelete] = useState<BtpProject | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const transactionsRef = useRef<FinancialTransaction[]>([]);
+  transactionsRef.current = transactions;
   const [sectorSuggestionHistory, setSectorSuggestionHistory] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
@@ -3246,6 +3251,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const hasLoadedTransactionsRef = useRef(false);
   const transactionsLoadRequestRef = useRef(0);
+  const sectorSuggestionLoadRequestRef = useRef(0);
   const accountsLoadRequestRef = useRef(0);
   const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [busyAccountId, setBusyAccountId] = useState<string | null>(null);
@@ -3592,21 +3598,24 @@ export function FinanceTransactionsPage(): JSX.Element {
     () => (selectedTransaction ? canMutateTransaction(selectedTransaction) : false),
     [canMutateTransaction, selectedTransaction]
   );
+  const transactionSearchTextById = useMemo(() => new Map(transactions.map((item) => [
+    item.id,
+    buildQuickSearchText([
+      item.accountName,
+      item.accountRef,
+      item.description,
+      item.createdByEmail,
+      item.amount,
+      item.currency,
+      item.type === "CASH_IN" ? "Entree" : "Sortie",
+      item.activityCode ? getBusinessActivityLabel(item.activityCode) : "Charge transversale entreprise",
+      ...Object.values(item.metadata)
+    ])
+  ])), [transactions]);
   const displayTransactions = useMemo(() => {
-    return transactions.filter((item) =>
-      matchesQuickSearch(searchQuery, [
-        item.accountName,
-        item.accountRef,
-        item.description,
-        item.createdByEmail,
-        item.amount,
-        item.currency,
-        item.type === "CASH_IN" ? "Entree" : "Sortie",
-        item.activityCode ? getBusinessActivityLabel(item.activityCode) : "Charge transversale entreprise",
-        ...Object.values(item.metadata)
-      ])
-    );
-  }, [searchQuery, transactions]);
+    const matchesSearch = createQuickSearchMatcher(searchQuery);
+    return transactions.filter((item) => matchesSearch(transactionSearchTextById.get(item.id) ?? ""));
+  }, [searchQuery, transactionSearchTextById, transactions]);
   const totalVisibleTransactionPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTransactions.length / visibleTransactionsPageSize));
   }, [displayTransactions.length, visibleTransactionsPageSize]);
@@ -3853,35 +3862,27 @@ export function FinanceTransactionsPage(): JSX.Element {
       const payload = await withAuthorizedToken(async (accessToken) => {
         if (!selectedActivityCode) {
           return {
-            transactions: [] as FinancialTransaction[],
-            sectorHistory: [] as FinancialTransaction[]
+            transactions: [] as FinancialTransaction[]
           };
         }
 
-        return Promise.all([
-          listFinanceTransactionsRequest(accessToken, {
-            limit: TRANSACTIONS_PAGE_SIZE,
-            offset,
-            type: filters.type === "ALL" ? undefined : filters.type,
-            activityCode: selectedActivityCode
-          }),
-          isQuickFillSectorActivity(selectedActivityCode) && filters.type !== "ALL" && !append
-            ? listFinanceTransactionsRequest(accessToken, {
-                limit: TRANSACTIONS_PAGE_SIZE,
-                activityCode: selectedActivityCode
-              }).catch(() => null)
-            : Promise.resolve(null)
-        ]).then(([transactionsResp, sectorHistoryResp]) => ({
-          transactions: transactionsResp.items,
-          sectorHistory: isQuickFillSectorActivity(selectedActivityCode)
-            ? (sectorHistoryResp?.items ?? (append ? [] : transactionsResp.items))
-            : []
-        }));
+        const transactionsResp = await listFinanceTransactionsRequest(accessToken, {
+          limit: TRANSACTIONS_PAGE_SIZE,
+          offset,
+          type: filters.type === "ALL" ? undefined : filters.type,
+          activityCode: selectedActivityCode
+        });
+        return { transactions: transactionsResp.items };
       });
       if (requestId !== transactionsLoadRequestRef.current) return;
       setHasMoreTransactions(payload.transactions.length === TRANSACTIONS_PAGE_SIZE);
-      if (!append) {
-        setSectorSuggestionHistory(payload.sectorHistory);
+      if (
+        !append &&
+        selectedActivityCode &&
+        isQuickFillSectorActivity(selectedActivityCode) &&
+        filters.type === "ALL"
+      ) {
+        setSectorSuggestionHistory(payload.transactions);
       }
       setTransactions((prev) => {
         if (!append) {
@@ -3930,21 +3931,65 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
   }, [activeCompany?.id, filters.type, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
 
+  const loadSectorSuggestionHistory = useCallback(async () => {
+    const requestId = ++sectorSuggestionLoadRequestRef.current;
+    if (
+      isLoadingActivities ||
+      !isTransactionFormExpanded ||
+      !selectedActivityCode ||
+      !isQuickFillSectorActivity(selectedActivityCode) ||
+      filters.type === "ALL"
+    ) {
+      if (!isQuickFillSectorActivity(selectedActivityCode)) {
+        setSectorSuggestionHistory([]);
+      }
+      return;
+    }
+
+    setSectorSuggestionHistory([]);
+    try {
+      const response = await withAuthorizedToken((accessToken) =>
+        listFinanceTransactionsRequest(accessToken, {
+          limit: TRANSACTIONS_PAGE_SIZE,
+          activityCode: selectedActivityCode
+        })
+      );
+      if (requestId === sectorSuggestionLoadRequestRef.current) {
+        setSectorSuggestionHistory(response.items);
+      }
+    } catch {
+      if (requestId === sectorSuggestionLoadRequestRef.current) {
+        setSectorSuggestionHistory(transactionsRef.current);
+      }
+    }
+  }, [
+    activeCompany?.id,
+    filters.type,
+    isLoadingActivities,
+    isTransactionFormExpanded,
+    selectedActivityCode,
+    withAuthorizedToken
+  ]);
+
   const loadAccounts = useCallback(async () => {
     const requestId = ++accountsLoadRequestRef.current;
     if (isLoadingActivities) return;
     if (!selectedActivityCode) {
       setAccounts([]);
+      setHasLoadedAccounts(true);
+      setIsLoadingAccounts(false);
       setEditingAccountId(null);
       setTransactionForm((prev) => ({ ...prev, accountId: "" }));
       return;
     }
+    setIsLoadingAccounts(true);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listFinanceAccountsRequest(accessToken, { activityCode: selectedActivityCode })
       );
       if (requestId !== accountsLoadRequestRef.current) return;
       setAccounts(response.items);
+      setHasLoadedAccounts(true);
       setEditingAccountId((previous) =>
         previous && response.items.some((account) => account.id === previous) ? previous : null
       );
@@ -3958,8 +4003,20 @@ export function FinanceTransactionsPage(): JSX.Element {
       if (requestId === accountsLoadRequestRef.current) {
         setErrorMessage(toErrorMessage(error));
       }
+    } finally {
+      if (requestId === accountsLoadRequestRef.current) {
+        setIsLoadingAccounts(false);
+      }
     }
   }, [activeCompany?.id, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
+
+  useEffect(() => {
+    accountsLoadRequestRef.current += 1;
+    setAccounts([]);
+    setHasLoadedAccounts(false);
+    setIsLoadingAccounts(false);
+    setIsAccountListExpanded(false);
+  }, [activeCompany?.id, selectedActivityCode]);
 
   useEffect(() => {
     if (loadedCompanyIdRef.current === activeCompany?.id) return;
@@ -3987,8 +4044,15 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [loadData]);
 
   useEffect(() => {
-    void loadAccounts();
-  }, [loadAccounts]);
+    void loadSectorSuggestionHistory();
+    return () => {
+      sectorSuggestionLoadRequestRef.current += 1;
+    };
+  }, [loadSectorSuggestionHistory]);
+
+  useEffect(() => {
+    if (isTransactionFormExpanded) void loadAccounts();
+  }, [isTransactionFormExpanded, loadAccounts]);
 
   const loadArticles = useCallback(async () => {
     const requestId = ++articlesLoadRequestRef.current;
@@ -7770,15 +7834,40 @@ export function FinanceTransactionsPage(): JSX.Element {
         </section>
       ) : null}
 
-      {accounts.length > 0 ? (
+      {selectedActivityCode && (accounts.length > 0 || !hasLoadedAccounts || isAccountListExpanded) ? (
         <section className="panel">
-          <details className="finance-section-toggle">
+          <details
+            className="finance-section-toggle"
+            open={isAccountListExpanded}
+            onToggle={(event) => {
+              const isExpanded = event.currentTarget.open;
+              setIsAccountListExpanded(isExpanded);
+              if (isExpanded && !isTransactionFormExpanded) void loadAccounts();
+            }}
+          >
             <summary className="finance-section-summary">
               <span>Consulter les comptes financiers</span>
-              <small>{accounts.length} compte(s) visible(s) dans le contexte actuel.</small>
+              <small>
+                {hasLoadedAccounts
+                  ? `${accounts.length} compte(s) visible(s) dans le contexte actuel.`
+                  : "Afficher les comptes du secteur actif."}
+              </small>
             </summary>
-            <div className="operations-member-grid">
-              {accounts.map((account) => {
+            {isLoadingAccounts ? <p className="hint">Chargement des comptes financiers...</p> : null}
+            {!isLoadingAccounts && !hasLoadedAccounts ? (
+              <div className="actions-inline">
+                <p className="hint">Les comptes n'ont pas pu être chargés.</p>
+                <button type="button" className="secondary-btn" onClick={() => void loadAccounts()}>
+                  Réessayer
+                </button>
+              </div>
+            ) : null}
+            {hasLoadedAccounts && accounts.length === 0 ? (
+              <p className="hint">Aucun compte financier n'est disponible pour ce secteur.</p>
+            ) : null}
+            {hasLoadedAccounts && accounts.length > 0 ? (
+              <div className="operations-member-grid">
+                {accounts.map((account) => {
                 const canEditAccount = canManageAccount(account);
                 const isLockedAccount = account.transactionsCount > 0;
                 const isBusy = busyAccountId === account.id;
@@ -7835,9 +7924,10 @@ export function FinanceTransactionsPage(): JSX.Element {
                       </div>
                     ) : null}
                   </article>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </details>
         </section>
       ) : null}

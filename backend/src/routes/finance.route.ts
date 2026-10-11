@@ -378,7 +378,8 @@ financeRouter.get(
       companyId: req.auth.companyId,
       role: req.auth.role,
       payPeriod: query.payPeriod,
-      employeeUserId: query.employeeUserId
+      employeeUserId: query.employeeUserId,
+      includeItems: false
     });
     res.status(200).json({ item });
   })

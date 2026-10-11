@@ -365,15 +365,17 @@ export async function updateOperationTaskAssignment(input: {
   companyId: string;
   taskId: string;
   assignedToId: string | null;
+  status: TaskStatus;
 }): Promise<void> {
   await getDbPool().execute<ResultSetHeader>(
     `
       UPDATE tasks
-      SET assigned_to_id = ?
+      SET assigned_to_id = ?,
+          status = ?
       WHERE company_id = ?
         AND id = ?
     `,
-    [input.assignedToId, input.companyId, input.taskId]
+    [input.assignedToId, input.status, input.companyId, input.taskId]
   );
 }
 

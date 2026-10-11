@@ -96,8 +96,6 @@ export type DashboardSummary = {
   operations: DashboardOperationsSummary;
   sectorRulesVersion: string;
   activitySummary: DashboardActivitySummary[];
-  activityProfiles: BusinessActivityProfile[];
-  activityHighlightsByCode: Partial<Record<BusinessActivityCode, ActivityReportHighlight[]>>;
   operationalPerformance: ReportOperationalMetric[];
   recentTransactions: DashboardRecentTransaction[];
   recentTasks: DashboardRecentTask[];
@@ -833,6 +831,68 @@ export type GeneralExpensesReport = {
   };
 };
 
+export type DailyActivitiesReport = {
+  periodLabel: string;
+  activities: Array<{
+    dueDate: string | null;
+    categoryLabel: string;
+    title: string;
+    description: string;
+    status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+    indicativeAmount: string | null;
+    agreementRef: string;
+    partnerName: string;
+  }>;
+  categories: Array<{
+    categoryLabel: string;
+    activitiesCount: number;
+    openCount: number;
+    doneCount: number;
+    blockedCount: number;
+  }>;
+  agreements: Array<{
+    agreementRef: string;
+    partnerName: string;
+    agreementType: string;
+    agreementDate: string;
+    purpose: string;
+    capitalAmount: string | null;
+    profitAmount: string | null;
+    paymentAccount: string;
+    status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED" | null;
+  }>;
+  transactions: Array<{
+    date: string;
+    categoryLabel: string;
+    operationLabel: string;
+    agreementRef: string;
+    partnerName: string;
+    paymentReference: string;
+    description: string;
+    direction: "CASH_IN" | "CASH_OUT";
+    status: "SUBMITTED" | "APPROVED";
+    amount: string;
+    currency: string;
+  }>;
+  currencySummaries: Array<{
+    currency: string;
+    transactionsCount: number;
+    approvedTransactionsCount: number;
+    pendingTransactionsCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+  }>;
+  totals: {
+    activitiesCount: number;
+    openCount: number;
+    doneCount: number;
+    blockedCount: number;
+    agreementsCount: number;
+    transactionsCount: number;
+  };
+};
+
 export type HydrocarbonOperationsReportRow = {
   date: string;
   direction: "CASH_IN" | "CASH_OUT";
@@ -930,6 +990,7 @@ export type ReportsOverview = {
   hydrocarbonOperationsReport: HydrocarbonOperationsReport | null;
   agencyOperationsReport: AgencyOperationsReport | null;
   generalExpensesReport: GeneralExpensesReport | null;
+  dailyActivitiesReport: DailyActivitiesReport | null;
   roleDistribution: ReportRoleDistribution[];
   topAssignees: DashboardWorkloadItem[];
 };
@@ -946,21 +1007,17 @@ type DashboardCompanyRow = RowDataPacket & {
   companyCode: string;
   activeUsersCount: number;
   totalMembershipsCount: number;
-  financialAccountsCount: number;
   unreadAlertsCount: number;
   auditEventsLast7Days: number;
 };
 
-type DashboardFinanceRow = RowDataPacket & {
+type DashboardFinanceCurrencyRow = RowDataPacket & {
+  currency: string;
   totalTransactionsCount: number;
   draftCount: number;
   submittedCount: number;
   approvedCount: number;
   rejectedCount: number;
-};
-
-type DashboardFinanceCurrencyRow = RowDataPacket & {
-  currency: string;
   approvedCashInTotal: string;
   approvedCashOutTotal: string;
   netApprovedTotal: string;
@@ -1102,6 +1159,48 @@ export type ReportOperationalTask = {
   metadata: Record<string, string>;
 };
 
+export type DashboardOperationalTransaction = Pick<
+  ReportOperationalTransaction,
+  "activityCode" | "status" | "type" | "amount" | "currency" | "metadata"
+>;
+
+export type DashboardOperationalTask = Pick<
+  ReportOperationalTask,
+  "activityCode" | "status" | "dueDate" | "metadata"
+>;
+
+export type DashboardOperationalMetadataKeys = Partial<
+  Record<BusinessActivityCode, readonly string[]>
+>;
+
+function buildDashboardMetadataProjection(
+  metadataKeysByActivity: DashboardOperationalMetadataKeys
+): { sql: string; values: string[] } {
+  const values: string[] = [];
+  const branches = Object.entries(metadataKeysByActivity)
+    .filter((entry): entry is [BusinessActivityCode, readonly string[]] =>
+      Boolean(entry[1]?.length)
+    )
+    .map(([activityCode, keys]) => {
+      values.push(activityCode);
+      const fields = keys
+        .map((key) => {
+          values.push(key, `$.${JSON.stringify(key)}`);
+          return "?, JSON_UNQUOTE(JSON_EXTRACT(metadata_json, ?))";
+        })
+        .join(", ");
+
+      return `WHEN ? THEN JSON_OBJECT(${fields})`;
+    });
+
+  return {
+    sql: branches.length
+      ? `CASE activity_code ${branches.join(" ")} ELSE JSON_OBJECT() END`
+      : "JSON_OBJECT()",
+    values
+  };
+}
+
 type TransactionExportRow = RowDataPacket & {
   id: string;
   occurredAt: Date;
@@ -1226,7 +1325,7 @@ function appendActivityFilter(
 export async function getDashboardCompanySummary(
   companyId: string,
   actorId: string
-): Promise<DashboardCompanySummary> {
+): Promise<Omit<DashboardCompanySummary, "financialAccountsCount"> | undefined> {
   const rows = await queryRows<DashboardCompanyRow[]>(
     `
       SELECT
@@ -1235,11 +1334,6 @@ export async function getDashboardCompanySummary(
         c.code AS companyCode,
         COUNT(DISTINCT CASE WHEN u.is_active = 1 THEN m.user_id END) AS activeUsersCount,
         COUNT(DISTINCT m.user_id) AS totalMembershipsCount,
-        (
-          SELECT COUNT(*)
-          FROM financial_accounts fa
-          WHERE fa.company_id = c.id
-        ) AS financialAccountsCount,
         (
           SELECT COUNT(*)
           FROM alerts al
@@ -1274,28 +1368,15 @@ export async function getDashboardFinanceSummary(
   const values: Array<string | number> = [companyId];
   appendActivityFilter(filters, values, "activity_code", period);
 
-  const rows = await queryRows<DashboardFinanceRow[]>(
-    `
-      SELECT
-        COUNT(*) AS totalTransactionsCount,
-        COALESCE(SUM(CASE WHEN status = 'DRAFT' THEN 1 ELSE 0 END), 0) AS draftCount,
-        COALESCE(SUM(CASE WHEN status = 'SUBMITTED' THEN 1 ELSE 0 END), 0) AS submittedCount,
-        COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approvedCount,
-        COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0) AS rejectedCount
-      FROM transactions
-      WHERE ${filters.join(" AND ")}
-    `,
-    values
-  );
-
-  const currencyFilters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
-  const currencyValues: Array<string | number> = [companyId];
-  appendActivityFilter(currencyFilters, currencyValues, "activity_code", period);
-
   const totalsByCurrencyRows = await queryRows<DashboardFinanceCurrencyRow[]>(
     `
       SELECT
         currency AS currency,
+        COUNT(*) AS totalTransactionsCount,
+        COALESCE(SUM(CASE WHEN status = 'DRAFT' THEN 1 ELSE 0 END), 0) AS draftCount,
+        COALESCE(SUM(CASE WHEN status = 'SUBMITTED' THEN 1 ELSE 0 END), 0) AS submittedCount,
+        COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approvedCount,
+        COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0) AS rejectedCount,
         COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') AND type = 'CASH_IN' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedCashInTotal,
         COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') AND type = 'CASH_OUT' THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedCashOutTotal,
         COALESCE(
@@ -1306,23 +1387,29 @@ export async function getDashboardFinanceSummary(
           '0.00'
         ) AS netApprovedTotal
       FROM transactions
-      WHERE ${currencyFilters.join(" AND ")}
+      WHERE ${filters.join(" AND ")}
       GROUP BY currency
       ORDER BY currency ASC
     `,
-    currencyValues
+    values
   );
 
-  const base = rows[0] ?? {
+  const totals = totalsByCurrencyRows.reduce((sum, row) => ({
+    totalTransactionsCount: sum.totalTransactionsCount + row.totalTransactionsCount,
+    draftCount: sum.draftCount + row.draftCount,
+    submittedCount: sum.submittedCount + row.submittedCount,
+    approvedCount: sum.approvedCount + row.approvedCount,
+    rejectedCount: sum.rejectedCount + row.rejectedCount
+  }), {
     totalTransactionsCount: 0,
     draftCount: 0,
     submittedCount: 0,
     approvedCount: 0,
     rejectedCount: 0
-  };
+  });
 
   return {
-    ...base,
+    ...totals,
     totalsByCurrency: totalsByCurrencyRows.map((row) => ({
       currency: row.currency,
       approvedCashInTotal: row.approvedCashInTotal,
@@ -1744,6 +1831,98 @@ export async function listReportOperationalTransactions(
   }));
 }
 
+export async function listDashboardOperationalTransactions(
+  companyId: string,
+  period: ReportPeriodFilter | undefined,
+  metadataKeysByActivity: DashboardOperationalMetadataKeys
+): Promise<DashboardOperationalTransaction[]> {
+  const metadataProjection = buildDashboardMetadataProjection(metadataKeysByActivity);
+  const filters: string[] = [
+    "company_id = ?",
+    "activity_code IS NOT NULL",
+    "status IN ('SUBMITTED', 'APPROVED')"
+  ];
+  const values: Array<string | number> = [companyId];
+  appendPeriodFilters(filters, values, "occurred_at", period);
+  appendActivityFilter(filters, values, "activity_code", period);
+
+  const rows = await queryRows<
+    Array<
+      RowDataPacket & {
+        activityCode: BusinessActivityCode;
+        status: "SUBMITTED" | "APPROVED";
+        type: "CASH_IN" | "CASH_OUT";
+        amount: string;
+        currency: string;
+        metadataJson: unknown;
+      }
+    >
+  >(
+    `
+      SELECT
+        activity_code AS activityCode,
+        status AS status,
+        type AS type,
+        CAST(amount AS CHAR) AS amount,
+        currency AS currency,
+        ${metadataProjection.sql} AS metadataJson
+      FROM transactions
+      WHERE ${filters.join(" AND ")}
+    `,
+    [...metadataProjection.values, ...values]
+  );
+
+  return rows.map((row) => ({
+    activityCode: row.activityCode,
+    status: row.status,
+    type: row.type,
+    amount: row.amount,
+    currency: row.currency,
+    metadata: toMetadataStringMap(row.metadataJson)
+  }));
+}
+
+export async function listDashboardOperationalTasks(
+  companyId: string,
+  period: ReportPeriodFilter | undefined,
+  metadataKeysByActivity: DashboardOperationalMetadataKeys
+): Promise<DashboardOperationalTask[]> {
+  const metadataProjection = buildDashboardMetadataProjection(metadataKeysByActivity);
+  const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
+  const values: Array<string | number> = [companyId];
+  appendTaskPeriodFilters(filters, values, period);
+  appendActivityFilter(filters, values, "activity_code", period);
+
+  const rows = await queryRows<
+    Array<
+      RowDataPacket & {
+        activityCode: BusinessActivityCode;
+        status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+        dueDate: Date | null;
+        metadataJson: unknown;
+      }
+    >
+  >(
+    `
+      SELECT
+        activity_code AS activityCode,
+        status AS status,
+        due_date AS dueDate,
+        ${metadataProjection.sql} AS metadataJson
+      FROM tasks
+      WHERE ${filters.join(" AND ")}
+    `,
+    [...metadataProjection.values, ...values]
+  );
+
+  return rows.map((row) => ({
+    activityCode: row.activityCode,
+    status: row.status,
+    dueDate: toIso(row.dueDate),
+    metadata: toMetadataStringMap(row.metadataJson)
+  }));
+}
+
 export async function listReportRentalTransactions(
   companyId: string
 ): Promise<ReportOperationalTransaction[]> {
@@ -1805,6 +1984,44 @@ export async function listReportGeneralStoreTransactions(
     amount: row.amount,
     currency: row.currency,
     description: row.description,
+    occurredAt: new Date(row.occurredAt).toISOString(),
+    metadata: toMetadataStringMap(row.metadataJson)
+  }));
+}
+
+export async function listGeneralStoreLedgerTransactions(
+  companyId: string
+): Promise<ReportOperationalTransaction[]> {
+  const rows = await queryRows<ReportOperationalTransactionRow[]>(
+    `
+      SELECT
+        activity_code AS activityCode,
+        status AS status,
+        type AS type,
+        CAST(amount AS CHAR) AS amount,
+        currency AS currency,
+        NULL AS description,
+        occurred_at AS occurredAt,
+        JSON_OBJECT(
+          'shopRef', JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.shopRef')),
+          'storeOperationKind', JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.storeOperationKind'))
+        ) AS metadataJson
+      FROM transactions
+      WHERE company_id = ?
+        AND activity_code = 'GENERAL_STORE'
+        AND currency = 'XOF'
+        AND status IN ('SUBMITTED', 'APPROVED')
+    `,
+    [companyId]
+  );
+
+  return rows.map((row) => ({
+    activityCode: row.activityCode,
+    status: row.status,
+    type: row.type,
+    amount: row.amount,
+    currency: row.currency,
+    description: null,
     occurredAt: new Date(row.occurredAt).toISOString(),
     metadata: toMetadataStringMap(row.metadataJson)
   }));
@@ -1881,24 +2098,32 @@ export async function listReportGeneralStoreInventorySnapshots(
   companyId: string
 ): Promise<GeneralStoreInventorySnapshot[]> {
   const rows = await queryRows<
-    Array<RowDataPacket & { metadataJson: unknown; createdAt: Date }>
+    Array<
+      RowDataPacket & {
+        shopRef: string | null;
+        remainingStockValue: string | null;
+        createdAt: Date;
+      }
+    >
   >(
     `
       SELECT
-        metadata_json AS metadataJson,
+        JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.shopRef')) AS shopRef,
+        JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.remainingStockValue')) AS remainingStockValue,
         created_at AS createdAt
       FROM tasks
       WHERE company_id = ?
         AND activity_code = 'GENERAL_STORE'
+        AND JSON_EXTRACT(metadata_json, '$.shopRef') IS NOT NULL
+        AND JSON_EXTRACT(metadata_json, '$.remainingStockValue') IS NOT NULL
     `,
     [companyId]
   );
 
   const snapshots: GeneralStoreInventorySnapshot[] = [];
   for (const row of rows) {
-    const metadata = toMetadataStringMap(row.metadataJson);
-    const shopRef = metadata.shopRef?.trim();
-    const remainingStockValue = metadata.remainingStockValue?.trim();
+    const shopRef = row.shopRef?.trim();
+    const remainingStockValue = row.remainingStockValue?.trim();
     if (!shopRef || !remainingStockValue) {
       continue;
     }

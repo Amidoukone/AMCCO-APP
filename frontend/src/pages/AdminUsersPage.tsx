@@ -18,7 +18,7 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
-import { matchesQuickSearch } from "../lib/quickSearch";
+import { buildQuickSearchText, createQuickSearchMatcher } from "../lib/quickSearch";
 import type { AdminUserItem } from "../types/admin-users";
 import { ROLE_CODES, type RoleCode } from "../types/role";
 import { ROLE_LABELS } from "../config/permissions";
@@ -76,7 +76,17 @@ export function AdminUsersPage(): JSX.Element {
   const [searchQuery, setSearchQuery] = usePersistedViewState(usersSearchStorageKey, "");
   const [roleFilter, setRoleFilter] = useState<"ALL" | RoleCode>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const userSearchTextById = useMemo(() => new Map(items.map((item) => [
+    item.userId,
+    buildQuickSearchText([
+      item.fullName,
+      item.email,
+      item.role,
+      ROLE_LABELS[item.role]
+    ])
+  ])), [items]);
   const displayItems = useMemo(() => {
+    const matchesSearch = createQuickSearchMatcher(searchQuery);
     return items
       .filter((item) => {
         if (roleFilter !== "ALL" && item.role !== roleFilter) {
@@ -90,15 +100,8 @@ export function AdminUsersPage(): JSX.Element {
         }
         return true;
       })
-      .filter((item) =>
-        matchesQuickSearch(searchQuery, [
-          item.fullName,
-          item.email,
-          item.role,
-          ROLE_LABELS[item.role]
-        ])
-      );
-  }, [items, roleFilter, searchQuery, statusFilter]);
+      .filter((item) => matchesSearch(userSearchTextById.get(item.userId) ?? ""));
+  }, [items, roleFilter, searchQuery, statusFilter, userSearchTextById]);
   const activeUsersCount = useMemo(() => items.filter((item) => item.isActive).length, [items]);
   const inactiveUsersCount = items.length - activeUsersCount;
 

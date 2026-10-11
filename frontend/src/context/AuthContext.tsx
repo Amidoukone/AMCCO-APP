@@ -10,13 +10,19 @@ import {
 } from "react";
 import {
   ApiError,
+  clearCachedGetResponses,
   loginRequest,
   logoutRequest,
   meRequest,
   refreshRequest,
   switchCompanyRequest
 } from "../lib/api";
-import { clearSessionTokens, loadSessionTokens, saveSessionTokens } from "../lib/auth-storage";
+import {
+  clearSessionTokens,
+  isAccessTokenExpired,
+  loadSessionTokens,
+  saveSessionTokens
+} from "../lib/auth-storage";
 import type { LoginInput, LoginUser, SessionTokens } from "../types/auth";
 import type { CompanyMembershipSummary, CompanyProfile } from "../types/companies";
 import { isRoleCode, type RoleCode } from "../types/role";
@@ -87,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
 
   const resetAuth = useCallback(() => {
+    clearCachedGetResponses();
     sessionRef.current = null;
     setUser(null);
     setSession(null);
@@ -97,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
   const applyAuthenticatedState = useCallback(
     (nextTokens: SessionTokens, me: Awaited<ReturnType<typeof meRequest>>) => {
+      clearCachedGetResponses();
       const normalizedTokens: SessionTokens = {
         accessToken: nextTokens.accessToken,
         refreshToken: nextTokens.refreshToken,
@@ -254,21 +262,23 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         return;
       }
 
-      try {
-        const me = await meRequest(persisted.accessToken);
-        if (!isMounted) {
-          return;
-        }
-        applyAuthenticatedState(persisted, me);
-        setIsInitializing(false);
-        return;
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 401) {
-          if (isMounted) {
-            resetAuth();
-            setIsInitializing(false);
+      if (!isAccessTokenExpired(persisted.accessToken)) {
+        try {
+          const me = await meRequest(persisted.accessToken);
+          if (!isMounted) {
+            return;
           }
+          applyAuthenticatedState(persisted, me);
+          setIsInitializing(false);
           return;
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.statusCode !== 401) {
+            if (isMounted) {
+              resetAuth();
+              setIsInitializing(false);
+            }
+            return;
+          }
         }
       }
 

@@ -10,6 +10,7 @@ import {
   exportCompanyTasksExcel,
   exportCompanyTransactionsCsv,
   exportCompanyTransactionsExcel,
+  getCompanyGeneralStoreLedgerRows,
   getCompanyDashboardSummary,
   getCompanyReportsOverview
 } from "../services/reporting.service.js";
@@ -97,6 +98,24 @@ reportingRouter.get(
     );
 
     res.status(200).json({ item });
+  })
+);
+
+reportingRouter.get(
+  "/reports/general-store/ledger",
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+
+    const result = await getCompanyGeneralStoreLedgerRows({
+      actorId: req.auth.userId,
+      companyId: req.auth.companyId,
+      role: req.auth.role
+    });
+
+    res.status(200).json(result);
   })
 );
 

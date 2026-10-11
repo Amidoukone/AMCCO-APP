@@ -52,7 +52,8 @@ import type {
 } from "../types/tenants";
 import type {
   GeneralStoreShopListResponse,
-  GeneralStoreShopSingleResponse
+  GeneralStoreShopSingleResponse,
+  GeneralStoreShop
 } from "../types/shops";
 import type {
   BtpProjectListResponse,
@@ -65,6 +66,7 @@ import type {
 import type { BusinessActivityCode } from "../config/businessActivities";
 import type {
   DashboardSummaryResponse,
+  GeneralStoreOperationsReportRow,
   ReportsOverviewResponse
 } from "../types/reporting";
 import type {
@@ -88,10 +90,18 @@ type RequestOptions = {
   body?: unknown;
   accessToken?: string;
   headers?: Record<string, string>;
+  cacheTtlMs?: number;
 };
 
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
+const completedGetResponses = new Map<string, { value: unknown; expiresAt: number }>();
+const MAX_COMPLETED_GET_RESPONSES = 60;
 let inFlightGetEpoch = 0;
+
+export function clearCachedGetResponses(): void {
+  inFlightGetEpoch += 1;
+  completedGetResponses.clear();
+}
 
 export class ApiError extends Error {
   statusCode: number;
@@ -118,11 +128,23 @@ async function parseErrorMessage(response: Response): Promise<string> {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   if (method !== "GET") {
-    inFlightGetEpoch += 1;
+    clearCachedGetResponses();
   }
   const inFlightKey = method === "GET"
     ? `${inFlightGetEpoch}:${options.accessToken ?? ""}:${path}`
     : null;
+  const cacheTtlMs = method === "GET" ? Math.max(0, options.cacheTtlMs ?? 0) : 0;
+
+  if (inFlightKey && cacheTtlMs > 0) {
+    const cached = completedGetResponses.get(inFlightKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value as T;
+    }
+    if (cached) {
+      completedGetResponses.delete(inFlightKey);
+    }
+  }
+
   if (inFlightKey) {
     const existingRequest = inFlightGetRequests.get(inFlightKey);
     if (existingRequest) {
@@ -145,7 +167,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       throw new ApiError(response.status, await parseErrorMessage(response));
     }
 
-    return (await response.json()) as T;
+    const data = (await response.json()) as T;
+    if (inFlightKey && cacheTtlMs > 0) {
+      completedGetResponses.set(inFlightKey, { value: data, expiresAt: Date.now() + cacheTtlMs });
+      while (completedGetResponses.size > MAX_COMPLETED_GET_RESPONSES) {
+        const oldestKey = completedGetResponses.keys().next().value as string | undefined;
+        if (!oldestKey) break;
+        completedGetResponses.delete(oldestKey);
+      }
+    }
+    return data;
   })();
 
   if (inFlightKey) {
@@ -157,6 +188,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   } finally {
     if (inFlightKey && inFlightGetRequests.get(inFlightKey) === requestPromise) {
       inFlightGetRequests.delete(inFlightKey);
+    }
+    if (method !== "GET") {
+      clearCachedGetResponses();
     }
   }
 }
@@ -278,14 +312,16 @@ export function listAlertsRequest(
 
   return request<AlertListResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 5_000
   });
 }
 
 export function getAlertsSummaryRequest(accessToken: string): Promise<AlertSummaryResponse> {
   return request<AlertSummaryResponse>("/alerts/summary", {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 5_000
   });
 }
 
@@ -342,7 +378,8 @@ export function getDashboardSummaryRequest(
 
   return request<DashboardSummaryResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 10_000
   });
 }
 
@@ -351,7 +388,8 @@ export function listCompanyActivitiesRequest(
 ): Promise<CompanyActivitiesResponse> {
   return request<CompanyActivitiesResponse>("/activities", {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 30_000
   });
 }
 
@@ -410,7 +448,18 @@ export function getReportsOverviewRequest(
 
   return request<ReportsOverviewResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 10_000
+  });
+}
+
+export function getGeneralStoreLedgerRowsRequest(
+  accessToken: string
+): Promise<{ shops: GeneralStoreShop[]; rows: GeneralStoreOperationsReportRow[] }> {
+  return request<{ shops: GeneralStoreShop[]; rows: GeneralStoreOperationsReportRow[] }>("/reports/general-store/ledger", {
+    method: "GET",
+    accessToken,
+    cacheTtlMs: 10_000
   });
 }
 
@@ -587,7 +636,8 @@ export function listActivityArticlesRequest(
 ): Promise<ActivityArticleListResponse> {
   return request<ActivityArticleListResponse>(`/activities/${activityCode}/articles`, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 15_000
   });
 }
 
@@ -649,7 +699,8 @@ export function listRentalTenantsRequest(
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<RentalTenantListResponse>(`/rental/tenants${suffix}`, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 10_000
   });
 }
 
@@ -710,7 +761,8 @@ export function listGeneralStoreShopsRequest(
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<GeneralStoreShopListResponse>(`/general-store/shops${suffix}`, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 10_000
   });
 }
 
@@ -767,7 +819,8 @@ export function listBtpProjectsRequest(
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<BtpProjectListResponse>(`/btp/projects${suffix}`, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 10_000
   });
 }
 
@@ -826,7 +879,8 @@ export function listDailyActivityCategoriesRequest(
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<DailyActivityCategoryListResponse>(`/daily-activities/categories${suffix}`, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 15_000
   });
 }
 
@@ -883,7 +937,8 @@ export function listFinanceAccountsRequest(
 
   return request<FinancialAccountListResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 5_000
   });
 }
 
@@ -954,7 +1009,8 @@ export function listFinanceTransactionsRequest(
   const path = suffix ? `/finance/transactions?${suffix}` : "/finance/transactions";
   return request<FinancialTransactionListResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 5_000
   });
 }
 
@@ -1014,7 +1070,8 @@ export function listFinanceSalaryMembersRequest(
 ): Promise<SalaryMemberListResponse> {
   return request<SalaryMemberListResponse>("/finance/salary-members", {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 15_000
   });
 }
 
@@ -1049,7 +1106,8 @@ export function listFinanceSalariesRequest(
 
   return request<SalaryTransactionListResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 5_000
   });
 }
 
@@ -1132,7 +1190,8 @@ export function getFinanceSalarySummaryRequest(
   }
   return request<SalarySummaryResponse>(`/finance/salaries/summary?${params.toString()}`, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 5_000
   });
 }
 
@@ -1262,7 +1321,8 @@ export function listOperationsTasksRequest(
   const path = suffix ? `/operations/tasks?${suffix}` : "/operations/tasks";
   return request<OperationTaskListResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 5_000
   });
 }
 
@@ -1336,7 +1396,8 @@ export function listOperationsMembersRequest(
 
   return request<OperationTaskMembersResponse>(path, {
     method: "GET",
-    accessToken
+    accessToken,
+    cacheTtlMs: 15_000
   });
 }
 

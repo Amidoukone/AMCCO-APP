@@ -28,6 +28,7 @@ import {
   listSalaryTransactions,
   listTransactionProofs,
   reviewTransaction,
+  summarizeSalaryTransactions,
   type SalaryConfirmationStatus,
   submitTransaction,
   type SalaryPaymentMethod,
@@ -576,8 +577,7 @@ export async function listCompanyAccounts(input: {
 }
 
 export async function listCompanySalaryMembers(companyId: string) {
-  const members = await listCompanyUsers(companyId);
-  return members.filter((member) => member.isActive);
+  return listCompanyUsers(companyId, { activeOnly: true });
 }
 
 export async function createCompanyAccount(
@@ -781,13 +781,19 @@ export async function createCompanyTransaction(
     occurredAt?: string;
   }
 ) {
+  const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode)
+    .then(() => ({ ok: true as const }))
+    .catch((error: unknown) => ({ ok: false as const, error }));
   const account = await findFinancialAccountById(actor.companyId, input.accountId);
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
   }
   assertAccountSupportsActivity(account, input.activityCode);
 
-  await ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode);
+  const activityCheck = await activityCheckPromise;
+  if (!activityCheck.ok) {
+    throw activityCheck.error;
+  }
   const currency = input.currency.trim().toUpperCase();
   const description = input.description?.trim();
   const metadata = normalizeActivityMetadata(input.metadata);
@@ -884,13 +890,19 @@ export async function updateCompanyTransaction(
 
   ensureTransactionMutationOwnership(actor, existing);
 
+  const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode)
+    .then(() => ({ ok: true as const }))
+    .catch((error: unknown) => ({ ok: false as const, error }));
   const account = await findFinancialAccountById(actor.companyId, input.accountId);
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
   }
   assertAccountSupportsActivity(account, input.activityCode);
 
-  await ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode);
+  const activityCheck = await activityCheckPromise;
+  if (!activityCheck.ok) {
+    throw activityCheck.error;
+  }
   const currency = input.currency.trim().toUpperCase();
   const description = input.description?.trim();
   const metadata = normalizeActivityMetadata(input.metadata);
@@ -1017,8 +1029,108 @@ export async function getCompanySalarySummary(input: {
   role: RoleCode;
   payPeriod: string;
   employeeUserId?: string;
+  includeItems?: boolean;
 }) {
   ensureSalaryViewAccess(input.role);
+
+  if (input.includeItems === false) {
+    const aggregates = await summarizeSalaryTransactions({
+      companyId: input.companyId,
+      payPeriod: input.payPeriod,
+      employeeUserId: input.employeeUserId
+    });
+    const byStatus = new Map<SalarySummaryItem["status"], SalarySummaryItem>();
+    const byPaymentMethod = new Map<SalaryPaymentMethod, SalaryPaymentMethodSummaryItem>();
+    const byEmployee = new Map<string, SalaryEmployeeSummaryItem>();
+    let totalGrossCents = 0;
+    let totalBonusCents = 0;
+    let totalDeductionCents = 0;
+    let totalNetCents = 0;
+    let approvedNetCents = 0;
+    let pendingCount = 0;
+    let totalCount = 0;
+
+    for (const aggregate of aggregates) {
+      const count = Number(aggregate.count);
+      const grossCents = toMoneyCents(aggregate.grossAmount);
+      const bonusCents = toMoneyCents(aggregate.bonusAmount);
+      const deductionCents = toMoneyCents(aggregate.deductionAmount);
+      const netCents = toMoneyCents(aggregate.netAmount);
+      totalCount += count;
+      totalGrossCents += grossCents;
+      totalBonusCents += bonusCents;
+      totalDeductionCents += deductionCents;
+      totalNetCents += netCents;
+      if (aggregate.status === "SUBMITTED" || aggregate.status === "APPROVED") {
+        approvedNetCents += netCents;
+      }
+      if (aggregate.status === "DRAFT") pendingCount += count;
+
+      const statusSummary = byStatus.get(aggregate.status) ?? {
+        status: aggregate.status,
+        count: 0,
+        grossAmount: "0.00",
+        bonusAmount: "0.00",
+        deductionAmount: "0.00",
+        netAmount: "0.00"
+      };
+      statusSummary.count += count;
+      statusSummary.grossAmount = centsToMoney(toMoneyCents(statusSummary.grossAmount) + grossCents);
+      statusSummary.bonusAmount = centsToMoney(toMoneyCents(statusSummary.bonusAmount) + bonusCents);
+      statusSummary.deductionAmount = centsToMoney(
+        toMoneyCents(statusSummary.deductionAmount) + deductionCents
+      );
+      statusSummary.netAmount = centsToMoney(toMoneyCents(statusSummary.netAmount) + netCents);
+      byStatus.set(aggregate.status, statusSummary);
+
+      const paymentSummary = byPaymentMethod.get(aggregate.paymentMethod) ?? {
+        paymentMethod: aggregate.paymentMethod,
+        count: 0,
+        netAmount: "0.00"
+      };
+      paymentSummary.count += count;
+      paymentSummary.netAmount = centsToMoney(toMoneyCents(paymentSummary.netAmount) + netCents);
+      byPaymentMethod.set(aggregate.paymentMethod, paymentSummary);
+
+      const employeeSummary = byEmployee.get(aggregate.employeeUserId) ?? {
+        employeeUserId: aggregate.employeeUserId,
+        employeeFullName: aggregate.employeeFullName,
+        employeeEmail: aggregate.employeeEmail,
+        employeeRole: aggregate.employeeRole as RoleCode,
+        count: 0,
+        grossAmount: "0.00",
+        bonusAmount: "0.00",
+        deductionAmount: "0.00",
+        netAmount: "0.00"
+      };
+      employeeSummary.count += count;
+      employeeSummary.grossAmount = centsToMoney(toMoneyCents(employeeSummary.grossAmount) + grossCents);
+      employeeSummary.bonusAmount = centsToMoney(toMoneyCents(employeeSummary.bonusAmount) + bonusCents);
+      employeeSummary.deductionAmount = centsToMoney(
+        toMoneyCents(employeeSummary.deductionAmount) + deductionCents
+      );
+      employeeSummary.netAmount = centsToMoney(toMoneyCents(employeeSummary.netAmount) + netCents);
+      byEmployee.set(aggregate.employeeUserId, employeeSummary);
+    }
+
+    return {
+      payPeriod: input.payPeriod,
+      employeeUserId: input.employeeUserId ?? null,
+      totalCount,
+      totalGrossAmount: centsToMoney(totalGrossCents),
+      totalBonusAmount: centsToMoney(totalBonusCents),
+      totalDeductionAmount: centsToMoney(totalDeductionCents),
+      totalNetAmount: centsToMoney(totalNetCents),
+      approvedNetAmount: centsToMoney(approvedNetCents),
+      pendingCount,
+      items: [],
+      byStatus: Array.from(byStatus.values()),
+      byPaymentMethod: Array.from(byPaymentMethod.values()),
+      byEmployee: Array.from(byEmployee.values()).sort((left, right) =>
+        left.employeeFullName.localeCompare(right.employeeFullName, "fr")
+      )
+    };
+  }
 
   const items = await listCompanySalaryTransactions({
     actorId: input.employeeUserId ?? "salary-summary",
@@ -1141,12 +1253,13 @@ export async function createCompanySalaryTransaction(
 ) {
   ensureSalaryManagementAccess(actor.role);
 
-  const account = await findFinancialAccountById(actor.companyId, input.accountId);
+  const [account, membership] = await Promise.all([
+    findFinancialAccountById(actor.companyId, input.accountId),
+    findMembershipByCompanyAndUser(actor.companyId, input.employeeUserId)
+  ]);
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
   }
-
-  const membership = await findMembershipByCompanyAndUser(actor.companyId, input.employeeUserId);
   if (!membership) {
     throw new HttpError(404, "Collaborateur introuvable pour cette entreprise.");
   }
@@ -1263,12 +1376,13 @@ export async function updateCompanySalaryTransaction(
     throw new HttpError(400, "Cette transaction n'est pas un salaire.");
   }
 
-  const account = await findFinancialAccountById(actor.companyId, input.accountId);
+  const [account, membership] = await Promise.all([
+    findFinancialAccountById(actor.companyId, input.accountId),
+    findMembershipByCompanyAndUser(actor.companyId, input.employeeUserId)
+  ]);
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
   }
-
-  const membership = await findMembershipByCompanyAndUser(actor.companyId, input.employeeUserId);
   if (!membership) {
     throw new HttpError(404, "Collaborateur introuvable pour cette entreprise.");
   }
@@ -1830,6 +1944,9 @@ export async function submitCompanyTransaction(
     throw new HttpError(400, "Seules les transactions en brouillon peuvent être soumises.");
   }
 
+  const reviewerMembershipPromise = findMembershipByCompanyAndUser(actor.companyId, actor.actorId)
+    .then((membership) => ({ ok: true as const, membership }))
+    .catch((error: unknown) => ({ ok: false as const, error }));
   const account = await findFinancialAccountById(actor.companyId, fullTransaction.accountId);
   if (!account) {
     throw new HttpError(500, "Impossible de recharger le compte financier avant soumission.");
@@ -1861,8 +1978,11 @@ export async function submitCompanyTransaction(
     }
   }
 
-  const reviewerMembership = await findMembershipByCompanyAndUser(actor.companyId, actor.actorId);
-  const reviewer = buildReviewerMetadata(reviewerMembership, actor);
+  const reviewerMembershipResult = await reviewerMembershipPromise;
+  if (!reviewerMembershipResult.ok) {
+    throw reviewerMembershipResult.error;
+  }
+  const reviewer = buildReviewerMetadata(reviewerMembershipResult.membership, actor);
 
   await submitTransaction({
     companyId: actor.companyId,
@@ -2001,7 +2121,10 @@ export async function reviewCompanyTransaction(
   if (!fullTransaction) {
     throw new HttpError(500, "Impossible de recharger la transaction avant validation.");
   }
-  const account = await findFinancialAccountById(actor.companyId, fullTransaction.accountId);
+  const [account, reviewerMembership] = await Promise.all([
+    findFinancialAccountById(actor.companyId, fullTransaction.accountId),
+    findMembershipByCompanyAndUser(actor.companyId, actor.actorId)
+  ]);
   if (!account) {
     throw new HttpError(500, "Impossible de recharger le compte financier avant validation.");
   }
@@ -2018,7 +2141,6 @@ export async function reviewCompanyTransaction(
   const confirmationMetadata = salarySnapshot
     ? buildSalaryConfirmationSnapshot(fullTransaction)
     : null;
-  const reviewerMembership = await findMembershipByCompanyAndUser(actor.companyId, actor.actorId);
   const reviewer = buildReviewerMetadata(reviewerMembership, actor);
   const reviewerSuffix = reviewer.displayName ? ` par ${reviewer.displayName}` : "";
 

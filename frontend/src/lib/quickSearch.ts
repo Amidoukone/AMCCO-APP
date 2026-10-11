@@ -6,14 +6,20 @@ function normalizeSearchValue(value: string): string {
     .trim();
 }
 
-export function matchesQuickSearch(query: string, values: Array<string | null | undefined>): boolean {
+export function buildQuickSearchText(values: Array<string | null | undefined>): string {
+  return normalizeSearchValue(values.filter((value): value is string => Boolean(value)).join(" "));
+}
+
+export function createQuickSearchMatcher(query: string): (searchText: string) => boolean {
   const normalizedQuery = normalizeSearchValue(query);
   if (!normalizedQuery) {
-    return true;
+    return () => true;
   }
 
   const terms = normalizedQuery.split(/\s+/).filter((term) => term.length > 0);
-  const haystack = normalizeSearchValue(values.filter((value): value is string => Boolean(value)).join(" "));
+  return (searchText) => terms.every((term) => searchText.includes(term));
+}
 
-  return terms.every((term) => haystack.includes(term));
+export function matchesQuickSearch(query: string, values: Array<string | null | undefined>): boolean {
+  return createQuickSearchMatcher(query)(buildQuickSearchText(values));
 }

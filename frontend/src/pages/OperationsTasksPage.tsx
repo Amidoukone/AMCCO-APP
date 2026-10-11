@@ -18,7 +18,7 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
-import { matchesQuickSearch } from "../lib/quickSearch";
+import { buildQuickSearchText, createQuickSearchMatcher } from "../lib/quickSearch";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   resolveImageKitFileName,
@@ -34,11 +34,10 @@ import {
   createOperationsTaskRequest,
   deleteDailyActivityCategoryRequest,
   deleteOperationsTaskRequest,
-  getReportsOverviewRequest,
+  getGeneralStoreLedgerRowsRequest,
   getTaskAttachmentUploadAuthRequest,
   listBtpProjectsRequest,
   listDailyActivityCategoriesRequest,
-  listGeneralStoreShopsRequest,
   listOperationsMembersRequest,
   listOperationsTasksRequest,
   updateDailyActivityCategoryRequest,
@@ -565,7 +564,6 @@ export function OperationsTasksPage(): JSX.Element {
   const [tasks, setTasks] = useState<OperationTask[]>([]);
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
   const [shops, setShops] = useState<GeneralStoreShop[]>([]);
-  const [loadedShopsContext, setLoadedShopsContext] = useState<string | null>(null);
   const [shopLedgerRows, setShopLedgerRows] = useState<GeneralStoreOperationsReportRow[]>([]);
   const [loadedShopLedgerContext, setLoadedShopLedgerContext] = useState<string | null>(null);
   const [projects, setProjects] = useState<BtpProject[]>([]);
@@ -583,7 +581,6 @@ export function OperationsTasksPage(): JSX.Element {
   const membersLoadRequestRef = useRef(0);
   const loadedMembersContextRef = useRef<string | null>(null);
   const membersContextRef = useRef("");
-  const shopsLoadRequestRef = useRef(0);
   const shopLedgerLoadRequestRef = useRef(0);
   const projectsLoadRequestRef = useRef(0);
   const dailyCategoriesLoadRequestRef = useRef(0);
@@ -666,20 +663,23 @@ export function OperationsTasksPage(): JSX.Element {
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
   const hasRequiredTaskMetadata = taskMetadataFields.some((field) => field.required);
+  const taskSearchTextById = useMemo(() => new Map(tasks.map((task) => [
+    task.id,
+    buildQuickSearchText([
+      task.title,
+      task.description,
+      task.createdByEmail,
+      task.createdByFullName,
+      task.assignedToEmail,
+      task.assignedToFullName,
+      task.activityCode ? getBusinessActivityLabel(task.activityCode) : "",
+      ...Object.values(task.metadata)
+    ])
+  ])), [tasks]);
   const displayTasks = useMemo(() => {
-    return tasks.filter((task) =>
-      matchesQuickSearch(searchQuery, [
-        task.title,
-        task.description,
-        task.createdByEmail,
-        task.createdByFullName,
-        task.assignedToEmail,
-        task.assignedToFullName,
-        task.activityCode ? getBusinessActivityLabel(task.activityCode) : "",
-        ...Object.values(task.metadata)
-      ])
-    );
-  }, [searchQuery, tasks]);
+    const matchesSearch = createQuickSearchMatcher(searchQuery);
+    return tasks.filter((task) => matchesSearch(taskSearchTextById.get(task.id) ?? ""));
+  }, [searchQuery, taskSearchTextById, tasks]);
   const totalVisibleTaskPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTasks.length / visibleTasksPageSize));
   }, [displayTasks.length, visibleTasksPageSize]);
@@ -865,7 +865,6 @@ export function OperationsTasksPage(): JSX.Element {
     setShopLedgerRows([]);
     setProjects([]);
     setDailyActivityCategories([]);
-    setLoadedShopsContext(null);
     setLoadedShopLedgerContext(null);
     setLoadedProjectsContext(null);
     setIsLoading(true);
@@ -907,44 +906,13 @@ export function OperationsTasksPage(): JSX.Element {
     return () => window.cancelAnimationFrame(frameId);
   }, [isLoading, location.hash, location.pathname, location.search, navigate]);
 
-  const loadShops = useCallback(async () => {
-    const requestId = ++shopsLoadRequestRef.current;
-    if (isLoadingActivities) return;
-    if (selectedActivityCode !== "GENERAL_STORE") {
-      setShops([]);
-      setLoadedShopsContext(null);
-      return;
-    }
-    if (!isTaskFormExpanded && !editingTaskId) {
-      return;
-    }
-    const contextKey = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
-    if (loadedShopsContext === contextKey) {
-      return;
-    }
-    setShops([]);
-    try {
-      const payload = await withAuthorizedToken((accessToken) =>
-        listGeneralStoreShopsRequest(accessToken)
-      );
-      if (requestId !== shopsLoadRequestRef.current) return;
-      setShops(payload.items);
-      setLoadedShopsContext(contextKey);
-    } catch (error) {
-      if (requestId === shopsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
-    }
-  }, [activeCompany?.id, editingTaskId, isLoadingActivities, isTaskFormExpanded, loadedShopsContext, selectedActivityCode, withAuthorizedToken]);
-
-  useEffect(() => {
-    void loadShops();
-  }, [loadShops]);
-
   const loadShopLedger = useCallback(async () => {
     const requestId = ++shopLedgerLoadRequestRef.current;
     if (isLoadingActivities) return;
     if (selectedActivityCode !== "GENERAL_STORE") {
       setShopLedgerRows([]);
       setLoadedShopLedgerContext(null);
+      setShops([]);
       return;
     }
     if (!isTaskFormExpanded && !editingTaskId) {
@@ -957,13 +925,18 @@ export function OperationsTasksPage(): JSX.Element {
     setShopLedgerRows([]);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
-        getReportsOverviewRequest(accessToken, { activityCode: "GENERAL_STORE" })
+        getGeneralStoreLedgerRowsRequest(accessToken)
       );
       if (requestId !== shopLedgerLoadRequestRef.current) return;
-      setShopLedgerRows(payload.item.generalStoreOperationsReport?.rows ?? []);
+      setShops(payload.shops);
+      setShopLedgerRows(payload.rows);
       setLoadedShopLedgerContext(contextKey);
     } catch {
-      if (requestId === shopLedgerLoadRequestRef.current) setShopLedgerRows([]);
+      if (requestId === shopLedgerLoadRequestRef.current) {
+        setShops([]);
+        setShopLedgerRows([]);
+        setErrorMessage("Chargement des boutiques impossible. Vérifiez la connexion backend.");
+      }
     }
   }, [activeCompany?.id, editingTaskId, isLoadingActivities, isTaskFormExpanded, loadedShopLedgerContext, selectedActivityCode, withAuthorizedToken]);
 

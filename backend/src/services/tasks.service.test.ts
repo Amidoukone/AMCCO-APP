@@ -344,13 +344,10 @@ describe("tasks.service", () => {
       expect(updateOperationTaskAssignment).toHaveBeenCalledWith({
         companyId: actor.companyId,
         taskId: "task-2",
-        assignedToId: "employee-2"
-      });
-      expect(updateOperationTaskStatus).toHaveBeenCalledWith({
-        companyId: actor.companyId,
-        taskId: "task-2",
+        assignedToId: "employee-2",
         status: "IN_PROGRESS"
       });
+      expect(updateOperationTaskStatus).not.toHaveBeenCalled();
       expect(createAuditLogRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "TASK_ASSIGNED",

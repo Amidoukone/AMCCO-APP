@@ -735,8 +735,6 @@ export type DashboardSummary = {
   finance: DashboardFinanceSummary;
   operations: DashboardOperationsSummary;
   activitySummary: DashboardActivitySummary[];
-  activityProfiles: BusinessActivityProfile[];
-  activityHighlightsByCode: Partial<Record<BusinessActivityCode, ActivityReportHighlight[]>>;
   operationalPerformance: ReportOperationalMetric[];
   recentTransactions: DashboardRecentTransaction[];
   recentTasks: DashboardRecentTask[];

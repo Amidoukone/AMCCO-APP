@@ -24,6 +24,16 @@ type AccountRow = RowDataPacket & {
   createdAt: Date;
 };
 
+type FinancialAccountsSummaryRow = RowDataPacket & {
+  totalCount: number | string;
+  globalCount: number | string;
+  dedicatedCount: number | string;
+  restrictedCount: number | string;
+  compatibleCount: number | string;
+  dedicatedToSelectedActivityCount: number | string;
+  restrictedToSelectedActivityCount: number | string;
+};
+
 type TransactionRow = RowDataPacket & {
   id: string;
   companyId: string;
@@ -273,7 +283,11 @@ export async function listFinancialAccounts(input: {
         CAST(fa.balance AS CHAR) AS balance,
         fa.scope_type AS scopeType,
         fa.primary_activity_code AS primaryActivityCode,
-        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS allowedActivitiesCsv,
+        (
+          SELECT GROUP_CONCAT(faa.activity_code ORDER BY faa.activity_code SEPARATOR ',')
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+        ) AS allowedActivitiesCsv,
         (
           SELECT COUNT(*)
           FROM transactions t
@@ -281,23 +295,87 @@ export async function listFinancialAccounts(input: {
         ) AS transactionsCount,
         fa.created_at AS createdAt
       FROM financial_accounts fa
-      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       WHERE ${filters.join(" AND ")}
-      GROUP BY
-        fa.id,
-        fa.company_id,
-        fa.name,
-        fa.account_ref,
-        fa.balance,
-        fa.scope_type,
-        fa.primary_activity_code,
-        transactionsCount,
-        fa.created_at
       ORDER BY fa.name ASC
     `,
     values
   );
   return rows.map(toAccount);
+}
+
+export async function getFinancialAccountsSummary(input: {
+  companyId: string;
+  activityCode?: BusinessActivityCode;
+}): Promise<{
+  totalCount: number;
+  globalCount: number;
+  dedicatedCount: number;
+  restrictedCount: number;
+  compatibleCount: number;
+  incompatibleCount: number;
+  dedicatedToSelectedActivityCount: number;
+  restrictedToSelectedActivityCount: number;
+}> {
+  const activityCode = input.activityCode;
+  const compatibleCountSql = activityCode
+    ? `COALESCE(SUM(CASE WHEN
+        fa.scope_type = 'GLOBAL'
+        OR fa.primary_activity_code = ?
+        OR EXISTS (
+          SELECT 1
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+            AND faa.activity_code = ?
+        )
+      THEN 1 ELSE 0 END), 0)`
+    : "COUNT(*)";
+  const dedicatedCountSql = activityCode
+    ? "COALESCE(SUM(CASE WHEN fa.scope_type = 'DEDICATED' AND fa.primary_activity_code = ? THEN 1 ELSE 0 END), 0)"
+    : "0";
+  const restrictedCountSql = activityCode
+    ? `COALESCE(SUM(CASE WHEN
+        fa.scope_type = 'RESTRICTED'
+        AND EXISTS (
+          SELECT 1
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+            AND faa.activity_code = ?
+        )
+      THEN 1 ELSE 0 END), 0)`
+    : "0";
+  const values: string[] = activityCode
+    ? [activityCode, activityCode, activityCode, activityCode, input.companyId]
+    : [input.companyId];
+
+  const rows = await queryRows<FinancialAccountsSummaryRow[]>(
+    `
+      SELECT
+        COUNT(*) AS totalCount,
+        COALESCE(SUM(fa.scope_type = 'GLOBAL'), 0) AS globalCount,
+        COALESCE(SUM(fa.scope_type = 'DEDICATED'), 0) AS dedicatedCount,
+        COALESCE(SUM(fa.scope_type = 'RESTRICTED'), 0) AS restrictedCount,
+        ${compatibleCountSql} AS compatibleCount,
+        ${dedicatedCountSql} AS dedicatedToSelectedActivityCount,
+        ${restrictedCountSql} AS restrictedToSelectedActivityCount
+      FROM financial_accounts fa
+      WHERE fa.company_id = ?
+    `,
+    values
+  );
+
+  const summary = rows[0];
+  const totalCount = Number(summary?.totalCount ?? 0);
+  const compatibleCount = Number(summary?.compatibleCount ?? 0);
+  return {
+    totalCount,
+    globalCount: Number(summary?.globalCount ?? 0),
+    dedicatedCount: Number(summary?.dedicatedCount ?? 0),
+    restrictedCount: Number(summary?.restrictedCount ?? 0),
+    compatibleCount,
+    incompatibleCount: Math.max(totalCount - compatibleCount, 0),
+    dedicatedToSelectedActivityCount: Number(summary?.dedicatedToSelectedActivityCount ?? 0),
+    restrictedToSelectedActivityCount: Number(summary?.restrictedToSelectedActivityCount ?? 0)
+  };
 }
 
 export async function createFinancialAccount(input: {
@@ -443,7 +521,11 @@ export async function findFinancialAccountById(
         CAST(fa.balance AS CHAR) AS balance,
         fa.scope_type AS scopeType,
         fa.primary_activity_code AS primaryActivityCode,
-        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS allowedActivitiesCsv,
+        (
+          SELECT GROUP_CONCAT(faa.activity_code ORDER BY faa.activity_code SEPARATOR ',')
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+        ) AS allowedActivitiesCsv,
         (
           SELECT COUNT(*)
           FROM transactions t
@@ -451,19 +533,8 @@ export async function findFinancialAccountById(
         ) AS transactionsCount,
         fa.created_at AS createdAt
       FROM financial_accounts fa
-      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       WHERE fa.company_id = ?
         AND fa.id = ?
-      GROUP BY
-        fa.id,
-        fa.company_id,
-        fa.name,
-        fa.account_ref,
-        fa.balance,
-        fa.scope_type,
-        fa.primary_activity_code,
-        transactionsCount,
-        fa.created_at
       LIMIT 1
     `,
     [companyId, accountId]
@@ -617,7 +688,11 @@ export async function listFinancialTransactions(input: {
         fa.account_ref AS accountRef,
         fa.scope_type AS accountScopeType,
         fa.primary_activity_code AS accountPrimaryActivityCode,
-        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS accountAllowedActivitiesCsv,
+        (
+          SELECT GROUP_CONCAT(faa.activity_code ORDER BY faa.activity_code SEPARATOR ',')
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+        ) AS accountAllowedActivitiesCsv,
         t.type AS type,
         CAST(t.amount AS CHAR) AS amount,
         t.currency AS currency,
@@ -644,38 +719,10 @@ export async function listFinancialTransactions(input: {
         ) AS proofsCount
       FROM transactions t
       INNER JOIN financial_accounts fa ON fa.id = t.account_id
-      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users vu ON vu.id = t.validated_by_id
       LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
       WHERE ${filters.join(" AND ")}
-      GROUP BY
-        t.id,
-        t.company_id,
-        t.account_id,
-        fa.name,
-        fa.account_ref,
-        fa.scope_type,
-        fa.primary_activity_code,
-        t.type,
-        t.amount,
-        t.currency,
-        t.activity_code,
-        t.description,
-        t.metadata_json,
-        t.status,
-        t.requires_proof,
-        t.created_by_id,
-        cu.email,
-        t.validated_by_id,
-        vu.email,
-        t.salary_confirmation_status,
-        t.salary_confirmed_by_id,
-        su.email,
-        t.salary_confirmed_at,
-        t.occurred_at,
-        t.created_at,
-        t.updated_at
       ORDER BY t.occurred_at DESC, t.created_at DESC
       LIMIT ? OFFSET ?
     `,
@@ -726,7 +773,11 @@ export async function listSalaryTransactions(input: {
         fa.account_ref AS accountRef,
         fa.scope_type AS accountScopeType,
         fa.primary_activity_code AS accountPrimaryActivityCode,
-        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS accountAllowedActivitiesCsv,
+        (
+          SELECT GROUP_CONCAT(faa.activity_code ORDER BY faa.activity_code SEPARATOR ',')
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+        ) AS accountAllowedActivitiesCsv,
         t.type AS type,
         CAST(t.amount AS CHAR) AS amount,
         t.currency AS currency,
@@ -753,38 +804,10 @@ export async function listSalaryTransactions(input: {
         ) AS proofsCount
       FROM transactions t
       INNER JOIN financial_accounts fa ON fa.id = t.account_id
-      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users vu ON vu.id = t.validated_by_id
       LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
       WHERE ${filters.join(" AND ")}
-      GROUP BY
-        t.id,
-        t.company_id,
-        t.account_id,
-        fa.name,
-        fa.account_ref,
-        fa.scope_type,
-        fa.primary_activity_code,
-        t.type,
-        t.amount,
-        t.currency,
-        t.activity_code,
-        t.description,
-        t.metadata_json,
-        t.status,
-        t.requires_proof,
-        t.created_by_id,
-        cu.email,
-        t.validated_by_id,
-        vu.email,
-        t.salary_confirmation_status,
-        t.salary_confirmed_by_id,
-        su.email,
-        t.salary_confirmed_at,
-        t.occurred_at,
-        t.created_at,
-        t.updated_at
       ORDER BY t.occurred_at DESC, t.created_at DESC
       LIMIT ? OFFSET ?
     `,
@@ -792,6 +815,104 @@ export async function listSalaryTransactions(input: {
   );
 
   return rows.map(toTransaction);
+}
+
+type SalarySummaryAggregateRow = RowDataPacket & {
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  paymentMethod: SalaryPaymentMethod;
+  employeeUserId: string;
+  employeeFullName: string;
+  employeeEmail: string;
+  employeeRole: string;
+  count: number | string;
+  grossAmount: string;
+  bonusAmount: string;
+  deductionAmount: string;
+  netAmount: string;
+};
+
+export type SalarySummaryAggregate = {
+  status: SalarySummaryAggregateRow["status"];
+  paymentMethod: SalaryPaymentMethod;
+  employeeUserId: string;
+  employeeFullName: string;
+  employeeEmail: string;
+  employeeRole: string;
+  count: number;
+  grossAmount: string;
+  bonusAmount: string;
+  deductionAmount: string;
+  netAmount: string;
+};
+
+export async function summarizeSalaryTransactions(input: {
+  companyId: string;
+  payPeriod: string;
+  employeeUserId?: string;
+}): Promise<SalarySummaryAggregate[]> {
+  const filters = [
+    "t.company_id = ?",
+    "t.type = 'CASH_OUT'",
+    "t.activity_code IS NULL",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.entryCategory')) = 'SALARY'",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.payPeriod')) = ?",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeUserId')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeFullName')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeEmail')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeRole')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.grossAmount')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.bonusAmount')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.deductionAmount')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.netAmount')) <> ''",
+    "JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.paymentMethod')) IN ('BANK_TRANSFER', 'CASH', 'MOBILE_MONEY', 'CHEQUE')"
+  ];
+  const values: string[] = [input.companyId, input.payPeriod];
+
+  if (input.employeeUserId) {
+    filters.push("JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeUserId')) = ?");
+    values.push(input.employeeUserId);
+  }
+
+  const rows = await queryRows<SalarySummaryAggregateRow[]>(
+    `
+      SELECT
+        t.status AS status,
+        JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.paymentMethod')) AS paymentMethod,
+        JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeUserId')) AS employeeUserId,
+        JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeFullName')) AS employeeFullName,
+        JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeEmail')) AS employeeEmail,
+        JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeRole')) AS employeeRole,
+        COUNT(*) AS count,
+        CAST(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.grossAmount')) AS DECIMAL(18, 2))) AS CHAR) AS grossAmount,
+        CAST(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.bonusAmount')) AS DECIMAL(18, 2))) AS CHAR) AS bonusAmount,
+        CAST(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.deductionAmount')) AS DECIMAL(18, 2))) AS CHAR) AS deductionAmount,
+        CAST(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.netAmount')) AS DECIMAL(18, 2))) AS CHAR) AS netAmount
+      FROM transactions t
+      WHERE ${filters.join(" AND ")}
+      GROUP BY
+        t.status,
+        paymentMethod,
+        employeeUserId,
+        employeeFullName,
+        employeeEmail,
+        employeeRole
+    `,
+    values
+  );
+
+  return rows.map((row) => ({
+    status: row.status,
+    paymentMethod: row.paymentMethod,
+    employeeUserId: row.employeeUserId,
+    employeeFullName: row.employeeFullName,
+    employeeEmail: row.employeeEmail,
+    employeeRole: row.employeeRole,
+    count: Number(row.count),
+    grossAmount: row.grossAmount,
+    bonusAmount: row.bonusAmount,
+    deductionAmount: row.deductionAmount,
+    netAmount: row.netAmount
+  }));
 }
 
 export async function findSalaryTransactionByEmployeeAndPeriod(input: {
@@ -809,7 +930,11 @@ export async function findSalaryTransactionByEmployeeAndPeriod(input: {
         fa.account_ref AS accountRef,
         fa.scope_type AS accountScopeType,
         fa.primary_activity_code AS accountPrimaryActivityCode,
-        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS accountAllowedActivitiesCsv,
+        (
+          SELECT GROUP_CONCAT(faa.activity_code ORDER BY faa.activity_code SEPARATOR ',')
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+        ) AS accountAllowedActivitiesCsv,
         t.type AS type,
         CAST(t.amount AS CHAR) AS amount,
         t.currency AS currency,
@@ -836,7 +961,6 @@ export async function findSalaryTransactionByEmployeeAndPeriod(input: {
         ) AS proofsCount
       FROM transactions t
       INNER JOIN financial_accounts fa ON fa.id = t.account_id
-      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users vu ON vu.id = t.validated_by_id
       LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
@@ -847,33 +971,6 @@ export async function findSalaryTransactionByEmployeeAndPeriod(input: {
         AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.entryCategory')) = 'SALARY'
         AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.employeeUserId')) = ?
         AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.payPeriod')) = ?
-      GROUP BY
-        t.id,
-        t.company_id,
-        t.account_id,
-        fa.name,
-        fa.account_ref,
-        fa.scope_type,
-        fa.primary_activity_code,
-        t.type,
-        t.amount,
-        t.currency,
-        t.activity_code,
-        t.description,
-        t.metadata_json,
-        t.status,
-        t.requires_proof,
-        t.created_by_id,
-        cu.email,
-        t.validated_by_id,
-        vu.email,
-        t.salary_confirmation_status,
-        t.salary_confirmed_by_id,
-        su.email,
-        t.salary_confirmed_at,
-        t.occurred_at,
-        t.created_at,
-        t.updated_at
       ORDER BY t.created_at DESC
       LIMIT 1
     `,
@@ -927,7 +1024,11 @@ export async function findFinancialTransactionById(
         fa.account_ref AS accountRef,
         fa.scope_type AS accountScopeType,
         fa.primary_activity_code AS accountPrimaryActivityCode,
-        GROUP_CONCAT(DISTINCT faa.activity_code ORDER BY faa.activity_code SEPARATOR ',') AS accountAllowedActivitiesCsv,
+        (
+          SELECT GROUP_CONCAT(faa.activity_code ORDER BY faa.activity_code SEPARATOR ',')
+          FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id
+        ) AS accountAllowedActivitiesCsv,
         t.type AS type,
         CAST(t.amount AS CHAR) AS amount,
         t.currency AS currency,
@@ -954,39 +1055,11 @@ export async function findFinancialTransactionById(
         ) AS proofsCount
       FROM transactions t
       INNER JOIN financial_accounts fa ON fa.id = t.account_id
-      LEFT JOIN financial_account_activities faa ON faa.account_id = fa.id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users vu ON vu.id = t.validated_by_id
       LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
       WHERE t.company_id = ?
         AND t.id = ?
-      GROUP BY
-        t.id,
-        t.company_id,
-        t.account_id,
-        fa.name,
-        fa.account_ref,
-        fa.scope_type,
-        fa.primary_activity_code,
-        t.type,
-        t.amount,
-        t.currency,
-        t.activity_code,
-        t.description,
-        t.metadata_json,
-        t.status,
-        t.requires_proof,
-        t.created_by_id,
-        cu.email,
-        t.validated_by_id,
-        vu.email,
-        t.salary_confirmation_status,
-        t.salary_confirmed_by_id,
-        su.email,
-        t.salary_confirmed_at,
-        t.occurred_at,
-        t.created_at,
-        t.updated_at
       LIMIT 1
     `,
     [companyId, transactionId]
