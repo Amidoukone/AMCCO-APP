@@ -102,7 +102,7 @@ const HARDWARE_REPORT_BRANDING = {
   phone: "TEL: 79 07 24 40"
 };
 const GENERAL_EXPENSES_REPORT_BRANDING = {
-  title: "DEPENSES GENERALES",
+  title: "DÉPENSES GÉNÉRALES",
   agency: "Agence Mandingue de Courtage de Conseil et d'Orientation",
   brand: "AMCCO",
   fiscal: "N Fiscal 084126139L",
@@ -465,6 +465,16 @@ function toDisplayPeriodLabel(filters: { dateFrom?: string; dateTo?: string }): 
     : "aujourd'hui";
 
   return `${fromLabel} -> ${toLabel}`;
+}
+
+function toGeneralExpensesPeriodLabel(filters: { dateFrom?: string; dateTo?: string }): string {
+  const fromLabel = filters.dateFrom ? new Date(filters.dateFrom).toLocaleDateString("fr-FR") : null;
+  const toLabel = filters.dateTo ? new Date(filters.dateTo).toLocaleDateString("fr-FR") : null;
+
+  if (fromLabel && toLabel) return `Du ${fromLabel} au ${toLabel}`;
+  if (fromLabel) return `Depuis le ${fromLabel}`;
+  if (toLabel) return `Jusqu'au ${toLabel}`;
+  return "Toutes périodes";
 }
 
 function toDisplayActivityLabel(activityCode?: BusinessActivityCode): string {
@@ -1542,18 +1552,27 @@ function drawGeneralExpensesIcon(doc: PDFKit.PDFDocument, x: number, y: number):
     .fillColor("#78350f")
     .font("Helvetica-Bold")
     .fontSize(7.5)
-    .text("DEPENSES", x + 14, y + 36, { width: 68, align: "center" });
+    .text("DÉPENSES", x + 14, y + 36, { width: 68, align: "center" });
   doc.restore();
 }
 
 const GENERAL_EXPENSES_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "DATE", width: 65, align: "center" },
-  { label: "CATEGORIE", width: 205, align: "left" },
-  { label: "DESIGNATION", width: 205, align: "left" },
-  { label: "QUANTITE", width: 60, align: "right" },
-  { label: "PRIX UNITAIRE", width: 105, align: "right" },
-  { label: "MONTANT", width: 121, align: "right" }
+  { label: "CATÉGORIE", width: 197, align: "center" },
+  { label: "DÉSIGNATION", width: 197, align: "center" },
+  { label: "QUANTITÉ", width: 76, align: "center" },
+  { label: "PRIX UNITAIRE", width: 105, align: "center" },
+  { label: "MONTANT", width: 121, align: "center" }
 ];
+
+function getGeneralExpensesPdfColumns(doc: PDFKit.PDFDocument): PdfTableColumn[] {
+  const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const fixedColumns = GENERAL_EXPENSES_PDF_COLUMNS.slice(0, -1);
+  const fixedWidth = fixedColumns.reduce((sum, column) => sum + column.width, 0);
+  const amountColumn = GENERAL_EXPENSES_PDF_COLUMNS[GENERAL_EXPENSES_PDF_COLUMNS.length - 1];
+
+  return [...fixedColumns, { ...amountColumn, width: availableWidth - fixedWidth }];
+}
 
 function drawGeneralExpensesReportHeader(doc: PDFKit.PDFDocument, report: GeneralExpensesReport): void {
   const pageWidth = doc.page.width;
@@ -1608,7 +1627,7 @@ function drawGeneralExpensesReportHeader(doc: PDFKit.PDFDocument, report: Genera
     .fillColor("#111827")
     .font("Helvetica-Bold")
     .fontSize(16)
-    .text(`DEPENSES GENERALES - ${report.periodLabel.toUpperCase()}`, margin, 116, {
+    .text(`DÉPENSES GÉNÉRALES — ${report.periodLabel.toUpperCase()}`, margin, 116, {
       width: pageWidth - margin * 2,
       align: "center"
     });
@@ -1655,7 +1674,7 @@ function drawGeneralExpensesMetadataStrip(
     .fillColor("#92400e")
     .font("Helvetica-Bold")
     .fontSize(10)
-    .text("Genere le", pageWidth - margin - 160, y + 10, {
+    .text("Généré le", pageWidth - margin - 160, y + 10, {
       width: 150,
       align: "right"
     });
@@ -1677,10 +1696,10 @@ function drawGeneralExpensesMetricCards(doc: PDFKit.PDFDocument, report: General
   const cardWidth = (pageWidth - margin * 2 - gap * 3) / 4;
   const y = doc.y;
   const metrics = [
-    { label: "Dépenses PDG", value: formatPdfMoney(report.totals.pdgAmount) },
-    { label: "Dépenses employés", value: formatPdfMoney(report.totals.employeeAmount) },
-    { label: "Total dépenses", value: formatPdfMoney(report.totals.totalAmount) },
-    { label: "Lignes de dépense", value: formatPdfNumber(report.totals.transactionsCount) }
+    { label: "Dépenses du PDG", value: formatPdfMoney(report.totals.pdgAmount) },
+    { label: "Dépenses des employés", value: formatPdfMoney(report.totals.employeeAmount) },
+    { label: "Total des dépenses", value: formatPdfMoney(report.totals.totalAmount) },
+    { label: "Transactions", value: formatPdfNumber(report.totals.transactionsCount) }
   ];
 
   metrics.forEach((metric, index) => {
@@ -1708,9 +1727,9 @@ function drawGeneralExpensesMetricCards(doc: PDFKit.PDFDocument, report: General
 
 function drawGeneralExpensesTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
-  for (const column of GENERAL_EXPENSES_PDF_COLUMNS) {
+  for (const column of getGeneralExpensesPdfColumns(doc)) {
     drawPdfTableCell(doc, column.label, x, y, column.width, 27, {
-      align: "center",
+      align: column.align,
       fill: "#fde68a",
       font: "Helvetica-Bold",
       fontSize: 10.5
@@ -1726,18 +1745,19 @@ function drawGeneralExpensesDataRow(
   y: number
 ): number {
   const values = [
-    { value: formatPdfDate(row.date), align: "center" as const },
-    { value: truncatePdfText(row.categoryLabel, 40), align: "left" as const },
-    { value: truncatePdfText(row.designation, 28), align: "left" as const },
-    { value: row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "-", align: "right" as const },
-    { value: row.quantity > 0 ? formatPdfMoney(row.unitPrice) : "-", align: "right" as const },
-    { value: formatPdfMoney(row.amount), align: "right" as const }
+    formatPdfDate(row.date),
+    truncatePdfText(row.categoryLabel, 40),
+    truncatePdfText(row.designation, 28),
+    row.quantity > 0 ? formatPdfNumber(row.quantity, 2) : "-",
+    row.quantity > 0 ? formatPdfMoney(row.unitPrice) : "-",
+    formatPdfMoney(row.amount)
   ];
+  const columns = getGeneralExpensesPdfColumns(doc);
   let x = PDF_PAGE_MARGIN;
-  values.forEach((item, index) => {
-    const column = GENERAL_EXPENSES_PDF_COLUMNS[index];
-    drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
-      align: item.align,
+  values.forEach((value, index) => {
+    const column = columns[index];
+    drawPdfTableCell(doc, value, x, y, column.width, 24, {
+      align: column.align,
       fontSize: 10
     });
     x += column.width;
@@ -1751,8 +1771,9 @@ function drawGeneralExpensesTotalsRow(
   label: string,
   amount: string
 ): number {
-  const amountColumn = GENERAL_EXPENSES_PDF_COLUMNS[GENERAL_EXPENSES_PDF_COLUMNS.length - 1];
-  const firstColumnsWidth = GENERAL_EXPENSES_PDF_COLUMNS
+  const columns = getGeneralExpensesPdfColumns(doc);
+  const amountColumn = columns[columns.length - 1];
+  const firstColumnsWidth = columns
     .slice(0, -1)
     .reduce((sum, column) => sum + column.width, 0);
   drawPdfTableCell(doc, label, PDF_PAGE_MARGIN, y, firstColumnsWidth, 27, {
@@ -1769,7 +1790,7 @@ function drawGeneralExpensesTotalsRow(
     amountColumn.width,
     27,
     {
-      align: "right",
+      align: "center",
       fill: "#fde68a",
       font: "Helvetica-Bold",
       fontSize: 11
@@ -1825,9 +1846,12 @@ function drawGeneralExpensesOwnerTable(
   totalLabel: string,
   totalAmount: string
 ): void {
-  drawGeneralExpensesSectionTitle(doc, title);
-
   if (rows.length === 0) {
+    if (needsPdfPageBreak(doc, 18 + 20)) {
+      doc.addPage();
+      drawGeneralExpensesContinuationHeader(doc, report);
+    }
+    drawGeneralExpensesSectionTitle(doc, title);
     doc
       .fillColor("#78350f")
       .font("Helvetica")
@@ -1838,10 +1862,12 @@ function drawGeneralExpensesOwnerTable(
   }
 
   const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
-  if (doc.y + 27 + 24 + 27 > tableBottom) {
+  const minimumSectionHeight = 18 + 27 + 24 + 27;
+  if (needsPdfPageBreak(doc, minimumSectionHeight)) {
     doc.addPage();
     drawGeneralExpensesContinuationHeader(doc, report);
   }
+  drawGeneralExpensesSectionTitle(doc, title);
   let y = drawGeneralExpensesTableHeader(doc, doc.y);
 
   for (const row of rows) {
@@ -1870,13 +1896,13 @@ function drawGeneralExpensesTable(doc: PDFKit.PDFDocument, report: GeneralExpens
   const pdgRows = report.rows.filter((row) => row.ownerType === "PDG");
   const employeeRows = report.rows.filter((row) => row.ownerType === "EMPLOYE");
 
-  drawGeneralExpensesOwnerTable(doc, report, pdgRows, "DEPENSES PDG", "TOTAL PDG", report.totals.pdgAmount);
+  drawGeneralExpensesOwnerTable(doc, report, pdgRows, "DÉPENSES DU PDG", "TOTAL PDG", report.totals.pdgAmount);
   drawGeneralExpensesOwnerTable(
     doc,
     report,
     employeeRows,
-    "DEPENSES EMPLOYES",
-    "TOTAL EMPLOYES",
+    "DÉPENSES DES EMPLOYÉS",
+    "TOTAL DES EMPLOYÉS",
     report.totals.employeeAmount
   );
 }
@@ -1906,16 +1932,19 @@ function drawGeneralExpensesBreakdownTable(
     });
   doc.moveDown(0.3);
 
+  const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const categoryWidth = availableWidth * 0.525;
+  const countWidth = availableWidth * 0.17;
   const columns: PdfTableColumn[] = [
-    { label: "CATEGORIE", width: 400, align: "left" },
-    { label: "LIGNES", width: 130, align: "right" },
-    { label: "MONTANT", width: 232, align: "right" }
+    { label: "CATÉGORIE", width: categoryWidth, align: "center" },
+    { label: "LIGNES", width: countWidth, align: "center" },
+    { label: "MONTANT", width: availableWidth - categoryWidth - countWidth, align: "center" }
   ];
   const drawHeaderRow = (headerY: number): number => {
     let headerX = PDF_PAGE_MARGIN;
     for (const column of columns) {
       drawPdfTableCell(doc, column.label, headerX, headerY, column.width, 24, {
-        align: "center",
+        align: column.align,
         fill: "#fde68a",
         font: "Helvetica-Bold",
         fontSize: 10.5
@@ -1935,14 +1964,14 @@ function drawGeneralExpensesBreakdownTable(
     }
     let x = PDF_PAGE_MARGIN;
     const values = [
-      { value: row.categoryLabel, align: "left" as const },
-      { value: formatPdfNumber(row.transactionsCount), align: "right" as const },
-      { value: formatPdfMoney(row.amount), align: "right" as const }
+      row.categoryLabel,
+      formatPdfNumber(row.transactionsCount),
+      formatPdfMoney(row.amount)
     ];
-    values.forEach((item, index) => {
+    values.forEach((value, index) => {
       const column = columns[index];
-      drawPdfTableCell(doc, item.value, x, y, column.width, 24, {
-        align: item.align,
+      drawPdfTableCell(doc, value, x, y, column.width, 24, {
+        align: column.align,
         fontSize: 10
       });
       x += column.width;
@@ -1975,7 +2004,7 @@ function drawGeneralExpensesBreakdown(doc: PDFKit.PDFDocument, report: GeneralEx
 
 function buildEmptyGeneralExpensesReport(filters: ReportPeriodFilter): GeneralExpensesReport {
   return {
-    periodLabel: toDisplayPeriodLabel(filters),
+    periodLabel: toGeneralExpensesPeriodLabel(filters),
     rows: [],
     breakdownRows: [],
     totals: {
@@ -7973,7 +8002,7 @@ function buildGeneralExpensesReport(
   );
 
   return {
-    periodLabel: toDisplayPeriodLabel(filters),
+    periodLabel: toGeneralExpensesPeriodLabel(filters),
     rows,
     breakdownRows,
     totals: {

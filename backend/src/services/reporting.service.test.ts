@@ -80,6 +80,25 @@ vi.mock("../repositories/btp-projects.repository.js", () => ({
   listBtpProjects: vi.fn()
 }));
 
+function extractPdfText(pdf: Buffer): string {
+  const pdfLatin1 = pdf.toString("latin1");
+  const decodedStreams = [...pdfLatin1.matchAll(/stream\r?\n/g)]
+    .map((match) => {
+      const start = (match.index ?? 0) + match[0].length;
+      const end = pdfLatin1.indexOf("endstream", start);
+      if (end < 0) return "";
+      try {
+        return inflateSync(Buffer.from(pdfLatin1.slice(start, end).replace(/\r?\n$/, ""), "latin1")).toString("latin1");
+      } catch {
+        return "";
+      }
+    })
+    .join("\n");
+  return [...decodedStreams.matchAll(/<([0-9a-fA-F]+)>/g)]
+    .map((match) => Buffer.from(match[1], "hex").toString("latin1"))
+    .join("");
+}
+
 describe("reporting.service", () => {
   const actor = {
     actorId: "accountant-1",
@@ -681,9 +700,13 @@ describe("reporting.service", () => {
       dateFrom: "2026-06-01T00:00:00.000Z",
       dateTo: "2026-06-30T23:59:59.999Z"
     });
-
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    const extractedPdfText = extractPdfText(pdf);
+    expect(extractedPdfText).toContain("Achat ciment");
+    expect(extractedPdfText).toContain("Du 01/06/2026 au 30/06/2026");
+    expect(extractedPdfText).toContain("TOTAL PDG");
+    expect(extractedPdfText).toContain("648 000 F CFA");
   });
 
   it("requires a selected activity for reports", async () => {
