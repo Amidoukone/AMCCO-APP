@@ -635,7 +635,10 @@ export async function updateCompanyTaskStatus(
     throw new HttpError(404, "Tâche introuvable.");
   }
 
-  const canUpdate = canManageTasks(actor.role) || task.assignedToId === actor.actorId;
+  const canUpdate =
+    canManageTasks(actor.role) ||
+    task.assignedToId === actor.actorId ||
+    task.createdById === actor.actorId;
   if (!canUpdate) {
     throw new HttpError(403, "Permissions insuffisantes pour changer ce statut.");
   }

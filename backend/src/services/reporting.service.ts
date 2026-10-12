@@ -2207,32 +2207,6 @@ function drawHydrocarbonMetadataStrip(
   doc.y = y + 56;
 }
 
-function drawHydrocarbonMetricCards(doc: PDFKit.PDFDocument, report: HydrocarbonOperationsReport): void {
-  const margin = PDF_PAGE_MARGIN;
-  const width = doc.page.width - margin * 2;
-  const gap = 8;
-  const cardWidth = (width - gap * 3) / 4;
-  const cardHeight = 48;
-  const y = doc.y;
-  const metrics = [
-    { label: "Transactions", value: report.totals.transactionsCount },
-    { label: "Tâches terminées", value: report.totals.doneTasksCount },
-    { label: "À faire / en cours", value: report.totals.openTasksCount },
-    { label: "Bloquées", value: report.totals.blockedTasksCount }
-  ];
-
-  metrics.forEach((metric, index) => {
-    const x = margin + index * (cardWidth + gap);
-    doc.roundedRect(x, y, cardWidth, cardHeight, 4).fill("#f8fafc");
-    doc.rect(x, y, cardWidth, cardHeight).strokeColor("#cbd5e1").lineWidth(0.8).stroke();
-    doc.fillColor("#486581").font("Helvetica-Bold").fontSize(8.5)
-      .text(metric.label, x + 8, y + 7, { width: cardWidth - 16, align: "center" });
-    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(13)
-      .text(formatPdfNumber(metric.value), x + 8, y + 22, { width: cardWidth - 16, align: "center" });
-  });
-  doc.y = y + cardHeight + 12;
-}
-
 function drawHydrocarbonTable(
   doc: PDFKit.PDFDocument,
   report: HydrocarbonOperationsReport,
@@ -2244,7 +2218,7 @@ function drawHydrocarbonTable(
   const margin = PDF_PAGE_MARGIN;
   const tableWidth = doc.page.width - margin * 2;
   const headerHeight = 23;
-  const rowHeight = 23;
+  const rowHeight = 18;
   const bottom = doc.page.height - PDF_CONTENT_BOTTOM;
   const drawTitle = (continuation = false): void => {
     const y = doc.y;
@@ -2253,14 +2227,15 @@ function drawHydrocarbonTable(
     doc.y = y + 18;
   };
   const drawHeader = (): number => {
+    const headerY = doc.y;
     let x = margin;
     for (const column of columns) {
-      drawPdfTableCell(doc, column.label, x, doc.y, column.width, headerHeight, {
+      drawPdfTableCell(doc, column.label, x, headerY, column.width, headerHeight, {
         align: "center", fill: "#e2e8f0", font: "Helvetica-Bold", fontSize: 8.2, borderColor: "#cbd5e1"
       });
       x += column.width;
     }
-    return doc.y + headerHeight;
+    return headerY + headerHeight;
   };
 
   if (needsPdfPageBreak(doc, 18 + headerHeight + rowHeight)) {
@@ -2307,7 +2282,6 @@ function renderHydrocarbonReportsPdf(
   });
   drawHydrocarbonReportHeader(doc, report);
   drawHydrocarbonMetadataStrip(doc, report, generatedAt);
-  drawHydrocarbonMetricCards(doc, report);
 
   const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
   const summaryColumns: PdfTableColumn[] = [
@@ -2333,12 +2307,10 @@ function renderHydrocarbonReportsPdf(
   );
 
   const transactionColumns: PdfTableColumn[] = [
-    { label: "DATE", width: 70, align: "center" },
-    { label: "SENS", width: 82, align: "center" },
-    { label: "DESCRIPTION", width: 320, align: "center" },
-    { label: "STATUT", width: 105, align: "center" },
-    { label: "DEVISE", width: 76, align: "center" },
-    { label: "MONTANT", width: availableWidth - 653, align: "center" }
+    { label: "DATE", width: 72, align: "center" },
+    { label: "SENS", width: 90, align: "center" },
+    { label: "DESCRIPTION", width: availableWidth - 72 - 90 - 132, align: "left" },
+    { label: "MONTANT", width: 132, align: "right" }
   ];
   drawHydrocarbonTable(
     doc,
@@ -2349,8 +2321,6 @@ function renderHydrocarbonReportsPdf(
       formatPdfDate(row.date),
       row.direction === "CASH_IN" ? "Entrée" : "Sortie",
       row.description,
-      row.status === "APPROVED" ? "Finalisée" : "Enregistrée",
-      row.currency,
       formatHydrocarbonMoney(row.amount, row.currency)
     ]),
     "Aucun flux financier reportable sur la période sélectionnée."
@@ -2606,10 +2576,11 @@ function drawBeverageDepotTable(
     doc.y = titleY + 18;
   };
   const drawHeader = (): number => {
+    const headerY = doc.y;
     let x = margin;
     columns.forEach((column) => {
-      drawPdfTableCell(doc, column.label, x, doc.y, column.width, headerHeight, {
-        align: "center",
+      drawPdfTableCell(doc, column.label, x, headerY, column.width, headerHeight, {
+        align: column.align ?? "center",
         fill: "#fde68a",
         font: "Helvetica-Bold",
         fontSize: 8,
@@ -2617,7 +2588,7 @@ function drawBeverageDepotTable(
       });
       x += column.width;
     });
-    return doc.y + headerHeight;
+    return headerY + headerHeight;
   };
 
   if (needsPdfPageBreak(doc, 18 + headerHeight + rowHeight)) {
@@ -2655,7 +2626,7 @@ function drawBeverageDepotTable(
     columns.forEach((column, index) => {
       const cell = row[index];
       drawPdfTableCell(doc, cell?.value ?? "", x, y, column.width, rowHeight, {
-        align: "center",
+        align: cell?.align ?? column.align ?? "left",
         fontSize: 8.2,
         borderColor: "#d9e2ec"
       });

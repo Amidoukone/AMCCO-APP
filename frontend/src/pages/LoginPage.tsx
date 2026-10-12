@@ -4,6 +4,7 @@ import { ApiError } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import type { LoginClientDiagnostics } from "../types/auth";
 import { ButtonSpinner } from "../components/ButtonSpinner";
+import { getDefaultRouteForRole } from "../config/permissions";
 
 const LOGIN_BACKEND_ERROR = "Connexion impossible. Vérifiez le backend.";
 
@@ -61,7 +62,7 @@ export function LoginPage(): JSX.Element {
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      await login({
+      const authenticatedUser = await login({
         email: normalizedEmail,
         password: normalizedPassword,
         clientDiagnostics: buildLoginClientDiagnostics(
@@ -71,7 +72,13 @@ export function LoginPage(): JSX.Element {
           normalizedPassword
         )
       });
-      navigate(redirectTo, { replace: true });
+      const destination =
+        authenticatedUser.role === "HARDWARE_OPERATOR" ||
+        authenticatedUser.role === "HYDROCARBON_OPERATOR" ||
+        authenticatedUser.role === "BEVERAGE_DEPOT_OPERATOR"
+          ? getDefaultRouteForRole(authenticatedUser.role)
+          : redirectTo;
+      navigate(destination, { replace: true });
     } catch (error) {
       if (error instanceof ApiError) {
         setErrorMessage(error.message);

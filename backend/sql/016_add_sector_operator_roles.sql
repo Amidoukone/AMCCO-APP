@@ -1,0 +1,10 @@
+ALTER TABLE memberships
+  MODIFY role ENUM(
+    'OWNER',
+    'SYS_ADMIN',
+    'ACCOUNTANT',
+    'SUPERVISOR',
+    'EMPLOYEE',
+    'HARDWARE_OPERATOR',
+    'HYDROCARBON_OPERATOR'
+  ) NOT NULL;

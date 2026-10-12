@@ -42,6 +42,7 @@ import {
 } from "../repositories/admin-users.repository.js";
 import type { BusinessActivityCode } from "../types/business-activity.js";
 import type { RoleCode } from "../types/role.js";
+import { getRoleActivityCode } from "../types/role.js";
 
 type ActorContext = {
   actorId: string;
@@ -113,7 +114,14 @@ function canReviewTransaction(role: RoleCode): boolean {
 }
 
 function canManageTransaction(role: RoleCode): boolean {
-  return role === "SYS_ADMIN" || role === "ACCOUNTANT" || role === "EMPLOYEE";
+  return (
+    role === "SYS_ADMIN" ||
+    role === "ACCOUNTANT" ||
+    role === "EMPLOYEE" ||
+    role === "HARDWARE_OPERATOR" ||
+    role === "HYDROCARBON_OPERATOR" ||
+    role === "BEVERAGE_DEPOT_OPERATOR"
+  );
 }
 
 function canManageSalary(role: RoleCode): boolean {
@@ -139,6 +147,13 @@ function ensureSalaryViewAccess(role: RoleCode): void {
 function ensureTransactionManagementAccess(role: RoleCode): void {
   if (!canManageTransaction(role)) {
     throw new HttpError(403, "Permissions insuffisantes pour modifier ou supprimer les transactions.");
+  }
+}
+
+function ensureSectorTransactionAccess(role: RoleCode, activityCode: BusinessActivityCode | null): void {
+  const scopedActivityCode = getRoleActivityCode(role);
+  if (scopedActivityCode && activityCode !== scopedActivityCode) {
+    throw new HttpError(404, "Transaction introuvable.");
   }
 }
 
@@ -572,8 +587,13 @@ async function findTransactionForProofs(companyId: string, transactionId: string
 export async function listCompanyAccounts(input: {
   companyId: string;
   activityCode?: BusinessActivityCode;
+  role?: RoleCode;
 }) {
-  return listFinancialAccounts(input);
+  return listFinancialAccounts({
+    ...input,
+    activityCode: input.role ? getRoleActivityCode(input.role) ?? input.activityCode : input.activityCode,
+    sectorOnly: Boolean(input.role && getRoleActivityCode(input.role))
+  });
 }
 
 export async function listCompanySalaryMembers(companyId: string) {
@@ -781,6 +801,10 @@ export async function createCompanyTransaction(
     occurredAt?: string;
   }
 ) {
+  const scopedActivityCode = getRoleActivityCode(actor.role);
+  if (scopedActivityCode && input.activityCode !== scopedActivityCode) {
+    throw new HttpError(403, "Vous ne pouvez saisir que les transactions de votre secteur.");
+  }
   const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode)
     .then(() => ({ ok: true as const }))
     .catch((error: unknown) => ({ ok: false as const, error }));
@@ -789,6 +813,13 @@ export async function createCompanyTransaction(
     throw new HttpError(404, "Compte financier introuvable.");
   }
   assertAccountSupportsActivity(account, input.activityCode);
+  if (
+    scopedActivityCode &&
+    (account.scopeType === "GLOBAL" ||
+      (account.scopeType === "RESTRICTED" && account.allowedActivityCodes.some((code) => code !== scopedActivityCode)))
+  ) {
+    throw new HttpError(403, "Utilisez un compte financier dédié à votre secteur.");
+  }
 
   const activityCheck = await activityCheckPromise;
   if (!activityCheck.ok) {
@@ -889,7 +920,13 @@ export async function updateCompanyTransaction(
     throw new HttpError(400, "Les salaires doivent être gérés depuis la page salaires.");
   }
 
+  ensureSectorTransactionAccess(actor.role, existing.activityCode);
   ensureTransactionMutationOwnership(actor, existing);
+
+  const scopedActivityCode = getRoleActivityCode(actor.role);
+  if (scopedActivityCode && input.activityCode !== scopedActivityCode) {
+    throw new HttpError(403, "Vous ne pouvez modifier que les transactions de votre secteur.");
+  }
 
   const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode)
     .then(() => ({ ok: true as const }))
@@ -899,6 +936,13 @@ export async function updateCompanyTransaction(
     throw new HttpError(404, "Compte financier introuvable.");
   }
   assertAccountSupportsActivity(account, input.activityCode);
+  if (
+    scopedActivityCode &&
+    (account.scopeType === "GLOBAL" ||
+      (account.scopeType === "RESTRICTED" && account.allowedActivityCodes.some((code) => code !== scopedActivityCode)))
+  ) {
+    throw new HttpError(403, "Utilisez un compte financier dédié à votre secteur.");
+  }
 
   const activityCheck = await activityCheckPromise;
   if (!activityCheck.ok) {
@@ -1628,6 +1672,7 @@ export async function listCompanyTransactions(input: {
   status?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
   type?: "CASH_IN" | "CASH_OUT";
   activityCode?: BusinessActivityCode;
+  role?: RoleCode;
 }) {
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
   const offset = Math.max(input.offset ?? 0, 0);
@@ -1638,7 +1683,7 @@ export async function listCompanyTransactions(input: {
     offset,
     status: input.status,
     type: input.type,
-    activityCode: input.activityCode
+    activityCode: input.role ? getRoleActivityCode(input.role) ?? input.activityCode : input.activityCode
   });
 }
 
@@ -1727,6 +1772,7 @@ export async function deleteCompanyTransaction(
 
   ensureTransactionManagementAccess(actor.role);
 
+  ensureSectorTransactionAccess(actor.role, existing.activityCode);
   ensureTransactionMutationOwnership(actor, existing);
 
   const account = await findFinancialAccountById(actor.companyId, existing.accountId);
@@ -1851,6 +1897,8 @@ export async function addProofToTransaction(
     throw new HttpError(404, "Transaction introuvable.");
   }
 
+  ensureSectorTransactionAccess(actor.role, transaction.activityCode);
+
   const canEdit = transaction.createdById === actor.actorId || actor.role === "SYS_ADMIN" || actor.role === "SUPERVISOR";
 
   if (!canEdit) {
@@ -1909,6 +1957,8 @@ export async function listCompanyTransactionProofs(
   if (!transaction) {
     throw new HttpError(404, "Transaction introuvable.");
   }
+
+  ensureSectorTransactionAccess(actor.role, transaction.activityCode);
 
   await findTransactionForProofs(actor.companyId, transaction.id);
   const proofs = await listTransactionProofs(input.transactionId);
@@ -2224,6 +2274,8 @@ export async function getTransactionProofUploadAuth(
   if (!transaction) {
     throw new HttpError(404, "Transaction introuvable.");
   }
+
+  ensureSectorTransactionAccess(actor.role, transaction.activityCode);
 
   const canEdit = transaction.createdById === actor.actorId || actor.role === "SYS_ADMIN" || actor.role === "SUPERVISOR";
 

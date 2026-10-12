@@ -574,6 +574,54 @@ describe("tasks.service", () => {
   });
 
   describe("updateCompanyTaskStatus", () => {
+    it("allows an employee to change the status of an unassigned task they created", async () => {
+      vi.mocked(findOperationTaskMinimalById).mockResolvedValue({
+        id: "task-created-by-employee",
+        companyId: actor.companyId,
+        status: "TODO",
+        activityCode: "SERVICES",
+        createdById: "employee-1",
+        assignedToId: null
+      });
+      vi.mocked(findOperationTaskById).mockResolvedValue({
+        id: "task-created-by-employee",
+        companyId: actor.companyId,
+        title: "Vérifier un dossier",
+        description: null,
+        activityCode: "SERVICES",
+        metadata: {},
+        status: "IN_PROGRESS",
+        createdById: "employee-1",
+        createdByEmail: "employee@example.com",
+        createdByFullName: "Employee One",
+        assignedToId: null,
+        assignedToEmail: null,
+        assignedToFullName: null,
+        dueDate: null,
+        createdAt: "2026-10-12T08:00:00.000Z",
+        updatedAt: "2026-10-12T09:00:00.000Z"
+      });
+
+      const result = await updateCompanyTaskStatus(
+        {
+          actorId: "employee-1",
+          companyId: actor.companyId,
+          role: "EMPLOYEE"
+        },
+        {
+          taskId: "task-created-by-employee",
+          status: "IN_PROGRESS"
+        }
+      );
+
+      expect(updateOperationTaskStatus).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        taskId: "task-created-by-employee",
+        status: "IN_PROGRESS"
+      });
+      expect(result.status).toBe("IN_PROGRESS");
+    });
+
     it("rejects status changes from unauthorized users", async () => {
       vi.mocked(findOperationTaskMinimalById).mockResolvedValue({
         id: "task-3",

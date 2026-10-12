@@ -262,6 +262,18 @@ async function ensureCompanyProfileColumns(): Promise<void> {
   }
 }
 
+async function ensureSectorOperatorRoles(): Promise<void> {
+  const rows = await queryRows<(RowDataPacket & { Type: string })[]>(
+    `SHOW COLUMNS FROM memberships LIKE 'role'`
+  );
+  const roleType = rows[0]?.Type ?? "";
+  if (!roleType.includes("HARDWARE_OPERATOR") || !roleType.includes("HYDROCARBON_OPERATOR") || !roleType.includes("BEVERAGE_DEPOT_OPERATOR")) {
+    await getDbPool().execute(
+      `ALTER TABLE memberships MODIFY role ENUM('OWNER', 'SYS_ADMIN', 'ACCOUNTANT', 'SUPERVISOR', 'EMPLOYEE', 'HARDWARE_OPERATOR', 'HYDROCARBON_OPERATOR', 'BEVERAGE_DEPOT_OPERATOR') NOT NULL`
+    );
+  }
+}
+
 async function ensureRefreshSessionsBootstrapSupport(): Promise<void> {
   const rows = await queryRows<(RowDataPacket & { Null: "YES" | "NO" })[]>(
     `SHOW COLUMNS FROM refresh_sessions LIKE 'company_id'`
@@ -467,6 +479,7 @@ async function ensureCompanyActivitiesSeeded(): Promise<void> {
 export async function ensureBusinessActivitySchemaReady(): Promise<void> {
   try {
     await ensureRefreshSessionsBootstrapSupport();
+    await ensureSectorOperatorRoles();
     await ensureCompanyProfileColumns();
     await ensureActivityColumnOnTransactions();
     await ensureMetadataColumnOnTransactions();

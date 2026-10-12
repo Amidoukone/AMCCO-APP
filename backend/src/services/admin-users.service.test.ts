@@ -9,6 +9,7 @@ import {
   deleteMembership,
   findMembershipByCompanyAndUser,
   findUserByEmail,
+  hasSectorOperatorMembership,
   revokeRefreshSessionsForUserInCompany
 } from "../repositories/admin-users.repository.js";
 import { listAllCompanyIds } from "../repositories/companies.repository.js";
@@ -32,7 +33,8 @@ vi.mock("../repositories/admin-users.repository.js", () => ({
   updateMembershipRole: vi.fn(),
   updateUserPasswordHash: vi.fn(),
   updateUserProfile: vi.fn(),
-  countOwnersInCompany: vi.fn()
+  countOwnersInCompany: vi.fn(),
+  hasSectorOperatorMembership: vi.fn()
 }));
 
 vi.mock("../repositories/companies.repository.js", () => ({
@@ -57,6 +59,7 @@ describe("admin-users.service", () => {
     vi.mocked(deleteMembership).mockReset();
     vi.mocked(findMembershipByCompanyAndUser).mockReset();
     vi.mocked(findUserByEmail).mockReset();
+    vi.mocked(hasSectorOperatorMembership).mockReset().mockResolvedValue(false);
     vi.mocked(listAllCompanyIds).mockReset();
     vi.mocked(revokeRefreshSessionsForUserInCompany).mockReset();
     vi.mocked(createAuditLogRecord).mockReset();
@@ -130,6 +133,125 @@ describe("admin-users.service", () => {
       })
     );
     expect(result.userId).toBe("user-1");
+  });
+
+  it("creates a sector operator only in the active company", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+    vi.mocked(hashPassword).mockResolvedValue("hashed-password");
+    vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue({
+      membershipId: "membership-hardware",
+      userId: "operator-1",
+      companyId: "company-1",
+      role: "HARDWARE_OPERATOR",
+      email: "hardware@example.com",
+      fullName: "Hardware Operator",
+      isActive: true
+    });
+    vi.mocked(randomUUID)
+      .mockReturnValueOnce("operator-1")
+      .mockReturnValueOnce("membership-hardware")
+      .mockReturnValueOnce("audit-hardware");
+
+    const result = await createCompanyUser(
+      { actorId: "admin-1", companyId: "company-1" },
+      {
+        email: "hardware@example.com",
+        fullName: "Hardware Operator",
+        password: "Secret123!",
+        role: "HARDWARE_OPERATOR"
+      }
+    );
+
+    expect(createMembership).toHaveBeenCalledTimes(1);
+    expect(createMembership).toHaveBeenCalledWith({
+      membershipId: "membership-hardware",
+      companyId: "company-1",
+      userId: "operator-1",
+      role: "HARDWARE_OPERATOR"
+    });
+    expect(createMembershipIfMissing).not.toHaveBeenCalled();
+    expect(listAllCompanyIds).not.toHaveBeenCalled();
+    expect(result.role).toBe("HARDWARE_OPERATOR");
+  });
+
+  it("creates a beverage depot operator only in the active company", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+    vi.mocked(hashPassword).mockResolvedValue("hashed-password");
+    vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue({
+      membershipId: "membership-beverage",
+      userId: "operator-beverage",
+      companyId: "company-1",
+      role: "BEVERAGE_DEPOT_OPERATOR",
+      email: "beverage@example.com",
+      fullName: "Beverage Operator",
+      isActive: true
+    });
+    vi.mocked(randomUUID)
+      .mockReturnValueOnce("operator-beverage")
+      .mockReturnValueOnce("membership-beverage")
+      .mockReturnValueOnce("audit-beverage");
+
+    const result = await createCompanyUser(
+      { actorId: "admin-1", companyId: "company-1" },
+      {
+        email: "beverage@example.com",
+        fullName: "Beverage Operator",
+        password: "Secret123!",
+        role: "BEVERAGE_DEPOT_OPERATOR"
+      }
+    );
+
+    expect(createMembership).toHaveBeenCalledWith({
+      membershipId: "membership-beverage",
+      companyId: "company-1",
+      userId: "operator-beverage",
+      role: "BEVERAGE_DEPOT_OPERATOR"
+    });
+    expect(createMembershipIfMissing).not.toHaveBeenCalled();
+    expect(listAllCompanyIds).not.toHaveBeenCalled();
+    expect(result.role).toBe("BEVERAGE_DEPOT_OPERATOR");
+  });
+
+  it("does not assign a sector role to a previously shared user", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue({
+      userId: "existing-user",
+      email: "existing@example.com",
+      fullName: "Existing User",
+      isActive: true
+    });
+
+    await expect(createCompanyUser(
+      { actorId: "admin-1", companyId: "company-1" },
+      {
+        email: "existing@example.com",
+        fullName: "Existing User",
+        password: "Secret123!",
+        role: "HYDROCARBON_OPERATOR"
+      }
+    )).rejects.toMatchObject({ statusCode: 409 });
+    expect(createMembership).not.toHaveBeenCalled();
+  });
+
+  it("does not attach an existing sector operator to another company", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue({
+      userId: "operator-existing",
+      email: "operator@example.com",
+      fullName: "Sector Operator",
+      isActive: true
+    });
+    vi.mocked(hasSectorOperatorMembership).mockResolvedValue(true);
+
+    await expect(createCompanyUser(
+      { actorId: "admin-2", companyId: "company-2" },
+      {
+        email: "operator@example.com",
+        fullName: "Sector Operator",
+        password: "Secret123!",
+        role: "EMPLOYEE"
+      }
+    )).rejects.toMatchObject({ statusCode: 409 });
+    expect(hasSectorOperatorMembership).toHaveBeenCalledWith("operator-existing");
+    expect(createMembership).not.toHaveBeenCalled();
   });
 
   it("deletes a company membership and revokes company refresh sessions", async () => {

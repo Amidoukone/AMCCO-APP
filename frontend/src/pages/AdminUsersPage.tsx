@@ -402,12 +402,27 @@ export function AdminUsersPage(): JSX.Element {
               }))
             }
           >
-            {ROLE_CODES.map((role) => (
-              <option key={role} value={role}>
-                {ROLE_LABELS[role]}
-              </option>
-            ))}
+            <optgroup label="Rôles classiques">
+              {ROLE_CODES.filter((role) => role !== "HARDWARE_OPERATOR" && role !== "HYDROCARBON_OPERATOR" && role !== "BEVERAGE_DEPOT_OPERATOR").map((role) => (
+                <option key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Opérateurs sectoriels">
+              {ROLE_CODES.filter((role) => role === "HARDWARE_OPERATOR" || role === "HYDROCARBON_OPERATOR" || role === "BEVERAGE_DEPOT_OPERATOR").map((role) => (
+                <option key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                </option>
+              ))}
+            </optgroup>
           </select>
+          {createForm.role === "HARDWARE_OPERATOR" || createForm.role === "HYDROCARBON_OPERATOR" || createForm.role === "BEVERAGE_DEPOT_OPERATOR" ? (
+            <p className="hint">
+              Ce compte sera limité à son secteur et rattaché uniquement à l’entreprise active
+              {activeCompany?.name ? ` (${activeCompany.name})` : ""}. Utilisez une adresse e-mail dédiée.
+            </p>
+          ) : null}
           <div className="mobile-sticky-form-actions">
             <button type="submit" disabled={isSubmittingCreate}>
               {isSubmittingCreate ? (

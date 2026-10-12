@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getDefaultRouteForRole } from "../config/permissions";
 import agricultureHeroUrl from "../../images/all-images-tractor-plowing-field-sunset11.jpg";
 import agricultureSectorUrl from "../../images/National-Mission-for-Sustainable-Agriculture.jpg";
 import livestockSectorUrl from "../../images/images (7).jpg";
@@ -93,9 +94,9 @@ const heroHighlights = [
 ];
 
 export function HomePage(): JSX.Element {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const platformPath = isAuthenticated ? "/dashboard" : "/login";
+  const platformPath = isAuthenticated && user ? getDefaultRouteForRole(user.role) : "/login";
   const platformLabel = isAuthenticated ? "Ouvrir la plateforme" : "Se connecter";
 
   useEffect(() => {

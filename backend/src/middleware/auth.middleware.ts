@@ -4,6 +4,18 @@ import { isBootstrapCompanyId } from "../lib/bootstrap-auth.js";
 import { verifyAccessToken } from "../lib/token.js";
 import { findActiveUserById, findUserProfileForCompany } from "../repositories/auth.repository.js";
 import type { RoleCode } from "../types/role.js";
+import { getRoleActivityCode } from "../types/role.js";
+
+function isAllowedSectorOperatorRequest(req: Request, role: RoleCode): boolean {
+  if (req.method === "GET" && (req.path === "/me" || req.path === "/activities" || req.path === "/finance/accounts" || req.path === "/finance/transactions")) {
+    return true;
+  }
+  if (req.method === "PATCH" && req.path === "/me/password") return true;
+  if (req.method === "POST" && req.path === "/finance/transactions") return true;
+  if (role === "HARDWARE_OPERATOR" && req.method === "GET" && req.path === "/activities/HARDWARE/articles") return true;
+  const proofPath = /^\/finance\/transactions\/[a-f0-9-]+\/proofs(?:\/upload-auth)?$/i.test(req.path);
+  return proofPath && (req.method === "GET" || req.method === "POST");
+}
 
 function extractBearerToken(authHeader?: string): string | null {
   if (!authHeader) {
@@ -60,6 +72,10 @@ export async function authenticateAccessToken(
       email: currentProfile.email,
       fullName: currentProfile.fullName
     };
+    if (getRoleActivityCode(req.auth.role) && !isAllowedSectorOperatorRequest(req, req.auth.role)) {
+      next(new HttpError(403, "Accès limité aux transactions de votre secteur."));
+      return;
+    }
     next();
   } catch (error) {
     if (error instanceof HttpError) {

@@ -360,3 +360,25 @@ export async function countOwnersInCompany(companyId: string): Promise<number> {
   );
   return rows[0]?.total ?? 0;
 }
+
+export async function countMembershipsForUser(userId: string): Promise<number> {
+  const rows = await queryRows<(RowDataPacket & { total: number })[]>(
+    `SELECT COUNT(*) AS total FROM memberships WHERE user_id = ?`,
+    [userId]
+  );
+  return rows[0]?.total ?? 0;
+}
+
+export async function hasSectorOperatorMembership(userId: string): Promise<boolean> {
+  const rows = await queryRows<(RowDataPacket & { found: number })[]>(
+    `
+      SELECT 1 AS found
+      FROM memberships
+      WHERE user_id = ?
+        AND role IN ('HARDWARE_OPERATOR', 'HYDROCARBON_OPERATOR', 'BEVERAGE_DEPOT_OPERATOR')
+      LIMIT 1
+    `,
+    [userId]
+  );
+  return rows.length > 0;
+}

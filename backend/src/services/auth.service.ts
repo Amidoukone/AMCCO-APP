@@ -23,6 +23,7 @@ import {
 } from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import { updateUserPasswordHash } from "../repositories/admin-users.repository.js";
+import { getRoleActivityCode } from "../types/role.js";
 import type { AuthContext } from "../types/auth.js";
 import type { AuthUserRecord } from "../repositories/auth.repository.js";
 import type { RoleCode } from "../types/role.js";
@@ -80,9 +81,13 @@ function getRolePriority(role: RoleCode): number {
       return 2;
     case "SUPERVISOR":
       return 3;
+    case "HARDWARE_OPERATOR":
+    case "HYDROCARBON_OPERATOR":
+    case "BEVERAGE_DEPOT_OPERATOR":
+      return 4;
     case "EMPLOYEE":
     default:
-      return 4;
+      return 5;
   }
 }
 
@@ -517,6 +522,12 @@ export async function switchCompany(input: {
   });
   if (!targetMembership || !targetMembership.company.isActive) {
     throw new HttpError(403, "Aucun accès à l'entreprise cible.");
+  }
+  if (
+    input.targetCompanyId !== payload.companyId &&
+    (getRoleActivityCode(payload.role) || getRoleActivityCode(targetMembership.role))
+  ) {
+    throw new HttpError(403, "Un compte sectoriel ne peut pas changer d'entreprise.");
   }
 
   const auth: AuthContext = {

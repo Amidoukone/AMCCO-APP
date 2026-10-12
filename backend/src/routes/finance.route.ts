@@ -4,6 +4,7 @@ import { HttpError } from "../errors/http-error.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { authenticateAccessToken, authorizeRoles } from "../middleware/auth.middleware.js";
 import { BUSINESS_ACTIVITY_CODES } from "../types/business-activity.js";
+import { getRoleActivityCode } from "../types/role.js";
 import {
   addProofToTransaction,
   confirmCompanySalaryReceipt,
@@ -123,7 +124,8 @@ financeRouter.get(
     const query = listAccountsQuerySchema.parse(req.query);
     const items = await listCompanyAccounts({
       companyId: req.auth.companyId,
-      activityCode: query.activityCode
+      activityCode: getRoleActivityCode(req.auth.role) ?? query.activityCode,
+      role: req.auth.role
     });
     res.status(200).json({ items });
   })
@@ -220,7 +222,8 @@ financeRouter.get(
       offset: query.offset,
       status: query.status,
       type: query.type,
-      activityCode: query.activityCode
+      activityCode: getRoleActivityCode(req.auth.role) ?? query.activityCode,
+      role: req.auth.role
     });
     res.status(200).json({ items });
   })
@@ -436,7 +439,7 @@ financeRouter.get(
 
 financeRouter.post(
   "/finance/transactions",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -465,7 +468,7 @@ financeRouter.post(
 
 financeRouter.patch(
   "/finance/transactions/:transactionId",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "EMPLOYEE"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -517,7 +520,7 @@ financeRouter.get(
 
 financeRouter.get(
   "/finance/transactions/:transactionId/proofs/upload-auth",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -539,7 +542,7 @@ financeRouter.get(
 
 financeRouter.post(
   "/finance/transactions/:transactionId/proofs",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -616,7 +619,7 @@ financeRouter.patch(
 
 financeRouter.delete(
   "/finance/transactions/:transactionId",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "EMPLOYEE"),
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");

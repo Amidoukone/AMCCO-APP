@@ -3272,7 +3272,14 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [user?.role]);
 
   const canManageTransactions = useMemo(() => {
-    return user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "EMPLOYEE";
+    return (
+      user?.role === "SYS_ADMIN" ||
+      user?.role === "ACCOUNTANT" ||
+      user?.role === "EMPLOYEE" ||
+      user?.role === "HARDWARE_OPERATOR" ||
+      user?.role === "HYDROCARBON_OPERATOR" ||
+      user?.role === "BEVERAGE_DEPOT_OPERATOR"
+    );
   }, [user?.role]);
 
   const canManageArticles = useMemo(() => {
@@ -4288,7 +4295,14 @@ export function FinanceTransactionsPage(): JSX.Element {
         const payload = {
           name: accountForm.name.trim(),
           accountRef: accountForm.accountRef.trim() || undefined,
-          openingBalance: normalizeAmountForApi(accountForm.openingBalance)
+          openingBalance: normalizeAmountForApi(accountForm.openingBalance),
+          scopeType: accountForm.scopeType,
+          primaryActivityCode:
+            accountForm.scopeType === "DEDICATED" && accountForm.primaryActivityCode
+              ? accountForm.primaryActivityCode
+              : undefined,
+          allowedActivityCodes:
+            accountForm.scopeType === "RESTRICTED" ? accountForm.allowedActivityCodes : []
         };
 
         return editingAccountId
@@ -5246,6 +5260,38 @@ export function FinanceTransactionsPage(): JSX.Element {
                 required
               />
             </label>
+            {canCreateAccount ? (
+              <label className="operations-inline-group">
+                <span>Portée du compte</span>
+                <select
+                  value={accountForm.scopeType}
+                  onChange={(event) => {
+                    const scopeType = event.target.value as FinancialAccountScopeType;
+                    setAccountForm((prev) => ({
+                      ...prev,
+                      scopeType,
+                      primaryActivityCode:
+                        scopeType === "DEDICATED"
+                          ? (selectedActivityCode ?? prev.primaryActivityCode)
+                          : prev.primaryActivityCode,
+                      allowedActivityCodes:
+                        scopeType === "RESTRICTED" && selectedActivityCode
+                          ? [selectedActivityCode]
+                          : prev.allowedActivityCodes
+                    }));
+                  }}
+                >
+                  <option value="GLOBAL">Entreprise entière</option>
+                  <option value="DEDICATED">Un seul secteur</option>
+                  <option value="RESTRICTED">Secteurs sélectionnés</option>
+                </select>
+              </label>
+            ) : null}
+            {accountForm.scopeType === "DEDICATED" ? (
+              <p className="hint">
+                Un compte dédié à un seul secteur sera visible par l’opérateur de ce secteur.
+              </p>
+            ) : null}
             {false ? (
               <p className="hint">
                 Les comptes globaux entreprise sont réservés au propriétaire et à l'admin système.

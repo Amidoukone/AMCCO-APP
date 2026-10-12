@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS memberships (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36) NOT NULL,
   company_id VARCHAR(36) NOT NULL,
-  role ENUM('OWNER', 'SYS_ADMIN', 'ACCOUNTANT', 'SUPERVISOR', 'EMPLOYEE') NOT NULL,
+  role ENUM('OWNER', 'SYS_ADMIN', 'ACCOUNTANT', 'SUPERVISOR', 'EMPLOYEE', 'HARDWARE_OPERATOR', 'HYDROCARBON_OPERATOR', 'BEVERAGE_DEPOT_OPERATOR') NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_membership_user_company (user_id, company_id),
   KEY idx_membership_company_role (company_id, role),

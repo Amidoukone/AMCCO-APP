@@ -2720,7 +2720,7 @@ a {
 }
 
 .finance-transaction-primary strong {
-  color: #102a43;
+  color: #ffffff;
   font-size: 15px;
 }
 
@@ -10949,7 +10949,7 @@ textarea {
   }
 
   .finance-transaction-row.is-cash-in .finance-transaction-amount-cell {
-    color: #9df2d4;
+    color: #ffffff;
   }
 
   .finance-transaction-row.is-cash-out .finance-transaction-amount-cell {
@@ -11175,7 +11175,7 @@ textarea {
   }
 
   .finance-salary-net-cell {
-    color: #d8efe6;
+    color: #ffffff;
     font-size: 17px;
     font-weight: 900;
     line-height: 1.15;
@@ -13220,7 +13220,7 @@ textarea {
 
 .finance-transaction-row.is-cash-in .finance-transaction-amount-cell,
 .finance-salary-net-cell {
-  color: #bfffe4;
+  color: #ffffff;
 }
 
 .home-sector-tags span,
@@ -13734,7 +13734,7 @@ textarea {
   }
 
   .finance-transaction-mobile-status.is-approved {
-    color: #9df2d4;
+    color: #ffffff;
   }
 
   .finance-transaction-mobile-status.is-rejected {
@@ -14184,7 +14184,7 @@ textarea {
   }
 
   .finance-transaction-detail-status.is-approved {
-    color: #9df2d4;
+    color: #ffffff;
   }
 
   .finance-transaction-detail-status.is-rejected {

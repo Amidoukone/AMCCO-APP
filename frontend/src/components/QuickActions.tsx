@@ -24,7 +24,12 @@ export function QuickActions({
   const canUse = (key: NavigationItem["key"]): boolean =>
     navigation.some((item) => item.key === key) && canAccessFeature(role, key);
   const isReadOnlyOwner = isReadOnlyOwnerRole(role);
-  const canCreateTransactions = role === "SYS_ADMIN" || role === "ACCOUNTANT";
+  const canCreateTransactions =
+    role === "SYS_ADMIN" ||
+    role === "ACCOUNTANT" ||
+    role === "HARDWARE_OPERATOR" ||
+    role === "HYDROCARBON_OPERATOR" ||
+    role === "BEVERAGE_DEPOT_OPERATOR";
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
 
   const ownerActions = [

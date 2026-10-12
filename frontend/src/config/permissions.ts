@@ -20,12 +20,19 @@ export type NavigationItem = {
   section: "Pilotage" | "Exécution" | "Administration" | "Compte";
 };
 
-export const ROLE_LABELS: Record<RoleCode, string> = {
+const BASE_ROLE_LABELS = {
   OWNER: "Propriétaire",
   SYS_ADMIN: "Admin Système",
   ACCOUNTANT: "Comptable",
   SUPERVISOR: "Superviseur",
   EMPLOYEE: "Employé"
+};
+
+export const ROLE_LABELS: Record<RoleCode, string> = {
+  ...BASE_ROLE_LABELS,
+  HARDWARE_OPERATOR: "Opérateur Quincaillerie",
+  HYDROCARBON_OPERATOR: "Opérateur Hydrocarbure",
+  BEVERAGE_DEPOT_OPERATOR: "Opérateur Dépôt de boissons"
 };
 
 const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
@@ -35,11 +42,20 @@ const FEATURE_ACCESS: Record<FeatureKey, RoleCode[]> = {
   adminCompanies: ["SYS_ADMIN"],
   adminUsers: ["SYS_ADMIN"],
   adminActivities: ["SYS_ADMIN"],
-  financeTransactions: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
+  financeTransactions: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"],
   financeSalaries: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   operationsTasks: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
   reports: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"],
-  settingsSecurity: ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"]
+  settingsSecurity: [
+    "OWNER",
+    "SYS_ADMIN",
+    "ACCOUNTANT",
+    "SUPERVISOR",
+    "EMPLOYEE",
+    "HARDWARE_OPERATOR",
+    "HYDROCARBON_OPERATOR",
+    "BEVERAGE_DEPOT_OPERATOR"
+  ]
 };
 
 const NAVIGATION_ITEMS: NavigationItem[] = [
@@ -110,5 +126,8 @@ export function getNavigationForRole(role: RoleCode): NavigationItem[] {
 }
 
 export function getDefaultRouteForRole(role: RoleCode): string {
+  if (role === "HARDWARE_OPERATOR" || role === "HYDROCARBON_OPERATOR" || role === "BEVERAGE_DEPOT_OPERATOR") {
+    return "/finance/transactions";
+  }
   return getNavigationForRole(role)[0]?.to ?? "/dashboard";
 }

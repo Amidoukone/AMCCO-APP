@@ -15,6 +15,7 @@ import {
 import { ApiError, listCompanyActivitiesRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import type { BusinessActivityProfile, CompanyActivityItem } from "../types/activities";
+import { getRoleActivityCode } from "../types/role";
 import { useAuth } from "./AuthContext";
 
 type BusinessActivityContextValue = {
@@ -62,6 +63,7 @@ function toErrorMessage(error: unknown): string {
 
 export function BusinessActivityProvider({ children }: { children: ReactNode }): JSX.Element {
   const { activeCompany, user } = useAuth();
+  const restrictedActivityCode = user ? getRoleActivityCode(user.role) : null;
   const activeCompanyId = activeCompany?.id;
   const [activities, setActivities] = useState<CompanyActivityItem[]>([]);
   const [profiles, setProfiles] = useState<BusinessActivityProfile[]>([]);
@@ -83,6 +85,11 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       const persistedCode = readPersistedActivityCode(activeCompany.id);
 
       setSelectedActivityCodeState((currentCode) => {
+        if (restrictedActivityCode) {
+          const scopedCode = enabledItems.find((item) => item.code === restrictedActivityCode)?.code ?? null;
+          persistActivityCode(activeCompany.id, scopedCode);
+          return scopedCode;
+        }
         const nextSelectedCode =
           enabledItems.find((item) => item.code === currentCode)?.code ??
           enabledItems.find((item) => item.code === persistedCode)?.code ??
@@ -93,7 +100,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
         return nextSelectedCode;
       });
     },
-    [activeCompany?.id]
+    [activeCompany?.id, restrictedActivityCode]
   );
 
   const reloadActivities = useCallback(async () => {
@@ -135,12 +142,13 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
 
   const setSelectedActivityCode = useCallback(
     (activityCode: BusinessActivityCode | null) => {
+      if (restrictedActivityCode && activityCode !== restrictedActivityCode) return;
       setSelectedActivityCodeState(activityCode);
       if (activeCompany?.id) {
         persistActivityCode(activeCompany.id, activityCode);
       }
     },
-    [activeCompany?.id]
+    [activeCompany?.id, restrictedActivityCode]
   );
 
   const applyActivityUpdate = useCallback(

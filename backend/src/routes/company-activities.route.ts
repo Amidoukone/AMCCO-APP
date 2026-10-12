@@ -14,6 +14,7 @@ import {
   reclassifyLegacyCompanyData,
   updateCompanyActivityState
 } from "../services/company-activities.service.js";
+import { getRoleActivityCode } from "../types/role.js";
 
 const activityCodeParamSchema = z.object({
   activityCode: z.enum(BUSINESS_ACTIVITY_CODES)
@@ -43,6 +44,11 @@ companyActivitiesRouter.get(
       throw new HttpError(401, "Authentification requise.");
     }
     const payload = await listAvailableCompanyActivities(req.auth.companyId);
+    const sectorCode = getRoleActivityCode(req.auth.role);
+    if (sectorCode) {
+      payload.items = payload.items.filter((item) => item.code === sectorCode);
+      payload.profiles = payload.profiles.filter((profile) => profile.activityCode === sectorCode);
+    }
     res.status(200).json(payload);
   })
 );

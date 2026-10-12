@@ -13,6 +13,7 @@ import {
   findSalaryTransactionByEmployeeAndPeriod,
   findTransactionById,
   listSalaryTransactions,
+  listFinancialAccounts,
   reviewTransaction,
   submitTransaction,
   updateFinancialAccount,
@@ -34,6 +35,7 @@ import {
   exportCompanySalaryCsv,
   getCompanySalarySummary,
   listCompanySalaryMembers,
+  listCompanyAccounts,
   reviewCompanyTransaction,
   submitCompanyTransaction,
   updateCompanyAccount,
@@ -92,6 +94,23 @@ describe("finance.service", () => {
     vi.clearAllMocks();
     vi.mocked(ensureCompanyActivityEnabledOrThrow).mockResolvedValue(undefined);
     vi.mocked(listCompanyUsers).mockResolvedValue([]);
+  });
+
+  it("limits beverage depot operator account choices to the beverage depot sector", async () => {
+    vi.mocked(listFinancialAccounts).mockResolvedValue([]);
+
+    await listCompanyAccounts({
+      companyId: actor.companyId,
+      activityCode: "HYDROCARBON",
+      role: "BEVERAGE_DEPOT_OPERATOR"
+    });
+
+    expect(listFinancialAccounts).toHaveBeenCalledWith({
+      companyId: actor.companyId,
+      activityCode: "BEVERAGE_DEPOT",
+      role: "BEVERAGE_DEPOT_OPERATOR",
+      sectorOnly: true
+    });
   });
 
   it("loads salary members with the active-user filter delegated to the repository", async () => {
@@ -1522,6 +1541,68 @@ describe("finance.service", () => {
       expect(createFinancialTransaction).not.toHaveBeenCalled();
     });
 
+    it("rejects a sector operator transaction for a different activity before account lookup", async () => {
+      await expect(createCompanyTransaction(
+        { ...actor, role: "HARDWARE_OPERATOR" },
+        {
+          accountId: "account-1",
+          type: "CASH_IN",
+          amount: "1000.00",
+          currency: "XOF",
+          activityCode: "HYDROCARBON"
+        }
+      )).rejects.toMatchObject<HttpError>({ statusCode: 403 });
+
+      expect(findFinancialAccountById).not.toHaveBeenCalled();
+      expect(createFinancialTransaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects a beverage depot operator transaction for a different activity before account lookup", async () => {
+      await expect(createCompanyTransaction(
+        { ...actor, role: "BEVERAGE_DEPOT_OPERATOR" },
+        {
+          accountId: "account-1",
+          type: "CASH_IN",
+          amount: "1000.00",
+          currency: "XOF",
+          activityCode: "HYDROCARBON"
+        }
+      )).rejects.toMatchObject<HttpError>({ statusCode: 403 });
+
+      expect(findFinancialAccountById).not.toHaveBeenCalled();
+      expect(createFinancialTransaction).not.toHaveBeenCalled();
+    });
+
+    it("does not let a sector operator record transactions through a global account", async () => {
+      vi.mocked(findFinancialAccountById).mockResolvedValue({
+        id: "account-global",
+        companyId: actor.companyId,
+        name: "Caisse générale",
+        accountRef: null,
+        balance: "100000.00",
+        scopeType: "GLOBAL",
+        primaryActivityCode: null,
+        allowedActivityCodes: [],
+        createdAt: "2026-04-20T08:00:00.000Z"
+      });
+
+      await expect(createCompanyTransaction(
+        { ...actor, role: "HARDWARE_OPERATOR" },
+        {
+          accountId: "account-global",
+          type: "CASH_IN",
+          amount: "1000.00",
+          currency: "XOF",
+          activityCode: "HARDWARE"
+        }
+      )).rejects.toMatchObject<HttpError>({
+        statusCode: 403,
+        message: "Utilisez un compte financier dédié à votre secteur."
+      });
+
+      expect(createFinancialTransaction).not.toHaveBeenCalled();
+    });
+
     it("rejects a mining transaction without business description", async () => {
       vi.mocked(findFinancialAccountById).mockResolvedValue({
         id: "account-1",
@@ -1584,6 +1665,127 @@ describe("finance.service", () => {
   });
 
   describe("updateCompanyTransaction", () => {
+    it("allows a beverage operator to update their own transaction without leaving the sector", async () => {
+      const existing = {
+        id: "beverage-txn-operator",
+        companyId: actor.companyId,
+        accountId: "beverage-account",
+        accountName: "Caisse boissons",
+        accountRef: null,
+        accountScopeType: "DEDICATED",
+        accountPrimaryActivityCode: "BEVERAGE_DEPOT",
+        accountAllowedActivityCodes: ["BEVERAGE_DEPOT"],
+        type: "CASH_OUT",
+        amount: "5000.00",
+        currency: "XOF",
+        activityCode: "BEVERAGE_DEPOT",
+        description: "Carburant",
+        metadata: { beverageOperationKind: "DEPENSE", expenseCategory: "Carburant" },
+        status: "APPROVED",
+        requiresProof: false,
+        createdById: "operator-1",
+        createdByEmail: "operator@example.com",
+        validatedById: "operator-1",
+        validatedByEmail: "operator@example.com",
+        salaryConfirmationStatus: "NOT_REQUIRED",
+        salaryConfirmedById: null,
+        salaryConfirmedByEmail: null,
+        salaryConfirmedAt: null,
+        occurredAt: "2026-10-12T08:00:00.000Z",
+        createdAt: "2026-10-12T08:00:00.000Z",
+        updatedAt: "2026-10-12T08:00:00.000Z",
+        proofsCount: 0
+      };
+      const updated = {
+        ...existing,
+        amount: "7000.00",
+        status: "DRAFT",
+        description: "Carburant journée",
+        updatedAt: "2026-10-12T09:00:00.000Z"
+      };
+      vi.mocked(findFinancialTransactionById)
+        .mockResolvedValueOnce(existing as never)
+        .mockResolvedValue(updated as never);
+      vi.mocked(findFinancialAccountById).mockResolvedValue({
+        id: "beverage-account",
+        companyId: actor.companyId,
+        name: "Caisse boissons",
+        accountRef: null,
+        balance: "10000.00",
+        scopeType: "DEDICATED",
+        primaryActivityCode: "BEVERAGE_DEPOT",
+        allowedActivityCodes: ["BEVERAGE_DEPOT"],
+        createdAt: "2026-10-12T08:00:00.000Z"
+      });
+      vi.mocked(findMembershipByCompanyAndUser).mockResolvedValue(null);
+
+      const result = await updateCompanyTransaction(
+        {
+          actorId: "operator-1",
+          companyId: actor.companyId,
+          role: "BEVERAGE_DEPOT_OPERATOR"
+        },
+        {
+          transactionId: existing.id,
+          accountId: "beverage-account",
+          type: "CASH_OUT",
+          amount: "7000.00",
+          currency: "XOF",
+          activityCode: "BEVERAGE_DEPOT",
+          description: "Carburant journée",
+          metadata: { beverageOperationKind: "DEPENSE", expenseCategory: "Carburant" },
+          occurredAt: "2026-10-12T09:00:00.000Z"
+        }
+      );
+
+      expect(updateFinancialTransaction).toHaveBeenCalledWith(expect.objectContaining({
+        transactionId: existing.id,
+        activityCode: "BEVERAGE_DEPOT",
+        accountId: "beverage-account",
+        amount: "7000.00"
+      }));
+      expect(result.createdById).toBe("operator-1");
+      expect(reviewTransaction).toHaveBeenCalledWith(expect.objectContaining({
+        transactionId: existing.id,
+        status: "APPROVED"
+      }));
+    });
+
+    it("rejects an operator edit that changes the transaction to another sector", async () => {
+      vi.mocked(findFinancialTransactionById).mockResolvedValueOnce({
+        id: "beverage-txn-operator",
+        companyId: actor.companyId,
+        accountId: "beverage-account",
+        type: "CASH_OUT",
+        amount: "5000.00",
+        currency: "XOF",
+        activityCode: "BEVERAGE_DEPOT",
+        metadata: { beverageOperationKind: "DEPENSE", expenseCategory: "Carburant" },
+        status: "APPROVED",
+        requiresProof: false,
+        createdById: "operator-1"
+      } as never);
+
+      await expect(updateCompanyTransaction(
+        {
+          actorId: "operator-1",
+          companyId: actor.companyId,
+          role: "BEVERAGE_DEPOT_OPERATOR"
+        },
+        {
+          transactionId: "beverage-txn-operator",
+          accountId: "hydrocarbon-account",
+          type: "CASH_OUT",
+          amount: "5000.00",
+          currency: "XOF",
+          activityCode: "HYDROCARBON"
+        }
+      )).rejects.toMatchObject<HttpError>({ statusCode: 403 });
+
+      expect(findFinancialAccountById).not.toHaveBeenCalled();
+      expect(updateFinancialTransaction).not.toHaveBeenCalled();
+    });
+
     it("allows an accountant to update a non-approved transaction and resets the workflow to draft", async () => {
       vi.mocked(findFinancialTransactionById)
         .mockResolvedValueOnce({
@@ -1908,6 +2110,64 @@ describe("finance.service", () => {
   });
 
   describe("deleteCompanyTransaction", () => {
+    it("allows an operator to delete their own transaction in their sector", async () => {
+      vi.mocked(findFinancialTransactionById).mockResolvedValue({
+        id: "beverage-txn-delete",
+        companyId: actor.companyId,
+        accountId: "beverage-account",
+        accountName: "Caisse boissons",
+        accountRef: null,
+        accountScopeType: "DEDICATED",
+        accountPrimaryActivityCode: "BEVERAGE_DEPOT",
+        accountAllowedActivityCodes: ["BEVERAGE_DEPOT"],
+        type: "CASH_OUT",
+        amount: "5000.00",
+        currency: "XOF",
+        activityCode: "BEVERAGE_DEPOT",
+        description: "Carburant",
+        metadata: { beverageOperationKind: "DEPENSE", expenseCategory: "Carburant" },
+        status: "APPROVED",
+        requiresProof: false,
+        createdById: "operator-1",
+        createdByEmail: "operator@example.com",
+        validatedById: "operator-1",
+        validatedByEmail: "operator@example.com",
+        salaryConfirmationStatus: "NOT_REQUIRED",
+        salaryConfirmedById: null,
+        salaryConfirmedByEmail: null,
+        salaryConfirmedAt: null,
+        occurredAt: "2026-10-12T08:00:00.000Z",
+        createdAt: "2026-10-12T08:00:00.000Z",
+        updatedAt: "2026-10-12T08:00:00.000Z",
+        proofsCount: 0
+      });
+      vi.mocked(findFinancialAccountById).mockResolvedValue({
+        id: "beverage-account",
+        companyId: actor.companyId,
+        name: "Caisse boissons",
+        accountRef: null,
+        balance: "10000.00",
+        scopeType: "DEDICATED",
+        primaryActivityCode: "BEVERAGE_DEPOT",
+        allowedActivityCodes: ["BEVERAGE_DEPOT"],
+        createdAt: "2026-10-12T08:00:00.000Z"
+      });
+
+      await deleteCompanyTransaction(
+        {
+          actorId: "operator-1",
+          companyId: actor.companyId,
+          role: "BEVERAGE_DEPOT_OPERATOR"
+        },
+        { transactionId: "beverage-txn-delete" }
+      );
+
+      expect(deleteFinancialTransaction).toHaveBeenCalledWith({
+        companyId: actor.companyId,
+        transactionId: "beverage-txn-delete"
+      });
+    });
+
     it("allows an accountant to delete a non-approved transaction", async () => {
       vi.mocked(findFinancialTransactionById).mockResolvedValue({
         id: "txn-4",
@@ -2203,6 +2463,74 @@ describe("finance.service", () => {
         message: "Permissions insuffisantes pour créer un compte financier."
       });
       expect(createFinancialAccount).not.toHaveBeenCalled();
+    });
+
+    it("creates a dedicated account for a sector operator", async () => {
+      vi.mocked(findFinancialAccountById).mockResolvedValue({
+        id: "hardware-account",
+        companyId: actor.companyId,
+        name: "Caisse Quincaillerie",
+        accountRef: null,
+        balance: "0.00",
+        scopeType: "DEDICATED",
+        primaryActivityCode: "HARDWARE",
+        allowedActivityCodes: ["HARDWARE"],
+        createdAt: "2026-10-12T08:00:00.000Z"
+      });
+
+      const result = await createCompanyAccount(
+        { ...actor, role: "SYS_ADMIN" },
+        {
+          name: "Caisse Quincaillerie",
+          scopeType: "DEDICATED",
+          primaryActivityCode: "HARDWARE"
+        }
+      );
+
+      expect(createFinancialAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          companyId: actor.companyId,
+          name: "Caisse Quincaillerie",
+          scopeType: "DEDICATED",
+          primaryActivityCode: "HARDWARE",
+          allowedActivityCodes: ["HARDWARE"]
+        })
+      );
+      expect(result.primaryActivityCode).toBe("HARDWARE");
+    });
+
+    it("creates a dedicated beverage depot account for operator transactions", async () => {
+      vi.mocked(findFinancialAccountById).mockResolvedValue({
+        id: "beverage-account",
+        companyId: actor.companyId,
+        name: "Caisse Dépôt boissons",
+        accountRef: null,
+        balance: "0.00",
+        scopeType: "DEDICATED",
+        primaryActivityCode: "BEVERAGE_DEPOT",
+        allowedActivityCodes: ["BEVERAGE_DEPOT"],
+        createdAt: "2026-10-12T08:00:00.000Z"
+      });
+
+      const result = await createCompanyAccount(
+        { ...actor, role: "SYS_ADMIN" },
+        {
+          name: "Caisse Dépôt boissons",
+          scopeType: "DEDICATED",
+          primaryActivityCode: "BEVERAGE_DEPOT"
+        }
+      );
+
+      expect(createFinancialAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          companyId: actor.companyId,
+          name: "Caisse Dépôt boissons",
+          scopeType: "DEDICATED",
+          primaryActivityCode: "BEVERAGE_DEPOT",
+          allowedActivityCodes: ["BEVERAGE_DEPOT"]
+        })
+      );
+      expect(result.primaryActivityCode).toBe("BEVERAGE_DEPOT");
     });
 
     it("creates a restricted account with allowed activities", async () => {

@@ -451,7 +451,7 @@ export function AppLayout(): JSX.Element {
     }
   }
 
-  async function handleMobileLogout(): Promise<void> {
+  async function handleLogout(): Promise<void> {
     await logout();
     setIsMobileMenuOpen(false);
     navigate("/login", { replace: true });
@@ -756,7 +756,7 @@ export function AppLayout(): JSX.Element {
                 <button
                   type="button"
                   className="secondary-btn mobile-menu-logout"
-                  onClick={() => void handleMobileLogout()}
+                  onClick={() => void handleLogout()}
                 >
                   Se déconnecter
                 </button>

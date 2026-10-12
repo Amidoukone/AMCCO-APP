@@ -671,6 +671,10 @@ describe("reporting.service", () => {
     const pdfText = extractPdfText(pdf);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdfText).toContain("HYDROCARBURES");
+    expect(pdfText).not.toContain("STATUT");
+    expect(pdfText).not.toContain("Transactions");
+    expect(pdfText).not.toContain("Tâches terminées");
+    expect(pdfText).not.toContain("À faire / en cours");
     expect(pdfText).toContain("Synthèse financière par devise");
     expect(pdfText).toContain("75 000 F CFA");
     expect(pdfText).toContain("250,5 EUR");
@@ -698,7 +702,7 @@ describe("reporting.service", () => {
     expect(emptyPdfText).toContain("Aucune action enregistrée sur la période sélectionnée.");
 
     vi.mocked(listReportOperationalTransactions).mockResolvedValue(
-      Array.from({ length: 50 }, (_, index) => ({
+      Array.from({ length: 100 }, (_, index) => ({
         activityCode: "HYDROCARBON" as const,
         status: "APPROVED" as const,
         type: index % 2 === 0 ? "CASH_IN" as const : "CASH_OUT" as const,
@@ -722,8 +726,8 @@ describe("reporting.service", () => {
     const longPdf = await exportCompanyReportsPdf(actor, filters);
     const longPdfText = extractPdfText(longPdf);
     expect(longPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
-    expect(longPdfText).toContain("Flux financiers détaillés (50 ligne(s)) (suite)");
-    expect(longPdfText).toContain("Opération test hydrocarbure 50");
+    expect(longPdfText).toContain("Flux financiers détaillés (100 ligne(s)) (suite)");
+    expect(longPdfText).toContain("Opération test hydrocarbure 100");
     expect(longPdfText).toContain("Actions détaillées (40 ligne(s)) (suite)");
     expect(longPdfText).toContain("Action test hydrocarbure 40");
   });
@@ -1220,6 +1224,7 @@ describe("reporting.service", () => {
     vi.mocked(listReportOperationalTransactions).mockResolvedValue([
       {
         activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_IN", amount: "60000.00", currency: "XOF",
+        description: "Vente opérateur compte dédié",
         occurredAt: "2026-09-05T10:00:00.000Z", metadata: {
           beverageOperationKind: "VENTE", productName: "Boisson gazeuse", quantity: "12",
           purchaseUnitPrice: "4500", saleUnitPrice: "5000"
@@ -1270,6 +1275,9 @@ describe("reporting.service", () => {
       reconciliations: [expect.objectContaining({ dailySales: "60000.00", dailyDeposits: "45000.00", dailyBalance: "15000.00", dailyExpenses: "8000.00" })]
     });
     expect(overview.beverageDepotReport?.inventory).toHaveLength(3);
+    expect(overview.beverageDepotReport?.transactions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ description: "Vente opérateur compte dédié", category: "VENTE" })])
+    );
     expect(overview.operationalPerformance).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1320,6 +1328,7 @@ describe("reporting.service", () => {
     expect(extractedPdfText).toContain("dernier inventaire clôturé sur la période");
     expect(extractedPdfText).not.toContain("105 000 F CFA");
     expect(extractedPdfText).toContain("Boisson gazeuse");
+    expect(extractedPdfText).toContain("Vente opérateur compte dédié");
     expect(extractedPdfText).toContain("Inventaire hors caisse");
     expect(extractedPdfText).toContain("Rapprochement journalier");
 

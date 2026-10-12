@@ -4,12 +4,14 @@ import { hashPassword } from "../lib/password.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import {
   countOwnersInCompany,
+  countMembershipsForUser,
   createMembershipIfMissing,
   createMembership,
   createUser,
   deleteMembership,
   findMembershipByCompanyAndUser,
   findUserByEmail,
+  hasSectorOperatorMembership,
   listCompanyUsers,
   revokeRefreshSessionsForUserInCompany,
   updateMembershipRole,
@@ -18,6 +20,7 @@ import {
 } from "../repositories/admin-users.repository.js";
 import { listAllCompanyIds } from "../repositories/companies.repository.js";
 import type { RoleCode } from "../types/role.js";
+import { getRoleActivityCode } from "../types/role.js";
 
 type ActorContext = {
   actorId: string;
@@ -49,6 +52,12 @@ export async function createCompanyUser(
   const fullName = input.fullName.trim();
 
   const existingUser = await findUserByEmail(email);
+  if (existingUser && getRoleActivityCode(input.role)) {
+    throw new HttpError(409, "Un compte sectoriel doit utiliser une adresse e-mail dédiée.");
+  }
+  if (existingUser && await hasSectorOperatorMembership(existingUser.userId)) {
+    throw new HttpError(409, "Un compte sectoriel ne peut pas être rattaché à une autre entreprise.");
+  }
   if (existingUser) {
     const existingMembership = await findMembershipByCompanyAndUser(actor.companyId, existingUser.userId);
     if (existingMembership) {
@@ -80,7 +89,7 @@ export async function createCompanyUser(
     });
   }
 
-  const companyIds = await listAllCompanyIds();
+  const companyIds = getRoleActivityCode(input.role) ? [actor.companyId] : await listAllCompanyIds();
   for (const companyId of companyIds) {
     if (companyId === actor.companyId) {
       try {
@@ -183,6 +192,12 @@ export async function changeCompanyUserRole(
   const membership = await findMembershipByCompanyAndUser(actor.companyId, input.userId);
   if (!membership) {
     throw new HttpError(404, "Rattachement utilisateur introuvable pour cette entreprise.");
+  }
+
+  if (getRoleActivityCode(input.role) && !getRoleActivityCode(membership.role)) {
+    if ((await countMembershipsForUser(input.userId)) > 1) {
+      throw new HttpError(400, "Un compte sectoriel doit être rattaché à une seule entreprise.");
+    }
   }
 
   if (membership.userId === actor.actorId && input.role !== membership.role) {

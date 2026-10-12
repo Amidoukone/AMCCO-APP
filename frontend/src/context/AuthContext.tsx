@@ -35,7 +35,7 @@ type AuthState = {
   getSession: () => SessionTokens | null;
   activeCompany: CompanyProfile | null;
   memberships: CompanyMembershipSummary[];
-  login: (input: LoginInput) => Promise<void>;
+  login: (input: LoginInput) => Promise<LoginUser>;
   refreshSession: () => Promise<string | null>;
   switchCompany: (companyId: string) => Promise<void>;
   applyCompanyUpdate: (company: CompanyProfile, role: RoleCode) => void;
@@ -132,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     };
     const me = response.me ?? await meRequest(response.accessToken);
     applyAuthenticatedState(baseTokens, me);
+    return toLoginUser(me);
   }, [applyAuthenticatedState]);
 
   const logout = useCallback(async () => {

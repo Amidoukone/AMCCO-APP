@@ -269,9 +269,39 @@ function toTransactionMinimal(row: TransactionMinimalRow): TransactionMinimal {
 export async function listFinancialAccounts(input: {
   companyId: string;
   activityCode?: BusinessActivityCode;
+  sectorOnly?: boolean;
 }): Promise<FinancialAccount[]> {
   const filters: string[] = ["fa.company_id = ?"];
-  const values: Array<string | number> = [input.companyId];
+  const filterValues: Array<string | number> = [];
+
+  if (input.activityCode) {
+    if (input.sectorOnly) {
+      filters.push(`(
+        (fa.scope_type = 'DEDICATED' AND fa.primary_activity_code = ?)
+        OR (fa.scope_type = 'RESTRICTED'
+          AND EXISTS (SELECT 1 FROM financial_account_activities faa WHERE faa.account_id = fa.id AND faa.activity_code = ?)
+          AND NOT EXISTS (SELECT 1 FROM financial_account_activities other_faa WHERE other_faa.account_id = fa.id AND other_faa.activity_code <> ?))
+      )`);
+      filterValues.push(input.activityCode, input.activityCode, input.activityCode);
+    } else {
+      filters.push(`(
+        fa.scope_type = 'GLOBAL'
+        OR (fa.scope_type = 'DEDICATED' AND fa.primary_activity_code = ?)
+        OR (fa.scope_type = 'RESTRICTED' AND EXISTS (
+          SELECT 1 FROM financial_account_activities faa
+          WHERE faa.account_id = fa.id AND faa.activity_code = ?
+        ))
+      )`);
+      filterValues.push(input.activityCode, input.activityCode);
+    }
+  }
+
+  const countActivityFilter = input.sectorOnly && input.activityCode ? "AND t.activity_code = ?" : "";
+  const values: Array<string | number> = [
+    ...(countActivityFilter ? [input.activityCode as BusinessActivityCode] : []),
+    input.companyId,
+    ...filterValues
+  ];
 
   const rows = await queryRows<AccountRow[]>(
     `
@@ -291,7 +321,7 @@ export async function listFinancialAccounts(input: {
         (
           SELECT COUNT(*)
           FROM transactions t
-          WHERE t.account_id = fa.id
+          WHERE t.account_id = fa.id ${countActivityFilter}
         ) AS transactionsCount,
         fa.created_at AS createdAt
       FROM financial_accounts fa

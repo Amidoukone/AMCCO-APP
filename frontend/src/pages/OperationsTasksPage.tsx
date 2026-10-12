@@ -1485,7 +1485,7 @@ export function OperationsTasksPage(): JSX.Element {
     if (canAssignTasks) {
       return true;
     }
-    return task.assignedToId === user?.id;
+    return task.assignedToId === user?.id || task.createdById === user?.id;
   }
 
   function taskMatchesCurrentList(task: OperationTask): boolean {

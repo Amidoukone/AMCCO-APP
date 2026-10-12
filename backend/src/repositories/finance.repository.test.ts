@@ -4,7 +4,7 @@ const { queryRowsMock } = vi.hoisted(() => ({ queryRowsMock: vi.fn() }));
 
 vi.mock("../lib/db.js", () => ({ queryRows: queryRowsMock }));
 
-import { getFinancialAccountsSummary } from "./finance.repository.js";
+import { getFinancialAccountsSummary, listFinancialAccounts } from "./finance.repository.js";
 
 describe("finance.repository", () => {
   beforeEach(() => {
@@ -70,5 +70,21 @@ describe("finance.repository", () => {
     });
 
     expect(queryRowsMock.mock.calls[0][1]).toEqual(["company-1"]);
+  });
+
+  it("limits a sector operator to dedicated accounts and sector-only counts", async () => {
+    queryRowsMock.mockResolvedValue([]);
+
+    await listFinancialAccounts({
+      companyId: "company-1",
+      activityCode: "HARDWARE",
+      sectorOnly: true
+    });
+
+    const [sql, values] = queryRowsMock.mock.calls[0] as [string, string[]];
+    expect(sql).toContain("fa.scope_type = 'DEDICATED'");
+    expect(sql).toContain("NOT EXISTS (SELECT 1 FROM financial_account_activities other_faa");
+    expect(sql).toContain("AND t.activity_code = ?");
+    expect(values).toEqual(["HARDWARE", "company-1", "HARDWARE", "HARDWARE", "HARDWARE"]);
   });
 });
