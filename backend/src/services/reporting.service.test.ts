@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { inflateSync } from "node:zlib";
+import * as XLSX from "xlsx";
 import {
   exportCompanyReportsPdf,
+  exportCompanyTransactionsExcel,
   exportCompanyTransactionsCsv,
   getCompanyDashboardSummary,
   getCompanyReportsOverview
@@ -1678,6 +1680,19 @@ describe("reporting.service", () => {
       },
       {
         activityCode: "GENERAL_STORE",
+        status: "SUBMITTED",
+        type: "CASH_IN",
+        amount: "2000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-25T09:00:00.000Z",
+        description: "Recouvrement en attente de validation",
+        metadata: {
+          storeOperationKind: "RECOUVREMENT",
+          shopRef: "Boutique Nord"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
         status: "APPROVED",
         type: "CASH_OUT",
         amount: "50000.00",
@@ -1687,6 +1702,45 @@ describe("reporting.service", () => {
           storeOperationKind: "ACHAT",
           shopRef: "Boutique Sud"
         }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "10000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-22T09:00:00.000Z",
+        description: "Réassort après inventaire",
+        metadata: {
+          storeOperationKind: "ACHAT",
+          shopRef: "Boutique Nord"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "APPROVED",
+        type: "CASH_IN",
+        amount: "5000.00",
+        currency: "XOF",
+        occurredAt: "2026-09-24T09:00:00.000Z",
+        description: "Versement complémentaire",
+        metadata: {
+          storeOperationKind: "RECOUVREMENT",
+          shopRef: "Boutique Nord"
+        }
+      },
+      {
+        activityCode: "GENERAL_STORE",
+        status: "APPROVED",
+        type: "CASH_OUT",
+        amount: "70000.00",
+        currency: "XOF",
+        occurredAt: "2026-10-02T09:00:00.000Z",
+        description: "Achat après la date de situation",
+        metadata: {
+          storeOperationKind: "ACHAT",
+          shopRef: "Boutique Nord"
+        }
       }
     ]);
     vi.mocked(listReportGeneralStoreInventorySnapshots).mockResolvedValue([
@@ -1694,6 +1748,11 @@ describe("reporting.service", () => {
         shopRef: "Boutique Nord",
         remainingStockValue: "30000.00",
         recordedAt: "2026-09-20T09:00:00.000Z"
+      },
+      {
+        shopRef: "Boutique Nord",
+        remainingStockValue: "10000.00",
+        recordedAt: "2026-10-08T09:00:00.000Z"
       }
     ]);
 
@@ -1706,9 +1765,10 @@ describe("reporting.service", () => {
     expect(result.generalStoreOperationsReport?.rows).toEqual([
       expect.objectContaining({
         shopRef: "Boutique Nord",
-        purchaseAmount: "100000.00",
-        collectedAmount: "40000.00",
-        balanceAmount: "60000.00",
+        purchaseAmount: "110000.00",
+        collectedAmount: "47000.00",
+        balanceAmount: "63000.00",
+        transactionsCount: 5,
         remainingStockValue: "30000.00",
         estimatedSoldAmount: "70000.00",
         varianceAmount: "30000.00",
@@ -1727,11 +1787,32 @@ describe("reporting.service", () => {
     ]);
     expect(result.generalStoreOperationsReport?.totals).toMatchObject({
       shopsCount: 2,
-      purchaseAmount: "150000.00",
-      collectedAmount: "40000.00",
-      balanceAmount: "110000.00",
-      transactionsCount: 3,
+      purchaseAmount: "160000.00",
+      collectedAmount: "47000.00",
+      balanceAmount: "113000.00",
+      transactionsCount: 6,
       currency: "XOF"
+    });
+    expect(result.generalStoreOperationsReport?.breakdownRows).toEqual([
+      expect.objectContaining({
+        operationKind: "ACHAT",
+        transactionsCount: 3,
+        amount: "160000.00"
+      }),
+      expect.objectContaining({
+        operationKind: "RECOUVREMENT",
+        transactionsCount: 3,
+        amount: "47000.00"
+      })
+    ]);
+    expect(result.generalStoreOperationsReport?.operationRows).toHaveLength(6);
+    expect(result.generalStoreOperationsReport?.operationRows[0]).toMatchObject({
+      date: "2026-09-25",
+      shopRef: "Boutique Nord",
+      operationKind: "RECOUVREMENT",
+      status: "SUBMITTED",
+      designation: "Recouvrement en attente de validation",
+      amount: "2000.00"
     });
 
     vi.mocked(listGeneralStoreShops).mockResolvedValue(
@@ -1756,6 +1837,31 @@ describe("reporting.service", () => {
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
     expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
+
+    vi.mocked(listTransactionsForExport).mockResolvedValue([]);
+    const workbookBuffer = await exportCompanyTransactionsExcel(actor, {
+      activityCode: "GENERAL_STORE",
+      dateFrom: "2026-09-01T00:00:00.000Z",
+      dateTo: "2026-09-30T23:59:59.999Z"
+    });
+    const workbook = XLSX.read(workbookBuffer, { type: "buffer" });
+    expect(workbook.SheetNames).toEqual(expect.arrayContaining([
+      "Magasins", "MagasinsMouvements", "MagasinsSynthese", "MagasinsLecture"
+    ]));
+    const movementRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      workbook.Sheets.MagasinsMouvements!
+    );
+    expect(movementRows).toHaveLength(6);
+    expect(movementRows[0]).toMatchObject({
+      shopRef: "Boutique Nord",
+      operationKind: "RECOUVREMENT",
+      status: "SUBMITTED",
+      amount: "2000.00"
+    });
+    const readingRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      workbook.Sheets.MagasinsLecture!
+    );
+    expect(readingRows[0]?.definition).toContain("soumises ou approuvées");
   });
 
   it("builds the food opérations report from product and batch metadata", async () => {

@@ -22,6 +22,7 @@ import {
   listCompanyTaskAssignees,
   listOperationsTasks,
   listTaskAttachments,
+  type OperationTask,
   type TaskAttachment,
   type TaskStatus,
   updateOperationTask,
@@ -236,26 +237,28 @@ export async function createCompanyTask(
     dueDate
   });
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "TASK_CREATED",
-    entityType: "TASK",
-    entityId: taskId,
-    metadataJson: JSON.stringify({
-      title: input.title.trim(),
-      activityCode: input.activityCode,
-      metadata,
-      assignedToId,
-      initialStatus,
-      dueDate: dueDate ? dueDate.toISOString() : null,
-      taskWorkflow: profile.tasks.workflow.map((step) => step.code)
+  const auditWrites: Promise<void>[] = [
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: "TASK_CREATED",
+      entityType: "TASK",
+      entityId: taskId,
+      metadataJson: JSON.stringify({
+        title: input.title.trim(),
+        activityCode: input.activityCode,
+        metadata,
+        assignedToId,
+        initialStatus,
+        dueDate: dueDate ? dueDate.toISOString() : null,
+        taskWorkflow: profile.tasks.workflow.map((step) => step.code)
+      })
     })
-  });
+  ];
 
   if (assignedToId) {
-    await createAuditLogRecord({
+    auditWrites.push(createAuditLogRecord({
       auditId: randomUUID(),
       companyId: actor.companyId,
       actorId: actor.actorId,
@@ -269,16 +272,20 @@ export async function createCompanyTask(
         previousStatus: "TODO",
         nextStatus: initialStatus
       })
-    });
+    }));
   }
 
-  const created = await findOperationTaskById(actor.companyId, taskId);
+  const [created] = await Promise.all([
+    findOperationTaskById(actor.companyId, taskId),
+    Promise.all(auditWrites)
+  ]);
   if (!created) {
     throw new HttpError(500, "Impossible de recharger la tâche créée.");
   }
 
+  const notificationWrites: Promise<void>[] = [];
   if (assignedToId && assignedToId !== actor.actorId) {
-    await createUserTargetedAlerts({
+    notificationWrites.push(createUserTargetedAlerts({
       companyId: actor.companyId,
       recipientUserIds: [assignedToId],
       code: "TASK_ASSIGNED",
@@ -290,11 +297,11 @@ export async function createCompanyTask(
         taskId: created.id,
         title: created.title
       }
-    });
+    }));
   }
 
   if (actor.role === "EMPLOYEE") {
-    await createRoleTargetedAlerts({
+    notificationWrites.push(createRoleTargetedAlerts({
       companyId: actor.companyId,
       recipientRoles: ["SUPERVISOR"],
       excludeUserIds: [actor.actorId],
@@ -308,8 +315,9 @@ export async function createCompanyTask(
         title: created.title,
         createdById: created.createdById
       }
-    });
+    }));
   }
+  await Promise.all(notificationWrites);
 
   return created;
 }
@@ -382,23 +390,24 @@ export async function assignCompanyTask(
     status: nextStatus
   });
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: nextAssignedToId ? "TASK_ASSIGNED" : "TASK_UNASSIGNED",
-    entityType: "TASK",
-    entityId: task.id,
-    metadataJson: JSON.stringify({
-      previousAssignedToId: task.assignedToId,
-      nextAssignedToId,
-      note: input.note?.trim() || null,
-      previousStatus,
-      nextStatus
+  const [updated] = await Promise.all([
+    findOperationTaskById(actor.companyId, task.id),
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: nextAssignedToId ? "TASK_ASSIGNED" : "TASK_UNASSIGNED",
+      entityType: "TASK",
+      entityId: task.id,
+      metadataJson: JSON.stringify({
+        previousAssignedToId: task.assignedToId,
+        nextAssignedToId,
+        note: input.note?.trim() || null,
+        previousStatus,
+        nextStatus
+      })
     })
-  });
-
-  const updated = await findOperationTaskById(actor.companyId, task.id);
+  ]);
   if (!updated) {
     throw new HttpError(500, "Impossible de recharger la tâche mise à jour.");
   }
@@ -536,26 +545,28 @@ export async function updateCompanyTask(
     dueDate
   });
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "TASK_UPDATED",
-    entityType: "TASK",
-    entityId: existing.id,
-    metadataJson: JSON.stringify({
-      previousTitle: existing.title,
-      nextTitle: title,
-      previousDescription: existing.description,
-      nextDescription: input.description?.trim() || null,
-      previousDueDate: existing.dueDate,
-      nextDueDate: dueDate ? dueDate.toISOString() : null,
-      previousMetadata: existing.metadata,
-      nextMetadata: metadata
+  const [updated] = await Promise.all([
+    findOperationTaskById(actor.companyId, existing.id),
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: "TASK_UPDATED",
+      entityType: "TASK",
+      entityId: existing.id,
+      metadataJson: JSON.stringify({
+        previousTitle: existing.title,
+        nextTitle: title,
+        previousDescription: existing.description,
+        nextDescription: input.description?.trim() || null,
+        previousDueDate: existing.dueDate,
+        nextDueDate: dueDate ? dueDate.toISOString() : null,
+        previousMetadata: existing.metadata,
+        nextMetadata: metadata
+      })
     })
-  });
+  ]);
 
-  const updated = await findOperationTaskById(actor.companyId, existing.id);
   if (!updated) {
     throw new HttpError(500, "Impossible de recharger la tâche modifiée.");
   }
@@ -637,6 +648,7 @@ export async function updateCompanyTaskStatus(
 
   const profile = task.activityCode ? getBusinessActivityProfile(task.activityCode) : null;
 
+  let updated: OperationTask | null;
   if (task.status !== input.status) {
     await updateOperationTaskStatus({
       companyId: actor.companyId,
@@ -644,23 +656,27 @@ export async function updateCompanyTaskStatus(
       status: input.status
     });
 
-    await createAuditLogRecord({
-      auditId: randomUUID(),
-      companyId: actor.companyId,
-      actorId: actor.actorId,
-      action: "TASK_STATUS_CHANGED",
-      entityType: "TASK",
-      entityId: task.id,
-      metadataJson: JSON.stringify({
-        previousStatus: task.status,
-        nextStatus: input.status,
-        activityCode: task.activityCode,
-        taskWorkflow: profile?.tasks.workflow.map((step) => step.code) ?? []
+    [updated] = await Promise.all([
+      findOperationTaskById(actor.companyId, task.id),
+      createAuditLogRecord({
+        auditId: randomUUID(),
+        companyId: actor.companyId,
+        actorId: actor.actorId,
+        action: "TASK_STATUS_CHANGED",
+        entityType: "TASK",
+        entityId: task.id,
+        metadataJson: JSON.stringify({
+          previousStatus: task.status,
+          nextStatus: input.status,
+          activityCode: task.activityCode,
+          taskWorkflow: profile?.tasks.workflow.map((step) => step.code) ?? []
+        })
       })
-    });
+    ]);
+  } else {
+    updated = await findOperationTaskById(actor.companyId, task.id);
   }
 
-  const updated = await findOperationTaskById(actor.companyId, task.id);
   if (!updated) {
     throw new HttpError(500, "Impossible de recharger la tâche après changement de statut.");
   }

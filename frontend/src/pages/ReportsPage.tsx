@@ -970,6 +970,8 @@ export function ReportsPage(): JSX.Element {
           >
             <summary>Rentabilité et activité</summary>
 
+          {isReportDetailsExpanded ? (
+            <>
           {!hasFocusedOperationsReport ? (
             <>
           {!overview.hardwareMonthlyReport ? (
@@ -1379,8 +1381,8 @@ export function ReportsPage(): JSX.Element {
                 <div>
                   <h3>Rapport magasins</h3>
                   <p className="hint">
-                    {overview.generalStoreOperationsReport.periodLabel} | situation des boutiques
-                    au {overview.generalStoreOperationsReport.asOfLabel}.
+                    Situation cumulée au {overview.generalStoreOperationsReport.asOfLabel} | tous les
+                    mouvements jusqu'à cette date sont inclus.
                   </p>
                 </div>
               </div>
@@ -1425,12 +1427,14 @@ export function ReportsPage(): JSX.Element {
                   <thead>
                     <tr>
                       <th>Boutique</th>
+                      <th>Lieu</th>
+                      <th>Opérations</th>
                       <th>Total achats</th>
                       <th>Total recouvré</th>
                       <th>Solde dû</th>
                       <th>Stock restant</th>
-                      <th>Vendu estimé</th>
-                      <th>Écart</th>
+                      <th>Vendu estimé*</th>
+                      <th>Écart*</th>
                       <th>Dernier inventaire</th>
                       <th>Dernière opération</th>
                     </tr>
@@ -1438,29 +1442,31 @@ export function ReportsPage(): JSX.Element {
                   <tbody>
                     {overview.generalStoreOperationsReport.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={9}>
-                          Aucune boutique alimentée sur la période filtrée.
+                        <td colSpan={11}>
+                          Aucune boutique suivie à cette date de situation.
                         </td>
                       </tr>
                     ) : (
                       overview.generalStoreOperationsReport.rows.map((row) => (
                         <tr key={row.shopRef}>
                           <td>{row.shopRef}</td>
+                          <td>{row.location || "-"}</td>
+                          <td>{formatCount(row.transactionsCount)}</td>
                           <td>{formatAmount(row.purchaseAmount, row.currency)}</td>
                           <td>{formatAmount(row.collectedAmount, row.currency)}</td>
                           <td>{formatAmount(row.balanceAmount, row.currency)}</td>
                           <td>
-                            {row.remainingStockValue
+                            {row.remainingStockValue !== null
                               ? formatAmount(row.remainingStockValue, row.currency)
                               : "-"}
                           </td>
                           <td>
-                            {row.estimatedSoldAmount
+                            {row.estimatedSoldAmount !== null
                               ? formatAmount(row.estimatedSoldAmount, row.currency)
                               : "-"}
                           </td>
                           <td>
-                            {row.varianceAmount ? formatAmount(row.varianceAmount, row.currency) : "-"}
+                            {row.varianceAmount !== null ? formatAmount(row.varianceAmount, row.currency) : "-"}
                           </td>
                           <td>
                             {row.lastInventoryDate
@@ -1479,6 +1485,8 @@ export function ReportsPage(): JSX.Element {
                   <tfoot>
                     <tr>
                       <th>TOTAL</th>
+                      <th />
+                      <th>{formatCount(overview.generalStoreOperationsReport.totals.transactionsCount)}</th>
                       <th>
                         {formatAmount(
                           overview.generalStoreOperationsReport.totals.purchaseAmount,
@@ -1507,10 +1515,53 @@ export function ReportsPage(): JSX.Element {
                 </table>
               </div>
               <p className="hint">
-                Vendu estimé = achats livrés moins stock restant déclaré au dernier inventaire. Écart
-                = vendu estimé moins total recouvré : un écart positif signale un montant encore
-                attendu ou une perte de stock.
+                Situation cumulée au {overview.generalStoreOperationsReport.asOfLabel}. Solde dû = achats
+                livrés moins recouvrements enregistrés. Les montants incluent les opérations soumises et
+                approuvées; le statut est indiqué dans le détail. Vendu estimé et écart sont calculés à la date du
+                dernier inventaire : achats jusqu'à cette date moins le stock restant, puis comparaison
+                aux recouvrements constatés à cette même date. Cet indicateur doit être rapproché des ventes
+                réelles; il suppose un stock initial nul ou déjà intégré et peut aussi refléter un stock
+                manquant.
               </p>
+              <div className="reports-data-grid">
+                <article className="reports-table-panel">
+                  <div className="reports-table-header">
+                    <h4>Répartition des mouvements</h4>
+                    <span>{formatCount(overview.generalStoreOperationsReport.totals.transactionsCount)} opération(s)</span>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="admin-table">
+                      <thead><tr><th>Nature</th><th>Lignes</th><th>Montant</th></tr></thead>
+                      <tbody>
+                        {overview.generalStoreOperationsReport.breakdownRows.map((row) => (
+                          <tr key={row.operationKind}>
+                            <td>{row.operationLabel}</td>
+                            <td>{formatCount(row.transactionsCount)}</td>
+                            <td>{formatAmount(row.amount, row.currency)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </div>
+              <div className="table-wrap">
+                <table className="admin-table">
+                  <thead><tr><th>Date</th><th>Boutique</th><th>Nature</th><th>Statut</th><th>Désignation / motif</th><th>Montant</th></tr></thead>
+                  <tbody>
+                    {overview.generalStoreOperationsReport.operationRows.length === 0 ? (
+                      <tr><td colSpan={6}>Aucun mouvement enregistré à la date de situation.</td></tr>
+                    ) : overview.generalStoreOperationsReport.operationRows.map((row, index) => (
+                      <tr key={`${row.date}-${row.shopRef}-${row.operationKind}-${index}`}>
+                        <td>{row.date}</td><td>{row.shopRef}</td>
+                        <td>{row.operationKind === "ACHAT" ? "Achat" : "Recouvrement"}</td>
+                        <td>{row.status === "APPROVED" ? "Approuvée" : "Soumise"}</td>
+                        <td>{row.designation}</td><td>{formatAmount(row.amount, row.currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           ) : null}
 
@@ -3473,6 +3524,8 @@ export function ReportsPage(): JSX.Element {
 
           {selectedActivityCode !== "HARDWARE" && !hasFocusedOperationsReport ? (
             <ReportReadingGuidePanel />
+          ) : null}
+            </>
           ) : null}
           </details>
           </div>

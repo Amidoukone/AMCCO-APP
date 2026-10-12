@@ -311,45 +311,103 @@ export function AppLayout(): JSX.Element {
     let animationFrameId = 0;
     let scanAllTables = false;
     const pendingTableWrappers = new Set<HTMLElement>();
-    const scheduleEnhancement = (wrappers?: Iterable<HTMLElement>): void => {
+    const pendingRowsByWrapper = new Map<HTMLElement, Set<HTMLTableRowElement> | null>();
+    const scheduleEnhancement = (
+      wrappers?: Iterable<HTMLElement>,
+      rowsByWrapper?: Map<HTMLElement, Set<HTMLTableRowElement> | null>
+    ): void => {
       if (!wrappers) {
         scanAllTables = true;
       } else {
-        for (const wrapper of wrappers) pendingTableWrappers.add(wrapper);
+        for (const wrapper of wrappers) {
+          pendingTableWrappers.add(wrapper);
+          if (!rowsByWrapper || !rowsByWrapper.has(wrapper)) {
+            pendingRowsByWrapper.set(wrapper, null);
+            continue;
+          }
+
+          const incomingRows = rowsByWrapper.get(wrapper);
+          const existingRows = pendingRowsByWrapper.get(wrapper);
+          if (incomingRows === null || existingRows === null) {
+            pendingRowsByWrapper.set(wrapper, null);
+          } else {
+            const combinedRows = existingRows ?? new Set<HTMLTableRowElement>();
+            incomingRows?.forEach((row) => combinedRows.add(row));
+            pendingRowsByWrapper.set(wrapper, combinedRows);
+          }
+        }
       }
       window.cancelAnimationFrame(animationFrameId);
       animationFrameId = window.requestAnimationFrame(() => {
         if (scanAllTables) {
           scanAllTables = false;
           pendingTableWrappers.clear();
+          pendingRowsByWrapper.clear();
           enhanceMobileTables(root);
           return;
         }
         const wrappersToEnhance = Array.from(pendingTableWrappers);
+        const rowsToEnhance = new Map(pendingRowsByWrapper);
         pendingTableWrappers.clear();
-        enhanceMobileTables(root, wrappersToEnhance);
+        pendingRowsByWrapper.clear();
+        enhanceMobileTables(root, wrappersToEnhance, rowsToEnhance);
       });
     };
 
     scheduleEnhancement();
+    const onDetailsToggle = (event: Event): void => {
+      const details = event.target;
+      if (!(details instanceof HTMLDetailsElement) || !details.open) return;
+      scheduleEnhancement(details.querySelectorAll<HTMLElement>(".table-wrap"));
+    };
+    root.addEventListener("toggle", onDetailsToggle, true);
+
     const observer = new MutationObserver((records) => {
       const changedWrappers = new Set<HTMLElement>();
+      const changedRowsByWrapper = new Map<HTMLElement, Set<HTMLTableRowElement> | null>();
       records.forEach((record) => {
         const target = record.target instanceof Element
           ? record.target
           : record.target.parentElement;
         const changedWrapper = target?.closest<HTMLElement>(".table-wrap");
-        if (changedWrapper) changedWrappers.add(changedWrapper);
+        if (changedWrapper) {
+          changedWrappers.add(changedWrapper);
+          if (target?.closest("thead")) {
+            changedRowsByWrapper.set(changedWrapper, null);
+          } else {
+            const changedRows = changedRowsByWrapper.get(changedWrapper);
+            if (changedRows !== null) {
+              const rows = changedRows ?? new Set<HTMLTableRowElement>();
+              const targetRow = target?.closest<HTMLTableRowElement>("tr");
+              if (targetRow) rows.add(targetRow);
+              changedRowsByWrapper.set(changedWrapper, rows);
+            }
+          }
+        }
 
         record.addedNodes.forEach((node) => {
           if (!(node instanceof HTMLElement)) return;
-          if (node.matches(".table-wrap")) changedWrappers.add(node);
-          node.querySelectorAll<HTMLElement>(".table-wrap").forEach((wrapper) =>
-            changedWrappers.add(wrapper)
-          );
+          const addedWrappers = [
+            ...(node.matches(".table-wrap") ? [node] : []),
+            ...node.querySelectorAll<HTMLElement>(".table-wrap")
+          ];
+          addedWrappers.forEach((wrapper) => {
+            changedWrappers.add(wrapper);
+            changedRowsByWrapper.set(wrapper, null);
+          });
+
+          if (!changedWrapper || node.matches(".table-wrap") || addedWrappers.length > 0) return;
+          const changedRows = changedRowsByWrapper.get(changedWrapper);
+          if (changedRows === null) return;
+          const rows = changedRows ?? new Set<HTMLTableRowElement>();
+          if (node.matches("tr")) rows.add(node as HTMLTableRowElement);
+          node.querySelectorAll<HTMLTableRowElement>("tr").forEach((row) => rows.add(row));
+          changedRowsByWrapper.set(changedWrapper, rows);
         });
       });
-      if (changedWrappers.size > 0) scheduleEnhancement(changedWrappers);
+      if (changedWrappers.size > 0) {
+        scheduleEnhancement(changedWrappers, changedRowsByWrapper);
+      }
     });
     observer.observe(root, {
       childList: true,
@@ -358,6 +416,7 @@ export function AppLayout(): JSX.Element {
 
     return () => {
       window.cancelAnimationFrame(animationFrameId);
+      root.removeEventListener("toggle", onDetailsToggle, true);
       observer.disconnect();
     };
   }, [location.pathname]);

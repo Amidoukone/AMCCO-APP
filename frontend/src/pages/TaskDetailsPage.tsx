@@ -184,6 +184,7 @@ export function TaskDetailsPage(): JSX.Element {
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const loadRequestRef = useRef(0);
@@ -229,7 +230,7 @@ export function TaskDetailsPage(): JSX.Element {
     const timelineRequestId = ++timelineLoadRequestRef.current;
     const append = options?.append === true;
     const silent = options?.silent === true;
-    const includeHistory = append || isTimelineExpandedRef.current;
+    const includeHistory = append;
     if (!append && loadedHistoryTaskRef.current !== taskId) {
       loadedHistoryTaskRef.current = null;
       setTimeline([]);
@@ -246,6 +247,7 @@ export function TaskDetailsPage(): JSX.Element {
     } else {
       setIsLoadingMoreTimeline(false);
       if (!silent) setIsLoading(true);
+      setIsLoadingMembers(canManageTasks);
     }
     setErrorMessage(null);
     try {
@@ -269,25 +271,38 @@ export function TaskDetailsPage(): JSX.Element {
           ? Promise.resolve({ items: [] as TaskAttachment[] })
           : listTaskAttachmentsRequest(accessToken, taskId);
         const taskResponse = await taskResponsePromise;
-        const membersResponsePromise =
-          taskResponse && canManageTasks
-            ? listOperationsMembersRequest(accessToken, {
-                activityCode: taskResponse.item.activityCode ?? undefined
-              })
-            : Promise.resolve({ items: [] });
-        const [timelineResponse, commentsResponse, attachmentsResponse, membersResponse] =
-          await Promise.all([
-            timelineResponsePromise,
-            commentsResponsePromise,
-            attachmentsResponsePromise,
-            membersResponsePromise
-          ]);
+        if (taskResponse && canManageTasks) {
+          void withAuthorizedToken((membersAccessToken) =>
+            listOperationsMembersRequest(membersAccessToken, {
+              activityCode: taskResponse.item.activityCode ?? undefined
+            })
+          )
+            .then((membersResponse) => {
+              if (requestId === loadRequestRef.current) {
+                setMembers(membersResponse.items);
+                setIsLoadingMembers(false);
+              }
+            })
+            .catch((error) => {
+              if (requestId === loadRequestRef.current) {
+                setErrorMessage(toErrorMessage(error));
+                setIsLoadingMembers(false);
+              }
+            });
+        } else if (!append) {
+          setMembers([]);
+          setIsLoadingMembers(false);
+        }
+        const [timelineResponse, commentsResponse, attachmentsResponse] = await Promise.all([
+          timelineResponsePromise,
+          commentsResponsePromise,
+          attachmentsResponsePromise
+        ]);
         return {
           task: taskResponse?.item ?? null,
           timeline: timelineResponse.items,
           comments: commentsResponse.items,
-          attachments: attachmentsResponse.items,
-          members: membersResponse.items
+          attachments: attachmentsResponse.items
         };
       });
       if (requestId !== loadRequestRef.current) return;
@@ -322,7 +337,6 @@ export function TaskDetailsPage(): JSX.Element {
         });
       }
       if (!append) {
-        setMembers(data.members);
         setAttachments(data.attachments);
       }
     } catch (error) {
@@ -400,6 +414,7 @@ export function TaskDetailsPage(): JSX.Element {
     setComments([]);
     setAttachments([]);
     setMembers([]);
+    setIsLoadingMembers(false);
     setHasMoreTimeline(false);
     setHasMoreComments(false);
     loadedHistoryTaskRef.current = null;
@@ -763,7 +778,7 @@ export function TaskDetailsPage(): JSX.Element {
                     <select
                       value={assignment}
                       onChange={(event) => setAssignment(event.target.value)}
-                      disabled={isSaving}
+                      disabled={isSaving || isLoadingMembers}
                     >
                       <option value="">Non assignée</option>
                       {members.map((member) => (
@@ -772,6 +787,9 @@ export function TaskDetailsPage(): JSX.Element {
                         </option>
                       ))}
                     </select>
+                    {isLoadingMembers ? (
+                      <small role="status">Chargement des personnes assignables...</small>
+                    ) : null}
                   </div>
                   <div className="operations-inline-group">
                     <label>Commentaire (optionnel)</label>

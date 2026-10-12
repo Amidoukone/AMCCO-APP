@@ -25,10 +25,11 @@ meRouter.get(
       throw new HttpError(401, "Authentification requise.");
     }
 
-    const memberships = await listUserCompanyMemberships(req.auth.userId);
-
     if (isBootstrapCompanyId(req.auth.companyId)) {
-      const bootstrapUser = await findActiveUserById(req.auth.userId);
+      const [memberships, bootstrapUser] = await Promise.all([
+        listUserCompanyMemberships(req.auth.userId),
+        findActiveUserById(req.auth.userId)
+      ]);
       if (!bootstrapUser) {
         throw new HttpError(404, "Utilisateur introuvable.");
       }
@@ -47,11 +48,14 @@ meRouter.get(
       return;
     }
 
-    const profile = await findUserProfileForCompany(req.auth.userId, req.auth.companyId);
+    const [memberships, profile, company] = await Promise.all([
+      listUserCompanyMemberships(req.auth.userId),
+      findUserProfileForCompany(req.auth.userId, req.auth.companyId),
+      findCompanyById(req.auth.companyId)
+    ]);
     if (!profile) {
       throw new HttpError(404, "Profil utilisateur introuvable pour cette entreprise.");
     }
-    const company = await findCompanyById(req.auth.companyId);
     if (!company || !company.isActive) {
       throw new HttpError(404, "Entreprise active introuvable.");
     }

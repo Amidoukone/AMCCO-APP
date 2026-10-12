@@ -16,12 +16,17 @@ import {
   revokeRefreshSession,
   upsertRefreshSession
 } from "../repositories/auth.repository.js";
-import { findUserCompanyMembership } from "../repositories/companies.repository.js";
+import {
+  findCompanyById,
+  findUserCompanyMembership,
+  listUserCompanyMemberships
+} from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import { updateUserPasswordHash } from "../repositories/admin-users.repository.js";
 import type { AuthContext } from "../types/auth.js";
 import type { AuthUserRecord } from "../repositories/auth.repository.js";
 import type { RoleCode } from "../types/role.js";
+import type { CompanyMembershipSummary, CompanyProfile } from "../types/company.js";
 
 export type ClientMeta = {
   ipAddress?: string | null;
@@ -145,6 +150,12 @@ export async function login(input: {
     companyCode: string;
     bootstrapMode: boolean;
   };
+  me: {
+    user: { id: string; email: string; fullName: string; role: RoleCode };
+    company: CompanyProfile | null;
+    memberships: CompanyMembershipSummary[];
+    bootstrapMode: boolean;
+  };
 }> {
   const authCandidates = await listActiveAuthUsersByEmail(input.email);
   const record = pickPreferredAuthUser(authCandidates, "AMCCO");
@@ -189,18 +200,33 @@ export async function login(input: {
       userAgent: input.meta?.userAgent ?? null
     });
 
-    await safeCreateAuditLog({
-      companyId: auth.companyId,
-      actorId: auth.userId,
-      action: "AUTH_LOGIN",
-      entityType: "SESSION",
-      entityId: sessionId,
-      metadata: {
-        bootstrapMode: true,
-        ipAddress: input.meta?.ipAddress ?? null,
-        userAgent: input.meta?.userAgent ?? null
-      }
-    });
+    const [memberships] = await Promise.all([
+      listUserCompanyMemberships(auth.userId),
+      safeCreateAuditLog({
+        companyId: auth.companyId,
+        actorId: auth.userId,
+        action: "AUTH_LOGIN",
+        entityType: "SESSION",
+        entityId: sessionId,
+        metadata: {
+          bootstrapMode: true,
+          ipAddress: input.meta?.ipAddress ?? null,
+          userAgent: input.meta?.userAgent ?? null
+        }
+      })
+    ]);
+
+    const me = {
+      user: {
+        id: bootstrapUser.userId,
+        email: bootstrapUser.email,
+        fullName: bootstrapUser.fullName,
+        role: auth.role
+      },
+      company: null,
+      memberships,
+      bootstrapMode: true
+    };
 
     return {
       accessToken,
@@ -213,7 +239,8 @@ export async function login(input: {
         companyId: BOOTSTRAP_COMPANY_ID,
         companyCode: BOOTSTRAP_COMPANY_CODE,
         bootstrapMode: true
-      }
+      },
+      me
     };
   }
   if (!record.userIsActive || !record.companyIsActive) {
@@ -248,17 +275,38 @@ export async function login(input: {
     userAgent: input.meta?.userAgent ?? null
   });
 
-  await safeCreateAuditLog({
-    companyId: auth.companyId,
-    actorId: auth.userId,
-    action: "AUTH_LOGIN",
-    entityType: "SESSION",
-    entityId: sessionId,
-    metadata: {
-      ipAddress: input.meta?.ipAddress ?? null,
-      userAgent: input.meta?.userAgent ?? null
-    }
-  });
+  const [profile, company, memberships] = await Promise.all([
+    findUserProfileForCompany(auth.userId, auth.companyId),
+    findCompanyById(auth.companyId),
+    listUserCompanyMemberships(auth.userId),
+    safeCreateAuditLog({
+      companyId: auth.companyId,
+      actorId: auth.userId,
+      action: "AUTH_LOGIN",
+      entityType: "SESSION",
+      entityId: sessionId,
+      metadata: {
+        ipAddress: input.meta?.ipAddress ?? null,
+        userAgent: input.meta?.userAgent ?? null
+      }
+    })
+  ]);
+
+  if (!profile || !company?.isActive) {
+    throw new HttpError(403, "L'utilisateur ou l'entreprise n'est plus actif.");
+  }
+
+  const me = {
+    user: {
+      id: profile.userId,
+      email: profile.email,
+      fullName: profile.fullName,
+      role: profile.role
+    },
+    company,
+    memberships,
+    bootstrapMode: false
+  };
 
   return {
     accessToken,
@@ -271,7 +319,8 @@ export async function login(input: {
       companyId: record.companyId,
       companyCode: record.companyCode,
       bootstrapMode: false
-    }
+    },
+    me
   };
 }
 
@@ -281,6 +330,12 @@ export async function refresh(input: {
 }): Promise<{
   accessToken: string;
   refreshToken: string;
+  me: {
+    user: { id: string; email: string; fullName: string; role: RoleCode };
+    company: CompanyProfile | null;
+    memberships: CompanyMembershipSummary[];
+    bootstrapMode: boolean;
+  };
 }> {
   const payload = verifyRefreshToken(input.refreshToken);
   const session = await findRefreshSessionById(payload.sessionId);
@@ -330,20 +385,37 @@ export async function refresh(input: {
       userAgent: input.meta?.userAgent ?? null
     });
 
-    await safeCreateAuditLog({
-      companyId: auth.companyId,
-      actorId: auth.userId,
-      action: "AUTH_REFRESH",
-      entityType: "SESSION",
-      entityId: payload.sessionId,
-      metadata: {
-        bootstrapMode: true,
-        ipAddress: input.meta?.ipAddress ?? null,
-        userAgent: input.meta?.userAgent ?? null
-      }
-    });
+    const [memberships] = await Promise.all([
+      listUserCompanyMemberships(auth.userId),
+      safeCreateAuditLog({
+        companyId: auth.companyId,
+        actorId: auth.userId,
+        action: "AUTH_REFRESH",
+        entityType: "SESSION",
+        entityId: payload.sessionId,
+        metadata: {
+          bootstrapMode: true,
+          ipAddress: input.meta?.ipAddress ?? null,
+          userAgent: input.meta?.userAgent ?? null
+        }
+      })
+    ]);
 
-    return { accessToken, refreshToken };
+    return {
+      accessToken,
+      refreshToken,
+      me: {
+        user: {
+          id: bootstrapUser.userId,
+          email: bootstrapUser.email,
+          fullName: bootstrapUser.fullName,
+          role: auth.role
+        },
+        company: null,
+        memberships,
+        bootstrapMode: true
+      }
+    };
   }
 
   const currentProfile = await findUserProfileForCompany(payload.userId, payload.companyId);
@@ -372,19 +444,41 @@ export async function refresh(input: {
     userAgent: input.meta?.userAgent ?? null
   });
 
-  await safeCreateAuditLog({
-    companyId: auth.companyId,
-    actorId: auth.userId,
-    action: "AUTH_REFRESH",
-    entityType: "SESSION",
-    entityId: payload.sessionId,
-    metadata: {
-      ipAddress: input.meta?.ipAddress ?? null,
-      userAgent: input.meta?.userAgent ?? null
-    }
-  });
+  const [company, memberships] = await Promise.all([
+    findCompanyById(auth.companyId),
+    listUserCompanyMemberships(auth.userId),
+    safeCreateAuditLog({
+      companyId: auth.companyId,
+      actorId: auth.userId,
+      action: "AUTH_REFRESH",
+      entityType: "SESSION",
+      entityId: payload.sessionId,
+      metadata: {
+        ipAddress: input.meta?.ipAddress ?? null,
+        userAgent: input.meta?.userAgent ?? null
+      }
+    })
+  ]);
 
-  return { accessToken, refreshToken };
+  if (!company?.isActive) {
+    throw new HttpError(403, "L'entreprise n'est plus active.");
+  }
+
+  return {
+    accessToken,
+    refreshToken,
+    me: {
+      user: {
+        id: currentProfile.userId,
+        email: currentProfile.email,
+        fullName: currentProfile.fullName,
+        role: currentProfile.role
+      },
+      company,
+      memberships,
+      bootstrapMode: false
+    }
+  };
 }
 
 export async function switchCompany(input: {
@@ -394,6 +488,12 @@ export async function switchCompany(input: {
 }): Promise<{
   accessToken: string;
   refreshToken: string;
+  me: {
+    user: { id: string; email: string; fullName: string; role: RoleCode };
+    company: CompanyProfile | null;
+    memberships: CompanyMembershipSummary[];
+    bootstrapMode: boolean;
+  };
 }> {
   const payload = verifyRefreshToken(input.refreshToken);
   const session = await findRefreshSessionById(payload.sessionId);
@@ -443,21 +543,43 @@ export async function switchCompany(input: {
     userAgent: input.meta?.userAgent ?? null
   });
 
-  await safeCreateAuditLog({
-    companyId: auth.companyId,
-    actorId: auth.userId,
-    action: "AUTH_COMPANY_SWITCH",
-    entityType: "SESSION",
-    entityId: nextSessionId,
-    metadata: {
-      fromCompanyId: payload.companyId,
-      toCompanyId: auth.companyId,
-      ipAddress: input.meta?.ipAddress ?? null,
-      userAgent: input.meta?.userAgent ?? null
-    }
-  });
+  const [profile, memberships] = await Promise.all([
+    findUserProfileForCompany(auth.userId, auth.companyId),
+    listUserCompanyMemberships(auth.userId),
+    safeCreateAuditLog({
+      companyId: auth.companyId,
+      actorId: auth.userId,
+      action: "AUTH_COMPANY_SWITCH",
+      entityType: "SESSION",
+      entityId: nextSessionId,
+      metadata: {
+        fromCompanyId: payload.companyId,
+        toCompanyId: auth.companyId,
+        ipAddress: input.meta?.ipAddress ?? null,
+        userAgent: input.meta?.userAgent ?? null
+      }
+    })
+  ]);
 
-  return { accessToken, refreshToken };
+  if (!profile) {
+    throw new HttpError(403, "L'utilisateur n'a plus accÃ¨s Ã  l'entreprise cible.");
+  }
+
+  return {
+    accessToken,
+    refreshToken,
+    me: {
+      user: {
+        id: profile.userId,
+        email: profile.email,
+        fullName: profile.fullName,
+        role: profile.role
+      },
+      company: targetMembership.company,
+      memberships,
+      bootstrapMode: false
+    }
+  };
 }
 
 export async function logout(input: { refreshToken?: string }): Promise<void> {

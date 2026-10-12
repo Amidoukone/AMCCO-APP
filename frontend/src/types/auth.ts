@@ -35,11 +35,13 @@ export type LoginResponse = {
   accessToken: string;
   refreshToken: string;
   user: LoginUser;
+  me?: MeResponse;
 };
 
 export type RefreshResponse = {
   accessToken: string;
   refreshToken: string;
+  me?: MeResponse;
 };
 
 export type MeResponse = {

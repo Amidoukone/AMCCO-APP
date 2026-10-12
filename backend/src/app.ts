@@ -1,3 +1,4 @@
+import compression from "compression";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
@@ -41,9 +42,11 @@ app.use(
 app.use(helmet());
 app.use(
   cors({
-    origin: corsOrigins.length > 1 ? corsOrigins : corsOrigins[0]
+    origin: corsOrigins.length > 1 ? corsOrigins : corsOrigins[0],
+    maxAge: 86_400
   })
 );
+app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/", (_req, res) => {

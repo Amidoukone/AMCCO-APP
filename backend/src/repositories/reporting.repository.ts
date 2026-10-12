@@ -263,6 +263,7 @@ export type AgricultureOperationsReport = {
 export type GeneralStoreOperationsReportRow = {
   shopRef: string;
   location: string;
+  transactionsCount: number;
   lastOperationDate: string;
   purchaseAmount: string;
   collectedAmount: string;
@@ -274,10 +275,30 @@ export type GeneralStoreOperationsReportRow = {
   currency: "XOF";
 };
 
+export type GeneralStoreOperationDetailRow = {
+  date: string;
+  shopRef: string;
+  operationKind: "ACHAT" | "RECOUVREMENT";
+  status: "SUBMITTED" | "APPROVED";
+  designation: string;
+  amount: string;
+  currency: "XOF";
+};
+
+export type GeneralStoreOperationsBreakdownRow = {
+  operationKind: "ACHAT" | "RECOUVREMENT";
+  operationLabel: string;
+  transactionsCount: number;
+  amount: string;
+  currency: "XOF";
+};
+
 export type GeneralStoreOperationsReport = {
   periodLabel: string;
   asOfLabel: string;
   rows: GeneralStoreOperationsReportRow[];
+  operationRows: GeneralStoreOperationDetailRow[];
+  breakdownRows: GeneralStoreOperationsBreakdownRow[];
   totals: {
     shopsCount: number;
     purchaseAmount: string;
@@ -1924,7 +1945,8 @@ export async function listDashboardOperationalTasks(
 }
 
 export async function listReportRentalTransactions(
-  companyId: string
+  companyId: string,
+  asOfDate?: string
 ): Promise<ReportOperationalTransaction[]> {
   const rows = await queryRows<ReportOperationalTransactionRow[]>(
     `
@@ -1940,8 +1962,11 @@ export async function listReportRentalTransactions(
       FROM transactions
       WHERE company_id = ?
         AND activity_code = 'RENTAL'
+        AND currency = 'XOF'
+        AND status IN ('SUBMITTED', 'APPROVED')
+        ${asOfDate ? "AND occurred_at <= ?" : ""}
     `,
-    [companyId]
+    asOfDate ? [companyId, asOfDate] : [companyId]
   );
 
   return rows.map((row) => ({
@@ -1957,7 +1982,8 @@ export async function listReportRentalTransactions(
 }
 
 export async function listReportGeneralStoreTransactions(
-  companyId: string
+  companyId: string,
+  asOfDate?: string
 ): Promise<ReportOperationalTransaction[]> {
   const rows = await queryRows<ReportOperationalTransactionRow[]>(
     `
@@ -1973,8 +1999,11 @@ export async function listReportGeneralStoreTransactions(
       FROM transactions
       WHERE company_id = ?
         AND activity_code = 'GENERAL_STORE'
+        AND currency = 'XOF'
+        AND status IN ('SUBMITTED', 'APPROVED')
+        ${asOfDate ? "AND occurred_at <= ?" : ""}
     `,
-    [companyId]
+    asOfDate ? [companyId, asOfDate] : [companyId]
   );
 
   return rows.map((row) => ({
@@ -2028,7 +2057,8 @@ export async function listGeneralStoreLedgerTransactions(
 }
 
 export async function listReportHardwareTransactions(
-  companyId: string
+  companyId: string,
+  asOfDate?: string
 ): Promise<ReportOperationalTransaction[]> {
   const rows = await queryRows<ReportOperationalTransactionRow[]>(
     `
@@ -2044,9 +2074,12 @@ export async function listReportHardwareTransactions(
       FROM transactions
       WHERE company_id = ?
         AND activity_code = 'HARDWARE'
+        AND currency = 'XOF'
+        AND status IN ('SUBMITTED', 'APPROVED')
+        ${asOfDate ? "AND occurred_at <= ?" : ""}
       ORDER BY occurred_at ASC, created_at ASC
     `,
-    [companyId]
+    asOfDate ? [companyId, asOfDate] : [companyId]
   );
 
   return rows.map((row) => ({
@@ -2062,7 +2095,8 @@ export async function listReportHardwareTransactions(
 }
 
 export async function listReportBtpTransactions(
-  companyId: string
+  companyId: string,
+  asOfDate?: string
 ): Promise<ReportOperationalTransaction[]> {
   const rows = await queryRows<ReportOperationalTransactionRow[]>(
     `
@@ -2078,8 +2112,11 @@ export async function listReportBtpTransactions(
       FROM transactions
       WHERE company_id = ?
         AND activity_code = 'BTP'
+        AND currency = 'XOF'
+        AND status IN ('SUBMITTED', 'APPROVED')
+        ${asOfDate ? "AND occurred_at <= ?" : ""}
     `,
-    [companyId]
+    asOfDate ? [companyId, asOfDate] : [companyId]
   );
 
   return rows.map((row) => ({
@@ -2095,7 +2132,8 @@ export async function listReportBtpTransactions(
 }
 
 export async function listReportGeneralStoreInventorySnapshots(
-  companyId: string
+  companyId: string,
+  asOfDate?: string
 ): Promise<GeneralStoreInventorySnapshot[]> {
   const rows = await queryRows<
     Array<
@@ -2116,8 +2154,9 @@ export async function listReportGeneralStoreInventorySnapshots(
         AND activity_code = 'GENERAL_STORE'
         AND JSON_EXTRACT(metadata_json, '$.shopRef') IS NOT NULL
         AND JSON_EXTRACT(metadata_json, '$.remainingStockValue') IS NOT NULL
+        ${asOfDate ? "AND created_at <= ?" : ""}
     `,
-    [companyId]
+    asOfDate ? [companyId, asOfDate] : [companyId]
   );
 
   const snapshots: GeneralStoreInventorySnapshot[] = [];

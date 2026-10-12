@@ -835,28 +835,29 @@ export async function createCompanyTransaction(
     transactionId
   });
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "FINANCE_TRANSACTION_CREATED",
-    entityType: "TRANSACTION",
-    entityId: transactionId,
-    metadataJson: JSON.stringify({
-      ...governanceMetadata,
-      accountId: input.accountId,
-      type: input.type,
-      amount: input.amount,
-      currency,
-      activityCode: input.activityCode,
-      activityLabel: profile.label,
-      metadata,
-      requiresProof: profile.finance.requiresProof,
-      financeWorkflow: profile.finance.workflow.map((step) => step.code)
+  const [created] = await Promise.all([
+    findFinancialTransactionById(actor.companyId, transactionId),
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: "FINANCE_TRANSACTION_CREATED",
+      entityType: "TRANSACTION",
+      entityId: transactionId,
+      metadataJson: JSON.stringify({
+        ...governanceMetadata,
+        accountId: input.accountId,
+        type: input.type,
+        amount: input.amount,
+        currency,
+        activityCode: input.activityCode,
+        activityLabel: profile.label,
+        metadata,
+        requiresProof: profile.finance.requiresProof,
+        financeWorkflow: profile.finance.workflow.map((step) => step.code)
+      })
     })
-  });
-
-  const created = await findFinancialTransactionById(actor.companyId, transactionId);
+  ]);
   if (!created) {
     throw new HttpError(500, "Impossible de recharger la transaction créée.");
   }
@@ -937,33 +938,34 @@ export async function updateCompanyTransaction(
     transactionId: existing.id
   });
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "FINANCE_TRANSACTION_UPDATED",
-    entityType: "TRANSACTION",
-    entityId: existing.id,
-    metadataJson: JSON.stringify({
-      ...buildFinanceGovernanceMetadata({
-        account,
+  const [updated] = await Promise.all([
+    findFinancialTransactionById(actor.companyId, existing.id),
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: "FINANCE_TRANSACTION_UPDATED",
+      entityType: "TRANSACTION",
+      entityId: existing.id,
+      metadataJson: JSON.stringify({
+        ...buildFinanceGovernanceMetadata({
+          account,
+          activityCode: input.activityCode,
+          transactionId: existing.id
+        }),
+        previousStatus: existing.status,
+        accountId: input.accountId,
+        type: input.type,
+        amount: input.amount,
+        currency,
         activityCode: input.activityCode,
-        transactionId: existing.id
-      }),
-      previousStatus: existing.status,
-      accountId: input.accountId,
-      type: input.type,
-      amount: input.amount,
-      currency,
-      activityCode: input.activityCode,
-      activityLabel: profile.label,
-      metadata,
-      requiresProof: profile.finance.requiresProof,
-      financeWorkflow: profile.finance.workflow.map((step) => step.code)
+        activityLabel: profile.label,
+        metadata,
+        requiresProof: profile.finance.requiresProof,
+        financeWorkflow: profile.finance.workflow.map((step) => step.code)
+      })
     })
-  });
-
-  const updated = await findFinancialTransactionById(actor.companyId, existing.id);
+  ]);
   if (!updated) {
     throw new HttpError(500, "Impossible de recharger la transaction modifiée.");
   }
@@ -1844,7 +1846,7 @@ export async function addProofToTransaction(
     fileSize: number;
   }
 ) {
-  const transaction = await findTransactionById(actor.companyId, input.transactionId);
+  const transaction = await findFinancialTransactionById(actor.companyId, input.transactionId);
   if (!transaction) {
     throw new HttpError(404, "Transaction introuvable.");
   }
@@ -1919,16 +1921,12 @@ export async function submitCompanyTransaction(
     transactionId: string;
   }
 ) {
-  const transaction = await findTransactionById(actor.companyId, input.transactionId);
+  const transaction = await findFinancialTransactionById(actor.companyId, input.transactionId);
   if (!transaction) {
     throw new HttpError(404, "Transaction introuvable.");
   }
 
-  const fullTransaction = await findFinancialTransactionById(actor.companyId, transaction.id);
-  if (!fullTransaction) {
-    throw new HttpError(500, "Impossible de recharger la transaction avant soumission.");
-  }
-  const salarySnapshot = extractSalarySnapshot(fullTransaction.metadata);
+  const salarySnapshot = extractSalarySnapshot(transaction.metadata);
 
   const canSubmit =
     transaction.createdById === actor.actorId ||
@@ -1947,10 +1945,14 @@ export async function submitCompanyTransaction(
   const reviewerMembershipPromise = findMembershipByCompanyAndUser(actor.companyId, actor.actorId)
     .then((membership) => ({ ok: true as const, membership }))
     .catch((error: unknown) => ({ ok: false as const, error }));
-  const account = await findFinancialAccountById(actor.companyId, fullTransaction.accountId);
-  if (!account) {
-    throw new HttpError(500, "Impossible de recharger le compte financier avant soumission.");
-  }
+  const account = {
+    id: transaction.accountId,
+    name: transaction.accountName,
+    accountRef: transaction.accountRef,
+    scopeType: transaction.accountScopeType,
+    primaryActivityCode: transaction.accountPrimaryActivityCode,
+    allowedActivityCodes: transaction.accountAllowedActivityCodes
+  };
   const profile =
     !salarySnapshot && transaction.activityCode
       ? getBusinessActivityProfile(transaction.activityCode)
@@ -1967,11 +1969,11 @@ export async function submitCompanyTransaction(
 
     try {
       assertTransactionInputMatchesActivityProfile(transaction.activityCode, {
-        type: fullTransaction.type,
-        amount: fullTransaction.amount,
-        currency: fullTransaction.currency,
-        description: fullTransaction.description ?? undefined,
-        metadata: fullTransaction.metadata
+        type: transaction.type,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        description: transaction.description ?? undefined,
+        metadata: transaction.metadata
       });
     } catch (error) {
       throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
@@ -2023,18 +2025,9 @@ export async function submitCompanyTransaction(
       : {})
   };
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: actionCode,
-    entityType,
-    entityId: transaction.id,
-    metadataJson: JSON.stringify(traceMetadata)
-  });
-
+  const notificationWrites: Promise<unknown>[] = [];
   if (salarySnapshot) {
-    await createRoleTargetedAlerts({
+    notificationWrites.push(createRoleTargetedAlerts({
       companyId: actor.companyId,
       recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
       excludeUserIds: [actor.actorId],
@@ -2048,8 +2041,8 @@ export async function submitCompanyTransaction(
         transactionId: transaction.id,
         createdById: transaction.createdById
       }
-    });
-    await createUserTargetedAlerts({
+    }));
+    notificationWrites.push(createUserTargetedAlerts({
       companyId: actor.companyId,
       recipientUserIds: [salarySnapshot.employeeUserId],
       code: actionCode,
@@ -2062,25 +2055,37 @@ export async function submitCompanyTransaction(
         transactionId: transaction.id,
         createdById: transaction.createdById
       }
-    });
-    return;
+    }));
+  } else {
+    notificationWrites.push(createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
+      excludeUserIds: [actor.actorId],
+      code: actionCode,
+      message: `Une transaction ${profile?.label ?? "finance"} a été enregistrée et est disponible dans le suivi financier.`,
+      severity: "INFO",
+      entityType,
+      entityId: transaction.id,
+      metadata: {
+        ...traceMetadata,
+        transactionId: transaction.id,
+        createdById: transaction.createdById
+      }
+    }));
   }
 
-  await createRoleTargetedAlerts({
-    companyId: actor.companyId,
-    recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
-    excludeUserIds: [actor.actorId],
-    code: actionCode,
-    message: `Une transaction ${profile?.label ?? "finance"} a été enregistrée et est disponible dans le suivi financier.`,
-    severity: "INFO",
-    entityType,
-    entityId: transaction.id,
-    metadata: {
-      ...traceMetadata,
-      transactionId: transaction.id,
-      createdById: transaction.createdById
-    }
-  });
+  await Promise.all([
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: actionCode,
+      entityType,
+      entityId: transaction.id,
+      metadataJson: JSON.stringify(traceMetadata)
+    }),
+    ...notificationWrites
+  ]);
 }
 
 export async function confirmCompanySalaryReceipt(
@@ -2105,7 +2110,7 @@ export async function reviewCompanyTransaction(
     throw new HttpError(403, "Permissions insuffisantes pour valider les transactions.");
   }
 
-  const transaction = await findTransactionById(actor.companyId, input.transactionId);
+  const transaction = await findFinancialTransactionById(actor.companyId, input.transactionId);
   if (!transaction) {
     throw new HttpError(404, "Transaction introuvable.");
   }
@@ -2117,18 +2122,16 @@ export async function reviewCompanyTransaction(
   const profile = transaction.activityCode
     ? getBusinessActivityProfile(transaction.activityCode)
     : null;
-  const fullTransaction = await findFinancialTransactionById(actor.companyId, transaction.id);
-  if (!fullTransaction) {
-    throw new HttpError(500, "Impossible de recharger la transaction avant validation.");
-  }
-  const [account, reviewerMembership] = await Promise.all([
-    findFinancialAccountById(actor.companyId, fullTransaction.accountId),
-    findMembershipByCompanyAndUser(actor.companyId, actor.actorId)
-  ]);
-  if (!account) {
-    throw new HttpError(500, "Impossible de recharger le compte financier avant validation.");
-  }
-  const salarySnapshot = extractSalarySnapshot(fullTransaction.metadata);
+  const reviewerMembership = await findMembershipByCompanyAndUser(actor.companyId, actor.actorId);
+  const account = {
+    id: transaction.accountId,
+    name: transaction.accountName,
+    accountRef: transaction.accountRef,
+    scopeType: transaction.accountScopeType,
+    primaryActivityCode: transaction.accountPrimaryActivityCode,
+    allowedActivityCodes: transaction.accountAllowedActivityCodes
+  };
+  const salarySnapshot = extractSalarySnapshot(transaction.metadata);
   const actionCode = salarySnapshot
     ? input.decision === "APPROVED"
       ? "FINANCE_SALARY_APPROVED"
@@ -2139,7 +2142,7 @@ export async function reviewCompanyTransaction(
   const entityType = salarySnapshot ? "SALARY" : "TRANSACTION";
 
   const confirmationMetadata = salarySnapshot
-    ? buildSalaryConfirmationSnapshot(fullTransaction)
+    ? buildSalaryConfirmationSnapshot(transaction)
     : null;
   const reviewer = buildReviewerMetadata(reviewerMembership, actor);
   const reviewerSuffix = reviewer.displayName ? ` par ${reviewer.displayName}` : "";

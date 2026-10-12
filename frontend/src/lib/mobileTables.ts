@@ -8,9 +8,17 @@ function getTableHeaders(table: HTMLTableElement): string[] {
 }
 
 function labelTableRows(table: HTMLTableElement, headers: string[]): void {
-  const rows = table.querySelectorAll("tbody tr, tfoot tr");
+  labelRows(table, headers, table.querySelectorAll("tbody tr, tfoot tr"));
+}
 
-  rows.forEach((row) => {
+function labelRows(
+  table: HTMLTableElement,
+  headers: string[],
+  rows: Iterable<HTMLTableRowElement>
+): void {
+  for (const row of rows) {
+    if (!table.contains(row)) continue;
+
     let headerIndex = 0;
     const cells = Array.from(row.children).filter(
       (cell): cell is HTMLTableCellElement => cell instanceof HTMLTableCellElement
@@ -23,12 +31,13 @@ function labelTableRows(table: HTMLTableElement, headers: string[]): void {
       }
       headerIndex += Math.max(cell.colSpan, 1);
     });
-  });
+  }
 }
 
 export function enhanceMobileTables(
   root: HTMLElement,
-  candidates?: Iterable<HTMLElement>
+  candidates?: Iterable<HTMLElement>,
+  rowsByWrapper?: Map<HTMLElement, Set<HTMLTableRowElement> | null>
 ): void {
   const wrappers = candidates
     ? Array.from(candidates).filter((wrapper) => root.contains(wrapper))
@@ -36,6 +45,8 @@ export function enhanceMobileTables(
   const isReportsPage = root.querySelector(".reports-control-panel") !== null;
 
   wrappers.forEach((wrapper) => {
+    if (wrapper.closest("details:not([open])")) return;
+
     const table = wrapper.querySelector("table.admin-table");
     if (!(table instanceof HTMLTableElement)) {
       return;
@@ -48,7 +59,12 @@ export function enhanceMobileTables(
       return;
     }
 
-    labelTableRows(table, headers);
+    const candidateRows = rowsByWrapper?.get(wrapper);
+    if (candidateRows === undefined || candidateRows === null) {
+      labelTableRows(table, headers);
+    } else {
+      labelRows(table, headers, candidateRows);
+    }
 
     if (wrapper.classList.contains("mobile-card-table")) {
       wrapper.classList.remove("mobile-auto-card-table", "mobile-scroll-table");

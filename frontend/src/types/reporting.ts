@@ -205,6 +205,7 @@ export type AgricultureOperationsReport = {
 export type GeneralStoreOperationsReportRow = {
   shopRef: string;
   location: string;
+  transactionsCount: number;
   lastOperationDate: string;
   purchaseAmount: string;
   collectedAmount: string;
@@ -216,10 +217,30 @@ export type GeneralStoreOperationsReportRow = {
   currency: "XOF";
 };
 
+export type GeneralStoreOperationDetailRow = {
+  date: string;
+  shopRef: string;
+  operationKind: "ACHAT" | "RECOUVREMENT";
+  status: "SUBMITTED" | "APPROVED";
+  designation: string;
+  amount: string;
+  currency: "XOF";
+};
+
+export type GeneralStoreOperationsBreakdownRow = {
+  operationKind: "ACHAT" | "RECOUVREMENT";
+  operationLabel: string;
+  transactionsCount: number;
+  amount: string;
+  currency: "XOF";
+};
+
 export type GeneralStoreOperationsReport = {
   periodLabel: string;
   asOfLabel: string;
   rows: GeneralStoreOperationsReportRow[];
+  operationRows: GeneralStoreOperationDetailRow[];
+  breakdownRows: GeneralStoreOperationsBreakdownRow[];
   totals: {
     shopsCount: number;
     purchaseAmount: string;

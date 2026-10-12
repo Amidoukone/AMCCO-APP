@@ -232,7 +232,8 @@ describe("finance.service", () => {
         requiresProof: false,
         salaryConfirmationStatus: "NOT_REQUIRED"
       });
-      vi.mocked(findFinancialTransactionById).mockResolvedValue({
+      let salaryReadCount = 0;
+      vi.mocked(findFinancialTransactionById).mockImplementation(async () => ({
         id: "salary-1",
         companyId: actor.companyId,
         accountId: "account-1",
@@ -260,7 +261,7 @@ describe("finance.service", () => {
           paymentMethod: "BANK_TRANSFER",
           note: "Prime de rendement"
         },
-        status: "APPROVED",
+        status: salaryReadCount++ === 0 ? "DRAFT" : "APPROVED",
         requiresProof: false,
         createdById: actor.actorId,
         createdByEmail: "actor@example.com",
@@ -274,7 +275,7 @@ describe("finance.service", () => {
         createdAt: "2026-04-20T08:00:00.000Z",
         updatedAt: "2026-04-20T08:00:00.000Z",
         proofsCount: 0
-      });
+      }));
 
       const result = await createCompanySalaryTransaction(
         {
@@ -378,6 +379,49 @@ describe("finance.service", () => {
           occurredAt: "2026-04-20T08:00:00.000Z",
           createdAt: "2026-04-20T08:00:00.000Z",
           updatedAt: "2026-04-20T08:00:00.000Z",
+          proofsCount: 0
+        })
+        .mockResolvedValueOnce({
+          id: "salary-3",
+          companyId: actor.companyId,
+          accountId: "account-2",
+          accountName: "Banque secondaire",
+          accountRef: "BNK-02",
+          accountScopeType: "GLOBAL",
+          accountPrimaryActivityCode: null,
+          accountAllowedActivityCodes: [],
+          type: "CASH_OUT",
+          amount: "96000.00",
+          currency: "XOF",
+          activityCode: null,
+          description: "Salaire 2026-04 - Agent Test",
+          metadata: {
+            entryCategory: "SALARY",
+            employeeUserId: "employee-1",
+            employeeFullName: "Agent Test",
+            employeeEmail: "employee@example.com",
+            employeeRole: "EMPLOYEE",
+            payPeriod: "2026-04",
+            grossAmount: "93000.00",
+            bonusAmount: "5000.00",
+            deductionAmount: "2000.00",
+            netAmount: "96000.00",
+            paymentMethod: "BANK_TRANSFER",
+            note: "Ajustement"
+          },
+          status: "DRAFT",
+          requiresProof: false,
+          createdById: actor.actorId,
+          createdByEmail: "actor@example.com",
+          validatedById: null,
+          validatedByEmail: null,
+          salaryConfirmationStatus: "NOT_REQUIRED",
+          salaryConfirmedById: null,
+          salaryConfirmedByEmail: null,
+          salaryConfirmedAt: null,
+          occurredAt: "2026-04-21T08:00:00.000Z",
+          createdAt: "2026-04-20T08:00:00.000Z",
+          updatedAt: "2026-04-21T08:00:00.000Z",
           proofsCount: 0
         })
         .mockResolvedValue({
@@ -583,6 +627,48 @@ describe("finance.service", () => {
             bonusAmount: "5000.00",
             deductionAmount: "2500.00",
             netAmount: "92500.00",
+            paymentMethod: "BANK_TRANSFER"
+          },
+          status: "DRAFT",
+          requiresProof: false,
+          createdById: actor.actorId,
+          createdByEmail: "actor@example.com",
+          validatedById: null,
+          validatedByEmail: null,
+          salaryConfirmationStatus: "NOT_REQUIRED",
+          salaryConfirmedById: null,
+          salaryConfirmedByEmail: null,
+          salaryConfirmedAt: null,
+          occurredAt: "2026-04-20T08:00:00.000Z",
+          createdAt: "2026-04-20T08:00:00.000Z",
+          updatedAt: "2026-04-20T08:00:00.000Z",
+          proofsCount: 0
+        })
+        .mockResolvedValueOnce({
+          id: "salary-4",
+          companyId: actor.companyId,
+          accountId: "account-1",
+          accountName: "Banque principale",
+          accountRef: "BNK-01",
+          accountScopeType: "GLOBAL",
+          accountPrimaryActivityCode: null,
+          accountAllowedActivityCodes: [],
+          type: "CASH_OUT",
+          amount: "94000.00",
+          currency: "XOF",
+          activityCode: null,
+          description: "Salaire 2026-04 - Agent Test",
+          metadata: {
+            entryCategory: "SALARY",
+            employeeUserId: "employee-1",
+            employeeFullName: "Agent Test",
+            employeeEmail: "employee@example.com",
+            employeeRole: "EMPLOYEE",
+            payPeriod: "2026-04",
+            grossAmount: "90000.00",
+            bonusAmount: "6000.00",
+            deductionAmount: "2000.00",
+            netAmount: "94000.00",
             paymentMethod: "BANK_TRANSFER"
           },
           status: "DRAFT",

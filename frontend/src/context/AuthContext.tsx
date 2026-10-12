@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       accessToken: response.accessToken,
       refreshToken: response.refreshToken
     };
-    const me = await meRequest(response.accessToken);
+    const me = response.me ?? await meRequest(response.accessToken);
     applyAuthenticatedState(baseTokens, me);
   }, [applyAuthenticatedState]);
 
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
           refreshToken: refreshed.refreshToken
         };
 
-        const me = await meRequest(nextTokens.accessToken);
+        const me = refreshed.me ?? await meRequest(nextTokens.accessToken);
         applyAuthenticatedState(nextTokens, me);
         return nextTokens.accessToken;
       } catch {
@@ -196,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         accessToken: switched.accessToken,
         refreshToken: switched.refreshToken
       };
-      const me = await meRequest(nextTokens.accessToken);
+      const me = switched.me ?? await meRequest(nextTokens.accessToken);
       applyAuthenticatedState(nextTokens, me);
     },
     [activeCompany, applyAuthenticatedState, resetAuth]
@@ -288,7 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
           accessToken: refreshed.accessToken,
           refreshToken: refreshed.refreshToken
         };
-        const me = await meRequest(nextTokens.accessToken);
+        const me = refreshed.me ?? await meRequest(nextTokens.accessToken);
         if (!isMounted) {
           return;
         }

@@ -3625,11 +3625,14 @@ function renderAgricultureReportsPdf(
   drawPdfReadingGuideBox(doc);
 }
 
-function buildEmptyGeneralStoreOperationsReport(filters: ReportPeriodFilter): GeneralStoreOperationsReport {
+function buildEmptyGeneralStoreOperationsReport(): GeneralStoreOperationsReport {
+  const asOfLabel = formatPdfDate(new Date().toISOString());
   return {
-    periodLabel: toDisplayPeriodLabel(filters),
-    asOfLabel: formatPdfDate(new Date().toISOString()),
+    periodLabel: `Cumul au ${asOfLabel}`,
+    asOfLabel,
     rows: [],
+    operationRows: [],
+    breakdownRows: [],
     totals: {
       shopsCount: 0,
       purchaseAmount: "0.00",
@@ -3642,12 +3645,14 @@ function buildEmptyGeneralStoreOperationsReport(filters: ReportPeriodFilter): Ge
 }
 
 const GENERAL_STORE_PDF_COLUMNS: PdfTableColumn[] = [
-  { label: "BOUTIQUE", width: 180, align: "left" },
-  { label: "TOTAL ACHATS", width: 115, align: "right" },
-  { label: "TOTAL RECOUVRE", width: 115, align: "right" },
-  { label: "SOLDE DU", width: 115, align: "right" },
-  { label: "STOCK RESTANT", width: 115, align: "right" },
-  { label: "ECART", width: 115, align: "right" }
+  { label: "BOUTIQUE / INVENTAIRE", width: 140, align: "left" },
+  { label: "OPÉRATIONS", width: 50, align: "center" },
+  { label: "TOTAL ACHATS", width: 95, align: "right" },
+  { label: "TOTAL RECOUVRÉ", width: 95, align: "right" },
+  { label: "SOLDE DÛ", width: 85, align: "right" },
+  { label: "STOCK RESTANT", width: 95, align: "right" },
+  { label: "VENDU ESTIMÉ*", width: 100, align: "right" },
+  { label: "ÉCART*", width: 100, align: "right" }
 ];
 
 function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
@@ -3686,7 +3691,7 @@ function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralSt
     align: "center"
   });
   doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#4f46e5").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION DES BOUTIQUES - ${report.periodLabel.toUpperCase()}`, margin, 114, {
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION CUMULÉE DES BOUTIQUES AU ${report.asOfLabel.toUpperCase()}`, margin, 114, {
     width: pageWidth - margin * 2,
     align: "center"
   });
@@ -3694,7 +3699,7 @@ function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralSt
 }
 
 function drawGeneralStoreContinuationHeader(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
-  drawSectorContinuationHeader(doc, "SITUATION DES BOUTIQUES", report.periodLabel);
+  drawSectorContinuationHeader(doc, "SITUATION CUMULÉE DES BOUTIQUES", report.asOfLabel);
 }
 
 function drawGeneralStoreMetadataStrip(
@@ -3759,7 +3764,7 @@ function drawGeneralStoreTableHeader(doc: PDFKit.PDFDocument, y: number): number
       align: "center",
       fill: "#e0e7ff",
       font: "Helvetica-Bold",
-      fontSize: 11
+      fontSize: 8.5
     });
     x += column.width;
   }
@@ -3772,12 +3777,14 @@ function drawGeneralStoreDataRow(
   y: number
 ): number {
   const values = [
-    { value: truncatePdfText(row.shopRef, 24), align: "left" as const },
+    { value: truncatePdfText(`${row.shopRef} / ${row.lastInventoryDate ? formatPdfDate(row.lastInventoryDate) : "sans inventaire"}`, 28), align: "left" as const },
+    { value: formatPdfNumber(row.transactionsCount), align: "center" as const },
     { value: formatPdfMoney(row.purchaseAmount), align: "right" as const },
     { value: formatPdfMoney(row.collectedAmount), align: "right" as const },
     { value: formatPdfMoney(row.balanceAmount), align: "right" as const },
-    { value: row.remainingStockValue ? formatPdfMoney(row.remainingStockValue) : "-", align: "right" as const },
-    { value: row.varianceAmount ? formatPdfMoney(row.varianceAmount) : "-", align: "right" as const }
+    { value: row.remainingStockValue !== null ? formatPdfMoney(row.remainingStockValue) : "-", align: "right" as const },
+    { value: row.estimatedSoldAmount !== null ? formatPdfMoney(row.estimatedSoldAmount) : "-", align: "right" as const },
+    { value: row.varianceAmount !== null ? formatPdfMoney(row.varianceAmount) : "-", align: "right" as const }
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
@@ -3800,6 +3807,13 @@ function drawGeneralStoreTotalsRow(doc: PDFKit.PDFDocument, report: GeneralStore
     fontSize: 11
   });
   x += GENERAL_STORE_PDF_COLUMNS[0].width;
+  drawPdfTableCell(doc, formatPdfNumber(report.totals.transactionsCount), x, y, GENERAL_STORE_PDF_COLUMNS[1].width, 27, {
+    align: "center",
+    fill: "#eef2ff",
+    font: "Helvetica-Bold",
+    fontSize: 10
+  });
+  x += GENERAL_STORE_PDF_COLUMNS[1].width;
 
   const values = [
     formatPdfMoney(report.totals.purchaseAmount),
@@ -3807,7 +3821,7 @@ function drawGeneralStoreTotalsRow(doc: PDFKit.PDFDocument, report: GeneralStore
     formatPdfMoney(report.totals.balanceAmount)
   ];
   for (let index = 0; index < values.length; index += 1) {
-    const column = GENERAL_STORE_PDF_COLUMNS[index + 1];
+    const column = GENERAL_STORE_PDF_COLUMNS[index + 2];
     drawPdfTableCell(doc, values[index], x, y, column.width, 27, {
       align: "right",
       fill: "#eef2ff",
@@ -3817,7 +3831,7 @@ function drawGeneralStoreTotalsRow(doc: PDFKit.PDFDocument, report: GeneralStore
     x += column.width;
   }
 
-  for (let index = 4; index < GENERAL_STORE_PDF_COLUMNS.length; index += 1) {
+  for (let index = 5; index < GENERAL_STORE_PDF_COLUMNS.length; index += 1) {
     const column = GENERAL_STORE_PDF_COLUMNS[index];
     drawPdfTableCell(doc, "", x, y, column.width, 27, { fill: "#eef2ff" });
     x += column.width;
@@ -3875,6 +3889,103 @@ function drawGeneralStoreOperationsTable(doc: PDFKit.PDFDocument, report: Genera
   doc.y = drawGeneralStoreTotalsRow(doc, report, y) + 12;
 }
 
+function drawGeneralStoreSupplementaryTables(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  const drawSection = (title: string, columns: PdfTableColumn[], rows: string[][], emptyText: string): void => {
+    const sectionHeight = 20 + 25 + Math.max(1, rows.length) * 24;
+    if (doc.y + sectionHeight > tableBottom) {
+      doc.addPage();
+      drawGeneralStoreContinuationHeader(doc, report);
+    }
+    doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(12)
+      .text(title, margin, doc.y, { width });
+    let y = doc.y + 20;
+    const drawHeader = (): void => {
+      let x = margin;
+      for (const column of columns) {
+        drawPdfTableCell(doc, column.label, x, y, column.width, 25, {
+          align: "center", fill: "#e0e7ff", font: "Helvetica-Bold", fontSize: 8.5
+        });
+        x += column.width;
+      }
+      y += 25;
+    };
+    drawHeader();
+    if (rows.length === 0) {
+      drawPdfTableCell(doc, emptyText, margin, y, width, 30, {
+        align: "left", fontSize: 8.5
+      });
+      doc.y = y + 42;
+      return;
+    }
+    const shownRows = rows;
+    for (const row of shownRows) {
+      if (y + 24 > tableBottom) {
+        doc.addPage();
+        drawGeneralStoreContinuationHeader(doc, report);
+        doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(10)
+          .text(`${title} (suite)`, margin, doc.y, { width });
+        y = doc.y + 18;
+        drawHeader();
+      }
+      let x = margin;
+      columns.forEach((column, index) => {
+        drawPdfTableCell(doc, row[index] ?? "", x, y, column.width, 24, {
+          align: column.align, fontSize: rows.length === 0 ? 8.5 : 8
+        });
+        x += column.width;
+      });
+      y += 24;
+    }
+    doc.y = y + 14;
+  };
+
+  const summaryColumns: PdfTableColumn[] = [
+    { label: "NATURE DE L'OPÉRATION", width: width * 0.56, align: "left" },
+    { label: "LIGNES", width: width * 0.16, align: "center" },
+    { label: "MONTANT", width: width * 0.28, align: "right" }
+  ];
+  drawSection("Répartition des mouvements", summaryColumns, report.breakdownRows.map((row) => [
+    row.operationLabel, formatPdfNumber(row.transactionsCount), formatPdfMoney(row.amount)
+  ]), "Aucun mouvement comptabilisé à la date de situation.");
+
+  const detailColumns: PdfTableColumn[] = [
+    { label: "DATE", width: width * 0.10, align: "center" },
+    { label: "BOUTIQUE", width: width * 0.18, align: "left" },
+    { label: "NATURE", width: width * 0.15, align: "left" },
+    { label: "DÉSIGNATION / MOTIF", width: width * 0.39, align: "left" },
+    { label: "MONTANT", width: width * 0.18, align: "right" }
+  ];
+  drawSection(`Opérations détaillées (${formatPdfNumber(report.operationRows.length)} ligne(s))`, detailColumns,
+    report.operationRows.map((row) => [
+      formatPdfDate(row.date), truncatePdfText(row.shopRef, 22),
+      `${row.operationKind === "ACHAT" ? "Achat" : "Recouvrement"} (${row.status === "APPROVED" ? "approuvée" : "soumise"})`,
+      truncatePdfText(row.designation, 50), formatPdfMoney(row.amount)
+    ]), "Aucune opération détaillée disponible.");
+}
+
+function drawGeneralStoreReadingNote(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
+  const margin = PDF_PAGE_MARGIN;
+  const width = doc.page.width - margin * 2;
+  const height = 48;
+  if (needsPdfPageBreak(doc, height + 10)) {
+    doc.addPage();
+    drawGeneralStoreContinuationHeader(doc, report);
+  }
+  const y = doc.y;
+  doc.roundedRect(margin, y, width, height, 4).fill("#f8fafc");
+  doc.roundedRect(margin, y, width, height, 4).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
+  doc.fillColor("#334155").font("Helvetica").fontSize(8.3).text(
+    "Lecture : les totaux incluent les opérations soumises et approuvées. Le solde dû est calculé sur les achats livrés et recouvrements cumulés jusqu'à la date de situation. *Le vendu estimé et l'écart sont calculés à la date du dernier inventaire : achats enregistrés à cette date moins stock évalué, puis comparaison aux recouvrements de cette même date. L'estimation suppose que le stock initial est nul ou déjà intégré; elle reste à rapprocher des ventes constatées et peut inclure des montants à recouvrer ou des pertes de stock.",
+    margin + 9,
+    y + 7,
+    { width: width - 18, height: height - 12 }
+  );
+  doc.y = y + height + 10;
+}
+
 function drawGeneralStorePdfFooter(
   doc: PDFKit.PDFDocument,
   pageNumber: number,
@@ -3907,22 +4018,14 @@ function renderGeneralStoreReportsPdf(
   overview: ReportsOverview,
   filters: ReportPeriodFilter
 ): void {
-  const report = overview.generalStoreOperationsReport ?? buildEmptyGeneralStoreOperationsReport(filters);
+  const report = overview.generalStoreOperationsReport ?? buildEmptyGeneralStoreOperationsReport();
 
   drawGeneralStoreReportHeader(doc, report);
   drawGeneralStoreMetadataStrip(doc, report, filters, overview.generatedAt);
   drawGeneralStoreMetricCards(doc, report);
+  drawGeneralStoreReadingNote(doc, report);
   drawGeneralStoreOperationsTable(doc, report);
-
-  const note =
-    "Lecture: le solde dû correspond aux achats livrés moins le total déjà recouvré. L'écart compare la valeur vendue estimée (achats moins stock restant au dernier inventaire) au total recouvré: un écart positif signale un montant encore attendu ou une perte de stock.";
-  const noteWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
-  const noteHeight = doc.heightOfString(note, { width: noteWidth });
-  if (doc.y + noteHeight <= doc.page.height - PDF_CONTENT_BOTTOM) {
-    doc.fillColor("#486581").font("Helvetica-Bold").fontSize(10).text(note, PDF_PAGE_MARGIN, doc.y, {
-      width: noteWidth
-    });
-  }
+  drawGeneralStoreSupplementaryTables(doc, report);
 }
 
 function buildEmptyFoodOperationsReport(filters: ReportPeriodFilter): FoodOperationsReport {
@@ -8095,6 +8198,7 @@ function buildGeneralStoreOperationsReportRows(overview: ReportsOverview): Array
   return (overview.generalStoreOperationsReport?.rows ?? []).map((item) => ({
     shopRef: item.shopRef,
     location: item.location,
+    transactionsCount: item.transactionsCount,
     lastOperationDate: item.lastOperationDate,
     purchaseAmount: item.purchaseAmount,
     collectedAmount: item.collectedAmount,
@@ -8105,6 +8209,45 @@ function buildGeneralStoreOperationsReportRows(overview: ReportsOverview): Array
     varianceAmount: item.varianceAmount ?? "",
     currency: item.currency
   }));
+}
+
+function buildGeneralStoreOperationDetailRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.generalStoreOperationsReport?.operationRows ?? []).map((item) => ({
+    date: item.date,
+    shopRef: item.shopRef,
+    operationKind: item.operationKind,
+    status: item.status,
+    designation: item.designation,
+    amount: item.amount,
+    currency: item.currency
+  }));
+}
+
+function buildGeneralStoreOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
+  return (overview.generalStoreOperationsReport?.breakdownRows ?? []).map((item) => ({
+    operationKind: item.operationKind,
+    operationLabel: item.operationLabel,
+    transactionsCount: item.transactionsCount,
+    amount: item.amount,
+    currency: item.currency
+  }));
+}
+
+function buildGeneralStoreReadingRows(): Array<Record<string, unknown>> {
+  return [
+    {
+      indicator: "Périmètre",
+      definition: "Achats, recouvrements et nombres d'opérations soumises ou approuvées sont cumulés depuis l'historique jusqu'à la date de situation (date de fin sélectionnée, ou date du jour)."
+    },
+    {
+      indicator: "Vendu estimé",
+      definition: "Achats reportables enregistrés jusqu'au dernier inventaire moins la valeur du stock restant à cet inventaire. L'estimation suppose un stock initial nul ou déjà intégré."
+    },
+    {
+      indicator: "Écart",
+      definition: "Vendu estimé moins les recouvrements enregistrés jusqu'à la date du même inventaire. À rapprocher des ventes constatées; un écart peut aussi représenter des créances ou pertes de stock."
+    }
+  ];
 }
 
 function buildFoodOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
@@ -9665,34 +9808,6 @@ function buildGeneralStoreOperationsReport(
   const asOfDate = resolveGeneralStoreAsOfDate(filters);
   const asOfIso = asOfDate.toISOString();
 
-  const ledgerByShop = new Map<string, GeneralStoreShopLedger>();
-  for (const transaction of reportableTransactions) {
-    if (transaction.occurredAt > asOfIso) {
-      continue;
-    }
-    const shopKey = transaction.metadata.shopRef?.trim();
-    if (!shopKey) {
-      continue;
-    }
-    const ledger = ledgerByShop.get(shopKey) ?? {
-      purchaseValue: 0,
-      collectedValue: 0,
-      lastOperationAt: null,
-      transactionsCount: 0
-    };
-    const amount = toNumberAmount(transaction.amount);
-    if (getGeneralStoreTransactionKind(transaction) === "ACHAT") {
-      ledger.purchaseValue += amount;
-    } else {
-      ledger.collectedValue += amount;
-    }
-    ledger.transactionsCount += 1;
-    if (!ledger.lastOperationAt || transaction.occurredAt > ledger.lastOperationAt) {
-      ledger.lastOperationAt = transaction.occurredAt;
-    }
-    ledgerByShop.set(shopKey, ledger);
-  }
-
   const inventoryByShop = new Map<string, GeneralStoreInventoryCheckpoint>();
   for (const snapshot of inventorySnapshots) {
     if (snapshot.recordedAt > asOfIso) {
@@ -9708,15 +9823,77 @@ function buildGeneralStoreOperationsReport(
     });
   }
 
+  const ledgerByShop = new Map<string, GeneralStoreShopLedger>();
+  const inventoryLedgerByShop = new Map<string, { purchaseValue: number; collectedValue: number }>();
+  const operationRows: GeneralStoreOperationsReport["operationRows"] = [];
+  const breakdownByKind = new Map<"ACHAT" | "RECOUVREMENT", { count: number; amount: number }>();
+  const asOfTransactions = reportableTransactions
+    .filter((transaction) => transaction.occurredAt <= asOfIso)
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+  for (const transaction of asOfTransactions) {
+    const shopKey = transaction.metadata.shopRef?.trim();
+    if (!shopKey) {
+      continue;
+    }
+    const ledger = ledgerByShop.get(shopKey) ?? {
+      purchaseValue: 0,
+      collectedValue: 0,
+      lastOperationAt: null,
+      transactionsCount: 0
+    };
+    const amount = toNumberAmount(transaction.amount);
+    const operationKind = getGeneralStoreTransactionKind(transaction);
+    if (operationKind === "ACHAT") {
+      ledger.purchaseValue += amount;
+    } else {
+      ledger.collectedValue += amount;
+    }
+    const inventoryCheckpoint = inventoryByShop.get(shopKey);
+    if (inventoryCheckpoint && transaction.occurredAt <= inventoryCheckpoint.recordedAt) {
+      const inventoryLedger = inventoryLedgerByShop.get(shopKey) ?? { purchaseValue: 0, collectedValue: 0 };
+      if (operationKind === "ACHAT") {
+        inventoryLedger.purchaseValue += amount;
+      } else {
+        inventoryLedger.collectedValue += amount;
+      }
+      inventoryLedgerByShop.set(shopKey, inventoryLedger);
+    }
+    operationRows.push({
+      date: toReportDate(transaction.occurredAt),
+      shopRef: shopKey,
+      operationKind,
+      status: transaction.status === "APPROVED" ? "APPROVED" : "SUBMITTED",
+      designation: transaction.description?.trim() || (operationKind === "ACHAT" ? "Achat de marchandises" : "Recouvrement client"),
+      amount: toMoneyString(amount),
+      currency: "XOF"
+    });
+    const breakdown = breakdownByKind.get(operationKind) ?? { count: 0, amount: 0 };
+    breakdown.count += 1;
+    breakdown.amount += amount;
+    breakdownByKind.set(operationKind, breakdown);
+    ledger.transactionsCount += 1;
+    if (!ledger.lastOperationAt || transaction.occurredAt > ledger.lastOperationAt) {
+      ledger.lastOperationAt = transaction.occurredAt;
+    }
+    ledgerByShop.set(shopKey, ledger);
+  }
+
   function buildRow(shopKey: string, location: string, ledger: GeneralStoreShopLedger | undefined) {
     const purchaseValue = ledger?.purchaseValue ?? 0;
     const collectedValue = ledger?.collectedValue ?? 0;
     const checkpoint = inventoryByShop.get(shopKey);
-    const estimatedSoldValue = checkpoint ? purchaseValue - checkpoint.remainingStockValue : null;
-    const varianceValue = estimatedSoldValue !== null ? estimatedSoldValue - collectedValue : null;
+    const inventoryLedger = inventoryLedgerByShop.get(shopKey);
+    const estimatedSoldValue = checkpoint
+      ? (inventoryLedger?.purchaseValue ?? 0) - checkpoint.remainingStockValue
+      : null;
+    const collectedAtInventoryValue = checkpoint ? inventoryLedger?.collectedValue ?? 0 : null;
+    const varianceValue = estimatedSoldValue !== null
+      ? estimatedSoldValue - (collectedAtInventoryValue ?? 0)
+      : null;
     return {
       shopRef: shopKey,
       location,
+      transactionsCount: ledger?.transactionsCount ?? 0,
       lastOperationDate: ledger?.lastOperationAt ?? "",
       purchaseAmount: toMoneyString(purchaseValue),
       collectedAmount: toMoneyString(collectedValue),
@@ -9756,11 +9933,24 @@ function buildGeneralStoreOperationsReport(
     (sum, ledger) => sum + ledger.transactionsCount,
     0
   );
+  const breakdownRows: GeneralStoreOperationsReport["breakdownRows"] = (["ACHAT", "RECOUVREMENT"] as const)
+    .map((operationKind) => {
+      const item = breakdownByKind.get(operationKind) ?? { count: 0, amount: 0 };
+      return {
+        operationKind,
+        operationLabel: operationKind === "ACHAT" ? "Achats de marchandises" : "Recouvrements clients",
+        transactionsCount: item.count,
+        amount: toMoneyString(item.amount),
+        currency: "XOF" as const
+      };
+    });
 
   return {
-    periodLabel: toDisplayPeriodLabel(filters),
+    periodLabel: `Cumul au ${formatPdfDate(asOfIso)}`,
     asOfLabel: formatPdfDate(asOfIso),
     rows,
+    operationRows,
+    breakdownRows,
     totals: {
       shopsCount: rows.length,
       purchaseAmount: toMoneyString(totalsAcc.purchaseValue),
@@ -12661,6 +12851,7 @@ export async function getCompanyReportsOverview(
   const shouldLoadGeneralStoreData = !filters.activityCode || filters.activityCode === "GENERAL_STORE";
   const shouldLoadHardwareData = !filters.activityCode || filters.activityCode === "HARDWARE";
   const shouldLoadBtpData = !filters.activityCode || filters.activityCode === "BTP";
+  const asOfDate = filters.dateTo;
 
   const [
     financeByStatus,
@@ -12690,25 +12881,25 @@ export async function getCompanyReportsOverview(
       listReportOperationalTransactions(actor.companyId, filters),
       listReportOperationalTasks(actor.companyId, filters),
       shouldLoadRentalData
-        ? listReportRentalTransactions(actor.companyId)
+        ? listReportRentalTransactions(actor.companyId, asOfDate)
         : Promise.resolve([] as ReportOperationalTransaction[]),
       shouldLoadRentalData
         ? listRentalTenants({ companyId: actor.companyId, activeOnly: true })
         : Promise.resolve([] as RentalTenant[]),
       shouldLoadGeneralStoreData
-        ? listReportGeneralStoreTransactions(actor.companyId)
+        ? listReportGeneralStoreTransactions(actor.companyId, asOfDate)
         : Promise.resolve([] as ReportOperationalTransaction[]),
       shouldLoadGeneralStoreData
         ? listGeneralStoreShops({ companyId: actor.companyId, activeOnly: true })
         : Promise.resolve([] as GeneralStoreShop[]),
       shouldLoadGeneralStoreData
-        ? listReportGeneralStoreInventorySnapshots(actor.companyId)
+        ? listReportGeneralStoreInventorySnapshots(actor.companyId, asOfDate)
         : Promise.resolve([] as GeneralStoreInventorySnapshot[]),
       shouldLoadHardwareData
-        ? listReportHardwareTransactions(actor.companyId)
+        ? listReportHardwareTransactions(actor.companyId, asOfDate)
         : Promise.resolve([] as ReportOperationalTransaction[]),
       shouldLoadBtpData
-        ? listReportBtpTransactions(actor.companyId)
+        ? listReportBtpTransactions(actor.companyId, asOfDate)
         : Promise.resolve([] as ReportOperationalTransaction[]),
       shouldLoadBtpData
         ? listBtpProjects({ companyId: actor.companyId, activeOnly: true })
@@ -13024,6 +13215,7 @@ export async function exportCompanyTransactionsExcel(
       columns: [
         "shopRef",
         "location",
+        "transactionsCount",
         "lastOperationDate",
         "purchaseAmount",
         "collectedAmount",
@@ -13034,6 +13226,21 @@ export async function exportCompanyTransactionsExcel(
         "varianceAmount",
         "currency"
       ]
+    },
+    {
+      name: "MagasinsMouvements",
+      rows: buildGeneralStoreOperationDetailRows(overview),
+      columns: ["date", "shopRef", "operationKind", "status", "designation", "amount", "currency"]
+    },
+    {
+      name: "MagasinsSynthese",
+      rows: buildGeneralStoreOperationsBreakdownRows(overview),
+      columns: ["operationKind", "operationLabel", "transactionsCount", "amount", "currency"]
+    },
+    {
+      name: "MagasinsLecture",
+      rows: buildGeneralStoreReadingRows(),
+      columns: ["indicator", "definition"]
     },
     {
       name: "Alimentation",
@@ -13516,6 +13723,7 @@ export async function exportCompanyTasksExcel(
       columns: [
         "shopRef",
         "location",
+        "transactionsCount",
         "lastOperationDate",
         "purchaseAmount",
         "collectedAmount",
@@ -13526,6 +13734,21 @@ export async function exportCompanyTasksExcel(
         "varianceAmount",
         "currency"
       ]
+    },
+    {
+      name: "MagasinsMouvements",
+      rows: buildGeneralStoreOperationDetailRows(overview),
+      columns: ["date", "shopRef", "operationKind", "status", "designation", "amount", "currency"]
+    },
+    {
+      name: "MagasinsSynthese",
+      rows: buildGeneralStoreOperationsBreakdownRows(overview),
+      columns: ["operationKind", "operationLabel", "transactionsCount", "amount", "currency"]
+    },
+    {
+      name: "MagasinsLecture",
+      rows: buildGeneralStoreReadingRows(),
+      columns: ["indicator", "definition"]
     },
     {
       name: "Alimentation",
