@@ -3949,7 +3949,7 @@ function drawGeneralStoreReadingNote(doc: PDFKit.PDFDocument, report: GeneralSto
   doc.roundedRect(margin, y, width, height, 4).fill("#f8fafc");
   doc.roundedRect(margin, y, width, height, 4).strokeColor("#c7d2fe").lineWidth(0.8).stroke();
   doc.fillColor("#334155").font("Helvetica").fontSize(8.3).text(
-    "Lecture : les totaux incluent les opérations soumises et approuvées. Le solde dû est calculé sur les achats livrés et recouvrements cumulés jusqu'à la date de situation. *Le vendu estimé et l'écart sont calculés à la date du dernier inventaire : achats enregistrés à cette date moins stock évalué, puis comparaison aux recouvrements de cette même date. L'estimation suppose que le stock initial est nul ou déjà intégré; elle reste à rapprocher des ventes constatées et peut inclure des montants à recouvrer ou des pertes de stock.",
+    "Lecture : les totaux incluent les opérations soumises et approuvées. Le solde dû est calculé sur les achats livrés et recouvrements cumulés jusqu'à la date de situation. *Le vendu estimé et l'écart sont calculés à la date du dernier inventaire : achats enregistrés à cette date moins stock évalué, puis comparaison aux recouvrements de cette même date. L'estimation suppose que le stock initial est nul ou déjà intégré. Elle reste à rapprocher des ventes constatées et n'est pas affichée si les achats enregistrés ne couvrent pas le stock déclaré.",
     margin + 9,
     y + 7,
     { width: width - 18, height: height - 12 }
@@ -8212,7 +8212,7 @@ function buildGeneralStoreReadingRows(): Array<Record<string, unknown>> {
     },
     {
       indicator: "Vendu estimé",
-      definition: "Achats reportables enregistrés jusqu'au dernier inventaire moins la valeur du stock restant à cet inventaire. L'estimation suppose un stock initial nul ou déjà intégré."
+      definition: "Achats reportables enregistrés jusqu'au dernier inventaire moins la valeur du stock restant à cet inventaire. L'estimation suppose un stock initial nul ou déjà intégré et n'est calculée que si les achats couvrent le stock déclaré."
     },
     {
       indicator: "Écart",
@@ -9854,8 +9854,11 @@ function buildGeneralStoreOperationsReport(
     const collectedValue = ledger?.collectedValue ?? 0;
     const checkpoint = inventoryByShop.get(shopKey);
     const inventoryLedger = inventoryLedgerByShop.get(shopKey);
-    const estimatedSoldValue = checkpoint
-      ? (inventoryLedger?.purchaseValue ?? 0) - checkpoint.remainingStockValue
+    const recordedPurchaseValue = inventoryLedger?.purchaseValue ?? 0;
+    // This estimate assumes recorded purchases cover the counted stock. A lower
+    // purchase total would turn opening stock into a misleading negative sale.
+    const estimatedSoldValue = checkpoint && recordedPurchaseValue > 0 && recordedPurchaseValue >= checkpoint.remainingStockValue
+      ? recordedPurchaseValue - checkpoint.remainingStockValue
       : null;
     const collectedAtInventoryValue = checkpoint ? inventoryLedger?.collectedValue ?? 0 : null;
     const varianceValue = estimatedSoldValue !== null

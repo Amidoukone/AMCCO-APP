@@ -1520,8 +1520,8 @@ export function ReportsPage(): JSX.Element {
                 approuvées; le statut est indiqué dans le détail. Vendu estimé et écart sont calculés à la date du
                 dernier inventaire : achats jusqu'à cette date moins le stock restant, puis comparaison
                 aux recouvrements constatés à cette même date. Cet indicateur doit être rapproché des ventes
-                réelles; il suppose un stock initial nul ou déjà intégré et peut aussi refléter un stock
-                manquant.
+                réelles; il suppose un stock initial nul ou déjà intégré. Il reste vide si les achats
+                enregistrés ne couvrent pas le stock déclaré.
               </p>
               <div className="reports-data-grid">
                 <article className="reports-table-panel">

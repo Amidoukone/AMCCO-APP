@@ -1612,6 +1612,78 @@ describe("reporting.service", () => {
     expect(unfilteredResult.agricultureOperationsReport?.periodLabel).toBe("Toutes périodes");
   });
 
+  it("does not infer sales from stock when a boutique has no recorded purchases", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([]);
+    vi.mocked(listReportGeneralStoreTransactions).mockResolvedValue([]);
+    vi.mocked(listGeneralStoreShops).mockResolvedValue([
+      {
+        id: "shop-nioumala",
+        companyId: actor.companyId,
+        name: "Boutique Nioumala",
+        location: null,
+        phone: null,
+        isActive: true,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z")
+      }
+    ]);
+    vi.mocked(listReportGeneralStoreInventorySnapshots).mockResolvedValue([
+      {
+        shopRef: "Boutique Nioumala",
+        remainingStockValue: "1200000.00",
+        recordedAt: "2026-09-20T09:00:00.000Z"
+      }
+    ]);
+
+    const result = await getCompanyReportsOverview(actor, {
+      activityCode: "GENERAL_STORE",
+      dateTo: "2026-10-01T23:59:59.999Z"
+    });
+
+    expect(result.generalStoreOperationsReport?.rows).toEqual([
+      expect.objectContaining({
+        shopRef: "Boutique Nioumala",
+        transactionsCount: 0,
+        purchaseAmount: "0.00",
+        collectedAmount: "0.00",
+        balanceAmount: "0.00",
+        remainingStockValue: "1200000.00",
+        estimatedSoldAmount: null,
+        varianceAmount: null
+      })
+    ]);
+
+    const pdf = await exportCompanyReportsPdf(actor, {
+      activityCode: "GENERAL_STORE",
+      dateTo: "2026-10-01T23:59:59.999Z"
+    });
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(extractPdfText(pdf)).not.toContain("-1 200 000");
+
+    vi.mocked(listTransactionsForExport).mockResolvedValue([]);
+    const workbookBuffer = await exportCompanyTransactionsExcel(actor, {
+      activityCode: "GENERAL_STORE",
+      dateTo: "2026-10-01T23:59:59.999Z"
+    });
+    const workbook = XLSX.read(workbookBuffer, { type: "buffer" });
+    const storeRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.Magasins!);
+    expect(storeRows).toEqual([
+      expect.objectContaining({
+        shopRef: "Boutique Nioumala",
+        purchaseAmount: "0.00",
+        remainingStockValue: "1200000.00",
+        estimatedSoldAmount: "",
+        varianceAmount: ""
+      })
+    ]);
+  });
+
   it("builds the général store opérations report as a per-boutique ledger", async () => {
     vi.mocked(listReportFinanceByStatus).mockResolvedValue([
       { status: "APPROVED", currency: "XOF", count: 3, totalAmount: "190000.00" }
@@ -1762,6 +1834,11 @@ describe("reporting.service", () => {
         shopRef: "Boutique Nord",
         remainingStockValue: "10000.00",
         recordedAt: "2026-10-08T09:00:00.000Z"
+      },
+      {
+        shopRef: "Boutique Sud",
+        remainingStockValue: "1200000.00",
+        recordedAt: "2026-09-20T09:00:00.000Z"
       }
     ]);
 
@@ -1788,7 +1865,7 @@ describe("reporting.service", () => {
         purchaseAmount: "50000.00",
         collectedAmount: "0.00",
         balanceAmount: "50000.00",
-        remainingStockValue: null,
+        remainingStockValue: "1200000.00",
         estimatedSoldAmount: null,
         varianceAmount: null,
         currency: "XOF"
@@ -1845,6 +1922,7 @@ describe("reporting.service", () => {
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    expect(extractPdfText(pdf)).not.toContain("-1 150 000");
     expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
 
     vi.mocked(listTransactionsForExport).mockResolvedValue([]);
