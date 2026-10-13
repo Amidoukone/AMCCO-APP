@@ -85,8 +85,15 @@ import {
 const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
 const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
 const TRANSACTIONS_PAGE_SIZE = 100;
+const TRANSACTIONS_MOBILE_PAGE_SIZE = 30;
 const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 10;
+function getTransactionsFetchPageSize(): number {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
+    ? TRANSACTIONS_MOBILE_PAGE_SIZE
+    : TRANSACTIONS_PAGE_SIZE;
+}
+
 const STORE_OPERATION_KIND_KEY = "storeOperationKind";
 type StoreOperationKind = "ACHAT" | "RECOUVREMENT";
 const STORE_OPERATION_LABELS: Record<StoreOperationKind, string> = {
@@ -3191,6 +3198,7 @@ function isAccountVisibleForSelectedActivity(
 }
 
 export function FinanceTransactionsPage(): JSX.Element {
+  const [transactionsFetchPageSize] = useState(getTransactionsFetchPageSize);
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -3854,6 +3862,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     const offset = options?.offset ?? 0;
     const append = options?.append === true;
     const silent = options?.silent === true;
+    const pageSize = transactionsFetchPageSize;
     if (isLoadingActivities) {
       setIsLoadingMoreTransactions(false);
       return;
@@ -3874,7 +3883,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         }
 
         const transactionsResp = await listFinanceTransactionsRequest(accessToken, {
-          limit: TRANSACTIONS_PAGE_SIZE,
+          limit: pageSize,
           offset,
           type: filters.type === "ALL" ? undefined : filters.type,
           activityCode: selectedActivityCode
@@ -3882,7 +3891,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         return { transactions: transactionsResp.items };
       });
       if (requestId !== transactionsLoadRequestRef.current) return;
-      setHasMoreTransactions(payload.transactions.length === TRANSACTIONS_PAGE_SIZE);
+      setHasMoreTransactions(payload.transactions.length === pageSize);
       if (
         !append &&
         selectedActivityCode &&
@@ -3936,7 +3945,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         }
       }
     }
-  }, [activeCompany?.id, filters.type, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, filters.type, isLoadingActivities, selectedActivityCode, transactionsFetchPageSize, withAuthorizedToken]);
 
   const loadSectorSuggestionHistory = useCallback(async () => {
     const requestId = ++sectorSuggestionLoadRequestRef.current;
@@ -3957,7 +3966,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listFinanceTransactionsRequest(accessToken, {
-          limit: TRANSACTIONS_PAGE_SIZE,
+          limit: transactionsFetchPageSize,
           activityCode: selectedActivityCode
         })
       );
@@ -3975,6 +3984,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     isLoadingActivities,
     isTransactionFormExpanded,
     selectedActivityCode,
+    transactionsFetchPageSize,
     withAuthorizedToken
   ]);
 
@@ -4163,13 +4173,13 @@ export function FinanceTransactionsPage(): JSX.Element {
     });
   }
 
-  function renderVisibleTransactionsPagination(): JSX.Element | null {
+  function renderVisibleTransactionsPagination(placement: "top" | "bottom" = "top"): JSX.Element | null {
     if (displayTransactions.length === 0) {
       return null;
     }
 
     return (
-      <div className="list-pagination finance-transactions-pagination">
+      <div className={`list-pagination finance-transactions-pagination mobile-pagination-${placement}`}>
         <div className="finance-transactions-pagination-meta">
           <p className="hint list-pagination-meta">
             Transactions {visibleTransactionsRange.start} à {visibleTransactionsRange.end} sur{" "}
@@ -7672,15 +7682,15 @@ export function FinanceTransactionsPage(): JSX.Element {
               </tbody>
             </table>
           </div>
-          <div className="list-pagination">
-            <p className="hint list-pagination-meta">
-              {displayTransactions.length} transaction(s) filtrée(s)
-              {displayTransactions.length !== transactions.length
-                ? ` sur ${transactions.length} chargee(s)`
-                : ""}
-              {hasMoreTransactions ? " sur plusieurs pages." : "."}
-            </p>
-            {hasMoreTransactions ? (
+          {hasMoreTransactions ? (
+            <div className="list-pagination">
+              <p className="hint list-pagination-meta">
+                {displayTransactions.length} transaction(s) filtrée(s)
+                {displayTransactions.length !== transactions.length
+                  ? ` sur ${transactions.length} chargee(s)`
+                  : ""}
+                {" sur plusieurs pages."}
+              </p>
               <button
                 type="button"
                 className="secondary-btn"
@@ -7689,8 +7699,9 @@ export function FinanceTransactionsPage(): JSX.Element {
               >
                 {isLoadingMoreTransactions ? "Chargement..." : "Charger plus"}
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
+          {renderVisibleTransactionsPagination("bottom")}
           </>
         ) : null}
       </section>

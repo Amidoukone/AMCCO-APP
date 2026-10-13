@@ -64,8 +64,15 @@ import type { DailyActivityCategory } from "../types/daily-activity-categories";
 import type { GeneralStoreOperationsReportRow } from "../types/reporting";
 
 const TASKS_PAGE_SIZE = 200;
+const TASKS_MOBILE_PAGE_SIZE = 40;
 const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const DEFAULT_TASKS_VISIBLE_PAGE_SIZE = 10;
+function getTasksFetchPageSize(): number {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
+    ? TASKS_MOBILE_PAGE_SIZE
+    : TASKS_PAGE_SIZE;
+}
+
 const AGRICULTURE_TASK_KIND_KEY = "agricultureTaskKind";
 type AgricultureTaskKind =
   | "PREPARATION"
@@ -552,6 +559,7 @@ function createDefaultTaskForm(): {
 }
 
 export function OperationsTasksPage(): JSX.Element {
+  const [tasksFetchPageSize] = useState(getTasksFetchPageSize);
   const navigate = useNavigate();
   const location = useLocation();
   const { activeCompany, user } = useAuth();
@@ -775,6 +783,7 @@ export function OperationsTasksPage(): JSX.Element {
     const offset = options?.offset ?? 0;
     const append = options?.append === true;
     const silent = options?.silent === true;
+    const pageSize = tasksFetchPageSize;
     if (isLoadingActivities) {
       setIsLoadingMoreTasks(false);
       return;
@@ -796,7 +805,7 @@ export function OperationsTasksPage(): JSX.Element {
     setErrorMessage(null);
     try {
       const query = {
-        limit: TASKS_PAGE_SIZE,
+        limit: pageSize,
         offset,
         status: filters.status === "ALL" ? undefined : filters.status,
         activityCode: selectedActivityCode,
@@ -807,7 +816,7 @@ export function OperationsTasksPage(): JSX.Element {
         listOperationsTasksRequest(accessToken, query)
       );
       if (requestId !== tasksLoadRequestRef.current) return;
-      setHasMoreTasks(taskResponse.items.length === TASKS_PAGE_SIZE);
+      setHasMoreTasks(taskResponse.items.length === pageSize);
       setTasks((prev) => {
         if (!append) {
           return taskResponse.items;
@@ -847,6 +856,7 @@ export function OperationsTasksPage(): JSX.Element {
     filters.status,
     isLoadingActivities,
     selectedActivityCode,
+    tasksFetchPageSize,
     withAuthorizedToken
   ]);
 
@@ -1090,13 +1100,13 @@ export function OperationsTasksPage(): JSX.Element {
     });
   }
 
-  function renderVisibleTasksPagination(): JSX.Element | null {
+  function renderVisibleTasksPagination(placement: "top" | "bottom" = "top"): JSX.Element | null {
     if (displayTasks.length === 0) {
       return null;
     }
 
     return (
-      <div className="list-pagination list-view-pagination">
+      <div className={`list-pagination list-view-pagination mobile-pagination-${placement}`}>
         <div className="list-view-pagination-meta">
           <p className="hint list-pagination-meta">
             Tâches {visibleTasksRange.start} à {visibleTasksRange.end} sur {displayTasks.length} affichée(s)
@@ -1280,7 +1290,7 @@ export function OperationsTasksPage(): JSX.Element {
             response.item,
             ...prev.filter((task) => task.id !== response.item.id)
           ]);
-          if (tasks.length + 1 >= TASKS_PAGE_SIZE) {
+          if (tasks.length + 1 >= tasksFetchPageSize) {
             setHasMoreTasks(true);
           }
           setAssignments((prev) => ({
@@ -2709,13 +2719,13 @@ export function OperationsTasksPage(): JSX.Element {
               );
             })}
           </div>
-          <div className="list-pagination">
-            <p className="hint list-pagination-meta">
-              {displayTasks.length} tâche(s) affichée(s)
-              {displayTasks.length !== tasks.length ? ` sur ${tasks.length} chargée(s)` : ""}
-              {hasMoreTasks ? " sur plusieurs pages." : "."}
-            </p>
-            {hasMoreTasks ? (
+          {hasMoreTasks ? (
+            <div className="list-pagination">
+              <p className="hint list-pagination-meta">
+                {displayTasks.length} tâche(s) affichée(s)
+                {displayTasks.length !== tasks.length ? ` sur ${tasks.length} chargée(s)` : ""}
+                {" sur plusieurs pages."}
+              </p>
               <button
                 type="button"
                 className="secondary-btn"
@@ -2724,8 +2734,9 @@ export function OperationsTasksPage(): JSX.Element {
               >
                 {isLoadingMoreTasks ? "Chargement..." : "Charger plus"}
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
+          {renderVisibleTasksPagination("bottom")}
           </>
         ) : null}
       </section>
