@@ -100,6 +100,33 @@ describe("dump truck transaction validation", () => {
     })).toThrow(/nombre de voyages multiplié/);
   });
 
+  it("requires a route and prevents the AMCCO share from exceeding the gross amount", () => {
+    const base = {
+      type: "CASH_IN" as const,
+      amount: "420000",
+      currency: "XOF",
+      description: "Travaux camion benne",
+      metadata: {
+        transportService: "Gestion camion benne",
+        transportCategory: "Camion benne",
+        dumpTruckOperationKind: "TRAVAUX",
+        assetType: "Camion benne",
+        vehicleRef: "AB-1234-MD",
+        quantity: "3",
+        purchaseUnitPrice: "140000",
+        amccoAmount: "450000"
+      }
+    };
+
+    expect(() => assertTransactionInputMatchesActivityProfile("TRANSPORT", base))
+      .toThrow(/trajet, chantier ou ordre de mission/);
+
+    expect(() => assertTransactionInputMatchesActivityProfile("TRANSPORT", {
+      ...base,
+      metadata: { ...base.metadata, routeRef: "Koursalé" }
+    })).toThrow(/part AMCCO ne peut pas dépasser/);
+  });
+
   it("requires an expense category for truck maintenance and other charges", () => {
     expect(() => assertTransactionInputMatchesActivityProfile("TRANSPORT", {
       type: "CASH_OUT",

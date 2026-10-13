@@ -7592,6 +7592,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                             const nextMetadata = {
                               ...prev.metadata,
                               [DUMP_TRUCK_OPERATION_KEY]: operationKind,
+                              ...(operationKind !== "VERSEMENT_AMCCO" ? { counterpartyRef: "" } : {}),
                               ...(!workOrRental
                                 ? { quantity: "", purchaseUnitPrice: "", amccoAmount: "" }
                                 : {}),

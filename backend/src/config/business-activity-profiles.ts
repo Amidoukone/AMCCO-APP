@@ -1893,6 +1893,9 @@ export function assertTransactionInputMatchesActivityProfile(
       throw new Error("Le client ou partenaire concerné par le versement est requis.");
     }
     if (operationKind === "TRAVAUX" || operationKind === "LOCATION") {
+      if (!metadata.routeRef?.trim()) {
+        throw new Error("Le trajet, chantier ou ordre de mission est requis pour les travaux ou locations.");
+      }
       if (!metadata.quantity?.trim() || !metadata.purchaseUnitPrice?.trim()) {
         throw new Error("Le nombre de voyages et le prix unitaire sont requis pour les travaux ou locations.");
       }
@@ -1919,6 +1922,12 @@ export function assertTransactionInputMatchesActivityProfile(
       const amccoAmount = Number(metadata.amccoAmount.trim().replace(/\s/g, "").replace(",", "."));
       if (!Number.isFinite(amccoAmount) || amccoAmount < 0) {
         throw new Error("La part AMCCO doit être un montant positif ou nul.");
+      }
+      if (
+        (operationKind === "TRAVAUX" || operationKind === "LOCATION") &&
+        amccoAmount > Number(input.amount ?? "")
+      ) {
+        throw new Error("La part AMCCO ne peut pas dépasser le montant total des travaux ou de la location.");
       }
     }
   }
