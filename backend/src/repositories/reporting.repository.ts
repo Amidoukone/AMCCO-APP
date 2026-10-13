@@ -944,6 +944,8 @@ export type DailyActivitiesReport = {
 
 export type HydrocarbonOperationsReportRow = {
   date: string;
+  categoryLabel: string;
+  assetRef: string;
   direction: "CASH_IN" | "CASH_OUT";
   description: string;
   status: "SUBMITTED" | "APPROVED";

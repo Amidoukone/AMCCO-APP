@@ -7229,6 +7229,10 @@ export function FinanceTransactionsPage(): JSX.Element {
                 const isFieldRequired = field.required || (
                   selectedActivityCode === "BEVERAGE_DEPOT" && beverageRequiredFields.includes(field.key)
                 ) || (
+                  selectedActivityCode === "HYDROCARBON" &&
+                  transactionForm.metadata.hydrocarbonCategory === "Citerne" &&
+                  field.key === "hydrocarbonAssetRef"
+                ) || (
                   selectedActivityCode === "TRANSPORT" &&
                   transactionForm.metadata.transportCategory === "Camion benne" &&
                   (field.key === DUMP_TRUCK_OPERATION_KEY ||

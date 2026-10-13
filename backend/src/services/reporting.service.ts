@@ -2309,8 +2309,10 @@ function renderHydrocarbonReportsPdf(
 
   const transactionColumns: PdfTableColumn[] = [
     { label: "DATE", width: 72, align: "center" },
-    { label: "SENS", width: 90, align: "center" },
-    { label: "DESCRIPTION", width: availableWidth - 72 - 90 - 132, align: "left" },
+    { label: "CATÉGORIE", width: 84, align: "center" },
+    { label: "RÉFÉRENCE", width: 84, align: "center" },
+    { label: "SENS", width: 66, align: "center" },
+    { label: "DESCRIPTION", width: availableWidth - 72 - 84 - 84 - 66 - 132, align: "left" },
     { label: "MONTANT", width: 132, align: "right" }
   ];
   drawHydrocarbonTable(
@@ -2320,6 +2322,8 @@ function renderHydrocarbonReportsPdf(
     transactionColumns,
     report.rows.map((row) => [
       formatPdfDate(row.date),
+      row.categoryLabel,
+      row.assetRef,
       row.direction === "CASH_IN" ? "Entrée" : "Sortie",
       row.description,
       formatHydrocarbonMoney(row.amount, row.currency)
@@ -8891,6 +8895,8 @@ function buildHydrocarbonOperationsReport(
 
     return {
       date: toReportDate(item.occurredAt),
+      categoryLabel: item.metadata.hydrocarbonCategory?.trim() || "Non classé",
+      assetRef: item.metadata.hydrocarbonAssetRef?.trim() || "-",
       direction: item.type,
       description: item.description?.trim() || "—",
       status: item.status as "SUBMITTED" | "APPROVED",

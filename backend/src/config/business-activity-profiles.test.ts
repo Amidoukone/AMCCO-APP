@@ -36,6 +36,8 @@ describe("dump truck transaction validation", () => {
       .toContain("Camion benne");
     expect(profile.reporting.operationalDimensions?.map((dimension) => dimension.key))
       .toContain("dumpTruckOperationKind");
+    expect(profile.finance.metadataFields?.find((field) => field.key === "transportCategory")?.options)
+      .not.toContain("Citerne");
   });
 
   it("keeps existing transport transactions valid without the dump truck category", () => {
@@ -157,5 +159,42 @@ describe("dump truck transaction validation", () => {
         vehicleRef: "AB-1234-MD"
       }
     })).toThrow(/client ou partenaire/);
+  });
+});
+
+describe("hydrocarbon cistern category", () => {
+  it("places Citerne in Hydrocarbure with a traceable equipment reference", () => {
+    const profile = getBusinessActivityProfile("HYDROCARBON");
+    const categoryField = profile.finance.metadataFields?.find((field) => field.key === "hydrocarbonCategory");
+
+    expect(categoryField?.required).toBe(true);
+    expect(categoryField?.options).toContain("Citerne");
+    expect(profile.finance.metadataFields?.map((field) => field.key)).toContain("hydrocarbonAssetRef");
+    expect(profile.reporting.operationalDimensions?.map((entry) => entry.key))
+      .toContain("hydrocarbonAssetRef");
+  });
+
+  it("requires a reference for cistern transactions while accepting other categories", () => {
+    const base = {
+      type: "CASH_IN" as const,
+      amount: "100000",
+      currency: "XOF",
+      description: "Opération hydrocarbure"
+    };
+
+    expect(() => assertTransactionInputMatchesActivityProfile("HYDROCARBON", {
+      ...base,
+      metadata: { hydrocarbonCategory: "Citerne" }
+    })).toThrow(/référence de la citerne/);
+
+    expect(() => assertTransactionInputMatchesActivityProfile("HYDROCARBON", {
+      ...base,
+      metadata: { hydrocarbonCategory: "Citerne", hydrocarbonAssetRef: "CT-001" }
+    })).not.toThrow();
+
+    expect(() => assertTransactionInputMatchesActivityProfile("HYDROCARBON", {
+      ...base,
+      metadata: { hydrocarbonCategory: "Carburant" }
+    })).not.toThrow();
   });
 });

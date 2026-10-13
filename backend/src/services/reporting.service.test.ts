@@ -622,7 +622,8 @@ describe("reporting.service", () => {
     vi.mocked(listReportOperationalTransactions).mockResolvedValue([
       {
         activityCode: "HYDROCARBON", status: "APPROVED", type: "CASH_IN", amount: "120000.00", currency: "XOF",
-        description: "Vente de gasoil", occurredAt: "2026-07-02T09:00:00.000Z", metadata: {}
+        description: "Vente de gasoil", occurredAt: "2026-07-02T09:00:00.000Z",
+        metadata: { hydrocarbonCategory: "Citerne", hydrocarbonAssetRef: "CT-001" }
       },
       {
         activityCode: "HYDROCARBON", status: "SUBMITTED", type: "CASH_OUT", amount: "45000.00", currency: "XOF",
@@ -660,6 +661,9 @@ describe("reporting.service", () => {
     const overview = await getCompanyReportsOverview(actor, filters);
     expect(overview.hydrocarbonOperationsReport).toMatchObject({
       totals: { transactionsCount: 4, tasksCount: 4, doneTasksCount: 1, openTasksCount: 2, blockedTasksCount: 1 },
+      rows: expect.arrayContaining([
+        expect.objectContaining({ categoryLabel: "Citerne", assetRef: "CT-001" })
+      ]),
       currencySummaries: [
         { currency: "XOF", transactionsCount: 2, cashInAmount: "120000.00", cashOutAmount: "45000.00", netAmount: "75000.00" },
         { currency: "EUR", transactionsCount: 1, cashInAmount: "250.50", cashOutAmount: "0.00", netAmount: "250.50" },
@@ -680,6 +684,9 @@ describe("reporting.service", () => {
     expect(pdfText).toContain("250,5 EUR");
     expect(pdfText).toContain("-100,25 USD");
     expect(pdfText).toContain("Flux financiers détaillés");
+    expect(pdfText).toContain("CATÉGORIE");
+    expect(pdfText).toContain("Citerne");
+    expect(pdfText).toContain("CT-001");
     expect(pdfText).toContain("Approvisionnement cuve");
     expect(pdfText).toContain("Suivi des actions");
     expect(pdfText).toContain("À faire");

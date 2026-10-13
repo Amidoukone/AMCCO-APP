@@ -154,6 +154,47 @@ function makeBasicProfile(activityCode: BusinessActivityCode): BusinessActivityP
   });
 }
 
+function makeHydrocarbonProfile(): BusinessActivityProfile {
+  const basicProfile = makeBasicProfile("HYDROCARBON");
+  return {
+    ...basicProfile,
+    operationsModel: "Suivi des citernes, équipements, approvisionnements et ventes de produits hydrocarbures.",
+    finance: {
+      ...basicProfile.finance,
+      requiresDescription: true,
+      fields: [
+        field("accountId", "Compte", true, "Compte ou caisse concerné."),
+        field("amount", "Montant", true, "Montant encaissé ou dépensé."),
+        field("description", "Opération", true, "Produit, mouvement ou motif de la transaction.")
+      ],
+      metadataFields: [
+        field("hydrocarbonCategory", "Catégorie hydrocarbure", true, "Classe l'opération pour le suivi du secteur.", [
+          "Citerne", "Carburant", "Lubrifiant", "Autre"
+        ]),
+        field("hydrocarbonAssetRef", "Référence citerne / équipement", false, "Code ou immatriculation de la citerne, cuve ou équipement."),
+        field("quantity", "Quantité", false, "Volume ou quantité livré, vendu ou contrôlé."),
+        field("unit", "Unité", false, "Unité de mesure de la quantité.", ["Litre", "m³", "Unité"]),
+        field("counterpartyRef", "Fournisseur ou client", false, "Partenaire concerné par l'approvisionnement ou la vente.")
+      ],
+      workflow: [
+        workflow("CLASSIFY", "Catégoriser", "Chaque flux est rattaché à une catégorie hydrocarbure."),
+        workflow("TRACE", "Tracer l'équipement", "Les opérations liées aux citernes peuvent être retrouvées par leur référence."),
+        workflow("OVERVIEW", "Suivre les flux", "Les entrées et sorties alimentent le rapport Hydrocarbure.")
+      ]
+    },
+    reporting: {
+      ...basicProfile.reporting,
+      focusArea: "Suivi des flux et des équipements hydrocarbures",
+      exportSections: ["flux financiers", "catégories hydrocarbures", "citernes et équipements"],
+      operationalDimensions: [
+        dimension("hydrocarbonCategory", "Catégorie hydrocarbure", "Répartit les opérations entre citernes, carburants, lubrifiants et autres."),
+        dimension("hydrocarbonAssetRef", "Citerne / équipement", "Retrouve les mouvements associés à une citerne ou un équipement."),
+        dimension("counterpartyRef", "Fournisseur ou client", "Suit les partenaires associés aux flux.")
+      ]
+    }
+  };
+}
+
 const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityProfile> = {
   HARDWARE: makeProfile("HARDWARE", {
     operationsModel: "Achat d'articles de quincaillerie remis ensuite aux quincailliers, avec un bénéfice fixe par article.",
@@ -896,7 +937,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   TRANSPORT: makeProfile("TRANSPORT", {
-    operationsModel: "Transport avec location et gestion de camions bennes, tracteurs, citernes, rotations et charges véhicules.",
+    operationsModel: "Transport avec location et gestion de camions bennes, tracteurs, rotations et charges véhicules.",
     finance: {
       allowedTransactionTypes: ["CASH_IN", "CASH_OUT"],
       allowedCurrencies: ["XOF", "EUR", "USD"],
@@ -908,10 +949,10 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Vehicule ou mission", true, "Mission, client, véhicule ou charge concernée.")
       ],
       metadataFields: [
-        field("transportService", "Sous-section transport", true, "Location, gestion camion benne, tracteur ou citerne."),
-        { ...field("transportCategory", "Catégorie transport", false, "Type de véhicule ou d'activité transport."), options: ["Ambulances", "Corbillard", "Camion benne", "Tracteur", "Citerne", "Autre"] },
+        field("transportService", "Sous-section transport", true, "Location, gestion camion benne ou tracteur."),
+        { ...field("transportCategory", "Catégorie transport", false, "Type de véhicule ou d'activité transport."), options: ["Ambulances", "Corbillard", "Camion benne", "Tracteur", "Autre"] },
         field("dumpTruckOperationKind", "Opération camion benne", false, "Travaux, location, versement AMCCO ou charge.", ["TRAVAUX", "LOCATION", "VERSEMENT_AMCCO", "DEPENSE", "ENTRETIEN", "CARBURANT", "AUTRE"]),
-        field("assetType", "Type d'engin", true, "Camion benne, tracteur, citerne ou autre engin."),
+        field("assetType", "Type d'engin", true, "Camion benne, tracteur ou autre engin."),
         field("vehicleRef", "Référence véhicule", false, "Immatriculation ou code interne."),
         field("routeRef", "Trajet ou mission", false, "Trajet, chantier, client ou ordre de mission."),
         field("counterpartyRef", "Client ou partenaire", false, "Client, chauffeur ou partenaire concerné."),
@@ -934,15 +975,15 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       blockedRequiresAssignee: true,
       blockedAlertSeverity: "WARNING",
       fields: [
-        field("title", "Action transport", true, "Exemple: location, entretien, rotation ou contrôle citerne."),
+        field("title", "Action transport", true, "Exemple: location, entretien ou rotation."),
         field("description", "Vehicule ou mission", true, "Mission, client, véhicule ou problème à traiter."),
         field("assignedToId", "Responsable transport", true, "Chauffeur, gestionnaire ou responsable parc."),
         field("dueDate", "Échéance", true, "Les missions et entretiens doivent être dates.")
       ],
       metadataFields: [
-        field("transportService", "Sous-section transport", true, "Location, gestion camion benne, tracteur ou citerne."),
+        field("transportService", "Sous-section transport", true, "Location, gestion camion benne ou tracteur."),
         { ...field("transportCategory", "Catégorie transport", false, "Ambulances ou corbillard."), options: ["Ambulances", "Corbillard"] },
-        field("assetType", "Type d'engin", true, "Camion benne, tracteur, citerne ou autre engin."),
+        field("assetType", "Type d'engin", true, "Camion benne, tracteur ou autre engin."),
         field("vehicleRef", "Référence véhicule", false, "Immatriculation ou code interne."),
         field("routeRef", "Trajet ou mission", false, "Trajet, client ou ordre de mission.")
       ],
@@ -955,12 +996,12 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     },
     reporting: {
       focusArea: "Rentabilité et disponibilité du parc transport",
-      exportSections: ["locations", "camions bennes", "tracteurs", "citernes", "maintenance", "blocages"],
+      exportSections: ["locations", "camions bennes", "tracteurs", "maintenance", "blocages"],
       operationalDimensions: [
         dimension("transportService", "Sous-section transport", "Compare location et gestion d'engins."),
         dimension("transportCategory", "Catégorie transport", "Suit les nouvelles catégories transport."),
         dimension("dumpTruckOperationKind", "Opération camion benne", "Compare les travaux, locations, versements et charges des camions bennes."),
-        dimension("assetType", "Type d'engin", "Mesure les flux et blocages camions bennes, tracteurs et citernes."),
+        dimension("assetType", "Type d'engin", "Mesure les flux et blocages camions bennes et tracteurs."),
         dimension("vehicleRef", "Véhicule", "Suit rentabilité et disponibilité par véhicule."),
         dimension("routeRef", "Trajet ou chantier", "Suit les travaux et locations par destination."),
         dimension("counterpartyRef", "Client ou partenaire", "Suit les travaux et versements par interlocuteur."),
@@ -992,7 +1033,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
     }
   }),
   TRANSIT: makeBasicProfile("TRANSIT"),
-  HYDROCARBON: makeBasicProfile("HYDROCARBON"),
+  HYDROCARBON: makeHydrocarbonProfile(),
   HADJ: makeBasicProfile("HADJ"),
   MONEY_TRANSFER: makeProfile("MONEY_TRANSFER", {
     operationsModel: "Gestion des transactions Orange Money, Moov Money, Wave, Western Union, MoneyGram et Ria avec suivi caisse et rapprochement.",
@@ -1868,6 +1909,17 @@ export function assertTransactionInputMatchesActivityProfile(
       if (!Number.isFinite(amount) || Math.round(amount * 100) !== Math.round(quantity * unitPrice * 100)) {
         throw new Error("Le montant doit correspondre à la quantité multipliée par le prix unitaire.");
       }
+    }
+  }
+  if (activityCode === "HYDROCARBON") {
+    const metadata = input.metadata ?? {};
+    const category = metadata.hydrocarbonCategory?.trim();
+    const allowedCategories = ["Citerne", "Carburant", "Lubrifiant", "Autre"];
+    if (!category || !allowedCategories.includes(category)) {
+      throw new Error("Choisissez une catégorie hydrocarbure valide.");
+    }
+    if (category === "Citerne" && !metadata.hydrocarbonAssetRef?.trim()) {
+      throw new Error("La référence de la citerne ou de l'équipement est requise pour cette catégorie.");
     }
   }
   if (activityCode === "TRANSPORT" && input.metadata?.transportCategory === "Camion benne") {

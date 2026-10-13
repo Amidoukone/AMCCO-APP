@@ -81,7 +81,7 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
   {
     code: "TRANSPORT",
     label: "Transport",
-    description: "Location et gestion de camions bennes, tracteurs, citernes et rotations."
+    description: "Location et gestion de camions bennes, tracteurs et rotations."
   },
   {
     code: "MONEY_TRANSFER",
@@ -114,7 +114,7 @@ export const BUSINESS_ACTIVITIES: BusinessActivityDefinition[] = [
     description: "Achats de boissons, ventes par produit, dépenses d'exploitation, stocks et rapprochement journalier."
   },
   { code: "TRANSIT", label: "Transit", description: "Suivi général des opérations de transit." },
-  { code: "HYDROCARBON", label: "Hydrocarbure", description: "Suivi général des opérations liées aux hydrocarbures." },
+  { code: "HYDROCARBON", label: "Hydrocarbure", description: "Gestion des citernes, équipements, approvisionnements et ventes de produits hydrocarbures." },
   { code: "HADJ", label: "Hadj", description: "Suivi général des opérations liées au Hadj." },
   {
     code: "REAL_ESTATE_AGENCY",
