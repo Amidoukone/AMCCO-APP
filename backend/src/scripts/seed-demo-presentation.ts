@@ -226,6 +226,60 @@ const demoAccounts: DemoAccount[] = [
     allowedActivityCodes: ["GENERAL_STORE"]
   },
   {
+    key: "hardwareCash",
+    name: "Caisse quincaillerie Sabalibougou",
+    accountRef: "QUI-SAB-01",
+    balance: "1850000.00",
+    scopeType: "DEDICATED",
+    primaryActivityCode: "HARDWARE",
+    allowedActivityCodes: ["HARDWARE"]
+  },
+  {
+    key: "rentalCash",
+    name: "Compte locations immobilières",
+    accountRef: "LOC-BKO-01",
+    balance: "4200000.00",
+    scopeType: "DEDICATED",
+    primaryActivityCode: "RENTAL",
+    allowedActivityCodes: ["RENTAL"]
+  },
+  {
+    key: "beverageCash",
+    name: "Caisse dépôt de boissons Faladié",
+    accountRef: "BOI-FAL-01",
+    balance: "975000.00",
+    scopeType: "DEDICATED",
+    primaryActivityCode: "BEVERAGE_DEPOT",
+    allowedActivityCodes: ["BEVERAGE_DEPOT"]
+  },
+  {
+    key: "generalExpensesCash",
+    name: "Caisse dépenses de fonctionnement",
+    accountRef: "DEP-FONC-01",
+    balance: "650000.00",
+    scopeType: "DEDICATED",
+    primaryActivityCode: "GENERAL_EXPENSES",
+    allowedActivityCodes: ["GENERAL_EXPENSES"]
+  },
+  {
+    key: "dailyActivitiesCash",
+    name: "Compte protocoles et activités quotidiennes",
+    accountRef: "ACT-QUOT-01",
+    balance: "2100000.00",
+    scopeType: "DEDICATED",
+    primaryActivityCode: "DAILY_ACTIVITIES",
+    allowedActivityCodes: ["DAILY_ACTIVITIES"]
+  },
+  {
+    key: "servicesCash",
+    name: "Compte services divers",
+    accountRef: "SER-DIV-01",
+    balance: "1380000.00",
+    scopeType: "DEDICATED",
+    primaryActivityCode: "SERVICES",
+    allowedActivityCodes: ["SERVICES"]
+  },
+  {
     key: "btpCash",
     name: "Caisse chantier Bamako",
     accountRef: "BTP-BKO-A45",
@@ -936,6 +990,325 @@ function buildDemoTransactions(userIds: Map<string, string>): DemoTransaction[] 
       createdAt: daysFromNow(-2, 15, 10)
     },
     {
+      key: "hardware-stock-sabalibougou",
+      accountKey: "hardwareCash",
+      type: "CASH_OUT",
+      amount: "1200000.00",
+      currency: "XOF",
+      activityCode: "HARDWARE",
+      description: "Achat et remise de ciment à la quincaillerie Sabalibougou",
+      metadata: withSeedMarker({
+        hardwareOperationKind: "ITEM_ENTRY",
+        itemName: "Ciment CEM II 50 kg",
+        quantity: "150",
+        purchaseUnitPrice: "8000",
+        recipientRef: "Quincaillerie Sabalibougou",
+        supplierRef: "Ciments du Mali",
+        invoiceRef: "FAC-QUI-2026-118"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "accountant",
+      validatedByKey: "sysAdmin",
+      occurredAt: daysFromNow(-6, 9),
+      createdAt: daysFromNow(-6, 9, 20)
+    },
+    {
+      key: "hardware-collection-sabalibougou",
+      accountKey: "hardwareCash",
+      type: "CASH_IN",
+      amount: "375000.00",
+      currency: "XOF",
+      activityCode: "HARDWARE",
+      description: "Recouvrement partiel vente de ciment",
+      metadata: withSeedMarker({
+        hardwareOperationKind: "RECOUVREMENT",
+        itemName: "Ciment CEM II 50 kg",
+        quantity: "50",
+        recipientRef: "Quincaillerie Sabalibougou",
+        paymentReference: "REC-QUI-2026-044"
+      }),
+      status: "SUBMITTED",
+      requiresProof: false,
+      createdByKey: "storeLead",
+      occurredAt: daysFromNow(-1, 16),
+      createdAt: daysFromNow(-1, 16, 10)
+    },
+    {
+      key: "store-purchase-marche-rose",
+      accountKey: "storeCash",
+      type: "CASH_OUT",
+      amount: "550000.00",
+      currency: "XOF",
+      activityCode: "GENERAL_STORE",
+      description: "Réapprovisionnement du magasin Marché Rose",
+      metadata: withSeedMarker({
+        storeOperationKind: "ACHAT",
+        shopRef: "Magasin Marché Rose",
+        supplierRef: "Grossiste Dibida",
+        invoiceRef: "FAC-MR-2026-083"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "accountant",
+      validatedByKey: "supervisor",
+      occurredAt: daysFromNow(-5, 11),
+      createdAt: daysFromNow(-5, 11, 15)
+    },
+    {
+      key: "store-collection-marche-rose",
+      accountKey: "storeCash",
+      type: "CASH_IN",
+      amount: "275000.00",
+      currency: "XOF",
+      activityCode: "GENERAL_STORE",
+      description: "Versement hebdomadaire du magasin Marché Rose",
+      metadata: withSeedMarker({
+        storeOperationKind: "RECOUVREMENT",
+        shopRef: "Magasin Marché Rose",
+        paymentReference: "VERSEMENT-MR-2026-041"
+      }),
+      status: "APPROVED",
+      requiresProof: false,
+      createdByKey: "storeLead",
+      validatedByKey: "accountant",
+      occurredAt: daysFromNow(-2, 18),
+      createdAt: daysFromNow(-2, 18, 10)
+    },
+    {
+      key: "rental-payment-amadou-traore",
+      accountKey: "rentalCash",
+      type: "CASH_IN",
+      amount: "600000.00",
+      currency: "XOF",
+      activityCode: "RENTAL",
+      description: "Loyer mensuel d'octobre - Villa ACI 2000",
+      metadata: withSeedMarker({
+        rentalOperationKind: "LOYER",
+        tenantRef: "Amadou Traoré",
+        unitLabel: "Villa ACI 2000, porte 18",
+        monthlyRent: "600000.00",
+        paymentReference: "LOY-ACI-2026-10"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "accountant",
+      validatedByKey: "sysAdmin",
+      occurredAt: daysFromNow(-3, 10),
+      createdAt: daysFromNow(-3, 10, 20)
+    },
+    {
+      key: "beverage-stock-soda",
+      accountKey: "beverageCash",
+      type: "CASH_OUT",
+      amount: "102000.00",
+      currency: "XOF",
+      activityCode: "BEVERAGE_DEPOT",
+      description: "Réception de 12 cartons de boissons gazeuses",
+      metadata: withSeedMarker({
+        beverageOperationKind: "ACHAT_STOCK",
+        productName: "Soda 33 cl",
+        quantity: "12",
+        purchaseUnitPrice: "8500",
+        supplierRef: "Sodibo Mali",
+        invoiceRef: "FAC-SOD-2026-207"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "storeLead",
+      validatedByKey: "accountant",
+      occurredAt: daysFromNow(-4, 8),
+      createdAt: daysFromNow(-4, 8, 30)
+    },
+    {
+      key: "beverage-sale-soda",
+      accountKey: "beverageCash",
+      type: "CASH_IN",
+      amount: "55000.00",
+      currency: "XOF",
+      activityCode: "BEVERAGE_DEPOT",
+      description: "Vente de 5 cartons de soda au restaurant Le Baobab",
+      metadata: withSeedMarker({
+        beverageOperationKind: "VENTE",
+        productName: "Soda 33 cl",
+        quantity: "5",
+        purchaseUnitPrice: "8500",
+        saleUnitPrice: "11000",
+        buyerRef: "Restaurant Le Baobab",
+        paymentReference: "VENTE-BOI-2026-316"
+      }),
+      status: "APPROVED",
+      requiresProof: false,
+      createdByKey: "storeLead",
+      validatedByKey: "accountant",
+      occurredAt: daysFromNow(-2, 14),
+      createdAt: daysFromNow(-2, 14, 10)
+    },
+    {
+      key: "beverage-fuel-expense",
+      accountKey: "beverageCash",
+      type: "CASH_OUT",
+      amount: "18000.00",
+      currency: "XOF",
+      activityCode: "BEVERAGE_DEPOT",
+      description: "Carburant pour livraison des commandes",
+      metadata: withSeedMarker({
+        beverageOperationKind: "DEPENSE",
+        expenseCategory: "Carburant",
+        supplierRef: "Station Faladié",
+        invoiceRef: "REC-CARB-2026-036"
+      }),
+      status: "SUBMITTED",
+      requiresProof: true,
+      createdByKey: "storeLead",
+      occurredAt: daysFromNow(-1, 17),
+      createdAt: daysFromNow(-1, 17, 5)
+    },
+    {
+      key: "general-expense-pdg-fuel",
+      accountKey: "generalExpensesCash",
+      type: "CASH_OUT",
+      amount: "45000.00",
+      currency: "XOF",
+      activityCode: "GENERAL_EXPENSES",
+      description: "Carburant déplacement du PDG",
+      metadata: withSeedMarker({
+        generalExpenseKind: "PDG_TRANSPORT",
+        quantity: "30",
+        unitPrice: "1500"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "accountant",
+      validatedByKey: "sysAdmin",
+      occurredAt: daysFromNow(-7, 7),
+      createdAt: daysFromNow(-7, 7, 10)
+    },
+    {
+      key: "general-expense-employee-meals",
+      accountKey: "generalExpensesCash",
+      type: "CASH_OUT",
+      amount: "36000.00",
+      currency: "XOF",
+      activityCode: "GENERAL_EXPENSES",
+      description: "Repas équipe magasin - 12 personnes",
+      metadata: withSeedMarker({
+        generalExpenseKind: "EMPLOYEE_MEALS",
+        quantity: "12",
+        unitPrice: "3000"
+      }),
+      status: "SUBMITTED",
+      requiresProof: false,
+      createdByKey: "storeLead",
+      occurredAt: daysFromNow(-1, 12),
+      createdAt: daysFromNow(-1, 12, 10)
+    },
+    {
+      key: "agreement-payment-sahel-1",
+      accountKey: "dailyActivitiesCash",
+      type: "CASH_IN",
+      amount: "750000.00",
+      currency: "XOF",
+      activityCode: "DAILY_ACTIVITIES",
+      description: "Premier versement partenaire pour le protocole de distribution",
+      metadata: withSeedMarker({
+        dailyActivityKind: "Protocole d'accord",
+        agreementRef: "PA-SAHEL-2026-004",
+        partnerName: "Société Sahel Distribution",
+        financialOperationKind: "PARTNER_PAYMENT",
+        paymentReference: "VIR-PA-004-01"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "accountant",
+      validatedByKey: "sysAdmin",
+      occurredAt: daysFromNow(-8, 10),
+      createdAt: daysFromNow(-8, 10, 15)
+    },
+    {
+      key: "agreement-capital-return-sahel",
+      accountKey: "dailyActivitiesCash",
+      type: "CASH_OUT",
+      amount: "200000.00",
+      currency: "XOF",
+      activityCode: "DAILY_ACTIVITIES",
+      description: "Retour partiel de capital selon le protocole PA-SAHEL-2026-004",
+      metadata: withSeedMarker({
+        dailyActivityKind: "Protocole d'accord",
+        agreementRef: "PA-SAHEL-2026-004",
+        partnerName: "Société Sahel Distribution",
+        financialOperationKind: "CAPITAL_RETURN",
+        paymentReference: "RET-CAP-PA-004-01"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "accountant",
+      validatedByKey: "supervisor",
+      occurredAt: daysFromNow(-5, 11),
+      createdAt: daysFromNow(-5, 11, 15)
+    },
+    {
+      key: "agreement-partner-payment-sahel-2",
+      accountKey: "dailyActivitiesCash",
+      type: "CASH_IN",
+      amount: "600000.00",
+      currency: "XOF",
+      activityCode: "DAILY_ACTIVITIES",
+      description: "Deuxième versement partenaire, en attente de validation",
+      metadata: withSeedMarker({
+        dailyActivityKind: "Protocole d'accord",
+        agreementRef: "PA-SAHEL-2026-004",
+        partnerName: "Société Sahel Distribution",
+        financialOperationKind: "PARTNER_PAYMENT",
+        paymentReference: "VIR-PA-004-02"
+      }),
+      status: "SUBMITTED",
+      requiresProof: false,
+      createdByKey: "accountant",
+      occurredAt: daysFromNow(-1, 10),
+      createdAt: daysFromNow(-1, 10, 10)
+    },
+    {
+      key: "services-maintenance-it",
+      accountKey: "servicesCash",
+      type: "CASH_OUT",
+      amount: "75000.00",
+      currency: "XOF",
+      activityCode: "SERVICES",
+      description: "Intervention et maintenance du réseau informatique",
+      metadata: withSeedMarker({
+        serviceType: "Maintenance informatique",
+        clientRef: "Siège AMCCO",
+        invoiceRef: "PREST-IT-2026-052"
+      }),
+      status: "APPROVED",
+      requiresProof: true,
+      createdByKey: "supervisor",
+      validatedByKey: "accountant",
+      occurredAt: daysFromNow(-4, 13),
+      createdAt: daysFromNow(-4, 13, 15)
+    },
+    {
+      key: "services-cold-room-check",
+      accountKey: "servicesCash",
+      type: "CASH_IN",
+      amount: "125000.00",
+      currency: "XOF",
+      activityCode: "SERVICES",
+      description: "Contrôle et entretien chambre froide pour Restaurant Le Baobab",
+      metadata: withSeedMarker({
+        serviceType: "Contrôle chambre froide",
+        clientRef: "Restaurant Le Baobab",
+        deliverableRef: "RAP-INT-2026-031"
+      }),
+      status: "APPROVED",
+      requiresProof: false,
+      createdByKey: "supervisor",
+      validatedByKey: "accountant",
+      occurredAt: daysFromNow(-2, 16),
+      createdAt: daysFromNow(-2, 16, 15)
+    },
+    {
       key: "mining-equipment-draft",
       accountKey: "bankMain",
       type: "CASH_OUT",
@@ -1308,6 +1681,111 @@ const demoTasks: DemoTask[] = [
     assignedToKey: "storeLead",
     dueDate: daysFromNow(1, 8),
     createdAt: daysFromNow(0, 7, 15)
+  },
+  {
+    key: "task-beverage-inventory",
+    title: "Inventaire des boissons avant clôture",
+    description: "Compter les cartons de soda et rapprocher le stock physique avec les sorties de la semaine.",
+    activityCode: "BEVERAGE_DEPOT",
+    metadata: withSeedMarker({
+      beverageTaskKind: "INVENTAIRE",
+      productName: "Soda 33 cl",
+      quantity: "42",
+      purchaseUnitPrice: "8500",
+      stockValue: "357000"
+    }),
+    status: "IN_PROGRESS",
+    createdByKey: "supervisor",
+    assignedToKey: "storeLead",
+    dueDate: daysFromNow(0, 18),
+    createdAt: daysFromNow(0, 8, 10)
+  },
+  {
+    key: "task-beverage-reconciliation",
+    title: "Rapprocher la journée du dépôt de boissons",
+    description: "Comparer les ventes saisies aux remises en banque et documenter le reliquat.",
+    activityCode: "BEVERAGE_DEPOT",
+    metadata: withSeedMarker({
+      beverageTaskKind: "RAPPROCHEMENT",
+      periodDate: daysFromNow(-1).toISOString().slice(0, 10),
+      dailySales: "235000",
+      dailyDeposits: "200000",
+      dailyBalance: "35000",
+      dailyExpenses: "18000"
+    }),
+    status: "TODO",
+    createdByKey: "supervisor",
+    assignedToKey: "storeLead",
+    dueDate: daysFromNow(0, 19),
+    createdAt: daysFromNow(0, 8, 20)
+  },
+  {
+    key: "task-general-expense-proof",
+    title: "Récupérer le justificatif de carburant du PDG",
+    description: "Joindre le reçu de la station au paiement de fonctionnement correspondant.",
+    activityCode: "GENERAL_EXPENSES",
+    metadata: withSeedMarker({ generalExpenseKind: "PDG_TRANSPORT" }),
+    status: "TODO",
+    createdByKey: "supervisor",
+    assignedToKey: "accountant",
+    dueDate: daysFromNow(1, 12),
+    createdAt: daysFromNow(0, 9)
+  },
+  {
+    key: "task-daily-agreement-sahel",
+    title: "Protocole d'accord PA-SAHEL-2026-004",
+    description: "Suivre le financement de la distribution des produits dans les magasins partenaires.",
+    activityCode: "DAILY_ACTIVITIES",
+    metadata: withSeedMarker({
+      dailyActivityKind: "Protocole d'accord",
+      agreementRef: "PA-SAHEL-2026-004",
+      partnerName: "Société Sahel Distribution",
+      agreementType: "Financier",
+      agreementDate: daysFromNow(-8).toISOString().slice(0, 10),
+      agreementPurpose: "Financement d'un réseau de distribution en commerce général",
+      agreementCapitalAmount: "2500000",
+      agreementProfitAmount: "300000",
+      agreementPaymentAccount: "Compte protocoles et activités quotidiennes"
+    }),
+    status: "IN_PROGRESS",
+    createdByKey: "supervisor",
+    assignedToKey: "accountant",
+    dueDate: daysFromNow(14, 17),
+    createdAt: daysFromNow(-8, 9)
+  },
+  {
+    key: "task-daily-agreement-cooperative",
+    title: "Protocole de partenariat avec la Coopérative Bani",
+    description: "Suivre les engagements de mise en relation commerciale et la remise des documents.",
+    activityCode: "DAILY_ACTIVITIES",
+    metadata: withSeedMarker({
+      dailyActivityKind: "Protocole d'accord",
+      agreementRef: "PA-BANI-2026-002",
+      partnerName: "Coopérative Bani",
+      agreementType: "Non financier",
+      agreementDate: daysFromNow(-3).toISOString().slice(0, 10),
+      agreementPurpose: "Partenariat de mise en relation entre producteurs et magasins"
+    }),
+    status: "TODO",
+    createdByKey: "supervisor",
+    assignedToKey: "fieldLead",
+    dueDate: daysFromNow(5, 15),
+    createdAt: daysFromNow(-3, 11)
+  },
+  {
+    key: "task-services-maintenance",
+    title: "Clôturer l'intervention de maintenance informatique",
+    description: "Confirmer la remise du rapport et la résolution des incidents du réseau du siège.",
+    activityCode: "SERVICES",
+    metadata: withSeedMarker({
+      serviceType: "Maintenance informatique",
+      clientRef: "Siège AMCCO"
+    }),
+    status: "IN_PROGRESS",
+    createdByKey: "supervisor",
+    assignedToKey: "fieldLead",
+    dueDate: daysFromNow(2, 16),
+    createdAt: daysFromNow(-1, 9, 30)
   }
 ];
 
@@ -1575,6 +2053,81 @@ async function ensureCompanyActivities(connection: PoolConnection, companyId: st
         ON DUPLICATE KEY UPDATE is_enabled = 1
       `,
       [companyId, activityCode]
+    );
+  }
+}
+
+async function ensureDailyActivityCategories(
+  connection: PoolConnection,
+  companyId: string
+): Promise<void> {
+  const categoryNames = [
+    "Rendez-vous",
+    "Demande pour le PDG",
+    "Récupération de document",
+    "Décision prise",
+    "Nouveau partenaire",
+    "Protocole d'accord",
+    "Actualité / information",
+    "Autre"
+  ];
+
+  for (const name of categoryNames) {
+    await connection.execute(
+      `
+        INSERT INTO daily_activity_categories (id, company_id, name, is_active)
+        VALUES (?, ?, ?, 1)
+        ON DUPLICATE KEY UPDATE is_active = 1
+      `,
+      [stableUuid(`daily-activity-category:${companyId}:${name}`), companyId, name]
+    );
+  }
+}
+
+async function ensureRentalTenants(connection: PoolConnection, companyId: string): Promise<void> {
+  const tenants = [
+    {
+      key: "famille-keita",
+      name: "Famille Keita",
+      unitLabel: "Appartement 2B Hamdallaye",
+      monthlyRent: "450000.00",
+      phone: "+223 70 00 20 26",
+      tenancyStart: "2026-01"
+    },
+    {
+      key: "amadou-traore",
+      name: "Amadou Traoré",
+      unitLabel: "Villa ACI 2000, porte 18",
+      monthlyRent: "600000.00",
+      phone: "+223 70 00 40 26",
+      tenancyStart: "2026-03"
+    }
+  ];
+
+  for (const tenant of tenants) {
+    await connection.execute(
+      `
+        INSERT INTO rental_tenants (
+          id, company_id, name, unit_label, monthly_rent, phone, tenancy_start, is_active
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          unit_label = VALUES(unit_label),
+          monthly_rent = VALUES(monthly_rent),
+          phone = VALUES(phone),
+          tenancy_start = VALUES(tenancy_start),
+          is_active = 1
+      `,
+      [
+        stableUuid(`rental-tenant:${companyId}:${tenant.key}`),
+        companyId,
+        tenant.name,
+        tenant.unitLabel,
+        tenant.monthlyRent,
+        tenant.phone,
+        tenant.tenancyStart
+      ]
     );
   }
 }
@@ -2082,8 +2635,10 @@ async function seedDemoPresentationData(): Promise<void> {
 
     const companyId = await ensureCompany(connection);
     await ensureCompanyActivities(connection, companyId);
+    await ensureDailyActivityCategories(connection, companyId);
     const userIds = await ensureUsers(connection, companyId);
     const accountIds = await ensureAccounts(connection, companyId);
+    await ensureRentalTenants(connection, companyId);
     const transactionIds = await ensureTransactions(connection, companyId, userIds, accountIds);
     await ensureTransactionProofs(connection, companyId, transactionIds);
     const taskIds = await ensureTasks(connection, companyId, userIds);
