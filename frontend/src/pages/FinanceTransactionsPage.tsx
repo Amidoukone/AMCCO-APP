@@ -2282,6 +2282,19 @@ function getVisibleFinanceMetadataFields(
   metadata: Record<string, string>,
   fields: ActivityFieldDefinition[]
 ): ActivityFieldDefinition[] {
+  if (activityCode === "HYDROCARBON") {
+    const category = metadata.hydrocarbonCategory;
+    const visibleKeys = new Set([
+      "hydrocarbonCategory",
+      ...(category === "Citerne"
+        ? ["hydrocarbonAssetRef"]
+        : category
+          ? ["quantity", "unit", "counterpartyRef"]
+          : [])
+    ]);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
   if (activityCode === "LIVESTOCK") {
     const operationKind = getLivestockOperationKind(type, metadata);
     const visibleKeys = getLivestockVisibleKeys(operationKind);
@@ -7026,8 +7039,11 @@ export function FinanceTransactionsPage(): JSX.Element {
           </details>
 
           <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails}>
-            <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : "Détails de l'opération"}</summary>
+            <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : selectedActivityCode === "HYDROCARBON" ? "Détails Hydrocarbure" : "Détails de l'opération"}</summary>
             <div className="finance-transaction-form-options-body">
+              {selectedActivityCode === "HYDROCARBON" ? (
+                <p className="hint finance-form-mode-hint">Choisissez d'abord le produit ou l'équipement. La quantité et le partenaire sont utiles pour les produits ; la référence est demandée pour une citerne.</p>
+              ) : null}
               {selectedActivityCode === "TRANSPORT" ? (
                 <p className="hint finance-form-mode-hint">
                   Choisissez le type de véhicule. Pour un camion benne, sélectionnez ensuite l'opération ; le sens du flux et les détails utiles s'adaptent automatiquement.
@@ -7644,6 +7660,24 @@ export function FinanceTransactionsPage(): JSX.Element {
                           </option>
                         ))}
                       </select>
+                    </label>
+                  );
+                }
+
+                if (selectedActivityCode === "HYDROCARBON" && field.key === "counterpartyRef") {
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{transactionForm.type === "CASH_OUT" ? "Fournisseur" : "Client"}</span>
+                      <input
+                        type="text"
+                        placeholder={transactionForm.type === "CASH_OUT" ? "Nom du fournisseur" : "Nom du client"}
+                        value={transactionForm.metadata[field.key] ?? ""}
+                        onChange={(event) => setTransactionForm((prev) => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, [field.key]: event.target.value }
+                        }))}
+                        title={field.helpText}
+                      />
                     </label>
                   );
                 }

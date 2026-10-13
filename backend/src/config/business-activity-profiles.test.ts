@@ -246,4 +246,28 @@ describe("hydrocarbon cistern category", () => {
       metadata: { hydrocarbonCategory: "Carburant" }
     })).not.toThrow();
   });
+
+  it("provides simple hydrocarbon task details and validates cistern follow-up", () => {
+    const profile = getBusinessActivityProfile("HYDROCARBON");
+    const taskFields = profile.tasks.metadataFields ?? [];
+    expect(taskFields.map((field) => field.key)).toEqual([
+      "hydrocarbonCategory", "hydrocarbonTaskKind", "hydrocarbonAssetRef", "locationRef"
+    ]);
+    expect(taskFields.find((field) => field.key === "hydrocarbonTaskKind")?.options).toContain("ENTRETIEN");
+
+    const baseTask = {
+      title: "Contrôle de citerne",
+      metadata: { hydrocarbonCategory: "Citerne", hydrocarbonTaskKind: "CONTROLE" }
+    };
+    expect(() => assertTaskInputMatchesActivityProfile("HYDROCARBON", baseTask))
+      .toThrow(/référence de la citerne/);
+    expect(() => assertTaskInputMatchesActivityProfile("HYDROCARBON", {
+      ...baseTask,
+      metadata: { ...baseTask.metadata, hydrocarbonAssetRef: "CT-001" }
+    })).not.toThrow();
+    expect(() => assertTaskInputMatchesActivityProfile("HYDROCARBON", {
+      ...baseTask,
+      metadata: { hydrocarbonCategory: "Carburant", hydrocarbonTaskKind: "INCONNU" }
+    })).toThrow(/type d'action Hydrocarbure valide/);
+  });
 });

@@ -170,18 +170,36 @@ function makeHydrocarbonProfile(): BusinessActivityProfile {
         field("description", "Opération", true, "Produit, mouvement ou motif de la transaction.")
       ],
       metadataFields: [
-        field("hydrocarbonCategory", "Catégorie hydrocarbure", true, "Classe l'opération pour le suivi du secteur.", [
+        field("hydrocarbonCategory", "Produit ou équipement", true, "Choisissez l'élément concerné par l'entrée ou la sortie.", [
           "Citerne", "Carburant", "Lubrifiant", "Autre"
         ]),
-        field("hydrocarbonAssetRef", "Référence citerne / équipement", false, "Code ou immatriculation de la citerne, cuve ou équipement."),
-        field("quantity", "Quantité", false, "Volume ou quantité livré, vendu ou contrôlé."),
-        field("unit", "Unité", false, "Unité de mesure de la quantité.", ["Litre", "m³", "Unité"]),
-        field("counterpartyRef", "Fournisseur ou client", false, "Partenaire concerné par l'approvisionnement ou la vente.")
+        field("hydrocarbonAssetRef", "Référence citerne / équipement", false, "Code ou immatriculation pour retrouver la citerne, cuve ou l'équipement."),
+        field("quantity", "Quantité", false, "Volume approvisionné, vendu ou contrôlé."),
+        field("unit", "Unité", false, "Unité utilisée pour la quantité.", ["Litre", "m³", "Unité"]),
+        field("counterpartyRef", "Fournisseur ou client", false, "Fournisseur pour une sortie, client pour une entrée.")
       ],
       workflow: [
         workflow("CLASSIFY", "Catégoriser", "Chaque flux est rattaché à une catégorie hydrocarbure."),
         workflow("TRACE", "Tracer l'équipement", "Les opérations liées aux citernes peuvent être retrouvées par leur référence."),
         workflow("OVERVIEW", "Suivre les flux", "Les entrées et sorties alimentent le rapport Hydrocarbure.")
+      ]
+    },
+    tasks: {
+      ...basicProfile.tasks,
+      fields: [
+        field("title", "Action à suivre", true, "Exemple : réception de carburant ou contrôle de citerne."),
+        field("description", "Précisions", false, "Ajoutez les consignes utiles à l'intervention."),
+        field("dueDate", "Échéance", false, "Date prévue pour l'action.")
+      ],
+      metadataFields: [
+        field("hydrocarbonCategory", "Produit ou équipement", true, "Choisissez l'élément concerné.", [
+          "Citerne", "Carburant", "Lubrifiant", "Autre"
+        ]),
+        field("hydrocarbonTaskKind", "Type d'action", true, "Précise le suivi à effectuer.", [
+          "APPROVISIONNEMENT", "LIVRAISON_VENTE", "ENTRETIEN", "CONTROLE", "SUIVI_GENERAL"
+        ]),
+        field("hydrocarbonAssetRef", "Référence citerne / équipement", false, "Code ou immatriculation de l'équipement concerné."),
+        field("locationRef", "Lieu ou site", false, "Dépôt, station ou site concerné.")
       ]
     },
     reporting: {
@@ -2052,6 +2070,20 @@ export function assertTaskInputMatchesActivityProfile(
     const taskKind = metadata.transportTaskKind?.trim();
     if (taskKind && !["Mission", "Location", "Entretien", "Contrôle", "Réparation", "Autre"].includes(taskKind)) {
       throw new Error("Choisissez un type d'intervention Transport valide.");
+    }
+  }
+  if (activityCode === "HYDROCARBON") {
+    const metadata = input.metadata ?? {};
+    const categories = ["Citerne", "Carburant", "Lubrifiant", "Autre"];
+    const taskKinds = ["APPROVISIONNEMENT", "LIVRAISON_VENTE", "ENTRETIEN", "CONTROLE", "SUIVI_GENERAL"];
+    if (!categories.includes(metadata.hydrocarbonCategory?.trim() ?? "")) {
+      throw new Error("Choisissez un produit ou un équipement Hydrocarbure valide.");
+    }
+    if (!taskKinds.includes(metadata.hydrocarbonTaskKind?.trim() ?? "")) {
+      throw new Error("Choisissez un type d'action Hydrocarbure valide.");
+    }
+    if (metadata.hydrocarbonCategory === "Citerne" && !metadata.hydrocarbonAssetRef?.trim()) {
+      throw new Error("La référence de la citerne ou de l'équipement est requise pour cette tâche.");
     }
   }
   if (activityCode === "BEVERAGE_DEPOT") {

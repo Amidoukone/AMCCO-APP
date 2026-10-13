@@ -675,6 +675,11 @@ export function OperationsTasksPage(): JSX.Element {
     ? taskMetadataFields.filter((field) => [
         "transportCategory", "transportTaskKind", "vehicleRef", "routeRef"
       ].includes(field.key))
+    : selectedActivityCode === "HYDROCARBON"
+      ? taskMetadataFields.filter((field) =>
+          ["hydrocarbonCategory", "hydrocarbonTaskKind", "locationRef"].includes(field.key) ||
+          (field.key === "hydrocarbonAssetRef" && createForm.metadata.hydrocarbonCategory === "Citerne")
+        )
     : taskMetadataFields;
   const taskSearchTextById = useMemo(() => new Map(tasks.map((task) => [
     task.id,
@@ -1365,6 +1370,10 @@ export function OperationsTasksPage(): JSX.Element {
       const legacyAssetType = task.metadata.assetType?.trim() ?? "";
       metadata.transportCategory = categoryOptions.includes(legacyAssetType) ? legacyAssetType : "Autre";
     }
+    if (task.activityCode === "HYDROCARBON") {
+      metadata.hydrocarbonCategory ||= metadata.hydrocarbonAssetRef ? "Citerne" : "Autre";
+      metadata.hydrocarbonTaskKind ||= "SUIVI_GENERAL";
+    }
     setCreateForm({
       title: task.title,
       description: task.description ?? "",
@@ -1736,10 +1745,13 @@ export function OperationsTasksPage(): JSX.Element {
             )}
             {visibleTaskMetadataFields.length > 0 ? (
               <details className="operations-task-form-options" open={hasRequiredTaskMetadata}>
-                <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : "Champs liés au secteur"}</summary>
+                <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : selectedActivityCode === "HYDROCARBON" ? "Détails Hydrocarbure" : "Champs liés au secteur"}</summary>
                 <div className="operations-task-form-options-body">
                   {selectedActivityCode === "TRANSPORT" ? (
                     <p className="hint">Choisissez le véhicule concerné. Le trajet et la référence du véhicule sont facultatifs.</p>
+                  ) : null}
+                  {selectedActivityCode === "HYDROCARBON" ? (
+                    <p className="hint">Choisissez le produit ou l'équipement, puis le type de suivi. La référence est demandée pour une citerne.</p>
                   ) : null}
                   {visibleTaskMetadataFields.filter((field) => {
                     if (selectedActivityCode !== "DAILY_ACTIVITIES") return true;
@@ -1771,7 +1783,19 @@ export function OperationsTasksPage(): JSX.Element {
                           required={field.required || isRequiredDailyAgreementField(field.key, createForm.metadata)}
                         >
                           <option value="">Choisir une catégorie</option>
-                          {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                          {field.options.map((option) => (
+                            <option key={option} value={option}>
+                              {field.key === "hydrocarbonTaskKind"
+                                ? ({
+                                    APPROVISIONNEMENT: "Approvisionnement",
+                                    LIVRAISON_VENTE: "Livraison ou vente",
+                                    ENTRETIEN: "Entretien",
+                                    CONTROLE: "Contrôle",
+                                    SUIVI_GENERAL: "Suivi général"
+                                  } as Record<string, string>)[option] ?? option
+                                : option}
+                            </option>
+                          ))}
                         </select>
                       </label>
                     ) : field.key === AGRICULTURE_TASK_KIND_KEY && selectedActivityCode === "AGRICULTURE" ? (
@@ -2230,7 +2254,9 @@ export function OperationsTasksPage(): JSX.Element {
                           }))
                         }
                         title={field.helpText}
-                        required={field.required || isRequiredDailyAgreementField(field.key, createForm.metadata)}
+                        required={field.required ||
+                          (selectedActivityCode === "HYDROCARBON" && field.key === "hydrocarbonAssetRef" && createForm.metadata.hydrocarbonCategory === "Citerne") ||
+                          isRequiredDailyAgreementField(field.key, createForm.metadata)}
                       />
                     )
                   ))}
