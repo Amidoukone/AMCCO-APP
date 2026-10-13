@@ -120,6 +120,8 @@ function dimension(
   return { key, label, description };
 }
 
+const TRANSPORT_CATEGORY_OPTIONS = ["Ambulances", "Corbillard", "Camion benne", "Tracteur", "Autre"];
+
 function makeProfile(
   activityCode: BusinessActivityCode,
   input: Omit<BusinessActivityProfile, "activityCode" | "label">
@@ -949,15 +951,15 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         field("description", "Vehicule ou mission", true, "Mission, client, véhicule ou charge concernée.")
       ],
       metadataFields: [
-        field("transportService", "Sous-section transport", true, "Location, gestion camion benne ou tracteur."),
-        { ...field("transportCategory", "Catégorie transport", false, "Type de véhicule ou d'activité transport."), options: ["Ambulances", "Corbillard", "Camion benne", "Tracteur", "Autre"] },
+        field("transportService", "Sous-section transport", false, "Détail facultatif pour les anciens suivis."),
+        field("transportCategory", "Type de véhicule", true, "Choisissez le véhicule ou le service concerné.", TRANSPORT_CATEGORY_OPTIONS),
         field("dumpTruckOperationKind", "Opération camion benne", false, "Travaux, location, versement AMCCO ou charge.", ["TRAVAUX", "LOCATION", "VERSEMENT_AMCCO", "DEPENSE", "ENTRETIEN", "CARBURANT", "AUTRE"]),
-        field("assetType", "Type d'engin", true, "Camion benne, tracteur ou autre engin."),
-        field("vehicleRef", "Référence véhicule", false, "Immatriculation ou code interne."),
-        field("routeRef", "Trajet ou mission", false, "Trajet, chantier, client ou ordre de mission."),
-        field("counterpartyRef", "Client ou partenaire", false, "Client, chauffeur ou partenaire concerné."),
+        field("assetType", "Type d'engin", false, "Type d'engin conservé pour le suivi historique."),
+        field("vehicleRef", "Véhicule / immatriculation", false, "Code interne ou immatriculation du véhicule."),
+        field("routeRef", "Trajet / lieu", false, "Trajet, chantier ou lieu de l'opération."),
+        field("counterpartyRef", "Client / partenaire", false, "Client, chauffeur ou partenaire concerné."),
         field("quantity", "Nombre de voyages", false, "Nombre de voyages ou unités de location."),
-        field("purchaseUnitPrice", "Prix unitaire / voyage", false, "Prix par voyage indiqué sur le registre."),
+        field("purchaseUnitPrice", "Prix par voyage", false, "Prix unitaire pour les travaux ou locations."),
         field("amccoAmount", "Part AMCCO", false, "Montant à affecter à AMCCO pour ce travail ou cette location."),
         field("expenseCategory", "Nature de la dépense", false, "Carburant, pneus, entretien ou autre charge.", ["Carburant", "Pneus", "Entretien", "Réparation", "Autre"])
       ],
@@ -975,17 +977,18 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       blockedRequiresAssignee: true,
       blockedAlertSeverity: "WARNING",
       fields: [
-        field("title", "Action transport", true, "Exemple: location, entretien ou rotation."),
-        field("description", "Vehicule ou mission", true, "Mission, client, véhicule ou problème à traiter."),
+        field("title", "Action transport", true, "Exemple : effectuer un trajet ou entretenir un véhicule."),
+        field("description", "Détail de l'action", true, "Précisez le travail à effectuer et le lieu si nécessaire."),
         field("assignedToId", "Responsable transport", true, "Chauffeur, gestionnaire ou responsable parc."),
         field("dueDate", "Échéance", true, "Les missions et entretiens doivent être dates.")
       ],
       metadataFields: [
-        field("transportService", "Sous-section transport", true, "Location, gestion camion benne ou tracteur."),
-        { ...field("transportCategory", "Catégorie transport", false, "Ambulances ou corbillard."), options: ["Ambulances", "Corbillard"] },
-        field("assetType", "Type d'engin", true, "Camion benne, tracteur ou autre engin."),
-        field("vehicleRef", "Référence véhicule", false, "Immatriculation ou code interne."),
-        field("routeRef", "Trajet ou mission", false, "Trajet, client ou ordre de mission.")
+        field("transportService", "Sous-section transport", false, "Détail conservé pour les suivis existants."),
+        field("transportCategory", "Type de véhicule", true, "Choisissez le véhicule concerné.", TRANSPORT_CATEGORY_OPTIONS),
+        field("transportTaskKind", "Type d'intervention", false, "Nature de l'action à réaliser.", ["Mission", "Location", "Entretien", "Contrôle", "Réparation", "Autre"]),
+        field("assetType", "Type d'engin", false, "Type d'engin conservé pour le suivi historique."),
+        field("vehicleRef", "Véhicule / immatriculation", false, "Code interne ou immatriculation du véhicule."),
+        field("routeRef", "Trajet / lieu", false, "Trajet, chantier ou lieu de l'action.")
       ],
       workflow: [
         workflow("PLAN", "Planification mission", "La mission ou action parc est affectée et datée."),
@@ -1002,6 +1005,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
         dimension("transportCategory", "Catégorie transport", "Suit les nouvelles catégories transport."),
         dimension("dumpTruckOperationKind", "Opération camion benne", "Compare les travaux, locations, versements et charges des camions bennes."),
         dimension("assetType", "Type d'engin", "Mesure les flux et blocages camions bennes et tracteurs."),
+        dimension("transportTaskKind", "Type d'intervention", "Regroupe les missions, locations et interventions du parc."),
         dimension("vehicleRef", "Véhicule", "Suit rentabilité et disponibilité par véhicule."),
         dimension("routeRef", "Trajet ou chantier", "Suit les travaux et locations par destination."),
         dimension("counterpartyRef", "Client ou partenaire", "Suit les travaux et versements par interlocuteur."),
@@ -1849,6 +1853,12 @@ export function assertTransactionInputMatchesActivityProfile(
     profile.finance.metadataFields,
     input.metadata
   );
+  if (activityCode === "TRANSPORT") {
+    const category = input.metadata?.transportCategory?.trim();
+    if (category && !TRANSPORT_CATEGORY_OPTIONS.includes(category) && category !== "Citerne") {
+      throw new Error("Choisissez un type de véhicule Transport valide.");
+    }
+  }
   if (activityCode === "HARDWARE") {
     const operationKind = input.metadata?.hardwareOperationKind?.trim();
     if (operationKind === "ITEM_ENTRY" || operationKind === "RECOUVREMENT") {
@@ -2033,6 +2043,17 @@ export function assertTaskInputMatchesActivityProfile(
     profile.tasks.metadataFields,
     input.metadata
   );
+  if (activityCode === "TRANSPORT") {
+    const metadata = input.metadata ?? {};
+    const category = metadata.transportCategory?.trim();
+    if (category && !TRANSPORT_CATEGORY_OPTIONS.includes(category) && category !== "Citerne") {
+      throw new Error("Choisissez un type de véhicule Transport valide.");
+    }
+    const taskKind = metadata.transportTaskKind?.trim();
+    if (taskKind && !["Mission", "Location", "Entretien", "Contrôle", "Réparation", "Autre"].includes(taskKind)) {
+      throw new Error("Choisissez un type d'intervention Transport valide.");
+    }
+  }
   if (activityCode === "BEVERAGE_DEPOT") {
     const metadata = input.metadata ?? {};
     const taskKind = metadata.beverageTaskKind?.trim();

@@ -671,6 +671,11 @@ export function OperationsTasksPage(): JSX.Element {
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
   const hasRequiredTaskMetadata = taskMetadataFields.some((field) => field.required);
+  const visibleTaskMetadataFields = selectedActivityCode === "TRANSPORT"
+    ? taskMetadataFields.filter((field) => [
+        "transportCategory", "transportTaskKind", "vehicleRef", "routeRef"
+      ].includes(field.key))
+    : taskMetadataFields;
   const taskSearchTextById = useMemo(() => new Map(tasks.map((task) => [
     task.id,
     buildQuickSearchText([
@@ -1354,12 +1359,18 @@ export function OperationsTasksPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setTaskAttachmentFile(null);
+    const metadata = syncMetadataState(task.metadata, taskMetadataFields);
+    if (task.activityCode === "TRANSPORT" && !metadata.transportCategory) {
+      const categoryOptions = taskMetadataFields.find((field) => field.key === "transportCategory")?.options ?? [];
+      const legacyAssetType = task.metadata.assetType?.trim() ?? "";
+      metadata.transportCategory = categoryOptions.includes(legacyAssetType) ? legacyAssetType : "Autre";
+    }
     setCreateForm({
       title: task.title,
       description: task.description ?? "",
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : "",
       assignedToId: task.assignedToId ?? "",
-      metadata: syncMetadataState(task.metadata, taskMetadataFields)
+      metadata
     });
   }
 
@@ -1642,7 +1653,9 @@ export function OperationsTasksPage(): JSX.Element {
             <div className="operations-task-form-primary">
               <input
                 type="text"
-                placeholder="Titre de la tâche"
+                placeholder={selectedActivityCode === "TRANSPORT"
+                  ? "Ex. : Entretien du véhicule TR-001"
+                  : "Titre de la tâche"}
                 value={createForm.title}
                 onChange={(event) =>
                   setCreateForm((prev) => ({
@@ -1654,7 +1667,9 @@ export function OperationsTasksPage(): JSX.Element {
               />
               <textarea
                 placeholder={
-                  selectedProfile?.tasks.requiresDescription
+                  selectedActivityCode === "TRANSPORT"
+                    ? "Décrivez le trajet, l'intervention ou le problème à traiter."
+                    : selectedProfile?.tasks.requiresDescription
                     ? "Description requise"
                     : "Description facultative"
                 }
@@ -1719,11 +1734,14 @@ export function OperationsTasksPage(): JSX.Element {
                 <strong>Cette tâche vous sera attribuée.</strong>
               </div>
             )}
-            {taskMetadataFields.length > 0 ? (
+            {visibleTaskMetadataFields.length > 0 ? (
               <details className="operations-task-form-options" open={hasRequiredTaskMetadata}>
-                <summary>Champs liés au secteur</summary>
+                <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : "Champs liés au secteur"}</summary>
                 <div className="operations-task-form-options-body">
-                  {taskMetadataFields.filter((field) => {
+                  {selectedActivityCode === "TRANSPORT" ? (
+                    <p className="hint">Choisissez le véhicule concerné. Le trajet et la référence du véhicule sont facultatifs.</p>
+                  ) : null}
+                  {visibleTaskMetadataFields.filter((field) => {
                     if (selectedActivityCode !== "DAILY_ACTIVITIES") return true;
                     const isProtocol = createForm.metadata[DAILY_ACTIVITY_KIND_KEY] === DAILY_PROTOCOL_CATEGORY;
                     if (field.key.startsWith("agreement") && !isProtocol) return false;
@@ -1734,7 +1752,24 @@ export function OperationsTasksPage(): JSX.Element {
                     field.options?.length ? (
                       <label key={field.key} className="operations-inline-group">
                         <span>{field.label}</span>
-                        <select value={createForm.metadata[field.key] ?? ""} onChange={(event) => setCreateForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={field.required || isRequiredDailyAgreementField(field.key, createForm.metadata)}>
+                        <select
+                          value={createForm.metadata[field.key] ?? ""}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              metadata: {
+                                ...prev.metadata,
+                                [field.key]: value,
+                                ...(selectedActivityCode === "TRANSPORT" && field.key === "transportCategory"
+                                  ? { assetType: value }
+                                  : {})
+                              }
+                            }));
+                          }}
+                          title={field.helpText}
+                          required={field.required || isRequiredDailyAgreementField(field.key, createForm.metadata)}
+                        >
                           <option value="">Choisir une catégorie</option>
                           {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                         </select>

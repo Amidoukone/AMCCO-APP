@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertTaskInputMatchesActivityProfile,
   assertTransactionInputMatchesActivityProfile,
   getBusinessActivityProfile
 } from "./business-activity-profiles.js";
@@ -47,9 +48,18 @@ describe("dump truck transaction validation", () => {
       currency: "XOF",
       description: "Entretien tracteur",
       metadata: {
+        transportCategory: "Tracteur",
         transportService: "Gestion tracteur",
         assetType: "Tracteur"
       }
+    })).not.toThrow();
+
+    expect(() => assertTransactionInputMatchesActivityProfile("TRANSPORT", {
+      type: "CASH_OUT",
+      amount: "25000",
+      currency: "XOF",
+      description: "Ancien suivi citerne",
+      metadata: { transportCategory: "Citerne", assetType: "Citerne" }
     })).not.toThrow();
   });
 
@@ -159,6 +169,45 @@ describe("dump truck transaction validation", () => {
         vehicleRef: "AB-1234-MD"
       }
     })).toThrow(/client ou partenaire/);
+  });
+});
+
+describe("transport task validation", () => {
+  it("requires a supported vehicle category and accepts task details", () => {
+    const profile = getBusinessActivityProfile("TRANSPORT");
+    const fields = profile.tasks.metadataFields ?? [];
+    expect(fields.find((field) => field.key === "transportCategory")?.required).toBe(true);
+    expect(fields.find((field) => field.key === "transportTaskKind")?.options)
+      .toContain("Entretien");
+    expect(fields.find((field) => field.key === "assetType")?.required).toBe(false);
+
+    expect(() => assertTaskInputMatchesActivityProfile("TRANSPORT", {
+      description: "Entretenir le camion au dépôt",
+      assignedToId: "driver-1",
+      dueDate: "2026-10-20T09:00:00.000Z",
+      metadata: {
+        transportCategory: "Camion benne",
+        transportTaskKind: "Entretien",
+        vehicleRef: "TR-001"
+      }
+    })).not.toThrow();
+  });
+
+  it("rejects unsupported vehicle and intervention values", () => {
+    const base = {
+      description: "Vérifier le véhicule",
+      assignedToId: "driver-1",
+      dueDate: "2026-10-20T09:00:00.000Z"
+    };
+
+    expect(() => assertTaskInputMatchesActivityProfile("TRANSPORT", {
+      ...base,
+      metadata: { transportCategory: "Vélo" }
+    })).toThrow(/type de véhicule Transport valide/);
+    expect(() => assertTaskInputMatchesActivityProfile("TRANSPORT", {
+      ...base,
+      metadata: { transportCategory: "Tracteur", transportTaskKind: "Non reconnu" }
+    })).toThrow(/type d'intervention Transport valide/);
   });
 });
 

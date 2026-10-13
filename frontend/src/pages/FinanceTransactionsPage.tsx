@@ -1068,14 +1068,6 @@ const GENERAL_EXPENSES_METADATA_FIELDS = new Set([
   "unitPrice"
 ]);
 const DUMP_TRUCK_OPERATION_KEY = "dumpTruckOperationKind";
-const DUMP_TRUCK_ONLY_METADATA_FIELDS = new Set([
-  DUMP_TRUCK_OPERATION_KEY,
-  "counterpartyRef",
-  "quantity",
-  "purchaseUnitPrice",
-  "amccoAmount",
-  "expenseCategory"
-]);
 const DUMP_TRUCK_OPERATION_LABELS: Record<string, string> = {
   TRAVAUX: "Travaux",
   LOCATION: "Location",
@@ -2374,13 +2366,18 @@ function getVisibleFinanceMetadataFields(
 
   if (activityCode === "TRANSPORT") {
     if (metadata.transportCategory !== "Camion benne") {
-      return fields.filter((field) => !DUMP_TRUCK_ONLY_METADATA_FIELDS.has(field.key));
+      const visibleKeys = new Set([
+        "transportCategory",
+        "vehicleRef",
+        "routeRef",
+        "counterpartyRef",
+        ...(type === "CASH_OUT" ? ["expenseCategory"] : [])
+      ]);
+      return fields.filter((field) => visibleKeys.has(field.key));
     }
     const operationKind = metadata[DUMP_TRUCK_OPERATION_KEY] ?? "TRAVAUX";
     const visibleKeys = new Set([
-      "transportService",
       "transportCategory",
-      "assetType",
       "vehicleRef",
       "routeRef",
       DUMP_TRUCK_OPERATION_KEY,
@@ -4977,13 +4974,23 @@ export function FinanceTransactionsPage(): JSX.Element {
     setTransactionProofFile(null);
     setEditingTransactionId(transaction.id);
     setIsTransactionFormExpanded(true);
+    const metadata = syncMetadataState(transaction.metadata, financeMetadataFields);
+    if (transaction.activityCode === "TRANSPORT" && !metadata.transportCategory) {
+      const categoryOptions = financeMetadataFields.find((field) => field.key === "transportCategory")?.options ?? [];
+      const legacyAssetType = transaction.metadata.assetType?.trim() ?? "";
+      const inferredCategory = categoryOptions.includes(legacyAssetType) ? legacyAssetType : "Autre";
+      metadata.transportCategory = inferredCategory === "Camion benne" &&
+        (!metadata[DUMP_TRUCK_OPERATION_KEY] || !metadata.vehicleRef)
+        ? "Autre"
+        : inferredCategory;
+    }
     setTransactionForm({
       accountId: transaction.accountId,
       type: transaction.type,
       amount: formatAmountForInput(transaction.amount),
       currency: transaction.currency,
       description: transaction.description ?? "",
-      metadata: syncMetadataState(transaction.metadata, financeMetadataFields),
+      metadata,
       occurredAt: toDateTimeLocalInput(transaction.occurredAt)
     });
     handleOpenTransactionDetails(transaction.id, transaction.activityCode);
@@ -7019,8 +7026,13 @@ export function FinanceTransactionsPage(): JSX.Element {
           </details>
 
           <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails}>
-            <summary>Détails de l'opération</summary>
+            <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : "Détails de l'opération"}</summary>
             <div className="finance-transaction-form-options-body">
+              {selectedActivityCode === "TRANSPORT" ? (
+                <p className="hint finance-form-mode-hint">
+                  Choisissez le type de véhicule. Pour un camion benne, sélectionnez ensuite l'opération ; le sens du flux et les détails utiles s'adaptent automatiquement.
+                </p>
+              ) : null}
               {selectedActivityCode === "HARDWARE" ? (
                 <p className="hint finance-form-mode-hint">
                   {getHardwareFormModeLabel(hardwareOperationKind)}
@@ -7540,6 +7552,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                             const nextMetadata = {
                               ...prev.metadata,
                               transportCategory: category,
+                              assetType: category,
                               ...(category === "Camion benne"
                                 ? { [DUMP_TRUCK_OPERATION_KEY]: operationKind }
                                 : {
@@ -7571,9 +7584,13 @@ export function FinanceTransactionsPage(): JSX.Element {
                           });
                         }}
                         title={field.helpText}
+                        required={isFieldRequired}
                       >
                         <option value="">Choisir une catégorie</option>
                         {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
+                        {editingTransactionId && transactionForm.metadata.transportCategory === "Citerne" ? (
+                          <option value="Citerne">Citerne (ancien enregistrement)</option>
+                        ) : null}
                       </select>
                     </label>
                   );
