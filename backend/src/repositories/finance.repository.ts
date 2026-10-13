@@ -768,6 +768,73 @@ export async function listFinancialTransactions(input: {
   return rows.map(toTransaction);
 }
 
+export async function summarizeDumpTruckTransactions(input: {
+  companyId: string;
+  period: string;
+}): Promise<Array<{
+  currency: string;
+  operationsCount: number;
+  incomeTotal: string;
+  amccoTotal: string;
+  expensesTotal: string;
+  netSettlementTotal: string;
+}>> {
+  const rows = await queryRows<Array<RowDataPacket & {
+    currency: string;
+    operationsCount: number;
+    incomeTotal: string;
+    amccoTotal: string;
+    expensesTotal: string;
+    netSettlementTotal: string;
+  }>>(
+    `
+      SELECT
+        currency AS currency,
+        COUNT(*) AS operationsCount,
+        COALESCE(CAST(SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END) AS CHAR), '0.00') AS incomeTotal,
+        COALESCE(CAST(SUM(CASE
+          WHEN type = 'CASH_IN' THEN COALESCE(
+            CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.amccoAmount')), '') AS DECIMAL(18, 2)),
+            0
+          )
+          ELSE 0
+        END) AS CHAR), '0.00') AS amccoTotal,
+        COALESCE(CAST(SUM(CASE
+          WHEN type = 'CASH_OUT' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.dumpTruckOperationKind')), '') <> 'VERSEMENT_AMCCO'
+            THEN amount
+          ELSE 0
+        END) AS CHAR), '0.00') AS expensesTotal,
+        COALESCE(CAST(
+          SUM(CASE WHEN type = 'CASH_IN' THEN amount ELSE 0 END) -
+          SUM(CASE
+            WHEN type = 'CASH_IN' THEN COALESCE(
+              CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.amccoAmount')), '') AS DECIMAL(18, 2)),
+              0
+            )
+            ELSE 0
+          END) -
+          SUM(CASE
+            WHEN type = 'CASH_OUT' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.dumpTruckOperationKind')), '') <> 'VERSEMENT_AMCCO'
+              THEN amount
+            ELSE 0
+          END)
+        AS CHAR), '0.00') AS netSettlementTotal
+      FROM transactions
+      WHERE company_id = ?
+        AND activity_code = 'TRANSPORT'
+        AND status IN ('SUBMITTED', 'APPROVED')
+        AND occurred_at >= CONCAT(?, '-01')
+        AND occurred_at < DATE_ADD(CONCAT(?, '-01'), INTERVAL 1 MONTH)
+        AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.transportCategory')) = 'Camion benne'
+      GROUP BY currency
+      ORDER BY currency ASC
+    `,
+    [input.companyId, input.period, input.period]
+  );
+
+  return rows;
+}
+
 export async function listSalaryTransactions(input: {
   companyId: string;
   limit: number;

@@ -25,6 +25,7 @@ import {
   findTransactionById,
   listFinancialAccounts,
   listFinancialTransactions,
+  summarizeDumpTruckTransactions,
   listSalaryTransactions,
   listTransactionProofs,
   reviewTransaction,
@@ -1696,6 +1697,13 @@ export async function listCompanyTransactions(input: {
     type: input.type,
     activityCode: input.role ? getRoleActivityCode(input.role) ?? input.activityCode : input.activityCode
   });
+}
+
+export async function getCompanyDumpTruckSummary(input: {
+  companyId: string;
+  period: string;
+}) {
+  return summarizeDumpTruckTransactions(input);
 }
 
 export async function deleteCompanyAccount(

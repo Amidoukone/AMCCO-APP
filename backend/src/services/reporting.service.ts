@@ -12549,6 +12549,16 @@ function getOperationalBucket(
   return created;
 }
 
+const TRANSPORT_OPERATION_DISPLAY_LABELS: Record<string, string> = {
+  TRAVAUX: "Travaux",
+  LOCATION: "Location",
+  VERSEMENT_AMCCO: "Versement AMCCO",
+  DEPENSE: "Dépense",
+  ENTRETIEN: "Entretien",
+  CARBURANT: "Carburant",
+  AUTRE: "Autre"
+};
+
 function buildOperationalPerformance(
   transactions: DashboardOperationalTransaction[],
   tasks: DashboardOperationalTask[],
@@ -12587,7 +12597,9 @@ function buildOperationalPerformance(
       dimensionKey: dimension.key,
       dimensionLabel: dimension.label,
       itemKey: value.itemKey,
-      itemLabel: value.itemLabel
+      itemLabel: activityCode === "TRANSPORT" && dimension.key === "dumpTruckOperationKind"
+        ? TRANSPORT_OPERATION_DISPLAY_LABELS[value.itemKey] ?? value.itemLabel
+        : value.itemLabel
     });
   }
 

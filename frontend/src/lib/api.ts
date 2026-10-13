@@ -35,6 +35,7 @@ import type {
   FinanceProofUploadAuthResponse,
   FinancialTransactionListResponse,
   FinancialTransactionSingleResponse,
+  DumpTruckSummaryResponse,
   SalaryMemberListResponse,
   SalaryPaymentMethod,
   SalarySummaryResponse,
@@ -1008,6 +1009,18 @@ export function listFinanceTransactionsRequest(
   const suffix = params.toString();
   const path = suffix ? `/finance/transactions?${suffix}` : "/finance/transactions";
   return request<FinancialTransactionListResponse>(path, {
+    method: "GET",
+    accessToken,
+    cacheTtlMs: 5_000
+  });
+}
+
+export function getFinanceDumpTruckSummaryRequest(
+  accessToken: string,
+  period: string
+): Promise<DumpTruckSummaryResponse> {
+  const params = new URLSearchParams({ period });
+  return request<DumpTruckSummaryResponse>(`/finance/dump-trucks/summary?${params.toString()}`, {
     method: "GET",
     accessToken,
     cacheTtlMs: 5_000

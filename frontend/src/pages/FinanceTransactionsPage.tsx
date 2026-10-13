@@ -40,6 +40,7 @@ import {
   deleteGeneralStoreShopRequest,
   deleteRentalTenantRequest,
   getFinanceProofUploadAuthRequest,
+  getFinanceDumpTruckSummaryRequest,
   listActivityArticlesRequest,
   listBtpProjectsRequest,
   listDailyActivityCategoriesRequest,
@@ -73,6 +74,7 @@ import type { DailyActivityCategory } from "../types/daily-activity-categories";
 import type {
   FinancialAccount,
   FinancialAccountScopeType,
+  DumpTruckSummaryItem,
   FinancialTransaction,
   TransactionProof
 } from "../types/finance";
@@ -1065,6 +1067,26 @@ const GENERAL_EXPENSES_METADATA_FIELDS = new Set([
   "quantity",
   "unitPrice"
 ]);
+const DUMP_TRUCK_OPERATION_KEY = "dumpTruckOperationKind";
+const DUMP_TRUCK_ONLY_METADATA_FIELDS = new Set([
+  DUMP_TRUCK_OPERATION_KEY,
+  "counterpartyRef",
+  "quantity",
+  "purchaseUnitPrice",
+  "amccoAmount",
+  "expenseCategory"
+]);
+const DUMP_TRUCK_OPERATION_LABELS: Record<string, string> = {
+  TRAVAUX: "Travaux",
+  LOCATION: "Location",
+  VERSEMENT_AMCCO: "Versement AMCCO",
+  DEPENSE: "Dépense",
+  ENTRETIEN: "Entretien",
+  CARBURANT: "Carburant",
+  AUTRE: "Autre"
+};
+const TRANSPORT_NUMERIC_METADATA_FIELDS = new Set(["quantity"]);
+const TRANSPORT_AMOUNT_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice"]);
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -1118,6 +1140,7 @@ function isMoneyMetadataField(key: string): boolean {
     key === "depositAmount" ||
     key === "invoiceAmount" ||
     key === "payoutAmount" ||
+    key === "amccoAmount" ||
     key === "discountAmount" ||
     key === "returnAmount" ||
     key === "roomRate" ||
@@ -1512,7 +1535,8 @@ function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
     BTP_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     FISH_FARMING_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
     LIVESTOCK_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    GENERAL_EXPENSES_NUMERIC_METADATA_FIELDS.has(fieldKey)
+    GENERAL_EXPENSES_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
+    TRANSPORT_NUMERIC_METADATA_FIELDS.has(fieldKey)
     ? "decimal"
     : "text";
 }
@@ -1563,6 +1587,10 @@ function shouldDeriveLivestockAmount(fieldKey: string): boolean {
 
 function shouldDeriveGeneralExpensesAmount(fieldKey: string): boolean {
   return GENERAL_EXPENSES_AMOUNT_METADATA_FIELDS.has(fieldKey);
+}
+
+function shouldDeriveTransportAmount(fieldKey: string): boolean {
+  return TRANSPORT_AMOUNT_METADATA_FIELDS.has(fieldKey);
 }
 
 function getDefaultTransactionType(
@@ -2344,6 +2372,29 @@ function getVisibleFinanceMetadataFields(
     return fields.filter((field) => GENERAL_EXPENSES_VISIBLE_METADATA_FIELDS.has(field.key));
   }
 
+  if (activityCode === "TRANSPORT") {
+    if (metadata.transportCategory !== "Camion benne") {
+      return fields.filter((field) => !DUMP_TRUCK_ONLY_METADATA_FIELDS.has(field.key));
+    }
+    const operationKind = metadata[DUMP_TRUCK_OPERATION_KEY] ?? "TRAVAUX";
+    const visibleKeys = new Set([
+      "transportService",
+      "transportCategory",
+      "assetType",
+      "vehicleRef",
+      "routeRef",
+      DUMP_TRUCK_OPERATION_KEY,
+      "counterpartyRef",
+      ...(operationKind === "TRAVAUX" || operationKind === "LOCATION"
+        ? ["quantity", "purchaseUnitPrice", "amccoAmount"]
+        : []),
+      ...(operationKind === "DEPENSE" || operationKind === "ENTRETIEN" || operationKind === "CARBURANT"
+        ? ["expenseCategory"]
+        : [])
+    ]);
+    return fields.filter((field) => visibleKeys.has(field.key));
+  }
+
   if (activityCode !== "HARDWARE") {
     return fields;
   }
@@ -2645,6 +2696,15 @@ function deriveSectorAmount(
   }
   if (activityCode === "GENERAL_EXPENSES") {
     return deriveGeneralExpensesAmount(metadata);
+  }
+  if (activityCode === "TRANSPORT") {
+    const operationKind = metadata[DUMP_TRUCK_OPERATION_KEY];
+    if (operationKind !== "TRAVAUX" && operationKind !== "LOCATION") {
+      return null;
+    }
+    const quantity = toAmountNumber(metadata.quantity ?? "");
+    const unitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
+    return quantity > 0 && unitPrice > 0 ? (quantity * unitPrice).toFixed(2) : null;
   }
   return null;
 }
@@ -3020,6 +3080,9 @@ function formatMetadataSummary(
 }
 
 function formatMetadataValue(key: string, value: string): string {
+  if (key === DUMP_TRUCK_OPERATION_KEY) {
+    return DUMP_TRUCK_OPERATION_LABELS[value] ?? value;
+  }
   if (key === HARDWARE_OPERATION_KIND_KEY && isHardwareOperationKind(value)) {
     return HARDWARE_OPERATION_LABELS[value];
   }
@@ -3250,6 +3313,13 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [projectPendingDelete, setProjectPendingDelete] = useState<BtpProject | null>(null);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [dumpTruckSummaryPeriod, setDumpTruckSummaryPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [dumpTruckSummaryItems, setDumpTruckSummaryItems] = useState<DumpTruckSummaryItem[]>([]);
+  const [isLoadingDumpTruckSummary, setIsLoadingDumpTruckSummary] = useState(false);
+  const [dumpTruckSummaryError, setDumpTruckSummaryError] = useState<string | null>(null);
   const transactionsRef = useRef<FinancialTransaction[]>([]);
   transactionsRef.current = transactions;
   const [sectorSuggestionHistory, setSectorSuggestionHistory] = useState<FinancialTransaction[]>([]);
@@ -3734,6 +3804,36 @@ export function FinanceTransactionsPage(): JSX.Element {
 
     return cards;
   }, [displayTransactions, transactions]);
+  const dumpTruckSummaryCards = useMemo(() => {
+    if (selectedActivityCode !== "TRANSPORT") {
+      return [];
+    }
+    const summaries = dumpTruckSummaryItems.length > 0
+      ? dumpTruckSummaryItems
+      : [{ currency: "XOF", operationsCount: 0, incomeTotal: "0", amccoTotal: "0", expensesTotal: "0", netSettlementTotal: "0" }];
+    return summaries.flatMap((summary) => [
+      {
+        title: `Recettes camion benne · ${summary.currency}`,
+        value: formatAmountForDisplay(summary.incomeTotal),
+        note: `${summary.operationsCount} opération(s) soumise(s) ou approuvée(s)`
+      },
+      {
+        title: `Part AMCCO · ${summary.currency}`,
+        value: formatAmountForDisplay(summary.amccoTotal),
+        note: "Part AMCCO saisie sur les recettes"
+      },
+      {
+        title: `Dépenses benne · ${summary.currency}`,
+        value: formatAmountForDisplay(summary.expensesTotal),
+        note: "Sorties hors versements AMCCO"
+      },
+      {
+        title: `Versement net estimé · ${summary.currency}`,
+        value: formatAmountForDisplay(summary.netSettlementTotal),
+        note: "Montant − part AMCCO − dépenses"
+      }
+    ]);
+  }, [dumpTruckSummaryItems, selectedActivityCode]);
 
   const handleOpenTransactionDetails = useCallback(
     (transactionId: string, activityCode: BusinessActivityCode | null) => {
@@ -3850,6 +3950,33 @@ export function FinanceTransactionsPage(): JSX.Element {
   useEffect(() => {
     setVisibleTransactionsPage(1);
   }, [searchQuery, filters.type, selectedActivityCode]);
+
+  useEffect(() => {
+    if (isLoadingActivities || selectedActivityCode !== "TRANSPORT" || !activeCompany?.id) {
+      setDumpTruckSummaryItems([]);
+      setDumpTruckSummaryError(null);
+      setIsLoadingDumpTruckSummary(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingDumpTruckSummary(true);
+    setDumpTruckSummaryError(null);
+    withAuthorizedToken((accessToken) =>
+      getFinanceDumpTruckSummaryRequest(accessToken, dumpTruckSummaryPeriod)
+    )
+      .then((response) => {
+        if (!cancelled) setDumpTruckSummaryItems(response.items);
+      })
+      .catch((error) => {
+        if (!cancelled) setDumpTruckSummaryError(toErrorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDumpTruckSummary(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeCompany?.id, dumpTruckSummaryPeriod, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     setVisibleTransactionsPage((previousPage) =>
@@ -5206,6 +5333,36 @@ export function FinanceTransactionsPage(): JSX.Element {
           </article>
         ))}
       </section>
+
+      {dumpTruckSummaryCards.length > 0 ? (
+        <section className="panel finance-page-panel" aria-label="Synthèse des camions bennes">
+          <div>
+            <h2>Camion benne</h2>
+            <p className="hint">
+              Synthèse complète des opérations soumises ou approuvées pour la période sélectionnée.
+            </p>
+            <label className="operations-inline-group">
+              <span>Période</span>
+              <input
+                type="month"
+                value={dumpTruckSummaryPeriod}
+                onChange={(event) => setDumpTruckSummaryPeriod(event.target.value)}
+              />
+            </label>
+          </div>
+          {isLoadingDumpTruckSummary ? <p className="hint">Chargement de la synthèse…</p> : null}
+          {dumpTruckSummaryError ? <p className="error-box">{dumpTruckSummaryError}</p> : null}
+          <div className="grid finance-summary-grid">
+            {dumpTruckSummaryCards.map((card) => (
+              <article key={card.title} className="metric-card finance-overview-card">
+                <h3>{card.title}</h3>
+                <p className="metric-value">{card.value}</p>
+                <p className="metric-note">{card.note}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {canCreateAccount ? (
         <section className="panel finance-page-panel">
@@ -6739,6 +6896,15 @@ export function FinanceTransactionsPage(): JSX.Element {
                   </select>
                 </label>
               </>
+            ) : selectedActivityCode === "TRANSPORT" &&
+              transactionForm.metadata.transportCategory === "Camion benne" ? (
+              <div className="operations-inline-group">
+                <span>Flux de l'opération</span>
+                <strong>{transactionForm.type === "CASH_IN" ? "Entrée" : "Sortie"}</strong>
+                <small className="hint">
+                  {DUMP_TRUCK_OPERATION_LABELS[transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] ?? ""] ?? "Choisissez l'opération camion benne dans les détails."}
+                </small>
+              </div>
             ) : (
               <label className="operations-inline-group">
                 <span>Type</span>
@@ -7062,6 +7228,19 @@ export function FinanceTransactionsPage(): JSX.Element {
                       : [];
                 const isFieldRequired = field.required || (
                   selectedActivityCode === "BEVERAGE_DEPOT" && beverageRequiredFields.includes(field.key)
+                ) || (
+                  selectedActivityCode === "TRANSPORT" &&
+                  transactionForm.metadata.transportCategory === "Camion benne" &&
+                  (field.key === DUMP_TRUCK_OPERATION_KEY ||
+                    field.key === "vehicleRef" ||
+                    (transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] === "VERSEMENT_AMCCO" &&
+                      field.key === "counterpartyRef") ||
+                    ((transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] === "TRAVAUX" ||
+                      transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] === "LOCATION") &&
+                      ["quantity", "purchaseUnitPrice", "routeRef"].includes(field.key)) ||
+                    (["DEPENSE", "ENTRETIEN", "CARBURANT"].includes(
+                      transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] ?? ""
+                    ) && field.key === "expenseCategory"))
                 );
                 if (
                   selectedActivityCode === "GENERAL_EXPENSES" &&
@@ -7342,6 +7521,111 @@ export function FinanceTransactionsPage(): JSX.Element {
                   );
                 }
 
+                if (selectedActivityCode === "TRANSPORT" && field.key === "transportCategory") {
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select
+                        value={transactionForm.metadata.transportCategory ?? ""}
+                        onChange={(event) => {
+                          const category = event.target.value;
+                          setTransactionForm((prev) => {
+                            const operationKind = category === "Camion benne"
+                              ? prev.metadata[DUMP_TRUCK_OPERATION_KEY] || "TRAVAUX"
+                              : "";
+                            const nextMetadata = {
+                              ...prev.metadata,
+                              transportCategory: category,
+                              ...(category === "Camion benne"
+                                ? { [DUMP_TRUCK_OPERATION_KEY]: operationKind }
+                                : {
+                                    [DUMP_TRUCK_OPERATION_KEY]: "",
+                                    counterpartyRef: "",
+                                    quantity: "",
+                                    purchaseUnitPrice: "",
+                                    amccoAmount: "",
+                                    expenseCategory: ""
+                                  })
+                            };
+                            const nextType = operationKind === "VERSEMENT_AMCCO" ||
+                              operationKind === "DEPENSE" ||
+                              operationKind === "ENTRETIEN" ||
+                              operationKind === "CARBURANT"
+                              ? "CASH_OUT"
+                              : category === "Camion benne" ? "CASH_IN" : prev.type;
+                            const derivedAmount = category === "Camion benne"
+                              ? deriveSectorAmount("TRANSPORT", nextType, nextMetadata)
+                              : null;
+                            return {
+                              ...prev,
+                              type: nextType,
+                              amount: derivedAmount
+                                ? formatAmountForInput(derivedAmount)
+                                : category === "Camion benne" ? "" : nextType !== prev.type ? "" : prev.amount,
+                              metadata: nextMetadata
+                            };
+                          });
+                        }}
+                        title={field.helpText}
+                      >
+                        <option value="">Choisir une catégorie</option>
+                        {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                  );
+                }
+
+                if (selectedActivityCode === "TRANSPORT" && field.key === DUMP_TRUCK_OPERATION_KEY) {
+                  return (
+                    <label key={field.key} className="operations-inline-group">
+                      <span>{field.label}</span>
+                      <select
+                        value={transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] ?? ""}
+                        onChange={(event) => {
+                          const operationKind = event.target.value;
+                          const incoming = ["TRAVAUX", "LOCATION"].includes(operationKind);
+                          const outgoing = ["VERSEMENT_AMCCO", "DEPENSE", "ENTRETIEN", "CARBURANT"].includes(operationKind);
+                          const workOrRental = operationKind === "TRAVAUX" || operationKind === "LOCATION";
+                          const expense = ["DEPENSE", "ENTRETIEN", "CARBURANT"].includes(operationKind);
+                          setTransactionForm((prev) => {
+                            const nextType = incoming ? "CASH_IN" : outgoing ? "CASH_OUT" : prev.type;
+                            const nextMetadata = {
+                              ...prev.metadata,
+                              [DUMP_TRUCK_OPERATION_KEY]: operationKind,
+                              ...(!workOrRental
+                                ? { quantity: "", purchaseUnitPrice: "", amccoAmount: "" }
+                                : {}),
+                              ...(!expense ? { expenseCategory: "" } : {})
+                            };
+                            const derivedAmount = incoming
+                              ? deriveSectorAmount("TRANSPORT", nextType, nextMetadata)
+                              : null;
+                            return {
+                              ...prev,
+                              type: nextType,
+                              amount: derivedAmount
+                                ? formatAmountForInput(derivedAmount)
+                                : operationKind === prev.metadata[DUMP_TRUCK_OPERATION_KEY]
+                                  ? prev.amount
+                                  : "",
+                              metadata: nextMetadata
+                            };
+                          });
+                        }}
+                        title={field.helpText}
+                        required={isFieldRequired}
+                      >
+                        <option value="">Choisir une opération</option>
+                        {field.options?.map((option) => (
+                          <option key={option} value={option}>
+                            {DUMP_TRUCK_OPERATION_LABELS[option] ?? option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                }
+
                 if (field.options?.length) {
                   return (
                     <label key={field.key} className="operations-inline-group">
@@ -7383,6 +7667,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                           (selectedActivityCode === "REAL_ESTATE_AGENCY" && shouldDeriveAgencyAmount(field.key)) ||
                           (selectedActivityCode === "FISH_FARMING" && shouldDeriveFishFarmingAmount(field.key)) ||
                           (selectedActivityCode === "LIVESTOCK" && shouldDeriveLivestockAmount(field.key)) ||
+                          (selectedActivityCode === "TRANSPORT" &&
+                            transactionForm.metadata.transportCategory === "Camion benne" &&
+                            shouldDeriveTransportAmount(field.key)) ||
                           (selectedActivityCode === "GENERAL_EXPENSES" && shouldDeriveGeneralExpensesAmount(field.key));
                         const derivedAmount = shouldDeriveAmount
                           ? deriveSectorAmount(selectedActivityCode, prev.type, nextMetadata)

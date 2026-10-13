@@ -7,7 +7,8 @@ vi.mock("../lib/db.js", () => ({ queryRows: queryRowsMock }));
 import {
   getFinancialAccountsSummary,
   listFinancialAccounts,
-  listFinancialTransactions
+  listFinancialTransactions,
+  summarizeDumpTruckTransactions
 } from "./finance.repository.js";
 
 describe("finance.repository", () => {
@@ -91,6 +92,39 @@ describe("finance.repository", () => {
     expect(sql).toContain("t.created_by_id = ?");
     expect(sql.indexOf("t.created_by_id = ?")).toBeLessThan(sql.indexOf("LIMIT ? OFFSET ?"));
     expect(values).toEqual(["company-1", "operator-1", "HARDWARE", 25, 10]);
+  });
+
+  it("summarizes all submitted and approved dump-truck operations for one company month", async () => {
+    queryRowsMock.mockResolvedValue([
+      {
+        currency: "XOF",
+        operationsCount: 6,
+        incomeTotal: "10795000.00",
+        amccoTotal: "8070000.00",
+        expensesTotal: "1330000.00",
+        netSettlementTotal: "1395000.00"
+      }
+    ]);
+
+    await expect(
+      summarizeDumpTruckTransactions({ companyId: "company-1", period: "2026-10" })
+    ).resolves.toEqual([
+      {
+        currency: "XOF",
+        operationsCount: 6,
+        incomeTotal: "10795000.00",
+        amccoTotal: "8070000.00",
+        expensesTotal: "1330000.00",
+        netSettlementTotal: "1395000.00"
+      }
+    ]);
+
+    const [sql, values] = queryRowsMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("activity_code = 'TRANSPORT'");
+    expect(sql).toContain("status IN ('SUBMITTED', 'APPROVED')");
+    expect(sql).toContain("JSON_EXTRACT(metadata_json, '$.transportCategory')");
+    expect(sql).toContain("DATE_ADD(CONCAT(?, '-01'), INTERVAL 1 MONTH)");
+    expect(values).toEqual(["company-1", "2026-10", "2026-10"]);
   });
 
   it("limits a sector operator to dedicated accounts and sector-only counts", async () => {

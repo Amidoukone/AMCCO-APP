@@ -909,10 +909,16 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("transportService", "Sous-section transport", true, "Location, gestion camion benne, tracteur ou citerne."),
-        { ...field("transportCategory", "Catégorie transport", false, "Ambulances ou corbillard."), options: ["Ambulances", "Corbillard"] },
+        { ...field("transportCategory", "Catégorie transport", false, "Type de véhicule ou d'activité transport."), options: ["Ambulances", "Corbillard", "Camion benne", "Tracteur", "Citerne", "Autre"] },
+        field("dumpTruckOperationKind", "Opération camion benne", false, "Travaux, location, versement AMCCO ou charge.", ["TRAVAUX", "LOCATION", "VERSEMENT_AMCCO", "DEPENSE", "ENTRETIEN", "CARBURANT", "AUTRE"]),
         field("assetType", "Type d'engin", true, "Camion benne, tracteur, citerne ou autre engin."),
         field("vehicleRef", "Référence véhicule", false, "Immatriculation ou code interne."),
-        field("routeRef", "Trajet ou mission", false, "Trajet, client ou ordre de mission.")
+        field("routeRef", "Trajet ou mission", false, "Trajet, chantier, client ou ordre de mission."),
+        field("counterpartyRef", "Client ou partenaire", false, "Client, chauffeur ou partenaire concerné."),
+        field("quantity", "Nombre de voyages", false, "Nombre de voyages ou unités de location."),
+        field("purchaseUnitPrice", "Prix unitaire / voyage", false, "Prix par voyage indiqué sur le registre."),
+        field("amccoAmount", "Part AMCCO", false, "Montant à affecter à AMCCO pour ce travail ou cette location."),
+        field("expenseCategory", "Nature de la dépense", false, "Carburant, pneus, entretien ou autre charge.", ["Carburant", "Pneus", "Entretien", "Réparation", "Autre"])
       ],
       workflow: [
         workflow("CREATE", "Saisie mission", "Le flux est rattaché au service, engin et véhicule si connu."),
@@ -953,8 +959,12 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       operationalDimensions: [
         dimension("transportService", "Sous-section transport", "Compare location et gestion d'engins."),
         dimension("transportCategory", "Catégorie transport", "Suit les nouvelles catégories transport."),
+        dimension("dumpTruckOperationKind", "Opération camion benne", "Compare les travaux, locations, versements et charges des camions bennes."),
         dimension("assetType", "Type d'engin", "Mesure les flux et blocages camions bennes, tracteurs et citernes."),
-        dimension("vehicleRef", "Vehicule", "Suit rentabilité et disponibilité par véhicule.")
+        dimension("vehicleRef", "Véhicule", "Suit rentabilité et disponibilité par véhicule."),
+        dimension("routeRef", "Trajet ou chantier", "Suit les travaux et locations par destination."),
+        dimension("counterpartyRef", "Client ou partenaire", "Suit les travaux et versements par interlocuteur."),
+        dimension("expenseCategory", "Nature de dépense", "Compare les charges des camions bennes.")
       ],
       highlights: [
         {
@@ -1857,6 +1867,58 @@ export function assertTransactionInputMatchesActivityProfile(
       const amount = Number(input.amount ?? "");
       if (!Number.isFinite(amount) || Math.round(amount * 100) !== Math.round(quantity * unitPrice * 100)) {
         throw new Error("Le montant doit correspondre à la quantité multipliée par le prix unitaire.");
+      }
+    }
+  }
+  if (activityCode === "TRANSPORT" && input.metadata?.transportCategory === "Camion benne") {
+    const metadata = input.metadata;
+    const operationKind = metadata.dumpTruckOperationKind?.trim();
+    const incomingKinds = ["TRAVAUX", "LOCATION"];
+    const outgoingKinds = ["VERSEMENT_AMCCO", "DEPENSE", "ENTRETIEN", "CARBURANT"];
+    if (![...incomingKinds, ...outgoingKinds, "AUTRE"].includes(operationKind ?? "")) {
+      throw new Error("Choisissez une opération valide pour le camion benne.");
+    }
+    if (!metadata.vehicleRef?.trim()) {
+      throw new Error("La référence ou l'immatriculation du camion benne est requise.");
+    }
+    const expectedType = incomingKinds.includes(operationKind ?? "")
+      ? "CASH_IN"
+      : outgoingKinds.includes(operationKind ?? "")
+        ? "CASH_OUT"
+        : null;
+    if (expectedType && input.type !== expectedType) {
+      throw new Error("Le type de flux ne correspond pas à l'opération du camion benne.");
+    }
+    if (operationKind === "VERSEMENT_AMCCO" && !metadata.counterpartyRef?.trim()) {
+      throw new Error("Le client ou partenaire concerné par le versement est requis.");
+    }
+    if (operationKind === "TRAVAUX" || operationKind === "LOCATION") {
+      if (!metadata.quantity?.trim() || !metadata.purchaseUnitPrice?.trim()) {
+        throw new Error("Le nombre de voyages et le prix unitaire sont requis pour les travaux ou locations.");
+      }
+      const quantity = Number(metadata.quantity.trim().replace(/\s/g, "").replace(",", "."));
+      const unitPrice = Number(metadata.purchaseUnitPrice.trim().replace(/\s/g, "").replace(",", "."));
+      const amount = Number(input.amount ?? "");
+      if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+        throw new Error("Le nombre de voyages et le prix unitaire doivent être supérieurs à zéro.");
+      }
+      if (!Number.isFinite(amount) || Math.round(amount * 100) !== Math.round(quantity * unitPrice * 100)) {
+        throw new Error("Le montant doit correspondre au nombre de voyages multiplié par le prix unitaire.");
+      }
+    }
+    if (["DEPENSE", "ENTRETIEN", "CARBURANT"].includes(operationKind ?? "")) {
+      const expenseCategories = ["Carburant", "Pneus", "Entretien", "Réparation", "Autre"];
+      if (!metadata.expenseCategory?.trim()) {
+        throw new Error("La nature de la dépense du camion benne est requise.");
+      }
+      if (!expenseCategories.includes(metadata.expenseCategory.trim())) {
+        throw new Error("Choisissez une nature de dépense valide pour le camion benne.");
+      }
+    }
+    if (metadata.amccoAmount?.trim()) {
+      const amccoAmount = Number(metadata.amccoAmount.trim().replace(/\s/g, "").replace(",", "."));
+      if (!Number.isFinite(amccoAmount) || amccoAmount < 0) {
+        throw new Error("La part AMCCO doit être un montant positif ou nul.");
       }
     }
   }

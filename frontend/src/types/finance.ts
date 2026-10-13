@@ -60,6 +60,19 @@ export type FinancialTransactionListResponse = {
   items: FinancialTransaction[];
 };
 
+export type DumpTruckSummaryItem = {
+  currency: string;
+  operationsCount: number;
+  incomeTotal: string;
+  amccoTotal: string;
+  expensesTotal: string;
+  netSettlementTotal: string;
+};
+
+export type DumpTruckSummaryResponse = {
+  items: DumpTruckSummaryItem[];
+};
+
 export type TransactionProof = {
   id: string;
   transactionId: string;

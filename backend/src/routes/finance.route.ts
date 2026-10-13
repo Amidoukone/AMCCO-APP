@@ -18,6 +18,7 @@ import {
   exportCompanySalaryExcel,
   getTransactionProofUploadAuth,
   getCompanySalarySummary,
+  getCompanyDumpTruckSummary,
   listCompanyAccounts,
   listCompanySalaryMembers,
   listCompanySalaryTransactions,
@@ -36,6 +37,10 @@ const listTransactionsQuerySchema = z.object({
   status: z.enum(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]).optional(),
   type: z.enum(["CASH_IN", "CASH_OUT"]).optional(),
   activityCode: z.enum(BUSINESS_ACTIVITY_CODES).optional()
+});
+
+const dumpTruckSummaryQuerySchema = z.object({
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)
 });
 
 const listAccountsQuerySchema = z.object({
@@ -225,6 +230,22 @@ financeRouter.get(
       type: query.type,
       activityCode: getRoleActivityCode(req.auth.role) ?? query.activityCode,
       role: req.auth.role
+    });
+    res.status(200).json({ items });
+  })
+);
+
+financeRouter.get(
+  "/finance/dump-trucks/summary",
+  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) {
+      throw new HttpError(401, "Authentification requise.");
+    }
+    const query = dumpTruckSummaryQuerySchema.parse(req.query);
+    const items = await getCompanyDumpTruckSummary({
+      companyId: req.auth.companyId,
+      period: query.period
     });
     res.status(200).json({ items });
   })
