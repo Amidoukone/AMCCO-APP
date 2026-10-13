@@ -12,6 +12,7 @@ import {
   findFinancialTransactionById,
   findSalaryTransactionByEmployeeAndPeriod,
   findTransactionById,
+  listFinancialTransactions,
   listSalaryTransactions,
   listFinancialAccounts,
   reviewTransaction,
@@ -34,6 +35,8 @@ import {
   deleteCompanyTransaction,
   exportCompanySalaryCsv,
   getCompanySalarySummary,
+  listCompanyTransactions,
+  listCompanyTransactionProofs,
   listCompanySalaryMembers,
   listCompanyAccounts,
   reviewCompanyTransaction,
@@ -111,6 +114,66 @@ describe("finance.service", () => {
       role: "BEVERAGE_DEPOT_OPERATOR",
       sectorOnly: true
     });
+  });
+
+  it("limits operator transaction lists to the authenticated creator", async () => {
+    vi.mocked(listFinancialTransactions).mockResolvedValue([]);
+
+    await listCompanyTransactions({
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      role: "HARDWARE_OPERATOR",
+      limit: 25
+    });
+
+    expect(listFinancialTransactions).toHaveBeenCalledWith({
+      companyId: actor.companyId,
+      limit: 25,
+      offset: 0,
+      createdById: actor.actorId,
+      status: undefined,
+      type: undefined,
+      activityCode: "HARDWARE"
+    });
+  });
+
+  it("keeps accountant transaction lists company-wide", async () => {
+    vi.mocked(listFinancialTransactions).mockResolvedValue([]);
+
+    await listCompanyTransactions({
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      role: "ACCOUNTANT"
+    });
+
+    expect(listFinancialTransactions).toHaveBeenCalledWith({
+      companyId: actor.companyId,
+      limit: 50,
+      offset: 0,
+      createdById: undefined,
+      status: undefined,
+      type: undefined,
+      activityCode: undefined
+    });
+  });
+
+  it("hides another user's transaction proofs from operators", async () => {
+    vi.mocked(findTransactionById).mockResolvedValue({
+      id: "transaction-other",
+      companyId: actor.companyId,
+      createdById: "another-user",
+      activityCode: "HARDWARE",
+      status: "APPROVED",
+      requiresProof: false,
+      salaryConfirmationStatus: "NOT_REQUIRED"
+    });
+
+    await expect(
+      listCompanyTransactionProofs(
+        { ...actor, role: "HARDWARE_OPERATOR" },
+        { transactionId: "transaction-other" }
+      )
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it("loads salary members with the active-user filter delegated to the repository", async () => {

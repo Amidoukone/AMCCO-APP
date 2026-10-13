@@ -4,7 +4,11 @@ const { queryRowsMock } = vi.hoisted(() => ({ queryRowsMock: vi.fn() }));
 
 vi.mock("../lib/db.js", () => ({ queryRows: queryRowsMock }));
 
-import { getFinancialAccountsSummary, listFinancialAccounts } from "./finance.repository.js";
+import {
+  getFinancialAccountsSummary,
+  listFinancialAccounts,
+  listFinancialTransactions
+} from "./finance.repository.js";
 
 describe("finance.repository", () => {
   beforeEach(() => {
@@ -70,6 +74,23 @@ describe("finance.repository", () => {
     });
 
     expect(queryRowsMock.mock.calls[0][1]).toEqual(["company-1"]);
+  });
+
+  it("applies the creator filter before transaction pagination", async () => {
+    queryRowsMock.mockResolvedValue([]);
+
+    await listFinancialTransactions({
+      companyId: "company-1",
+      createdById: "operator-1",
+      activityCode: "HARDWARE",
+      limit: 25,
+      offset: 10
+    });
+
+    const [sql, values] = queryRowsMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("t.created_by_id = ?");
+    expect(sql.indexOf("t.created_by_id = ?")).toBeLessThan(sql.indexOf("LIMIT ? OFFSET ?"));
+    expect(values).toEqual(["company-1", "operator-1", "HARDWARE", 25, 10]);
   });
 
   it("limits a sector operator to dedicated accounts and sector-only counts", async () => {

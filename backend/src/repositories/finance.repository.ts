@@ -686,12 +686,18 @@ export async function listFinancialTransactions(input: {
   companyId: string;
   limit: number;
   offset: number;
+  createdById?: string;
   status?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
   type?: "CASH_IN" | "CASH_OUT";
   activityCode?: BusinessActivityCode;
 }): Promise<FinancialTransaction[]> {
   const filters: string[] = ["t.company_id = ?", "t.activity_code IS NOT NULL"];
   const values: Array<string | number> = [input.companyId];
+
+  if (input.createdById) {
+    filters.push("t.created_by_id = ?");
+    values.push(input.createdById);
+  }
 
   if (input.status) {
     filters.push("t.status = ?");

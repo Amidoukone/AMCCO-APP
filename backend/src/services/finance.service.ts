@@ -157,6 +157,15 @@ function ensureSectorTransactionAccess(role: RoleCode, activityCode: BusinessAct
   }
 }
 
+function ensureOperatorTransactionVisibility(
+  actor: ActorContext,
+  transaction: Pick<FinancialTransaction, "createdById">
+): void {
+  if (getRoleActivityCode(actor.role) && transaction.createdById !== actor.actorId) {
+    throw new HttpError(404, "Transaction introuvable.");
+  }
+}
+
 function ensureTransactionMutationOwnership(actor: ActorContext, transaction: FinancialTransaction): void {
   if (actor.role !== "SYS_ADMIN" && transaction.createdById !== actor.actorId) {
     throw new HttpError(
@@ -1667,6 +1676,7 @@ export async function exportCompanySalaryExcel(input: {
 
 export async function listCompanyTransactions(input: {
   companyId: string;
+  actorId: string;
   limit?: number;
   offset?: number;
   status?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
@@ -1681,6 +1691,7 @@ export async function listCompanyTransactions(input: {
     companyId: input.companyId,
     limit,
     offset,
+    createdById: input.role && getRoleActivityCode(input.role) ? input.actorId : undefined,
     status: input.status,
     type: input.type,
     activityCode: input.role ? getRoleActivityCode(input.role) ?? input.activityCode : input.activityCode
@@ -1959,6 +1970,7 @@ export async function listCompanyTransactionProofs(
   }
 
   ensureSectorTransactionAccess(actor.role, transaction.activityCode);
+  ensureOperatorTransactionVisibility(actor, transaction);
 
   await findTransactionForProofs(actor.companyId, transaction.id);
   const proofs = await listTransactionProofs(input.transactionId);

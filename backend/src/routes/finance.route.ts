@@ -218,6 +218,7 @@ financeRouter.get(
     const query = listTransactionsQuerySchema.parse(req.query);
     const items = await listCompanyTransactions({
       companyId: req.auth.companyId,
+      actorId: req.auth.userId,
       limit: query.limit,
       offset: query.offset,
       status: query.status,
