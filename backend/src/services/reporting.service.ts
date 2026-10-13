@@ -61,7 +61,8 @@ import {
   type ReportOperationalMetric,
   type ReportOperationalTask,
   type ReportOperationalTransaction,
-  type ReportsOverview
+  type ReportsOverview,
+  type TransportOperationsReport
 } from "../repositories/reporting.repository.js";
 import {
   getFinancialAccountsSummary,
@@ -2793,6 +2794,209 @@ function renderGeneralExpensesReportsPdf(
   drawGeneralExpensesMetricCards(doc, report);
   drawGeneralExpensesTable(doc, report);
   drawGeneralExpensesBreakdown(doc, report);
+}
+
+function drawTransportReportHeader(
+  doc: PDFKit.PDFDocument,
+  report: TransportOperationsReport,
+  generatedAt: string
+): void {
+  const pageWidth = doc.page.width;
+  const margin = PDF_PAGE_MARGIN;
+  const centerX = margin + 80;
+  const centerWidth = pageWidth - margin * 2 - 160;
+
+  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
+  doc.fillColor("#0f2544").font("Helvetica-Bold").fontSize(18)
+    .text("TRANSPORT", centerX, 25, { width: centerWidth, align: "center" });
+  doc.fillColor("#486581").font("Helvetica-Bold").fontSize(10)
+    .text("Agence Mandingue de Courtage de Conseil et d'Orientation", centerX, 48, {
+      width: centerWidth, align: "center"
+    });
+  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11)
+    .text('"AMCCO"', centerX, 63, { width: centerWidth, align: "center" });
+  doc.moveTo(margin, 91).lineTo(pageWidth - margin, 91).strokeColor("#0f766e").lineWidth(2).stroke();
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(14)
+    .text(`SUIVI DES TRANSACTIONS — ${report.periodLabel.toUpperCase()}`, margin, 105, {
+      width: pageWidth - margin * 2, align: "center"
+    });
+  doc.fillColor("#486581").font("Helvetica").fontSize(8.5)
+    .text(`Généré le ${formatPdfDate(generatedAt)} · opérations soumises ou approuvées`, margin, 126, {
+      width: pageWidth - margin * 2, align: "center"
+    });
+  doc.y = 148;
+}
+
+function drawTransportContinuationHeader(doc: PDFKit.PDFDocument, report: TransportOperationsReport): void {
+  drawSectorContinuationHeader(doc, "TRANSPORT", report.periodLabel);
+}
+
+function formatTransportPdfMoney(value: string, currency: string): string {
+  const amount = formatPdfNumber(value);
+  return currency === "XOF" ? `${amount} F CFA` : `${amount} ${currency}`;
+}
+
+function drawTransportSummaryTable(doc: PDFKit.PDFDocument, report: TransportOperationsReport): void {
+  const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const columns: PdfTableColumn[] = [
+    { label: "DEVISE", width: availableWidth * 0.10, align: "center" },
+    { label: "OPÉRATIONS", width: availableWidth * 0.13, align: "center" },
+    { label: "ENTRÉES", width: availableWidth * 0.19, align: "right" },
+    { label: "PART AMCCO", width: availableWidth * 0.19, align: "right" },
+    { label: "SORTIES", width: availableWidth * 0.19, align: "right" },
+    { label: "SOLDE NET", width: availableWidth * 0.19, align: "right" }
+  ];
+  const drawHeader = (headerY: number): number => {
+    let x = PDF_PAGE_MARGIN;
+    for (const column of columns) {
+      drawPdfTableCell(doc, column.label, x, headerY, column.width, 24, {
+        align: column.align, fill: "#d1fae5", font: "Helvetica-Bold", fontSize: 9
+      });
+      x += column.width;
+    }
+    return headerY + 24;
+  };
+
+  doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(11.5)
+    .text("Synthèse par devise", PDF_PAGE_MARGIN, doc.y, { width: availableWidth });
+  doc.y += 19;
+  if (report.currencySummaries.length === 0) {
+    doc.fillColor("#64748b").font("Helvetica").fontSize(9)
+      .text("Aucune transaction Transport reportable sur la période.", PDF_PAGE_MARGIN, doc.y);
+    doc.y += 24;
+    return;
+  }
+
+  let y = drawHeader(doc.y);
+  for (const item of report.currencySummaries) {
+    let x = PDF_PAGE_MARGIN;
+    const values = [
+      item.currency,
+      formatPdfNumber(item.transactionsCount),
+      formatTransportPdfMoney(item.cashInAmount, item.currency),
+      formatTransportPdfMoney(item.amccoAmount, item.currency),
+      formatTransportPdfMoney(item.cashOutAmount, item.currency),
+      formatTransportPdfMoney(item.netAmount, item.currency)
+    ];
+    values.forEach((value, index) => {
+      drawPdfTableCell(doc, value, x, y, columns[index].width, 24, {
+        align: columns[index].align, fontSize: 8.5
+      });
+      x += columns[index].width;
+    });
+    y += 24;
+  }
+  doc.y = y + 16;
+}
+
+function drawTransportTransactionTable(doc: PDFKit.PDFDocument, report: TransportOperationsReport): void {
+  const availableWidth = doc.page.width - PDF_PAGE_MARGIN * 2;
+  const columns: PdfTableColumn[] = [
+    { label: "DATE", width: availableWidth * 0.075, align: "center" },
+    { label: "OPÉRATION", width: availableWidth * 0.12, align: "center" },
+    { label: "VÉHICULE", width: availableWidth * 0.09, align: "center" },
+    { label: "DÉSIGNATION / TRAJET", width: availableWidth * 0.205, align: "left" },
+    { label: "VOYAGES", width: availableWidth * 0.07, align: "center" },
+    { label: "PRIX UNIT.", width: availableWidth * 0.095, align: "right" },
+    { label: "ENTRÉE", width: availableWidth * 0.115, align: "right" },
+    { label: "PART AMCCO", width: availableWidth * 0.105, align: "right" },
+    { label: "SORTIE", width: availableWidth * 0.125, align: "right" }
+  ];
+  const drawHeader = (headerY: number): number => {
+    let x = PDF_PAGE_MARGIN;
+    columns.forEach((column) => {
+      drawPdfTableCell(doc, column.label, x, headerY, column.width, 25, {
+        align: column.align, fill: "#d1fae5", font: "Helvetica-Bold", fontSize: 7.5
+      });
+      x += column.width;
+    });
+    return headerY + 25;
+  };
+
+  doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(11.5)
+    .text("Transactions détaillées", PDF_PAGE_MARGIN, doc.y, { width: availableWidth });
+  doc.y += 19;
+  if (report.rows.length === 0) {
+    doc.roundedRect(PDF_PAGE_MARGIN, doc.y, availableWidth, 42, 4).fill("#f0fdfa");
+    doc.roundedRect(PDF_PAGE_MARGIN, doc.y, availableWidth, 42, 4).strokeColor("#99f6e4").lineWidth(0.8).stroke();
+    doc.fillColor("#475569").font("Helvetica").fontSize(9)
+      .text("Aucune transaction Transport enregistrée sur la période sélectionnée.", PDF_PAGE_MARGIN + 12, doc.y + 14, {
+        width: availableWidth - 24
+      });
+    doc.y += 54;
+    return;
+  }
+
+  const tableBottom = doc.page.height - PDF_CONTENT_BOTTOM;
+  let y = drawHeader(doc.y);
+  for (const row of report.rows) {
+    if (y + 25 > tableBottom) {
+      doc.addPage();
+      drawTransportContinuationHeader(doc, report);
+      doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(10)
+        .text("Transactions détaillées (suite)", PDF_PAGE_MARGIN, doc.y, { width: availableWidth });
+      y = drawHeader(doc.y + 18);
+    }
+    const values = [
+      formatPdfDate(row.date),
+      truncatePdfText(row.operationLabel, 18),
+      truncatePdfText(row.vehicleLabel, 14),
+      truncatePdfText(row.designation, 38),
+      row.quantity === null ? "-" : formatPdfNumber(row.quantity, 2),
+      row.unitPrice ? formatTransportPdfMoney(row.unitPrice, row.currency) : "-",
+      toNumberAmount(row.cashInAmount) > 0 ? formatTransportPdfMoney(row.cashInAmount, row.currency) : "-",
+      toNumberAmount(row.amccoAmount) > 0 ? formatTransportPdfMoney(row.amccoAmount, row.currency) : "-",
+      toNumberAmount(row.cashOutAmount) > 0 ? formatTransportPdfMoney(row.cashOutAmount, row.currency) : "-"
+    ];
+    let x = PDF_PAGE_MARGIN;
+    values.forEach((value, index) => {
+      drawPdfTableCell(doc, value, x, y, columns[index].width, 25, {
+        align: columns[index].align, fontSize: 7.2
+      });
+      x += columns[index].width;
+    });
+    y += 25;
+  }
+  doc.y = y + 10;
+}
+
+function renderTransportOperationsPdf(
+  doc: PDFKit.PDFDocument,
+  overview: ReportsOverview,
+  filters: ReportPeriodFilter
+): void {
+  const report = overview.transportOperationsReport ?? {
+    periodLabel: toDisplayPeriodLabel(filters),
+    rows: [],
+    currencySummaries: []
+  };
+  drawTransportReportHeader(doc, report, overview.generatedAt);
+  drawTransportSummaryTable(doc, report);
+  drawTransportTransactionTable(doc, report);
+}
+
+function drawTransportPdfFooter(
+  doc: PDFKit.PDFDocument,
+  pageNumber: number,
+  totalPages: number,
+  periodLabel: string
+): void {
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = PDF_PAGE_MARGIN;
+  const bottomMargin = doc.page.margins.bottom;
+  doc.save();
+  doc.page.margins.bottom = 0;
+  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44)
+    .strokeColor("#99f6e4").lineWidth(1).stroke();
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
+    .text(`AMCCO - Transport | ${periodLabel}`, margin, pageHeight - 32, { width: 300, lineBreak: false });
+  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
+    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
+      width: 80, align: "right", lineBreak: false
+    });
+  doc.page.margins.bottom = bottomMargin;
+  doc.restore();
 }
 
 const DAILY_ACTIVITIES_REPORT_BRANDING = {
@@ -9208,6 +9412,87 @@ function buildGeneralExpensesReport(
   };
 }
 
+function buildTransportOperationsReport(
+  transactions: ReportOperationalTransaction[],
+  filters: ReportPeriodFilter
+): TransportOperationsReport | null {
+  if (filters.activityCode && filters.activityCode !== "TRANSPORT") return null;
+
+  const sectorTransactions = transactions
+    .filter((transaction) =>
+      transaction.activityCode === "TRANSPORT" && isReportableFinancialStatus(transaction.status)
+    )
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt));
+
+  if (!filters.activityCode && sectorTransactions.length === 0) return null;
+
+  const totalsByCurrency = new Map<string, {
+    transactionsCount: number;
+    cashIn: number;
+    amcco: number;
+    cashOut: number;
+  }>();
+
+  const rows: TransportOperationsReport["rows"] = sectorTransactions.map((transaction) => {
+    const metadata = transaction.metadata;
+    const currency = transaction.currency.trim().toUpperCase() || "XOF";
+    const amount = toNumberAmount(transaction.amount);
+    const kind = metadata.dumpTruckOperationKind?.trim();
+    const category = metadata.transportCategory?.trim();
+    const service = metadata.transportService?.trim();
+    const operationLabel = kind
+      ? TRANSPORT_OPERATION_DISPLAY_LABELS[kind] ?? kind
+      : category || service || (transaction.type === "CASH_IN" ? "Recette transport" : "Dépense transport");
+    const designationParts = [
+      metadata.routeRef?.trim(),
+      metadata.counterpartyRef?.trim(),
+      transaction.description?.trim()
+    ].filter((value): value is string => Boolean(value));
+    const designation = Array.from(new Set(designationParts)).join(" · ") || "-";
+    const quantity = getMetadataNumber(metadata, "quantity");
+    const unitPrice = getMetadataNumber(metadata, "purchaseUnitPrice");
+    const amccoAmount = transaction.type === "CASH_IN" && category === "Camion benne"
+      ? getMetadataNumber(metadata, "amccoAmount")
+      : 0;
+    const totals = totalsByCurrency.get(currency) ?? { transactionsCount: 0, cashIn: 0, amcco: 0, cashOut: 0 };
+    totals.transactionsCount += 1;
+    if (transaction.type === "CASH_IN") totals.cashIn += amount;
+    else totals.cashOut += amount;
+    totals.amcco += amccoAmount;
+    totalsByCurrency.set(currency, totals);
+
+    return {
+      date: toReportDate(transaction.occurredAt),
+      operationLabel,
+      vehicleLabel: metadata.vehicleRef?.trim() || metadata.assetType?.trim() || "-",
+      designation,
+      quantity: quantity > 0 ? quantity : null,
+      unitPrice: unitPrice > 0 ? toMoneyString(unitPrice) : null,
+      cashInAmount: transaction.type === "CASH_IN" ? toMoneyString(amount) : "0.00",
+      amccoAmount: toMoneyString(amccoAmount),
+      cashOutAmount: transaction.type === "CASH_OUT" ? toMoneyString(amount) : "0.00",
+      currency
+    };
+  });
+
+  const currencySummaries: TransportOperationsReport["currencySummaries"] = Array.from(totalsByCurrency)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, totals]) => ({
+      currency,
+      transactionsCount: totals.transactionsCount,
+      cashInAmount: toMoneyString(totals.cashIn),
+      amccoAmount: toMoneyString(totals.amcco),
+      cashOutAmount: toMoneyString(totals.cashOut),
+      netAmount: toMoneyString(totals.cashIn - totals.cashOut)
+    }));
+
+  return {
+    periodLabel: toDisplayPeriodLabel(filters),
+    rows,
+    currencySummaries
+  };
+}
+
 function normalizeDailyActivityKind(value: string | undefined): string {
   return (value ?? "")
     .trim()
@@ -12837,6 +13122,7 @@ export async function getCompanyReportsOverview(
   const shouldLoadGeneralStoreData = !filters.activityCode || filters.activityCode === "GENERAL_STORE";
   const shouldLoadHardwareData = !filters.activityCode || filters.activityCode === "HARDWARE";
   const shouldLoadBtpData = !filters.activityCode || filters.activityCode === "BTP";
+  const isTransportReport = filters.activityCode === "TRANSPORT";
   const asOfDate = filters.dateTo;
 
   const [
@@ -12861,11 +13147,11 @@ export async function getCompanyReportsOverview(
       listReportFinanceByStatus(actor.companyId, filters),
       listReportFinanceByType(actor.companyId, filters),
       listReportFinanceByActivity(actor.companyId, filters),
-      listFinancialAccounts({ companyId: actor.companyId }),
-      listReportTaskByStatus(actor.companyId, filters),
-      listReportTaskByActivity(actor.companyId, filters),
+      isTransportReport ? Promise.resolve([]) : listFinancialAccounts({ companyId: actor.companyId }),
+      isTransportReport ? Promise.resolve([]) : listReportTaskByStatus(actor.companyId, filters),
+      isTransportReport ? Promise.resolve([]) : listReportTaskByActivity(actor.companyId, filters),
       listReportOperationalTransactions(actor.companyId, filters),
-      listReportOperationalTasks(actor.companyId, filters),
+      isTransportReport ? Promise.resolve([]) : listReportOperationalTasks(actor.companyId, filters),
       shouldLoadRentalData
         ? listReportRentalTransactions(actor.companyId, asOfDate)
         : Promise.resolve([] as ReportOperationalTransaction[]),
@@ -12939,7 +13225,9 @@ export async function getCompanyReportsOverview(
     financeAccounts: buildFinancialAccountGovernanceItems(visibleFinancialAccounts, filters.activityCode),
     taskByStatus,
     taskByActivity: taskByActivitySummary,
-    operationalPerformance: buildOperationalPerformance(operationalTransactions, operationalTasks),
+    operationalPerformance: isTransportReport
+      ? []
+      : buildOperationalPerformance(operationalTransactions, operationalTasks),
     hardwareMonthlyReport: buildHardwareMonthlyReport(operationalTransactions, hardwareTransactions, filters),
     agricultureOperationsReport: buildAgricultureOperationsReport(operationalTransactions, operationalTasks, filters),
     generalStoreOperationsReport: buildGeneralStoreOperationsReport(
@@ -12963,6 +13251,7 @@ export async function getCompanyReportsOverview(
       : null,
     agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
     generalExpensesReport: buildGeneralExpensesReport(operationalTransactions, filters),
+    transportOperationsReport: buildTransportOperationsReport(operationalTransactions, filters),
     dailyActivitiesReport: buildDailyActivitiesReport(operationalTransactions, operationalTasks, filters),
     roleDistribution: [],
     topAssignees: []
@@ -14084,6 +14373,19 @@ export async function exportCompanyReportsPdf(
       renderHardwareReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawHardwarePdfFooter(doc, pageNumber, totalPages, overview.hardwareMonthlyReport?.periodLabel ?? periodLabel);
+    }, { layout: "landscape" });
+  }
+
+  if (filters.activityCode === "TRANSPORT") {
+    const report = overview.transportOperationsReport ?? {
+      periodLabel,
+      rows: [],
+      currencySummaries: []
+    };
+    return buildPdfBuffer((doc) => {
+      renderTransportOperationsPdf(doc, overview, filters);
+    }, (doc, pageNumber, totalPages) => {
+      drawTransportPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
     }, { layout: "landscape" });
   }
 

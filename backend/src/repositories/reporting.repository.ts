@@ -852,6 +852,34 @@ export type GeneralExpensesReport = {
   };
 };
 
+export type TransportOperationsReportRow = {
+  date: string;
+  operationLabel: string;
+  vehicleLabel: string;
+  designation: string;
+  quantity: number | null;
+  unitPrice: string | null;
+  cashInAmount: string;
+  amccoAmount: string;
+  cashOutAmount: string;
+  currency: string;
+};
+
+export type TransportOperationsReportCurrencySummary = {
+  currency: string;
+  transactionsCount: number;
+  cashInAmount: string;
+  amccoAmount: string;
+  cashOutAmount: string;
+  netAmount: string;
+};
+
+export type TransportOperationsReport = {
+  periodLabel: string;
+  rows: TransportOperationsReportRow[];
+  currencySummaries: TransportOperationsReportCurrencySummary[];
+};
+
 export type DailyActivitiesReport = {
   periodLabel: string;
   activities: Array<{
@@ -1011,6 +1039,7 @@ export type ReportsOverview = {
   hydrocarbonOperationsReport: HydrocarbonOperationsReport | null;
   agencyOperationsReport: AgencyOperationsReport | null;
   generalExpensesReport: GeneralExpensesReport | null;
+  transportOperationsReport: TransportOperationsReport | null;
   dailyActivitiesReport: DailyActivitiesReport | null;
   roleDistribution: ReportRoleDistribution[];
   topAssignees: DashboardWorkloadItem[];

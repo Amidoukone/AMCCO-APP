@@ -655,7 +655,8 @@ export function ReportsPage(): JSX.Element {
     overview?.btpOperationsReport ||
     overview?.fishFarmingOperationsReport ||
     overview?.livestockOperationsReport ||
-    overview?.generalExpensesReport
+    overview?.generalExpensesReport ||
+    overview?.transportOperationsReport
   );
   const genericOperationalPerformanceRows = useMemo(
     () =>
@@ -701,7 +702,9 @@ export function ReportsPage(): JSX.Element {
     <div className="reports-page">
       <header className="section-header">
         <h2>Rapports PDF</h2>
-        <p>Données du secteur choisi, calculées depuis les transactions, tâches et comptes.</p>
+        <p>{selectedActivityCode === "TRANSPORT"
+          ? "Suivi des entrées, sorties et opérations du secteur Transport."
+          : "Données du secteur choisi, calculées depuis les transactions, tâches et comptes."}</p>
       </header>
 
       <section className="panel reports-control-panel">
@@ -890,7 +893,7 @@ export function ReportsPage(): JSX.Element {
             tabIndex={0}
           >
             <p className="reports-scroll-hint">Détails du rapport · Faites défiler cette zone pour consulter toutes les sections.</p>
-          <section className="panel reports-overview-panel">
+          {overview.transportOperationsReport ? null : <section className="panel reports-overview-panel">
             <div className="dashboard-panel-header">
               <div>
                 <h3>Vue du rapport</h3>
@@ -938,18 +941,22 @@ export function ReportsPage(): JSX.Element {
                 </>
               )}
             </div>
-          </section>
+          </section>}
 
           <section className="panel reports-export-panel">
             <div className="dashboard-panel-header">
               <div>
                 <h3>Export PDF avec les filtres sélectionnés</h3>
-                <p className="hint">Le fichier PDF reprend la période et le secteur choisis dans les filtres.</p>
+                  <p className="hint">{selectedActivityCode === "TRANSPORT"
+                    ? "Le PDF présente les entrées, sorties et transactions Transport de la période choisie."
+                    : "Le fichier PDF reprend la période et le secteur choisis dans les filtres."}</p>
               </div>
               <div className="reports-export-grid">
                 <article className="reports-export-card">
                   <strong className="reports-export-card-title">Rapport PDF</strong>
-                  <p className="hint">Synthèse, flux financiers, comptes et tâches du secteur.</p>
+                  <p className="hint">{selectedActivityCode === "TRANSPORT"
+                    ? "Synthèse et lignes détaillées des transactions Transport."
+                    : "Synthèse, flux financiers, comptes et tâches du secteur."}</p>
                   <button
                     type="button"
                     className="secondary-btn"
@@ -968,7 +975,7 @@ export function ReportsPage(): JSX.Element {
             open={isReportDetailsExpanded}
             onToggle={(event) => setIsReportDetailsExpanded(event.currentTarget.open)}
           >
-            <summary>Rentabilité et activité</summary>
+            <summary>{selectedActivityCode === "TRANSPORT" ? "Rapport Transport" : "Rentabilité et activité"}</summary>
 
           {isReportDetailsExpanded ? (
             <>
@@ -2698,6 +2705,93 @@ export function ReportsPage(): JSX.Element {
               </div>
             </section>
           ) : null}
+
+          {overview.transportOperationsReport ? (() => {
+            const report = overview.transportOperationsReport;
+            return (
+              <section className="panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h3>Rapport Transport</h3>
+                    <p className="hint">{report.periodLabel} · opérations soumises ou approuvées.</p>
+                  </div>
+                </div>
+
+                <div className="reports-owner-section">
+                  <h4 className="reports-owner-section-title">Synthèse par devise</h4>
+                  <div className="table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Devise</th>
+                          <th>Transactions</th>
+                          <th>Entrées</th>
+                          <th>Part AMCCO</th>
+                          <th>Sorties</th>
+                          <th>Solde net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.currencySummaries.length === 0 ? (
+                          <tr><td colSpan={6}>Aucun mouvement sur la période sélectionnée.</td></tr>
+                        ) : report.currencySummaries.map((summary) => (
+                          <tr key={summary.currency}>
+                            <td>{summary.currency}</td>
+                            <td>{formatCount(summary.transactionsCount)}</td>
+                            <td>{formatAmount(summary.cashInAmount, summary.currency)}</td>
+                            <td>{formatAmount(summary.amccoAmount, summary.currency)}</td>
+                            <td>{formatAmount(summary.cashOutAmount, summary.currency)}</td>
+                            <td>{formatAmount(summary.netAmount, summary.currency)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="reports-owner-section">
+                  <div className="reports-table-header">
+                    <h4>Transactions détaillées</h4>
+                    <span>{formatCount(report.rows.length)} opération(s)</span>
+                  </div>
+                  <div className="table-wrap" role="region" aria-label="Transactions Transport détaillées" tabIndex={0}>
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Opération</th>
+                          <th>Véhicule</th>
+                          <th>Désignation / trajet</th>
+                          <th>Voyages</th>
+                          <th>Prix unitaire</th>
+                          <th>Entrées</th>
+                          <th>Part AMCCO</th>
+                          <th>Sorties</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {report.rows.length === 0 ? (
+                          <tr><td colSpan={9}>Aucune transaction Transport sur la période sélectionnée.</td></tr>
+                        ) : report.rows.map((row, index) => (
+                          <tr key={`${row.date}-${row.vehicleLabel}-${index}`}>
+                            <td>{formatReportDate(row.date)}</td>
+                            <td>{row.operationLabel}</td>
+                            <td>{row.vehicleLabel}</td>
+                            <td>{row.designation}</td>
+                            <td>{row.quantity === null ? "-" : formatCount(row.quantity)}</td>
+                            <td>{row.unitPrice ? formatAmount(row.unitPrice, row.currency) : "-"}</td>
+                            <td>{Number(row.cashInAmount) > 0 ? formatAmount(row.cashInAmount, row.currency) : "-"}</td>
+                            <td>{Number(row.amccoAmount) > 0 ? formatAmount(row.amccoAmount, row.currency) : "-"}</td>
+                            <td>{Number(row.cashOutAmount) > 0 ? formatAmount(row.cashOutAmount, row.currency) : "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            );
+          })() : null}
 
           {overview.generalExpensesReport ? (() => {
             const report = overview.generalExpensesReport;

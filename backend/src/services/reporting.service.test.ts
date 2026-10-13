@@ -946,11 +946,18 @@ describe("reporting.service", () => {
         type: "CASH_IN",
         amount: "150000.00",
         currency: "XOF",
+        description: "Travaux de banco",
         occurredAt: "2026-09-05T10:00:00.000Z",
         metadata: {
           transportService: "Location camion",
+          transportCategory: "Camion benne",
+          dumpTruckOperationKind: "TRAVAUX",
           assetType: "Camion benne",
-          vehicleRef: "TR-001"
+          vehicleRef: "TR-001",
+          routeRef: "Koursalé",
+          quantity: "3",
+          purchaseUnitPrice: "50000",
+          amccoAmount: "25000"
         }
       },
       {
@@ -962,8 +969,11 @@ describe("reporting.service", () => {
         occurredAt: "2026-09-06T10:00:00.000Z",
         metadata: {
           transportService: "Location camion",
+          transportCategory: "Camion benne",
+          dumpTruckOperationKind: "CARBURANT",
           assetType: "Camion benne",
-          vehicleRef: "TR-001"
+          vehicleRef: "TR-001",
+          expenseCategory: "Carburant"
         }
       },
       {
@@ -1011,34 +1021,37 @@ describe("reporting.service", () => {
 
     expect(result.btpOperationsReport).toBeNull();
     expect(result.fishFarmingOperationsReport).toBeNull();
-    expect(result.operationalPerformance).toEqual(
-      expect.arrayContaining([
+    expect(result.transportOperationsReport).toMatchObject({
+      rows: [
         expect.objectContaining({
-          scope: "ACTIVITY",
-          activityCode: "TRANSPORT",
-          itemLabel: "Transport",
-          transactionsCount: 2,
-          approvedTransactionsCount: 2,
-          approvedCashIn: "150000.00",
-          approvedCashOut: "30000.00",
-          netProfit: "120000.00",
-          totalTasksCount: 2,
-          doneTasksCount: 1,
-          openTasksCount: 1,
-          blockedTasksCount: 1,
-          executionRate: 50
+          operationLabel: "Travaux",
+          vehicleLabel: "TR-001",
+          designation: "Koursalé · Travaux de banco",
+          quantity: 3,
+          unitPrice: "50000.00",
+          cashInAmount: "150000.00",
+          amccoAmount: "25000.00",
+          cashOutAmount: "0.00"
         }),
         expect.objectContaining({
-          scope: "SUBSECTION",
-          activityCode: "TRANSPORT",
-          dimensionKey: "transportService",
-          itemLabel: "Location camion",
-          approvedCashIn: "150000.00",
-          approvedCashOut: "30000.00",
-          totalTasksCount: 2
+          operationLabel: "Carburant",
+          cashInAmount: "0.00",
+          cashOutAmount: "30000.00"
         })
-      ])
-    );
+      ],
+      currencySummaries: [{
+        currency: "XOF",
+        transactionsCount: 2,
+        cashInAmount: "150000.00",
+        amccoAmount: "25000.00",
+        cashOutAmount: "30000.00",
+        netAmount: "120000.00"
+      }]
+    });
+    expect(result.operationalPerformance).toEqual([]);
+    expect(listReportTaskByStatus).not.toHaveBeenCalled();
+    expect(listReportTaskByActivity).not.toHaveBeenCalled();
+    expect(listReportOperationalTasks).not.toHaveBeenCalled();
 
     const pdf = await exportCompanyReportsPdf(actor, {
       activityCode: "TRANSPORT",
@@ -1048,6 +1061,12 @@ describe("reporting.service", () => {
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+    const transportPdfText = extractPdfText(pdf);
+    expect(transportPdfText).toContain("TRANSPORT");
+    expect(transportPdfText).toContain("Koursalé");
+    expect(transportPdfText).toContain("PART AMCCO");
+    expect(transportPdfText).not.toContain("Tâches consolidées");
+    expect(transportPdfText).not.toContain("Exécution");
   });
 
   it("reports agreement partners and actual protocol movements in the overview and PDF", async () => {
