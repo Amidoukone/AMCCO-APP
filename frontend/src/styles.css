@@ -3666,6 +3666,35 @@ a {
   font-weight: 700;
 }
 
+.dashboard-transport-overview {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-transport-overview .dashboard-kpi-grid {
+  margin-top: 0;
+}
+
+.dashboard-transport-overview .dashboard-kpi-card span {
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  overflow-wrap: anywhere;
+}
+
+.dashboard-transport-overview > .secondary-btn {
+  justify-self: start;
+}
+
+.dashboard-transport-task-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.dashboard-transport-task-summary strong {
+  width: 100%;
+}
+
 .dashboard-currency-list {
   margin: 14px 0;
   display: grid;

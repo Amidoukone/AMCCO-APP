@@ -223,6 +223,13 @@ export function DashboardPage(): JSX.Element {
       .slice(0, 8);
   }, [selectedActivityCode, summary]);
 
+  const transportOperationalRow = useMemo(() => {
+    if (!summary || selectedActivityCode !== "TRANSPORT") return null;
+    return summary.operationalPerformance.find(
+      (item) => item.scope === "ACTIVITY" && item.activityCode === "TRANSPORT"
+    ) ?? null;
+  }, [selectedActivityCode, summary]);
+
   return (
     <>
       <header className="section-header">
@@ -349,13 +356,54 @@ export function DashboardPage(): JSX.Element {
             <div className="dashboard-panel-header">
               <div>
                 <p className="sidebar-section-label">Pilotage opérationnel</p>
-                <h3>Rentabilité, efficacité et exécution</h3>
+                <h3>{selectedActivityCode === "TRANSPORT" ? "Synthèse transport" : "Rentabilité, efficacité et exécution"}</h3>
                 <p className="hint">
-                  Rentabilité calculée sur les flux comptabilisés en XOF, avec suivi des tâches,
-                  blocages et retards.
+                  {selectedActivityCode === "TRANSPORT"
+                    ? "Entrées, sorties et solde comptabilisés en XOF. Les trajets, véhicules et charges sont détaillés dans le rapport Transport."
+                    : "Rentabilité calculée sur les flux comptabilisés en XOF, avec suivi des tâches, blocages et retards."}
                 </p>
               </div>
             </div>
+            {selectedActivityCode === "TRANSPORT" ? (
+              <div className="dashboard-transport-overview">
+                {transportOperationalRow ? (
+                  <>
+                    <div className="dashboard-kpi-grid">
+                      <article className="dashboard-kpi-card">
+                        <strong>Entrées</strong>
+                        <span>{formatAmount(transportOperationalRow.approvedCashIn, "XOF")}</span>
+                      </article>
+                      <article className="dashboard-kpi-card">
+                        <strong>Sorties</strong>
+                        <span>{formatAmount(transportOperationalRow.approvedCashOut, "XOF")}</span>
+                      </article>
+                      <article className="dashboard-kpi-card">
+                        <strong>Solde</strong>
+                        <span>{formatAmount(transportOperationalRow.netProfit, "XOF")}</span>
+                      </article>
+                    </div>
+                    {transportOperationalRow.totalTasksCount > 0 ? (
+                      <div className="dashboard-transport-task-summary">
+                        <strong>Suivi des tâches</strong>
+                        <span>{transportOperationalRow.doneTasksCount}/{transportOperationalRow.totalTasksCount} terminées ({formatRate(transportOperationalRow.executionRate)})</span>
+                        <span>{transportOperationalRow.openTasksCount} ouvertes</span>
+                        {transportOperationalRow.blockedTasksCount > 0 ? <span>{transportOperationalRow.blockedTasksCount} blocages</span> : null}
+                        {transportOperationalRow.overdueTasksCount > 0 ? <span>{transportOperationalRow.overdueTasksCount} retards</span> : null}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <p>Aucun flux comptabilisé ni tâche pour le transport dans ce périmètre.</p>
+                )}
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => navigate("/reports?activityCode=TRANSPORT")}
+                >
+                  Voir le rapport Transport
+                </button>
+              </div>
+            ) : (
             <div className="table-wrap dashboard-operational-table-wrap mobile-auto-card-table">
               <table className="admin-table">
                 <thead>
@@ -433,6 +481,7 @@ export function DashboardPage(): JSX.Element {
                 </tbody>
               </table>
             </div>
+            )}
           </section>
 
           <DashboardPriorityPanels
