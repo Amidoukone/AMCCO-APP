@@ -106,7 +106,11 @@ export function DashboardPriorityPanels({
             className="dashboard-inline-button"
             type="button"
             onClick={() => {
-              onNavigate("/operations/tasks");
+              onNavigate(
+                selectedActivityCode
+                  ? `/operations/tasks?activityCode=${selectedActivityCode}`
+                  : "/operations/tasks"
+              );
             }}
           >
             Voir les tâches

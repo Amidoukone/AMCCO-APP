@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
 import { PageGuide } from "../components/PageGuide";
+import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
 import { ButtonSpinner } from "../components/ButtonSpinner";
 import {
   buildPersistedViewStorageKey,
@@ -35,6 +36,7 @@ import {
   deleteDailyActivityCategoryRequest,
   deleteOperationsTaskRequest,
   getGeneralStoreLedgerRowsRequest,
+  getOperationsTaskRequest,
   getTaskAttachmentUploadAuthRequest,
   listBtpProjectsRequest,
   listDailyActivityCategoriesRequest,
@@ -62,6 +64,7 @@ import type { GeneralStoreShop } from "../types/shops";
 import type { BtpProject } from "../types/projects";
 import type { DailyActivityCategory } from "../types/daily-activity-categories";
 import type { GeneralStoreOperationsReportRow } from "../types/reporting";
+import { getSectorRecordContext, getSectorSearchHint } from "../utils/sectorRecordContext";
 
 const TASKS_PAGE_SIZE = 200;
 const TASKS_MOBILE_PAGE_SIZE = 40;
@@ -562,9 +565,11 @@ export function OperationsTasksPage(): JSX.Element {
   const [tasksFetchPageSize] = useState(getTasksFetchPageSize);
   const navigate = useNavigate();
   const location = useLocation();
+  const requestedEditTaskId = new URLSearchParams(location.search).get("editTaskId");
   const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const {
+    enabledActivities,
     isLoading: isLoadingActivities,
     selectedActivityCode,
     selectedProfile
@@ -579,6 +584,7 @@ export function OperationsTasksPage(): JSX.Element {
   const [dailyActivityCategories, setDailyActivityCategories] = useState<DailyActivityCategory[]>([]);
   const [categoryForm, setCategoryForm] = useState({ name: "" });
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [isDailyActivityCategoriesExpanded, setIsDailyActivityCategoriesExpanded] = useState(false);
   const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [categoryPendingDelete, setCategoryPendingDelete] = useState<DailyActivityCategory | null>(null);
@@ -596,6 +602,9 @@ export function OperationsTasksPage(): JSX.Element {
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [hasUnsavedTaskChanges, setHasUnsavedTaskChanges] = useState(false);
+  const editingTaskActivityRef = useRef<BusinessActivityCode | null>(null);
+  const sectorFormScopeRef = useRef({ companyId: activeCompany?.id, activityCode: selectedActivityCode });
   const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
   const [hasMoreTasks, setHasMoreTasks] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -670,6 +679,28 @@ export function OperationsTasksPage(): JSX.Element {
   }, [user?.role]);
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
+  useEffect(() => {
+    const previous = sectorFormScopeRef.current;
+    if (previous.companyId === activeCompany?.id && previous.activityCode === selectedActivityCode) return;
+    sectorFormScopeRef.current = { companyId: activeCompany?.id, activityCode: selectedActivityCode };
+    const hadUnsavedWork = hasUnsavedTaskChanges || Boolean(editingTaskId);
+    setEditingTaskId(null);
+    editingTaskActivityRef.current = null;
+    setHasUnsavedTaskChanges(false);
+    setCreateForm({
+      ...createDefaultTaskForm(),
+      metadata: syncMetadataState({}, taskMetadataFields)
+    });
+    setTaskAttachmentFile(null);
+    setTasks([]);
+    setHasMoreTasks(false);
+    hasLoadedTasksRef.current = false;
+    setIsLoading(true);
+    setEditingCategoryId(null);
+    setCategoryForm({ name: "" });
+    setErrorMessage(null);
+    setSuccessMessage(hadUnsavedWork ? "Le formulaire a été réinitialisé pour le nouveau secteur." : null);
+  }, [activeCompany?.id, editingTaskId, hasUnsavedTaskChanges, selectedActivityCode, taskMetadataFields]);
   const hasRequiredTaskMetadata = taskMetadataFields.some((field) => field.required);
   const visibleTaskMetadataFields = selectedActivityCode === "TRANSPORT"
     ? taskMetadataFields.filter((field) => [
@@ -694,10 +725,24 @@ export function OperationsTasksPage(): JSX.Element {
       ...Object.values(task.metadata)
     ])
   ])), [tasks]);
+  const sectorTasks = useMemo(
+    () => tasks.filter((task) => task.companyId === activeCompany?.id && task.activityCode === selectedActivityCode),
+    [activeCompany?.id, selectedActivityCode, tasks]
+  );
+  const serviceCategorySuggestions = useMemo(() => {
+    if (selectedActivityCode !== "SERVICES") return [];
+    const values = new Set(["Morgue"]);
+    for (const task of sectorTasks) {
+      if (task.activityCode === "SERVICES" && task.metadata.serviceCategory?.trim()) {
+        values.add(task.metadata.serviceCategory.trim());
+      }
+    }
+    return [...values].sort((left, right) => left.localeCompare(right, "fr"));
+  }, [selectedActivityCode, sectorTasks]);
   const displayTasks = useMemo(() => {
     const matchesSearch = createQuickSearchMatcher(searchQuery);
-    return tasks.filter((task) => matchesSearch(taskSearchTextById.get(task.id) ?? ""));
-  }, [searchQuery, taskSearchTextById, tasks]);
+    return sectorTasks.filter((task) => matchesSearch(taskSearchTextById.get(task.id) ?? ""));
+  }, [searchQuery, sectorTasks, taskSearchTextById]);
   const totalVisibleTaskPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTasks.length / visibleTasksPageSize));
   }, [displayTasks.length, visibleTasksPageSize]);
@@ -926,6 +971,28 @@ export function OperationsTasksPage(): JSX.Element {
     return () => window.cancelAnimationFrame(frameId);
   }, [isLoading, location.hash, location.pathname, location.search, navigate]);
 
+  useEffect(() => {
+    if (!editingTaskId) return;
+    const frameId = window.requestAnimationFrame(() => {
+      document.getElementById("task-create")?.scrollIntoView({
+        block: "start",
+        behavior: "smooth"
+      });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [editingTaskId]);
+
+  useEffect(() => {
+    if (!editingCategoryId) return;
+    const frameId = window.requestAnimationFrame(() => {
+      document.getElementById("daily-activity-categories")?.scrollIntoView({
+        block: "start",
+        behavior: "smooth"
+      });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [editingCategoryId]);
+
   const loadShopLedger = useCallback(async () => {
     const requestId = ++shopLedgerLoadRequestRef.current;
     if (isLoadingActivities) return;
@@ -1054,6 +1121,7 @@ export function OperationsTasksPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingCategoryId(category.id);
+    setIsDailyActivityCategoriesExpanded(true);
     setCategoryForm({ name: category.name });
   }
 
@@ -1225,6 +1293,10 @@ export function OperationsTasksPage(): JSX.Element {
     if (!canCreateTasks || !selectedActivityCode) {
       return;
     }
+    if (editingTaskId && editingTaskActivityRef.current !== selectedActivityCode) {
+      setErrorMessage("Cette tâche appartient à un autre secteur. Rouvrez-la depuis son secteur.");
+      return;
+    }
     const wasEditingTask = Boolean(editingTaskId);
     const attachmentFileToUpload = editingTaskId ? null : taskAttachmentFile;
     setErrorMessage(null);
@@ -1270,6 +1342,8 @@ export function OperationsTasksPage(): JSX.Element {
             })
       );
       setEditingTaskId(null);
+      editingTaskActivityRef.current = null;
+      setHasUnsavedTaskChanges(false);
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsTaskFormExpanded(false);
       }
@@ -1360,6 +1434,8 @@ export function OperationsTasksPage(): JSX.Element {
     }
 
     setEditingTaskId(task.id);
+    editingTaskActivityRef.current = task.activityCode;
+    setHasUnsavedTaskChanges(false);
     setIsTaskFormExpanded(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -1383,8 +1459,57 @@ export function OperationsTasksPage(): JSX.Element {
     });
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedTaskId = params.get("editTaskId");
+    const requestedActivityCode = params.get("activityCode");
+    const clearRequest = (): void => {
+      params.delete("editTaskId");
+      navigate({ pathname: location.pathname, search: params.toString(), hash: "" }, { replace: true });
+    };
+    if (!requestedTaskId || isLoadingActivities) return;
+    if (!canCreateTasks) {
+      setErrorMessage("Votre rôle ne permet pas de modifier cette tâche.");
+      clearRequest();
+      return;
+    }
+    if (requestedActivityCode && !enabledActivities.some((activity) => activity.code === requestedActivityCode)) {
+      setErrorMessage("Le secteur demandé n'est plus disponible pour la modification.");
+      params.delete("activityCode");
+      clearRequest();
+      return;
+    }
+    if (!selectedProfile || !selectedActivityCode) {
+      setErrorMessage("Aucun secteur actif n'est disponible pour modifier cette tâche.");
+      clearRequest();
+      return;
+    }
+    if (requestedActivityCode && requestedActivityCode !== selectedActivityCode) return;
+
+    let cancelled = false;
+    void withAuthorizedToken((accessToken) => getOperationsTaskRequest(accessToken, requestedTaskId))
+      .then(({ item }) => {
+        if (cancelled) return;
+        if (item.activityCode !== selectedActivityCode || item.createdById !== user?.id) {
+          setErrorMessage("Cette tâche ne peut pas être modifiée depuis le secteur actuel.");
+          clearRequest();
+          return;
+        }
+        handleStartEditTask(item);
+        clearRequest();
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setErrorMessage(toErrorMessage(error));
+        clearRequest();
+      });
+    return () => { cancelled = true; };
+  }, [canCreateTasks, enabledActivities, isLoadingActivities, location.pathname, location.search, navigate, selectedActivityCode, selectedProfile, taskMetadataFields, user?.id, withAuthorizedToken]);
+
   function handleCancelEditTask(): void {
     setEditingTaskId(null);
+    editingTaskActivityRef.current = null;
+    setHasUnsavedTaskChanges(false);
     setIsTaskFormExpanded(false);
     setCreateForm({
       ...createDefaultTaskForm(),
@@ -1530,6 +1655,17 @@ export function OperationsTasksPage(): JSX.Element {
     navigate(`/operations/tasks/${taskId}`);
   }
 
+  function scrollToTaskSection(sectionId: string): void {
+    window.requestAnimationFrame(() => {
+      const section = document.getElementById(sectionId);
+      if (section instanceof HTMLDetailsElement) section.open = true;
+      section?.scrollIntoView({
+        block: "start",
+        behavior: "smooth"
+      });
+    });
+  }
+
   function preventCardNavigation(event: MouseEvent<HTMLElement>): void {
     event.stopPropagation();
   }
@@ -1559,27 +1695,55 @@ export function OperationsTasksPage(): JSX.Element {
       ) : null}
 
       <PageGuide
-        title="Guide des tâches"
-        description="Les tâches structurent le suivi terrain par secteur, responsable, statut et échéance."
-        items={[
-          {
-            term: "À faire",
-            description: "Travail créé mais pas encore démarré."
-          },
-          {
-            term: "En cours",
-            description: "Travail actif, suivi par le responsable ou le superviseur."
-          },
-          {
-            term: "Bloquée",
-            description: "Tâche arrêtée par un problème qui demande une décision ou un appui."
-          },
-          {
-            term: "Retard",
-            description: "Tâche ouverte dont l'échéance est dépassée."
-          }
-        ]}
+        title={
+          selectedProfile ? `Guide des tâches · ${selectedProfile.label}` : "Guide des tâches"
+        }
+        description={
+          selectedProfile?.operationsModel ??
+          "Les tâches structurent le suivi terrain par secteur, responsable, statut et échéance."
+        }
+        items={selectedProfile?.tasks.workflow.length
+          ? selectedProfile.tasks.workflow.map((step) => ({
+              term: step.label,
+              description: step.description
+            }))
+          : [
+              {
+                term: "À faire",
+                description: "Travail créé mais pas encore démarré."
+              },
+              {
+                term: "En cours",
+                description: "Travail actif, suivi par le responsable ou le superviseur."
+              },
+              {
+                term: "Bloquée",
+                description: "Tâche arrêtée par un problème qui demande une décision ou un appui."
+              },
+              {
+                term: "Retard",
+                description: "Tâche ouverte dont l'échéance est dépassée."
+              }
+            ]}
       />
+
+      <SectorWorkspaceNav actions={[
+        { label: "Voir les tâches", onClick: () => scrollToTaskSection("tasks-list") },
+        ...(canCreateTasks ? [{
+          label: "Créer une tâche",
+          onClick: () => {
+            setIsTaskFormExpanded(true);
+            scrollToTaskSection("task-create");
+          }
+        }] : []),
+        ...(selectedActivityCode === "DAILY_ACTIVITIES" && canManageDailyActivityCategories ? [{
+          label: "Gérer les catégories",
+          onClick: () => {
+            setIsDailyActivityCategoriesExpanded(true);
+            scrollToTaskSection("daily-activity-categories");
+          }
+        }] : [])
+      ]} />
 
       <section className="panel">
         {!isReadOnlyOwner ? <h3>Recherche</h3> : null}
@@ -1593,7 +1757,7 @@ export function OperationsTasksPage(): JSX.Element {
           <input
             type="search"
             className="quick-search-input"
-            placeholder="Recherche rapide: tâche, responsable, createur..."
+            placeholder={`Rechercher : ${getSectorSearchHint(selectedActivityCode)}...`}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -1654,11 +1818,17 @@ export function OperationsTasksPage(): JSX.Element {
         <details
           id="task-create"
           className="panel mobile-form-anchor mobile-create-disclosure"
-          open={isTaskFormExpanded || Boolean(editingTaskId)}
+          open={isTaskFormExpanded || Boolean(editingTaskId) || Boolean(requestedEditTaskId)}
           onToggle={(event) => setIsTaskFormExpanded(event.currentTarget.open)}
         >
-          <summary>{editingTaskId ? "Modifier une tâche" : "Nouvelle tâche"}</summary>
-          <form className="operations-task-form" onSubmit={handleCreateTask}>
+          <summary>{editingTaskId ? "Modifier une tâche" : requestedEditTaskId ? "Ouverture de la tâche..." : "Nouvelle tâche"}</summary>
+          {requestedEditTaskId && !editingTaskId ? <p className="hint" role="status">Chargement de la tâche à modifier...</p> : (
+          <form
+            className="operations-task-form"
+            onSubmit={handleCreateTask}
+            onChangeCapture={() => setHasUnsavedTaskChanges(true)}
+            data-unsaved-sector-form={hasUnsavedTaskChanges || editingTaskId ? "true" : undefined}
+          >
             <div className="operations-task-form-primary">
               <input
                 type="text"
@@ -2242,6 +2412,7 @@ export function OperationsTasksPage(): JSX.Element {
                       <input
                         key={field.key}
                         type="text"
+                        list={selectedActivityCode === "SERVICES" && field.key === "serviceCategory" ? "task-service-categories" : undefined}
                         placeholder={field.label}
                         value={createForm.metadata[field.key] ?? ""}
                         onChange={(event) =>
@@ -2261,6 +2432,11 @@ export function OperationsTasksPage(): JSX.Element {
                     )
                   ))}
                 </div>
+                {selectedActivityCode === "SERVICES" ? (
+                  <datalist id="task-service-categories">
+                    {serviceCategorySuggestions.map((value) => <option key={value} value={value} />)}
+                  </datalist>
+                ) : null}
               </details>
             ) : null}
             {!editingTaskId ? (
@@ -2345,12 +2521,18 @@ export function OperationsTasksPage(): JSX.Element {
               ) : null}
             </div>
           </form>
+          )}
         </details>
       ) : null}
 
       {selectedActivityCode === "DAILY_ACTIVITIES" && canManageDailyActivityCategories ? (
         <section className="panel">
-          <details className="finance-section-toggle">
+          <details
+            id="daily-activity-categories"
+            className="finance-section-toggle"
+            open={isDailyActivityCategoriesExpanded || Boolean(editingCategoryId)}
+            onToggle={(event) => setIsDailyActivityCategoriesExpanded(event.currentTarget.open)}
+          >
             <summary className="finance-section-summary">
               <span>{editingCategoryId ? "Modifier une catégorie" : "Gérer les catégories d'activité"}</span>
               <small>
@@ -2359,7 +2541,7 @@ export function OperationsTasksPage(): JSX.Element {
                   : "Ajoutez vos propres catégories (rendez-vous, décision, partenaire...) pour les retrouver en sélection lors de la saisie."}
               </small>
             </summary>
-            <form className="finance-account-form" onSubmit={handleSaveCategory}>
+            <form className="finance-account-form" onSubmit={handleSaveCategory} data-unsaved-sector-form={editingCategoryId ? "true" : undefined}>
               <label className="operations-inline-group">
                 <span>Nom de la catégorie</span>
                 <input
@@ -2490,7 +2672,7 @@ export function OperationsTasksPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className="panel">
+      <section id="tasks-list" className="panel">
         <div className="operations-list-header">
           <h3>Tâches</h3>
           {false ? (
@@ -2511,15 +2693,23 @@ export function OperationsTasksPage(): JSX.Element {
             </label>
           ) : !isReadOnlyOwner ? <p className="hint">{displayTasks.length} tâche(s) filtrée(s)</p> : null}
         </div>
-        {!isLoading && tasks.length === 0 ? (
+        {!isLoading && sectorTasks.length === 0 ? (
           <EmptyState
             title="Aucune tâche dans cette vue"
             description="Créez la première tâche du secteur actif ou changez les filtres pour retrouver les actions existantes."
             actionLabel={canCreateTasks ? "Préparer une tâche" : undefined}
-            onAction={canCreateTasks ? () => window.scrollTo({ top: 0, behavior: "smooth" }) : undefined}
+            onAction={canCreateTasks ? () => {
+              setIsTaskFormExpanded(true);
+              window.requestAnimationFrame(() => {
+                document.getElementById("task-create")?.scrollIntoView({
+                  block: "start",
+                  behavior: "smooth"
+                });
+              });
+            } : undefined}
           />
         ) : null}
-        {!isLoading && tasks.length > 0 && displayTasks.length === 0 ? (
+        {!isLoading && sectorTasks.length > 0 && displayTasks.length === 0 ? (
           <EmptyState
             title="Aucun résultat"
             description="Aucune tâche ne correspond à la recherche ou aux filtres appliqués."
@@ -2543,6 +2733,7 @@ export function OperationsTasksPage(): JSX.Element {
           >
             {paginatedTasks.map((task) => {
               const isBusy = busyTaskId === task.id;
+              const sectorContext = getSectorRecordContext(task.activityCode, task.metadata);
               const canUpdate = canUpdateTask(task);
               const isCompleted = task.status === "DONE";
               const editLockMessage = getTaskEditLockMessage(task);
@@ -2585,6 +2776,13 @@ export function OperationsTasksPage(): JSX.Element {
                   </p>
 
                   <div className="operations-task-meta">
+                    {sectorContext.length > 0 ? (
+                      <p className="sector-record-context">
+                        {sectorContext.map(({ label, value }) => (
+                          <span key={label}><strong>{label} :</strong> {value}</span>
+                        ))}
+                      </p>
+                    ) : null}
                     <p>
                       <strong>Activité:</strong> {getBusinessActivityLabel(task.activityCode)}
                     </p>

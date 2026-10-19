@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import type { NavigationItem } from "../config/permissions";
-import { canAccessFeature, isReadOnlyOwnerRole } from "../config/permissions";
+import {
+  canAccessFeature,
+  canManageSectorTransactions,
+  isReadOnlyOwnerRole
+} from "../config/permissions";
 import type { RoleCode } from "../types/role";
 
 type QuickActionsProps = {
@@ -24,12 +28,7 @@ export function QuickActions({
   const canUse = (key: NavigationItem["key"]): boolean =>
     navigation.some((item) => item.key === key) && canAccessFeature(role, key);
   const isReadOnlyOwner = isReadOnlyOwnerRole(role);
-  const canCreateTransactions =
-    role === "SYS_ADMIN" ||
-    role === "ACCOUNTANT" ||
-    role === "HARDWARE_OPERATOR" ||
-    role === "HYDROCARBON_OPERATOR" ||
-    role === "BEVERAGE_DEPOT_OPERATOR";
+  const canCreateTransactions = canManageSectorTransactions(role);
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
 
   const ownerActions = [

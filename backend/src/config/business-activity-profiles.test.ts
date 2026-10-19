@@ -5,6 +5,21 @@ import {
   getBusinessActivityProfile
 } from "./business-activity-profiles.js";
 
+describe("service categories", () => {
+  it("accepts existing and new categories for service transactions and tasks", () => {
+    for (const serviceCategory of ["Morgue", "Entretien", "Conseil"]) {
+      expect(() => assertTransactionInputMatchesActivityProfile("SERVICES", {
+        type: "CASH_IN",
+        currency: "XOF",
+        metadata: { serviceCategory, clientRef: "Client A" }
+      })).not.toThrow();
+      expect(() => assertTaskInputMatchesActivityProfile("SERVICES", {
+        metadata: { serviceCategory, clientRef: "Client A" }
+      })).not.toThrow();
+    }
+  });
+});
+
 describe("hardware recipient validation", () => {
   it("requires a recipient and the matching cash flow for purchases and recoveries", () => {
     expect(() => assertTransactionInputMatchesActivityProfile("HARDWARE", {

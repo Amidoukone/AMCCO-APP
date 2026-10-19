@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
 import { PageGuide } from "../components/PageGuide";
+import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
 import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
@@ -40,6 +41,7 @@ import {
   deleteGeneralStoreShopRequest,
   deleteRentalTenantRequest,
   getFinanceProofUploadAuthRequest,
+  getFinanceTransactionRequest,
   getFinanceDumpTruckSummaryRequest,
   listActivityArticlesRequest,
   listBtpProjectsRequest,
@@ -57,9 +59,7 @@ import {
   updateRentalTenantRequest
 } from "../lib/api";
 import {
-  BUSINESS_ACTIVITY_CODES,
   getBusinessActivityLabel,
-  isBusinessActivityCode,
   type BusinessActivityCode
 } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
@@ -83,6 +83,8 @@ import {
   getAccountGovernanceLines,
   getTransactionGovernanceLines
 } from "../utils/governanceDisplay";
+import { canManageSectorTransactions } from "../config/permissions";
+import { getSectorRecordContext, getSectorSearchHint } from "../utils/sectorRecordContext";
 
 const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
 const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
@@ -3280,6 +3282,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const {
     enabledActivities,
     isLoading: isLoadingActivities,
+    profiles,
     selectedActivity,
     selectedActivityCode,
     selectedProfile,
@@ -3290,6 +3293,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [hasLoadedAccounts, setHasLoadedAccounts] = useState(false);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
   const [isAccountListExpanded, setIsAccountListExpanded] = useState(false);
+  const [isAccountFormExpanded, setIsAccountFormExpanded] = useState(false);
   const [dailyActivityCategories, setDailyActivityCategories] = useState<DailyActivityCategory[]>([]);
   const dailyCategoriesLoadRequestRef = useRef(0);
   const [articles, setArticles] = useState<ActivityArticle[]>([]);
@@ -3334,6 +3338,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   transactionsRef.current = transactions;
   const [sectorSuggestionHistory, setSectorSuggestionHistory] = useState<FinancialTransaction[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  const [linkedTransaction, setLinkedTransaction] = useState<FinancialTransaction | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -3360,14 +3365,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [user?.role]);
 
   const canManageTransactions = useMemo(() => {
-    return (
-      user?.role === "SYS_ADMIN" ||
-      user?.role === "ACCOUNTANT" ||
-      user?.role === "EMPLOYEE" ||
-      user?.role === "HARDWARE_OPERATOR" ||
-      user?.role === "HYDROCARBON_OPERATOR" ||
-      user?.role === "BEVERAGE_DEPOT_OPERATOR"
-    );
+    return user ? canManageSectorTransactions(user.role) : false;
   }, [user?.role]);
 
   const canManageArticles = useMemo(() => {
@@ -3455,6 +3453,9 @@ export function FinanceTransactionsPage(): JSX.Element {
     occurredAt: ""
   });
   const [transactionProofFile, setTransactionProofFile] = useState<File | null>(null);
+  const [hasUnsavedTransactionChanges, setHasUnsavedTransactionChanges] = useState(false);
+  const editingTransactionActivityRef = useRef<BusinessActivityCode | null>(null);
+  const sectorFormScopeRef = useRef({ companyId: activeCompany?.id, activityCode: selectedActivityCode });
   const [isSavingTransaction, setIsSavingTransaction] = useState(false);
   const [isTransactionFormExpanded, setIsTransactionFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
@@ -3680,18 +3681,29 @@ export function FinanceTransactionsPage(): JSX.Element {
   );
   const requestedTransactionId = searchParams.get("transactionId");
   const requestedTransactionIdRef = useRef(requestedTransactionId);
-  const requestedActivityCode = useMemo(() => {
-    const activityCode = searchParams.get("activityCode");
-    return activityCode && isBusinessActivityCode(activityCode) ? activityCode : null;
-  }, [searchParams]);
+  const sectorTransactions = useMemo(
+    () => transactions.filter((item) => item.companyId === activeCompany?.id && item.activityCode === selectedActivityCode),
+    [activeCompany?.id, selectedActivityCode, transactions]
+  );
 
   const selectedTransaction = useMemo(
-    () => transactions.find((item) => item.id === selectedTransactionId) ?? null,
-    [selectedTransactionId, transactions]
+    () => sectorTransactions.find((item) => item.id === selectedTransactionId) ??
+      (linkedTransaction?.id === selectedTransactionId &&
+        linkedTransaction.companyId === activeCompany?.id &&
+        (linkedTransaction.activityCode === selectedActivityCode ||
+          (linkedTransaction.activityCode !== null && !enabledActivityCodes.includes(linkedTransaction.activityCode)))
+        ? linkedTransaction : null),
+    [activeCompany?.id, enabledActivityCodes, linkedTransaction, sectorTransactions, selectedActivityCode, selectedTransactionId]
   );
+  const isSelectedTransactionArchived = Boolean(
+    selectedTransaction?.activityCode && !enabledActivityCodes.includes(selectedTransaction.activityCode)
+  );
+  const selectedTransactionMetadataFields = selectedTransaction?.activityCode
+    ? profiles.find((profile) => profile.activityCode === selectedTransaction.activityCode)?.finance.metadataFields ?? financeMetadataFields
+    : financeMetadataFields;
   const canMutateSelectedTransaction = useMemo(
-    () => (selectedTransaction ? canMutateTransaction(selectedTransaction) : false),
-    [canMutateTransaction, selectedTransaction]
+    () => (selectedTransaction && !isSelectedTransactionArchived ? canMutateTransaction(selectedTransaction) : false),
+    [canMutateTransaction, isSelectedTransactionArchived, selectedTransaction]
   );
   const transactionSearchTextById = useMemo(() => new Map(transactions.map((item) => [
     item.id,
@@ -3707,10 +3719,20 @@ export function FinanceTransactionsPage(): JSX.Element {
       ...Object.values(item.metadata)
     ])
   ])), [transactions]);
+  const serviceCategorySuggestions = useMemo(() => {
+    if (selectedActivityCode !== "SERVICES") return [];
+    const values = new Set(["Morgue"]);
+    for (const item of sectorTransactions) {
+      if (item.activityCode === "SERVICES" && item.metadata.serviceCategory?.trim()) {
+        values.add(item.metadata.serviceCategory.trim());
+      }
+    }
+    return [...values].sort((left, right) => left.localeCompare(right, "fr"));
+  }, [selectedActivityCode, sectorTransactions]);
   const displayTransactions = useMemo(() => {
     const matchesSearch = createQuickSearchMatcher(searchQuery);
-    return transactions.filter((item) => matchesSearch(transactionSearchTextById.get(item.id) ?? ""));
-  }, [searchQuery, transactionSearchTextById, transactions]);
+    return sectorTransactions.filter((item) => matchesSearch(transactionSearchTextById.get(item.id) ?? ""));
+  }, [searchQuery, sectorTransactions, transactionSearchTextById]);
   const totalVisibleTransactionPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTransactions.length / visibleTransactionsPageSize));
   }, [displayTransactions.length, visibleTransactionsPageSize]);
@@ -3754,6 +3776,8 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   const resetTransactionForm = useCallback(() => {
     setEditingTransactionId(null);
+    editingTransactionActivityRef.current = null;
+    setHasUnsavedTransactionChanges(false);
     setTransactionProofFile(null);
     const defaultMetadata = syncMetadataState({}, financeMetadataFields);
     setTransactionForm((prev) => ({
@@ -3775,6 +3799,39 @@ export function FinanceTransactionsPage(): JSX.Element {
       occurredAt: prev.occurredAt
     }));
   }, [accounts, allowedCurrencies, financeMetadataFields, selectedActivityCode]);
+
+  useEffect(() => {
+    const previous = sectorFormScopeRef.current;
+    if (previous.companyId === activeCompany?.id && previous.activityCode === selectedActivityCode) return;
+    sectorFormScopeRef.current = { companyId: activeCompany?.id, activityCode: selectedActivityCode };
+    const hadUnsavedWork = hasUnsavedTransactionChanges || Boolean(editingTransactionId);
+    setEditingTransactionId(null);
+    editingTransactionActivityRef.current = null;
+    setHasUnsavedTransactionChanges(false);
+    setTransactionProofFile(null);
+    setTransactionForm({
+      accountId: "",
+      type: getDefaultTransactionType(selectedActivityCode),
+      amount: "",
+      currency: allowedCurrencies[0] ?? "XOF",
+      description: "",
+      metadata: syncMetadataState({}, financeMetadataFields),
+      occurredAt: ""
+    });
+    resetAccountForm();
+    resetArticleForm();
+    resetTenantForm();
+    resetShopForm();
+    resetProjectForm();
+    setTransactions([]);
+    setHasMoreTransactions(false);
+    hasLoadedTransactionsRef.current = false;
+    setIsLoading(true);
+    setSelectedTransactionId(new URLSearchParams(location.search).get("transactionId"));
+    setLinkedTransaction(null);
+    setErrorMessage(null);
+    setSuccessMessage(hadUnsavedWork ? "Le formulaire a été réinitialisé pour le nouveau secteur." : null);
+  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, financeMetadataFields, hasUnsavedTransactionChanges, location.search, resetAccountForm, resetArticleForm, resetProjectForm, resetShopForm, resetTenantForm, selectedActivityCode]);
 
   const canManageAccount = useCallback(
     (account: FinancialAccount): boolean => {
@@ -3847,6 +3904,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
   const handleOpenTransactionDetails = useCallback(
     (transactionId: string, activityCode: BusinessActivityCode | null) => {
+      requestedTransactionIdRef.current = transactionId;
       setSelectedTransactionId(transactionId);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
@@ -3861,9 +3919,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   );
 
   useEffect(() => {
-    if (!selectedTransactionId || !window.matchMedia("(max-width: 640px)").matches) {
-      return;
-    }
+    if (!requestedTransactionId || selectedTransaction?.id !== requestedTransactionId) return;
     const frameId = window.requestAnimationFrame(() => {
       document.getElementById("transaction-detail")?.scrollIntoView({
         block: "start",
@@ -3871,23 +3927,22 @@ export function FinanceTransactionsPage(): JSX.Element {
       });
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [selectedTransactionId]);
+  }, [requestedTransactionId, selectedTransaction?.id]);
 
   const handleCloseTransactionDetails = useCallback(() => {
+    requestedTransactionIdRef.current = null;
     setSelectedTransactionId(null);
+    setLinkedTransaction(null);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("transactionId");
-      next.delete("activityCode");
+      const activityCode = next.get("activityCode");
+      if (activityCode && !enabledActivityCodes.includes(activityCode as BusinessActivityCode)) {
+        next.delete("activityCode");
+      }
       return next;
     });
-  }, [setSearchParams]);
-
-  useEffect(() => {
-    if (requestedActivityCode) {
-      setSelectedActivityCode(requestedActivityCode);
-    }
-  }, [requestedActivityCode, setSelectedActivityCode]);
+  }, [enabledActivityCodes, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3951,11 +4006,62 @@ export function FinanceTransactionsPage(): JSX.Element {
     requestedTransactionIdRef.current = requestedTransactionId;
     if (!requestedTransactionId) {
       setSelectedTransactionId(null);
+      setLinkedTransaction(null);
       return;
     }
 
     setSelectedTransactionId(requestedTransactionId);
   }, [requestedTransactionId]);
+
+  useEffect(() => {
+    if (requestedTransactionId && !isLoadingActivities && !isLoading && !selectedActivityCode) {
+      setErrorMessage("Aucun secteur actif n'est disponible pour ouvrir cette transaction.");
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("transactionId");
+        return next;
+      }, { replace: true });
+      return;
+    }
+    if (
+      !requestedTransactionId || isLoadingActivities || isLoading || !selectedActivityCode ||
+      sectorTransactions.some((item) => item.id === requestedTransactionId) ||
+      (linkedTransaction?.id === requestedTransactionId && linkedTransaction.companyId === activeCompany?.id)
+    ) return;
+
+    let cancelled = false;
+    const clearInvalidLink = (): void => {
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("transactionId");
+        return next;
+      }, { replace: true });
+    };
+    void withAuthorizedToken((accessToken) =>
+      getFinanceTransactionRequest(accessToken, requestedTransactionId)
+    ).then(({ item }) => {
+      if (cancelled) return;
+      if (item.companyId !== activeCompany?.id || !item.activityCode) {
+        setErrorMessage("Cette transaction n'est pas disponible dans cet espace sectoriel.");
+        clearInvalidLink();
+        return;
+      }
+      if (enabledActivityCodes.includes(item.activityCode) && item.activityCode !== selectedActivityCode) {
+        setSelectedActivityCode(item.activityCode);
+        setSearchParams((previous) => {
+          const next = new URLSearchParams(previous);
+          next.set("activityCode", item.activityCode as BusinessActivityCode);
+          return next;
+        }, { replace: true });
+      }
+      setLinkedTransaction(item);
+    }).catch((error) => {
+      if (cancelled) return;
+      setErrorMessage(toErrorMessage(error));
+      clearInvalidLink();
+    });
+    return () => { cancelled = true; };
+  }, [activeCompany?.id, enabledActivityCodes, isLoading, isLoadingActivities, linkedTransaction?.id, linkedTransaction?.companyId, requestedTransactionId, sectorTransactions, selectedActivityCode, setSearchParams, setSelectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     setVisibleTransactionsPage(1);
@@ -4046,14 +4152,12 @@ export function FinanceTransactionsPage(): JSX.Element {
       });
       if (!append) {
         setEditingTransactionId((prev) =>
-          prev && payload.transactions.some((item) => item.id === prev) ? prev : null
+          prev && (prev === requestedTransactionIdRef.current || payload.transactions.some((item) => item.id === prev)) ? prev : null
         );
         setSelectedTransactionId((prev) => {
           const requestedId = requestedTransactionIdRef.current;
           if (requestedId) {
-            return payload.transactions.some((item) => item.id === requestedId)
-              ? requestedId
-              : null;
+            return requestedId;
           }
           return payload.transactions.some((item) => item.id === prev)
             ? prev
@@ -4478,6 +4582,17 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
   }
 
+  function scrollToFinanceSection(sectionId: string): void {
+    window.requestAnimationFrame(() => {
+      const section = document.getElementById(sectionId);
+      if (section instanceof HTMLDetailsElement) section.open = true;
+      section?.scrollIntoView({
+        block: "start",
+        behavior: "smooth"
+      });
+    });
+  }
+
   function handleStartEditAccount(account: FinancialAccount): void {
     const lockedMessage = getLockedAccountMessage(account);
     if (lockedMessage) {
@@ -4489,6 +4604,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingAccountId(account.id);
+    setIsAccountFormExpanded(true);
+    scrollToFinanceSection("account-create");
     setAccountForm({
       name: account.name,
       accountRef: account.accountRef ?? "",
@@ -4587,6 +4704,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingArticleId(article.id);
+    setIsArticleManagementExpanded(true);
+    scrollToFinanceSection("article-management");
     setArticleForm({
       name: article.name,
       defaultMargin: article.defaultMargin ? formatAmountForInput(article.defaultMargin) : "",
@@ -4671,6 +4790,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingTenantId(tenant.id);
+    setIsTenantManagementExpanded(true);
+    scrollToFinanceSection("tenant-management");
     setTenantForm({
       name: tenant.name,
       unitLabel: tenant.unitLabel,
@@ -4751,6 +4872,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingShopId(shop.id);
+    setIsShopManagementExpanded(true);
+    scrollToFinanceSection("shop-management");
     setShopForm({
       name: shop.name,
       location: shop.location ?? "",
@@ -4830,6 +4953,8 @@ export function FinanceTransactionsPage(): JSX.Element {
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingProjectId(project.id);
+    setIsProjectManagementExpanded(true);
+    scrollToFinanceSection("project-management");
     setProjectForm({
       name: project.name,
       clientRef: project.clientRef ?? "",
@@ -4875,6 +5000,10 @@ export function FinanceTransactionsPage(): JSX.Element {
   async function handleSaveTransaction(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!selectedActivityCode) {
+      return;
+    }
+    if (editingTransactionId && editingTransactionActivityRef.current !== selectedActivityCode) {
+      setErrorMessage("Cette transaction appartient à un autre secteur. Rouvrez-la depuis son secteur.");
       return;
     }
     const proofFileToUpload = transactionProofFile;
@@ -4930,6 +5059,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             )
           : next;
       });
+      setLinkedTransaction((prev) => prev?.id === response.item.id ? response.item : prev);
       if (isQuickFillSectorActivity(selectedActivityCode)) {
         setSectorSuggestionHistory((prev) => [
           response.item,
@@ -4986,7 +5116,10 @@ export function FinanceTransactionsPage(): JSX.Element {
 
     setTransactionProofFile(null);
     setEditingTransactionId(transaction.id);
+    editingTransactionActivityRef.current = transaction.activityCode;
+    setHasUnsavedTransactionChanges(false);
     setIsTransactionFormExpanded(true);
+    scrollToFinanceSection("transaction-create");
     const metadata = syncMetadataState(transaction.metadata, financeMetadataFields);
     if (transaction.activityCode === "TRANSPORT" && !metadata.transportCategory) {
       const categoryOptions = financeMetadataFields.find((field) => field.key === "transportCategory")?.options ?? [];
@@ -5006,7 +5139,6 @@ export function FinanceTransactionsPage(): JSX.Element {
       metadata,
       occurredAt: toDateTimeLocalInput(transaction.occurredAt)
     });
-    handleOpenTransactionDetails(transaction.id, transaction.activityCode);
   }
 
   function handleCancelEditTransaction(): void {
@@ -5088,6 +5220,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage("Transaction supprimée.");
       setTransactions((prev) => prev.filter((item) => item.id !== transaction.id));
+      setLinkedTransaction((prev) => prev?.id === transaction.id ? null : prev);
       void loadData({ silent: true });
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
@@ -5118,6 +5251,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       setSuccessMessage("Transaction supprimée.");
       setTransactionPendingDelete(null);
       setTransactions((prev) => prev.filter((item) => item.id !== transaction.id));
+      setLinkedTransaction((prev) => prev?.id === transaction.id ? null : prev);
       setSectorSuggestionHistory((prev) => prev.filter((item) => item.id !== transaction.id));
       setProofsByTransaction((prev) => {
         const next = { ...prev };
@@ -5322,27 +5456,85 @@ export function FinanceTransactionsPage(): JSX.Element {
       ) : null}
 
       <PageGuide
-        title="Guide des transactions"
-        description={`Les écritures affichées sont filtrées par secteur: ${selectedActivity?.label ?? "aucun secteur actif"}.`}
-        items={[
-          {
-            term: "Compte",
-            description: "Support financier utilisé pour enregistrer l'entrée ou la sortie."
-          },
-          {
-            term: "Comptabilisé",
-            description: "Une transaction enregistrée est prise en compte dans les rapports du secteur."
-          },
-          {
-            term: "Justificatif",
-            description: "Document lié à l'opération: reçu, facture, bordereau ou preuve terrain."
-          },
-          {
-            term: "Détail secteur",
-            description: "Les champs métier alimentent les rapports sectoriels et les exports."
-          }
-        ]}
+        title={
+          selectedActivity
+            ? `Guide des transactions · ${selectedActivity.label}`
+            : "Guide des transactions"
+        }
+        description={
+          selectedProfile?.operationsModel ??
+          `Les écritures affichées sont filtrées par secteur: ${selectedActivity?.label ?? "aucun secteur actif"}.`
+        }
+        items={selectedProfile?.finance.workflow.length
+          ? selectedProfile.finance.workflow.map((step) => ({
+              term: step.label,
+              description: step.description
+            }))
+          : [
+              {
+                term: "Compte",
+                description: "Support financier utilisé pour enregistrer l'entrée ou la sortie."
+              },
+              {
+                term: "Comptabilisé",
+                description: "Une transaction enregistrée est prise en compte dans les rapports du secteur."
+              },
+              {
+                term: "Justificatif",
+                description: "Document lié à l'opération: reçu, facture, bordereau ou preuve terrain."
+              },
+              {
+                term: "Détail secteur",
+                description: "Les champs métier alimentent les rapports sectoriels et les exports."
+              }
+            ]}
       />
+
+      <SectorWorkspaceNav actions={[
+        { label: "Voir les transactions", onClick: () => scrollToFinanceSection("transactions-list") },
+        ...(canManageTransactions ? [{
+          label: "Enregistrer une transaction",
+          onClick: () => {
+            setIsTransactionFormExpanded(true);
+            scrollToFinanceSection("transaction-create");
+          }
+        }] : []),
+        {
+          label: "Voir les comptes",
+          onClick: () => {
+            setIsAccountListExpanded(true);
+            scrollToFinanceSection("accounts-list");
+          }
+        },
+        ...(selectedActivityCode === "HARDWARE" && canManageArticles ? [{
+          label: "Gérer les articles",
+          onClick: () => {
+            setIsArticleManagementExpanded(true);
+            scrollToFinanceSection("article-management");
+          }
+        }] : []),
+        ...(selectedActivityCode === "RENTAL" && canManageTenants ? [{
+          label: "Gérer les locataires",
+          onClick: () => {
+            setIsTenantManagementExpanded(true);
+            scrollToFinanceSection("tenant-management");
+          }
+        }] : []),
+        ...(selectedActivityCode === "GENERAL_STORE" && canManageShops ? [{
+          label: "Gérer les boutiques",
+          onClick: () => {
+            setIsShopManagementExpanded(true);
+            scrollToFinanceSection("shop-management");
+          }
+        }] : []),
+        ...(selectedActivityCode === "BTP" && canManageProjects ? [{
+          label: "Gérer les chantiers",
+          onClick: () => {
+            setIsProjectManagementExpanded(true);
+            scrollToFinanceSection("project-management");
+          }
+        }] : [])
+      ]} />
 
       <section className={isReadOnlyOwner ? "grid finance-summary-grid owner-lite-metrics" : "grid finance-summary-grid"}>
         {financePageCards.map((card) => (
@@ -5386,7 +5578,12 @@ export function FinanceTransactionsPage(): JSX.Element {
 
       {canCreateAccount ? (
         <section className="panel finance-page-panel">
-          <details className="finance-section-toggle">
+          <details
+            id="account-create"
+            className="finance-section-toggle"
+            open={isAccountFormExpanded || Boolean(editingAccountId)}
+            onToggle={(event) => setIsAccountFormExpanded(event.currentTarget.open)}
+          >
             <summary className="finance-section-summary">
               <span>{editingAccountId ? "Modifier un compte financier" : "Créer un compte financier"}</span>
               <small>
@@ -5395,7 +5592,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   : "Nouveau compte financier."}
               </small>
             </summary>
-            <form className="finance-account-form" onSubmit={handleSaveAccount}>
+            <form className="finance-account-form" onSubmit={handleSaveAccount} data-unsaved-sector-form={editingAccountId ? "true" : undefined}>
             <label className="operations-inline-group">
               <span>Nom du compte</span>
               <input
@@ -5566,6 +5763,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       {selectedActivityCode === "HARDWARE" && canManageArticles ? (
         <section className="panel finance-page-panel">
           <details
+            id="article-management"
             className="finance-section-toggle"
             open={isArticleManagementExpanded}
             onToggle={(event) => setIsArticleManagementExpanded(event.currentTarget.open)}
@@ -5578,7 +5776,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   : "Ajoutez les articles vendus par la quincaillerie pour les retrouver en sélection."}
               </small>
             </summary>
-            <form className="finance-account-form" onSubmit={handleSaveArticle}>
+            <form className="finance-account-form" onSubmit={handleSaveArticle} data-unsaved-sector-form={editingArticleId ? "true" : undefined}>
               <label className="operations-inline-group">
                 <span>Nom de l'article</span>
                 <input
@@ -5713,6 +5911,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       {selectedActivityCode === "RENTAL" && canManageTenants ? (
         <section className="panel finance-page-panel">
           <details
+            id="tenant-management"
             className="finance-section-toggle"
             open={isTenantManagementExpanded}
             onToggle={(event) => setIsTenantManagementExpanded(event.currentTarget.open)}
@@ -5725,7 +5924,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   : "Ajoutez vos locataires (nom, logement occupé et loyer mensuel) pour les retrouver en sélection lors du paiement."}
               </small>
             </summary>
-            <form className="finance-account-form" onSubmit={handleSaveTenant}>
+            <form className="finance-account-form" onSubmit={handleSaveTenant} data-unsaved-sector-form={editingTenantId ? "true" : undefined}>
               <label className="operations-inline-group">
                 <span>Nom du locataire</span>
                 <input
@@ -5878,6 +6077,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       {selectedActivityCode === "GENERAL_STORE" && canManageShops ? (
         <section className="panel finance-page-panel">
           <details
+            id="shop-management"
             className="finance-section-toggle"
             open={isShopManagementExpanded}
             onToggle={(event) => setIsShopManagementExpanded(event.currentTarget.open)}
@@ -5890,7 +6090,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   : "Ajoutez les boutiques ou magasins livrés pour les retrouver en sélection lors des achats et recouvrements."}
               </small>
             </summary>
-            <form className="finance-account-form" onSubmit={handleSaveShop}>
+            <form className="finance-account-form" onSubmit={handleSaveShop} data-unsaved-sector-form={editingShopId ? "true" : undefined}>
               <label className="operations-inline-group">
                 <span>Nom de la boutique</span>
                 <input
@@ -6000,6 +6200,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       {selectedActivityCode === "BTP" && canManageProjects ? (
         <section className="panel finance-page-panel">
           <details
+            id="project-management"
             className="finance-section-toggle"
             open={isProjectManagementExpanded}
             onToggle={(event) => setIsProjectManagementExpanded(event.currentTarget.open)}
@@ -6012,7 +6213,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   : "Ajoutez vos chantiers (client, marché, lieu) pour les retrouver en sélection lors des opérations."}
               </small>
             </summary>
-            <form className="finance-account-form" onSubmit={handleSaveProject}>
+            <form className="finance-account-form" onSubmit={handleSaveProject} data-unsaved-sector-form={editingProjectId ? "true" : undefined}>
               <label className="operations-inline-group">
                 <span>Nom du chantier</span>
                 <input
@@ -6187,7 +6388,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             <input
               type="search"
               className="quick-search-input"
-              placeholder="Compte, référence, description..."
+              placeholder={`Rechercher : ${getSectorSearchHint(selectedActivityCode)}...`}
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
             />
@@ -6217,7 +6418,12 @@ export function FinanceTransactionsPage(): JSX.Element {
               propriétaire, l'admin système ou le comptable.
             </p>
           ) : null}
-          <form className="finance-transaction-form" onSubmit={handleSaveTransaction}>
+          <form
+            className="finance-transaction-form"
+            onSubmit={handleSaveTransaction}
+            onChangeCapture={() => setHasUnsavedTransactionChanges(true)}
+            data-unsaved-sector-form={hasUnsavedTransactionChanges || editingTransactionId ? "true" : undefined}
+          >
           <fieldset className="finance-transaction-form-section">
             <legend>Informations principales</legend>
           <div className="finance-transaction-form-quick">
@@ -6253,7 +6459,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       if (nextValue === "INVENTAIRE") {
-                        navigate("/operations/tasks");
+                        navigate(`/operations/tasks?activityCode=${encodeURIComponent(selectedActivityCode)}`);
                         return;
                       }
                       const nextKind = nextValue as StoreOperationKind;
@@ -7699,6 +7905,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   <span>{field.label}</span>
                   <input
                     type="text"
+                    list={selectedActivityCode === "SERVICES" && field.key === "serviceCategory" ? "finance-service-categories" : undefined}
                     inputMode={isMoneyMetadataField(field.key) ? "numeric" : getMetadataInputMode(field.key)}
                     placeholder={field.helpText || field.label}
                     value={transactionForm.metadata[field.key] ?? ""}
@@ -7763,6 +7970,11 @@ export function FinanceTransactionsPage(): JSX.Element {
                 );
               })}
             </div>
+            {selectedActivityCode === "SERVICES" ? (
+              <datalist id="finance-service-categories">
+                {serviceCategorySuggestions.map((value) => <option key={value} value={value} />)}
+              </datalist>
+            ) : null}
           </details>
 
           <div className="mobile-sticky-form-actions">
@@ -7809,17 +8021,25 @@ export function FinanceTransactionsPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className="panel finance-page-panel">
+      <section id="transactions-list" className="panel finance-page-panel">
         <h3>Transactions</h3>
-        {!isLoading && transactions.length === 0 ? (
+        {!isLoading && sectorTransactions.length === 0 ? (
           <EmptyState
             title="Aucune transaction dans cette vue"
             description="Enregistrez une premiere entree ou sortie, ou changez les filtres pour retrouver les transactions existantes."
             actionLabel={canManageTransactions ? "Préparer une transaction" : undefined}
-            onAction={canManageTransactions ? () => window.scrollTo({ top: 0, behavior: "smooth" }) : undefined}
+            onAction={canManageTransactions ? () => {
+              setIsTransactionFormExpanded(true);
+              window.requestAnimationFrame(() => {
+                document.getElementById("transaction-create")?.scrollIntoView({
+                  block: "start",
+                  behavior: "smooth"
+                });
+              });
+            } : undefined}
           />
         ) : null}
-        {!isLoading && transactions.length > 0 && displayTransactions.length === 0 ? (
+        {!isLoading && sectorTransactions.length > 0 && displayTransactions.length === 0 ? (
           <EmptyState
             title="Aucun résultat"
             description="Aucune transaction ne correspond à la recherche ou aux filtres appliqués."
@@ -7854,6 +8074,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               <tbody>
                 {paginatedTransactions.map((tx) => {
                   const isBusy = busyTransactionId === tx.id;
+                  const sectorContext = getSectorRecordContext(tx.activityCode, tx.metadata);
                   const isProofsOpen = openProofs[tx.id] === true;
                   const proofs = proofsByTransaction[tx.id] ?? [];
                   const isProofsLoading = loadingProofsByTransaction[tx.id] === true;
@@ -7881,6 +8102,16 @@ export function FinanceTransactionsPage(): JSX.Element {
                             ? getBusinessActivityLabel(tx.activityCode)
                             : "Charge transversale entreprise"}
                         </div>
+                        {tx.description?.trim() ? (
+                          <div className="finance-transaction-description">{tx.description}</div>
+                        ) : null}
+                        {sectorContext.length > 0 ? (
+                          <div className="sector-record-context">
+                            {sectorContext.map(({ label, value }) => (
+                              <span key={label}><strong>{label} :</strong> {value}</span>
+                            ))}
+                          </div>
+                        ) : null}
                       </td>
                       <td data-label="Montant" className="finance-transaction-amount-cell">
                         {formatAmountForDisplay(tx.amount)} {tx.currency}
@@ -8049,8 +8280,15 @@ export function FinanceTransactionsPage(): JSX.Element {
         ) : null}
       </section>
 
+      {requestedTransactionId && !selectedTransaction && !isLoading ? (
+        <p className="hint" role="status">Ouverture de la transaction...</p>
+      ) : null}
+
       {selectedTransaction ? (
         <section id="transaction-detail" className="panel finance-transaction-detail-panel">
+          {isSelectedTransactionArchived ? (
+            <p className="hint">Historique du secteur désactivé : cette transaction est disponible en consultation.</p>
+          ) : null}
           <div className="task-detail-header">
             <div>
               <h3>Detail de la transaction</h3>
@@ -8141,7 +8379,7 @@ export function FinanceTransactionsPage(): JSX.Element {
 
             <article className="finance-detail-block">
               <h4>Contexte métier</h4>
-              <p className="hint">{formatMetadataSummary(selectedTransaction.metadata, financeMetadataFields)}</p>
+              <p className="hint">{formatMetadataSummary(selectedTransaction.metadata, selectedTransactionMetadataFields)}</p>
             </article>
 
             <article className="finance-detail-block">
@@ -8237,6 +8475,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       {selectedActivityCode && (accounts.length > 0 || !hasLoadedAccounts || isAccountListExpanded) ? (
         <section className="panel">
           <details
+            id="accounts-list"
             className="finance-section-toggle"
             open={isAccountListExpanded}
             onToggle={(event) => {

@@ -1699,6 +1699,14 @@ export async function listCompanyTransactions(input: {
   });
 }
 
+export async function getCompanyTransaction(actor: ActorContext, transactionId: string) {
+  const transaction = await findFinancialTransactionById(actor.companyId, transactionId);
+  if (!transaction) throw new HttpError(404, "Transaction introuvable.");
+  ensureSectorTransactionAccess(actor.role, transaction.activityCode);
+  ensureOperatorTransactionVisibility(actor, transaction);
+  return transaction;
+}
+
 export async function getCompanyDumpTruckSummary(input: {
   companyId: string;
   period: string;
@@ -1793,6 +1801,10 @@ export async function deleteCompanyTransaction(
 
   ensureSectorTransactionAccess(actor.role, existing.activityCode);
   ensureTransactionMutationOwnership(actor, existing);
+
+  if (existing.activityCode) {
+    await ensureCompanyActivityEnabledOrThrow(actor.companyId, existing.activityCode);
+  }
 
   const account = await findFinancialAccountById(actor.companyId, existing.accountId);
   await deleteFinancialTransaction({

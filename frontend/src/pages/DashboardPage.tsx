@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { DashboardHero } from "../components/dashboard/DashboardHero";
 import { DashboardPriorityPanels } from "../components/dashboard/DashboardPriorityPanels";
 import { PageGuide } from "../components/PageGuide";
+import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ApiError, getDashboardSummaryRequest } from "../lib/api";
@@ -206,7 +207,7 @@ export function DashboardPage(): JSX.Element {
     if (isReadOnlyOwner) {
       return buildOwnerActionCards(summary, selectedActivityCode);
     }
-    return buildDailyActionCards(summary);
+    return buildDailyActionCards(summary, selectedActivityCode);
   }, [isReadOnlyOwner, selectedActivityCode, summary]);
 
   const operationalRows = useMemo(() => {
@@ -227,6 +228,8 @@ export function DashboardPage(): JSX.Element {
       <header className="section-header">
         <h2>Pilotage du jour</h2>
       </header>
+
+      <SectorWorkspaceNav />
 
       {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
       {isLoading ? <p>Chargement en cours...</p> : null}

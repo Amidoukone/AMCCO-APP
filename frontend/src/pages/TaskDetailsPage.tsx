@@ -178,7 +178,7 @@ export function TaskDetailsPage(): JSX.Element {
   const navigate = useNavigate();
   const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
-  const { profiles, setSelectedActivityCode } = useBusinessActivity();
+  const { enabledActivities, profiles, setSelectedActivityCode } = useBusinessActivity();
   const [task, setTask] = useState<OperationTask | null>(null);
   const [timeline, setTimeline] = useState<OperationTaskTimelineEvent[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -309,9 +309,6 @@ export function TaskDetailsPage(): JSX.Element {
       if (data.task) {
         setTask(data.task);
         setAssignment(data.task.assignedToId ?? "");
-        if (!append && data.task.activityCode) {
-          setSelectedActivityCode(data.task.activityCode);
-        }
       }
       if (includeHistory) {
         loadedHistoryTaskRef.current = taskId;
@@ -350,7 +347,16 @@ export function TaskDetailsPage(): JSX.Element {
         }
       }
     }
-  }, [activeCompany?.id, canManageTasks, setSelectedActivityCode, taskId, withAuthorizedToken]);
+  }, [activeCompany?.id, canManageTasks, taskId, withAuthorizedToken]);
+
+  useEffect(() => {
+    if (
+      task &&
+      task.companyId === activeCompany?.id &&
+      task.activityCode &&
+      enabledActivities.some((activity) => activity.code === task.activityCode)
+    ) setSelectedActivityCode(task.activityCode);
+  }, [activeCompany?.id, enabledActivities, setSelectedActivityCode, task?.activityCode, task?.companyId]);
 
   const loadHistory = useCallback(async () => {
     if (!taskId || loadedHistoryTaskRef.current === taskId) return;
@@ -660,7 +666,12 @@ export function TaskDetailsPage(): JSX.Element {
     <>
       <header className="section-header">
         <p className="task-detail-back-link-row">
-          <Link to="/operations/tasks" className="task-back-link">
+          <Link
+            to={task?.activityCode && enabledActivities.some((activity) => activity.code === task.activityCode)
+              ? `/operations/tasks?activityCode=${encodeURIComponent(task.activityCode)}`
+              : "/operations/tasks"}
+            className="task-back-link"
+          >
             Retour à la liste des tâches
           </Link>
         </p>
@@ -691,17 +702,27 @@ export function TaskDetailsPage(): JSX.Element {
               <strong>{statusLabel(task.status)}</strong>
             </div>
           </div>
-          {canManageTasks ? (
+          {canManageTasks || (user?.role !== "OWNER" && task.createdById === user?.id && enabledActivities.some((activity) => activity.code === task.activityCode)) ? (
             <div className="actions-inline">
-              <button
-                type="button"
-                className="secondary-btn mobile-hide-task-secondary-action"
-                onClick={() =>
-                  navigate(`/alerts?entityType=TASK&entityId=${encodeURIComponent(task.id)}`)
-                }
-              >
-                Voir alertes
-              </button>
+              {user?.role !== "OWNER" && task.createdById === user?.id && task.activityCode && enabledActivities.some((activity) => activity.code === task.activityCode) ? (
+                <Link
+                  className="secondary-btn"
+                  to={`/operations/tasks?activityCode=${encodeURIComponent(task.activityCode)}&editTaskId=${encodeURIComponent(task.id)}#task-create`}
+                >
+                  Modifier cette tâche
+                </Link>
+              ) : null}
+              {canManageTasks ? (
+                <button
+                  type="button"
+                  className="secondary-btn mobile-hide-task-secondary-action"
+                  onClick={() =>
+                    navigate(`/alerts?entityType=TASK&entityId=${encodeURIComponent(task.id)}`)
+                  }
+                >
+                  Voir alertes
+                </button>
+              ) : null}
             </div>
           ) : null}
           <p

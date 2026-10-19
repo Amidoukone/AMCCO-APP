@@ -9,6 +9,7 @@ import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getNavigationForRole, ROLE_LABELS, type FeatureKey } from "../config/permissions";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
+import { getRoleActivityCode } from "../types/role";
 import { enhanceMobileTables } from "../lib/mobileTables";
 
 const amccoLogoUrl = "/logo-amcco-web.jpg";
@@ -141,6 +142,10 @@ export function AppLayout(): JSX.Element {
   const unreadSummaryRequestRef = useRef(0);
   const withAuthorizedToken = useAuthorizedRequest();
   const canManageCompanies = user?.role === "SYS_ADMIN";
+  const restrictedActivityCode = user ? getRoleActivityCode(user.role) : null;
+  const selectableActivities = restrictedActivityCode
+    ? enabledActivities.filter((activity) => activity.code === restrictedActivityCode)
+    : enabledActivities;
   const isBootstrapMode = !activeCompany;
   const navigation = useMemo(
     () => (user ? getNavigationForRole(user.role) : []),
@@ -190,6 +195,15 @@ export function AppLayout(): JSX.Element {
       return groups;
     }, {});
   }, [isBootstrapMode, mobilePrimaryNavigation, visibleNavigation]);
+
+  useEffect(() => {
+    if (isLoadingActivities || !["/dashboard", "/finance/transactions", "/operations/tasks", "/reports"].includes(location.pathname)) return;
+    const requestedCode = new URLSearchParams(location.search).get("activityCode");
+    if (!requestedCode || !isBusinessActivityCode(requestedCode)) return;
+    if (restrictedActivityCode && requestedCode !== restrictedActivityCode) return;
+    if (!enabledActivities.some((activity) => activity.code === requestedCode)) return;
+    if (requestedCode !== selectedActivityCode) setSelectedActivityCode(requestedCode);
+  }, [enabledActivities, isLoadingActivities, location.pathname, location.search, restrictedActivityCode, setSelectedActivityCode]);
 
   useEffect(() => {
     if (isBootstrapMode) {
@@ -426,7 +440,31 @@ export function AppLayout(): JSX.Element {
   }
 
   function handleActivityChange(nextValue: string): void {
-    setSelectedActivityCode(isBusinessActivityCode(nextValue) ? nextValue : null);
+    const nextActivityCode = isBusinessActivityCode(nextValue) ? nextValue : null;
+    if (nextActivityCode && !selectableActivities.some((activity) => activity.code === nextActivityCode)) return;
+    if (
+      nextActivityCode !== selectedActivityCode &&
+      document.querySelector('[data-unsaved-sector-form="true"]') &&
+      !window.confirm("Une saisie ou une modification est en cours. Changer de secteur abandonnera ce formulaire. Continuer ?")
+    ) return;
+    setSelectedActivityCode(nextActivityCode);
+    if (location.pathname.startsWith("/operations/tasks/")) {
+      navigate(
+        nextActivityCode
+          ? `/operations/tasks?activityCode=${encodeURIComponent(nextActivityCode)}`
+          : "/operations/tasks",
+        { replace: true }
+      );
+    } else if (["/dashboard", "/finance/transactions", "/operations/tasks", "/reports"].includes(location.pathname)) {
+      const params = new URLSearchParams(location.search);
+      if (nextActivityCode) params.set("activityCode", nextActivityCode);
+      else params.delete("activityCode");
+      if (location.pathname === "/finance/transactions") params.delete("transactionId");
+      navigate(
+        { pathname: location.pathname, search: params.toString(), hash: "" },
+        { replace: true }
+      );
+    }
     setIsMobileMenuOpen(false);
   }
 
@@ -434,6 +472,10 @@ export function AppLayout(): JSX.Element {
     if (!nextCompanyId || nextCompanyId === activeCompany?.id) {
       return;
     }
+    if (
+      document.querySelector('[data-unsaved-sector-form="true"]') &&
+      !window.confirm("Une saisie ou une modification est en cours. Changer d'entreprise abandonnera le formulaire. Continuer ?")
+    ) return;
 
     setCompanySwitchError(null);
     setIsSwitchingCompany(true);
@@ -484,13 +526,13 @@ export function AppLayout(): JSX.Element {
               className="sidebar-sector-select"
               value={selectedActivityCode ?? ""}
               onChange={(event) => handleActivityChange(event.target.value)}
-              disabled={isLoadingActivities || enabledActivities.length === 0}
+              disabled={isLoadingActivities || selectableActivities.length <= 1}
               aria-label="Sélectionner le secteur actif"
             >
-              {enabledActivities.length === 0 ? (
+              {selectableActivities.length === 0 ? (
                 <option value="">Aucun secteur actif</option>
               ) : null}
-              {enabledActivities.map((activity) => (
+              {selectableActivities.map((activity) => (
                 <option key={activity.code} value={activity.code}>
                   {activity.label}
                 </option>
@@ -633,11 +675,11 @@ export function AppLayout(): JSX.Element {
             <div className="mobile-smart-menu">
               {mobilePanelMode === "sectors" ? (
                 <div className="mobile-sector-picker">
-                  {enabledActivities.length === 0 ? (
+                  {selectableActivities.length === 0 ? (
                     <p className="hint">Aucun secteur actif pour cette entreprise.</p>
                   ) : (
                     <div className="mobile-choice-list" role="group" aria-label="Choisir un secteur">
-                      {enabledActivities.map((activity) => {
+                      {selectableActivities.map((activity) => {
                         const isSelected = selectedActivityCode === activity.code;
                         return (
                           <button

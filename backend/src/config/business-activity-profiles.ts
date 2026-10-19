@@ -1268,7 +1268,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("serviceType", "Type de service", false, "Type de prestation ou intervention."),
-        { ...field("serviceCategory", "Catégorie service", false, "Morgue."), options: ["Morgue"] },
+        field("serviceCategory", "Catégorie de service", false, "Exemple : morgue, entretien, conseil ou logistique."),
         field("clientRef", "Client", false, "Client, site ou dossier de prestation.")
       ],
       workflow: [
@@ -1291,7 +1291,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("serviceType", "Type de service", false, "Type de prestation ou intervention."),
-        { ...field("serviceCategory", "Catégorie service", false, "Morgue."), options: ["Morgue"] },
+        field("serviceCategory", "Catégorie de service", false, "Exemple : morgue, entretien, conseil ou logistique."),
         field("clientRef", "Client", false, "Client, site ou dossier de prestation.")
       ],
       workflow: [
@@ -1305,7 +1305,7 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       exportSections: ["facturation", "interventions", "charge équipe"],
       operationalDimensions: [
         dimension("serviceType", "Type de service", "Compare rentabilité et exécution par type de prestation."),
-        dimension("serviceCategory", "Catégorie service", "Suit la catégorie Morgue."),
+        dimension("serviceCategory", "Catégorie de service", "Regroupe les opérations par catégorie de prestation."),
         dimension("clientRef", "Client", "Suit les flux, interventions et blocages par client.")
       ],
       highlights: [

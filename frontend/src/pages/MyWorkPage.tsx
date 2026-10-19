@@ -23,6 +23,9 @@ export function MyWorkPage(): JSX.Element {
   const withAuthorizedToken = useAuthorizedRequest();
   const { activeCompany } = useAuth();
   const { selectedActivityCode, isLoading: isLoadingActivities } = useBusinessActivity();
+  const activityQuery = selectedActivityCode
+    ? `?activityCode=${encodeURIComponent(selectedActivityCode)}`
+    : "";
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -102,10 +105,10 @@ export function MyWorkPage(): JSX.Element {
           <h2>Mon travail</h2>
         </div>
         <div className="my-work-header-actions">
-          <button type="button" className="dashboard-inline-button" onClick={() => navigate("/operations/tasks")}>
+          <button type="button" className="dashboard-inline-button" onClick={() => navigate(`/operations/tasks${activityQuery}`)}>
             Voir les tâches
           </button>
-          <button type="button" className="dashboard-inline-button" onClick={() => navigate("/finance/transactions")}>
+          <button type="button" className="dashboard-inline-button" onClick={() => navigate(`/finance/transactions${activityQuery}`)}>
             Voir les transactions
           </button>
         </div>
@@ -167,7 +170,7 @@ export function MyWorkPage(): JSX.Element {
                   <p className="sidebar-section-label">Opérations</p>
                   <h3>Tâches prioritaires</h3>
                 </div>
-                <button type="button" className="dashboard-inline-button" onClick={() => navigate("/operations/tasks")}>
+                <button type="button" className="dashboard-inline-button" onClick={() => navigate(`/operations/tasks${activityQuery}`)}>
                   Voir tout
                 </button>
               </div>
@@ -176,7 +179,7 @@ export function MyWorkPage(): JSX.Element {
                   title="Aucune tâche urgente"
                   description="Aucune priorité immédiate dans le périmètre courant."
                   actionLabel="Ouvrir les tâches"
-                  onAction={() => navigate("/operations/tasks")}
+                  onAction={() => navigate(`/operations/tasks${activityQuery}`)}
                 />
               ) : (
                 <div className="dashboard-priority-list">
@@ -221,7 +224,7 @@ export function MyWorkPage(): JSX.Element {
                   <p className="sidebar-section-label">Finance</p>
                   <h3>Transactions récentes</h3>
                 </div>
-                <button type="button" className="dashboard-inline-button" onClick={() => navigate("/finance/transactions")}>
+                <button type="button" className="dashboard-inline-button" onClick={() => navigate(`/finance/transactions${activityQuery}`)}>
                   Voir tout
                 </button>
               </div>
@@ -230,7 +233,7 @@ export function MyWorkPage(): JSX.Element {
                   title="Aucune transaction récente"
                   description="Aucune écriture récente n'est disponible dans le périmètre courant."
                   actionLabel="Ouvrir les transactions"
-                  onAction={() => navigate("/finance/transactions")}
+                  onAction={() => navigate(`/finance/transactions${activityQuery}`)}
                 />
               ) : (
                 <div className="dashboard-priority-list">
@@ -239,7 +242,12 @@ export function MyWorkPage(): JSX.Element {
                       key={transaction.id}
                       type="button"
                       className="dashboard-priority-item"
-                      onClick={() => navigate(`/finance/transactions?transactionId=${transaction.id}`)}
+                      onClick={() => {
+                        const transactionActivity = transaction.activityCode ?? selectedActivityCode;
+                        const query = new URLSearchParams({ transactionId: transaction.id });
+                        if (transactionActivity) query.set("activityCode", transactionActivity);
+                        navigate(`/finance/transactions?${query.toString()}`);
+                      }}
                     >
                       <div className="dashboard-priority-main">
                         <strong>{transaction.accountName}</strong>

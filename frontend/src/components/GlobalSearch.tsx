@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { isReadOnlyOwnerRole } from "../config/permissions";
+import { canManageSectorTransactions, isReadOnlyOwnerRole } from "../config/permissions";
 import { matchesQuickSearch } from "../lib/quickSearch";
 import type { NavigationItem } from "../config/permissions";
 import type { RoleCode } from "../types/role";
@@ -40,13 +40,17 @@ function buildSearchItems(
   selectedActivityCode: string | null
 ): SearchItem[] {
   const isReadOnlyOwner = isReadOnlyOwnerRole(role);
+  const canCreateTransactions = canManageSectorTransactions(role);
   const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
   const canUse = (key: NavigationItem["key"]): boolean =>
     navigation.some((item) => item.key === key);
   const items: SearchItem[] = navigation.map((item) => ({
     label: item.label,
     description: item.section,
-    to: item.to,
+    to:
+      item.key === "financeTransactions" || item.key === "operationsTasks"
+        ? `${item.to}${activityQuery}`
+        : item.to,
     keywords: [item.label, item.section, item.key, ...FEATURE_SEARCH_KEYWORDS[item.key]]
   }));
 
@@ -62,8 +66,10 @@ function buildSearchItems(
     canUse("operationsTasks")
       ? {
           label: isReadOnlyOwner ? "Voir les tâches" : "Créer une tâche",
-          description: "Voir les tâches",
-          to: `/operations/tasks${activityQuery}`,
+          description: isReadOnlyOwner
+            ? "Voir les tâches du secteur actif"
+            : "Créer une tâche dans le secteur actif",
+          to: `/operations/tasks${activityQuery}${isReadOnlyOwner ? "" : "#task-create"}`,
           keywords: isReadOnlyOwner
             ? ["tâches", "opérations", "suivi", "contrôle"]
             : ["nouvelle tâche", "créer tâche", "assigner", "opération"]
@@ -71,9 +77,13 @@ function buildSearchItems(
       : null,
     canUse("financeTransactions")
       ? {
-          label: isReadOnlyOwner ? "Voir les transactions" : "Créer une transaction",
-          description: "Voir les transactions",
-          to: `/finance/transactions${activityQuery}`,
+          label: canCreateTransactions ? "Créer une transaction" : "Voir les transactions",
+          description: canCreateTransactions
+            ? "Créer une transaction dans le secteur actif"
+            : "Voir les transactions du secteur actif",
+          to: `/finance/transactions${activityQuery}${
+            canCreateTransactions ? "#transaction-create" : ""
+          }`,
           keywords: isReadOnlyOwner
             ? ["transactions", "finance", "contrôle", "caisse"]
             : ["nouvelle transaction", "finance", "caisse", "dépense", "recette"]

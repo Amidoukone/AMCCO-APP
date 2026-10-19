@@ -888,6 +888,106 @@ export type TransportOperationsReport = {
   currencySummaries: TransportOperationsReportCurrencySummary[];
 };
 
+export type HydrocarbonOperationsReport = {
+  periodLabel: string;
+  rows: Array<{
+    date: string;
+    categoryLabel: string;
+    assetRef: string;
+    direction: "CASH_IN" | "CASH_OUT";
+    description: string;
+    status: "SUBMITTED" | "APPROVED";
+    amount: string;
+    currency: string;
+  }>;
+  currencySummaries: Array<{
+    currency: string;
+    transactionsCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+  }>;
+  tasks: Array<{
+    dueDate: string | null;
+    title: string;
+    description: string;
+    status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+  }>;
+  taskStatusSummary: Array<{
+    status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+    count: number;
+  }>;
+  totals: {
+    transactionsCount: number;
+    tasksCount: number;
+    doneTasksCount: number;
+    openTasksCount: number;
+    blockedTasksCount: number;
+  };
+};
+
+export type DailyActivitiesReport = {
+  periodLabel: string;
+  activities: Array<{
+    dueDate: string | null;
+    categoryLabel: string;
+    title: string;
+    description: string;
+    status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+    indicativeAmount: string | null;
+    agreementRef: string;
+    partnerName: string;
+  }>;
+  categories: Array<{
+    categoryLabel: string;
+    activitiesCount: number;
+    openCount: number;
+    doneCount: number;
+    blockedCount: number;
+  }>;
+  agreements: Array<{
+    agreementRef: string;
+    partnerName: string;
+    agreementType: string;
+    agreementDate: string;
+    purpose: string;
+    capitalAmount: string | null;
+    profitAmount: string | null;
+    paymentAccount: string;
+    status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED" | null;
+  }>;
+  transactions: Array<{
+    date: string;
+    categoryLabel: string;
+    operationLabel: string;
+    agreementRef: string;
+    partnerName: string;
+    paymentReference: string;
+    description: string;
+    direction: "CASH_IN" | "CASH_OUT";
+    status: "SUBMITTED" | "APPROVED";
+    amount: string;
+    currency: string;
+  }>;
+  currencySummaries: Array<{
+    currency: string;
+    transactionsCount: number;
+    approvedTransactionsCount: number;
+    pendingTransactionsCount: number;
+    cashInAmount: string;
+    cashOutAmount: string;
+    netAmount: string;
+  }>;
+  totals: {
+    activitiesCount: number;
+    openCount: number;
+    doneCount: number;
+    blockedCount: number;
+    agreementsCount: number;
+    transactionsCount: number;
+  };
+};
+
 export type ReportsOverview = {
   generatedAt: string;
   sectorRulesVersion: string;
@@ -921,6 +1021,8 @@ export type ReportsOverview = {
   agencyOperationsReport: AgencyOperationsReport | null;
   generalExpensesReport: GeneralExpensesReport | null;
   transportOperationsReport: TransportOperationsReport | null;
+  hydrocarbonOperationsReport: HydrocarbonOperationsReport | null;
+  dailyActivitiesReport: DailyActivitiesReport | null;
   roleDistribution: ReportRoleDistribution[];
   topAssignees: DashboardWorkloadItem[];
 };

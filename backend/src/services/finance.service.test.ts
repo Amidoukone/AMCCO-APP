@@ -34,6 +34,7 @@ import {
   createCompanyTransaction,
   deleteCompanyTransaction,
   exportCompanySalaryCsv,
+  getCompanyTransaction,
   getCompanySalarySummary,
   listCompanyTransactions,
   listCompanyTransactionProofs,
@@ -97,6 +98,31 @@ describe("finance.service", () => {
     vi.clearAllMocks();
     vi.mocked(ensureCompanyActivityEnabledOrThrow).mockResolvedValue(undefined);
     vi.mocked(listCompanyUsers).mockResolvedValue([]);
+  });
+
+  it("limits direct transaction links to the operator's sector and own records", async () => {
+    const operator = { ...actor, role: "HYDROCARBON_OPERATOR" as const };
+    const transaction = {
+      id: "transaction-1",
+      activityCode: "HYDROCARBON",
+      createdById: operator.actorId
+    } as NonNullable<Awaited<ReturnType<typeof findFinancialTransactionById>>>;
+    vi.mocked(findFinancialTransactionById).mockResolvedValue(transaction);
+
+    await expect(getCompanyTransaction(operator, transaction.id)).resolves.toBe(transaction);
+    expect(findFinancialTransactionById).toHaveBeenCalledWith(operator.companyId, transaction.id);
+
+    vi.mocked(findFinancialTransactionById).mockResolvedValue({
+      ...transaction,
+      activityCode: "BTP"
+    });
+    await expect(getCompanyTransaction(operator, transaction.id)).rejects.toMatchObject({ statusCode: 404 });
+
+    vi.mocked(findFinancialTransactionById).mockResolvedValue({
+      ...transaction,
+      createdById: "another-user"
+    });
+    await expect(getCompanyTransaction(operator, transaction.id)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it("limits beverage depot operator account choices to the beverage depot sector", async () => {
@@ -2173,6 +2199,23 @@ describe("finance.service", () => {
   });
 
   describe("deleteCompanyTransaction", () => {
+    it("preserves transactions from a disabled sector as read-only history", async () => {
+      vi.mocked(findFinancialTransactionById).mockResolvedValue({
+        id: "historical-transaction",
+        activityCode: "BEVERAGE_DEPOT",
+        createdById: "operator-1"
+      } as NonNullable<Awaited<ReturnType<typeof findFinancialTransactionById>>>);
+      vi.mocked(ensureCompanyActivityEnabledOrThrow).mockRejectedValue(
+        new HttpError(400, "Cette activité est désactivée pour cette entreprise.")
+      );
+
+      await expect(deleteCompanyTransaction(
+        { actorId: "operator-1", companyId: actor.companyId, role: "BEVERAGE_DEPOT_OPERATOR" },
+        { transactionId: "historical-transaction" }
+      )).rejects.toMatchObject({ statusCode: 400 });
+      expect(deleteFinancialTransaction).not.toHaveBeenCalled();
+    });
+
     it("allows an operator to delete their own transaction in their sector", async () => {
       vi.mocked(findFinancialTransactionById).mockResolvedValue({
         id: "beverage-txn-delete",

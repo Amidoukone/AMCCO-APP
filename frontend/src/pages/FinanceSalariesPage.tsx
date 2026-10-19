@@ -410,6 +410,17 @@ export function FinanceSalariesPage(): JSX.Element {
   }, [setSearchParams]);
 
   useEffect(() => {
+    if (!editingSalaryId) return;
+    const frameId = window.requestAnimationFrame(() => {
+      document.querySelector(".salary-form-panel")?.scrollIntoView({
+        block: "start",
+        behavior: "smooth"
+      });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [editingSalaryId]);
+
+  useEffect(() => {
     requestedTransactionIdRef.current = requestedTransactionId;
     if (!requestedTransactionId) {
       setSelectedSalaryId(null);
@@ -708,7 +719,6 @@ export function FinanceSalariesPage(): JSX.Element {
       note: item.note ?? "",
       occurredAt: toDateTimeLocalInput(item.occurredAt)
     });
-    handleOpenSalaryDetails(item.id);
   }
 
   function handleCancelEditSalary(): void {

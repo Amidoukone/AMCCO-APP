@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FeedbackBanner } from "../components/FeedbackBanner";
+import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
 import {
   ApiError,
   downloadReportExportRequest,
@@ -517,7 +519,8 @@ function summarizePeriodForm(form: PeriodFormState): string {
 export function ReportsPage(): JSX.Element {
   const { activeCompany } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
-  const { enabledActivities, isLoading: isLoadingActivities, selectedActivity, selectedActivityCode } = useBusinessActivity();
+  const { enabledActivities, isLoading: isLoadingActivities, selectedActivity, selectedActivityCode, setSelectedActivityCode } = useBusinessActivity();
+  const [, setSearchParams] = useSearchParams();
   const [overview, setOverview] = useState<ReportsOverview | null>(null);
   const [periodForm, setPeriodForm] = useState<PeriodFormState>(() =>
     createDefaultPeriodForm(selectedActivityCode ?? "")
@@ -621,6 +624,14 @@ export function ReportsPage(): JSX.Element {
 
     setSuccessMessage(null);
     setErrorMessage(null);
+    if (periodForm.activityCode) {
+      setSelectedActivityCode(periodForm.activityCode);
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.set("activityCode", periodForm.activityCode);
+        return next;
+      }, { replace: true });
+    }
     setAppliedPeriod(periodForm);
     if (window.matchMedia("(max-width: 640px)").matches) {
       setIsReportFiltersExpanded(false);
@@ -643,6 +654,11 @@ export function ReportsPage(): JSX.Element {
     () => (overview ? buildReportMetrics(overview) : null),
     [overview]
   );
+  const currentPeriodQuery = normalizePeriodQuery(appliedPeriod);
+  const isOverviewCurrent =
+    overview?.filters.activityCode === selectedActivityCode &&
+    overview.filters.dateFrom === (currentPeriodQuery.dateFrom ?? null) &&
+    overview.filters.dateTo === (currentPeriodQuery.dateTo ?? null);
   const hasFocusedOperationsReport = Boolean(
     overview?.agricultureOperationsReport ||
     overview?.generalStoreOperationsReport ||
@@ -656,7 +672,9 @@ export function ReportsPage(): JSX.Element {
     overview?.fishFarmingOperationsReport ||
     overview?.livestockOperationsReport ||
     overview?.generalExpensesReport ||
-    overview?.transportOperationsReport
+    overview?.transportOperationsReport ||
+    overview?.hydrocarbonOperationsReport ||
+    (selectedActivityCode === "DAILY_ACTIVITIES" && overview?.dailyActivitiesReport)
   );
   const genericOperationalPerformanceRows = useMemo(
     () =>
@@ -706,6 +724,19 @@ export function ReportsPage(): JSX.Element {
           ? "Suivi des entrées, sorties et opérations du secteur Transport."
           : "Données du secteur choisi, calculées depuis les transactions, tâches et comptes."}</p>
       </header>
+
+      <SectorWorkspaceNav actions={overview && isOverviewCurrent && !isLoading && !isRefreshing ? [{
+        label: "Voir le rapport du secteur",
+        onClick: () => {
+          setIsReportDetailsExpanded(true);
+          window.requestAnimationFrame(() => {
+            document.getElementById("reports-sector-details")?.scrollIntoView({
+              block: "start",
+              behavior: "smooth"
+            });
+          });
+        }
+      }] : []} />
 
       <section className="panel reports-control-panel">
         <details
@@ -884,7 +915,7 @@ export function ReportsPage(): JSX.Element {
         isLoading={isLoading || isRefreshing}
       />
 
-      {!isLoading && overview && reportMetrics ? (
+      {!isLoading && overview && isOverviewCurrent && reportMetrics ? (
         <>
           <div
             className="reports-result-scroll"
@@ -971,6 +1002,7 @@ export function ReportsPage(): JSX.Element {
           </section>
 
           <details
+            id="reports-sector-details"
             className="reports-details-disclosure"
             open={isReportDetailsExpanded}
             onToggle={(event) => setIsReportDetailsExpanded(event.currentTarget.open)}
@@ -2789,6 +2821,71 @@ export function ReportsPage(): JSX.Element {
                     </table>
                   </div>
                 </div>
+              </section>
+            );
+          })() : null}
+
+          {overview.hydrocarbonOperationsReport ? (() => {
+            const report = overview.hydrocarbonOperationsReport;
+            return (
+              <section className="panel">
+                <div className="dashboard-panel-header">
+                  <div>
+                    <h3>Rapport Hydrocarbure</h3>
+                    <p className="hint">{report.periodLabel} | opérations, équipements et tâches du secteur.</p>
+                  </div>
+                </div>
+                <div className="reports-summary-grid">
+                  <article className="reports-kpi-card"><span>Transactions</span><strong>{formatCount(report.totals.transactionsCount)}</strong></article>
+                  <article className="reports-kpi-card"><span>Tâches en cours ou à faire</span><strong>{formatCount(report.totals.openTasksCount)}</strong></article>
+                  <article className="reports-kpi-card"><span>Tâches terminées</span><strong>{formatCount(report.totals.doneTasksCount)}</strong></article>
+                  <article className="reports-kpi-card"><span>Tâches bloquées</span><strong>{formatCount(report.totals.blockedTasksCount)}</strong></article>
+                </div>
+                <div className="reports-data-grid">
+                  <article className="reports-table-panel">
+                    <div className="reports-table-header"><h4>Flux enregistrés par devise</h4></div>
+                    <div className="table-wrap"><table className="admin-table"><thead><tr><th>Devise</th><th>Transactions</th><th>Entrées</th><th>Sorties</th><th>Net</th></tr></thead><tbody>
+                      {report.currencySummaries.length === 0 ? <tr><td colSpan={5}>Aucune transaction sur la période.</td></tr> : report.currencySummaries.map((row) => <tr key={row.currency}><td>{row.currency}</td><td>{formatCount(row.transactionsCount)}</td><td>{formatAmount(row.cashInAmount, row.currency)}</td><td>{formatAmount(row.cashOutAmount, row.currency)}</td><td>{formatAmount(row.netAmount, row.currency)}</td></tr>)}
+                    </tbody></table></div>
+                  </article>
+                </div>
+                <div className="table-wrap"><table className="admin-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Équipement / site</th><th>Opération</th><th>Description</th><th>État</th><th>Montant</th></tr></thead><tbody>
+                  {report.rows.length === 0 ? <tr><td colSpan={7}>Aucune opération Hydrocarbure sur la période.</td></tr> : report.rows.map((row, index) => <tr key={`${row.date}-${row.assetRef}-${index}`}><td>{formatReportDate(row.date)}</td><td>{row.categoryLabel}</td><td>{row.assetRef}</td><td>{transactionTypeLabel(row.direction)}</td><td>{row.description}</td><td>{transactionStatusLabel(row.status)}</td><td>{formatAmount(row.amount, row.currency)}</td></tr>)}
+                </tbody></table></div>
+                <div className="table-wrap"><table className="admin-table"><thead><tr><th>Échéance</th><th>Tâche</th><th>Description</th><th>État</th></tr></thead><tbody>
+                  {report.tasks.length === 0 ? <tr><td colSpan={4}>Aucune tâche Hydrocarbure sur la période.</td></tr> : report.tasks.map((task, index) => <tr key={`${task.title}-${index}`}><td>{task.dueDate ? formatReportDate(task.dueDate) : "—"}</td><td>{task.title}</td><td>{task.description}</td><td>{taskStatusLabel(task.status)}</td></tr>)}
+                </tbody></table></div>
+              </section>
+            );
+          })() : null}
+
+          {overview.dailyActivitiesReport && selectedActivityCode === "DAILY_ACTIVITIES" ? (() => {
+            const report = overview.dailyActivitiesReport;
+            return (
+              <section className="panel">
+                <div className="dashboard-panel-header"><div><h3>Rapport Activités quotidiennes</h3><p className="hint">{report.periodLabel} | activités, accords et paiements du secteur.</p></div></div>
+                <div className="reports-summary-grid">
+                  <article className="reports-kpi-card"><span>Activités</span><strong>{formatCount(report.totals.activitiesCount)}</strong></article>
+                  <article className="reports-kpi-card"><span>À suivre</span><strong>{formatCount(report.totals.openCount)}</strong></article>
+                  <article className="reports-kpi-card"><span>Terminées</span><strong>{formatCount(report.totals.doneCount)}</strong></article>
+                  <article className="reports-kpi-card"><span>Accords</span><strong>{formatCount(report.totals.agreementsCount)}</strong></article>
+                </div>
+                <div className="reports-data-grid"><article className="reports-table-panel"><div className="reports-table-header"><h4>Paiements finalisés par devise</h4><span>Les transactions en attente sont comptées séparément.</span></div><div className="table-wrap"><table className="admin-table"><thead><tr><th>Devise</th><th>Finalisées</th><th>En attente</th><th>Entrées</th><th>Sorties</th><th>Net</th></tr></thead><tbody>
+                  {report.currencySummaries.length === 0 ? <tr><td colSpan={6}>Aucun paiement sur la période.</td></tr> : report.currencySummaries.map((row) => <tr key={row.currency}><td>{row.currency}</td><td>{formatCount(row.approvedTransactionsCount)}</td><td>{formatCount(row.pendingTransactionsCount)}</td><td>{formatAmount(row.cashInAmount, row.currency)}</td><td>{formatAmount(row.cashOutAmount, row.currency)}</td><td>{formatAmount(row.netAmount, row.currency)}</td></tr>)}
+                </tbody></table></div></article></div>
+                <h4>Activités</h4>
+                <div className="table-wrap"><table className="admin-table"><thead><tr><th>Échéance</th><th>Catégorie</th><th>Activité</th><th>Accord</th><th>Partenaire</th><th>État</th></tr></thead><tbody>
+                  {report.activities.length === 0 ? <tr><td colSpan={6}>Aucune activité sur la période.</td></tr> : report.activities.map((row, index) => <tr key={`${row.title}-${index}`}><td>{row.dueDate ? formatReportDate(row.dueDate) : "—"}</td><td>{row.categoryLabel}</td><td>{row.title}</td><td>{row.agreementRef || "—"}</td><td>{row.partnerName || "—"}</td><td>{taskStatusLabel(row.status)}</td></tr>)}
+                </tbody></table></div>
+                <h4>Accords prévus</h4>
+                <p className="hint">Les montants des accords sont indicatifs ; les paiements réellement finalisés figurent ci-dessus.</p>
+                <div className="table-wrap"><table className="admin-table"><thead><tr><th>Référence</th><th>Partenaire</th><th>Objet</th><th>Capital prévu</th><th>Profit prévu</th><th>État</th></tr></thead><tbody>
+                  {report.agreements.length === 0 ? <tr><td colSpan={6}>Aucun accord sur la période.</td></tr> : report.agreements.map((row) => <tr key={row.agreementRef}><td>{row.agreementRef}</td><td>{row.partnerName}</td><td>{row.purpose}</td><td>{row.capitalAmount ? formatAmount(row.capitalAmount) : "—"}</td><td>{row.profitAmount ? formatAmount(row.profitAmount) : "—"}</td><td>{row.status ? taskStatusLabel(row.status) : "—"}</td></tr>)}
+                </tbody></table></div>
+                <h4>Transactions liées</h4>
+                <div className="table-wrap"><table className="admin-table"><thead><tr><th>Date</th><th>Opération</th><th>Accord</th><th>Partenaire</th><th>Référence paiement</th><th>État</th><th>Montant</th></tr></thead><tbody>
+                  {report.transactions.length === 0 ? <tr><td colSpan={7}>Aucune transaction sur la période.</td></tr> : report.transactions.map((row, index) => <tr key={`${row.date}-${row.paymentReference}-${index}`}><td>{formatReportDate(row.date)}</td><td>{row.operationLabel}</td><td>{row.agreementRef || "—"}</td><td>{row.partnerName || "—"}</td><td>{row.paymentReference || "—"}</td><td>{transactionStatusLabel(row.status)}</td><td>{formatAmount(row.amount, row.currency)}</td></tr>)}
+                </tbody></table></div>
               </section>
             );
           })() : null}

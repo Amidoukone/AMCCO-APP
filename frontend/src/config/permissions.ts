@@ -101,6 +101,17 @@ export function canAccessFeature(role: RoleCode, feature: FeatureKey): boolean {
   return FEATURE_ACCESS[feature].includes(role);
 }
 
+export function canManageSectorTransactions(role: RoleCode): boolean {
+  return [
+    "SYS_ADMIN",
+    "ACCOUNTANT",
+    "EMPLOYEE",
+    "HARDWARE_OPERATOR",
+    "HYDROCARBON_OPERATOR",
+    "BEVERAGE_DEPOT_OPERATOR"
+  ].includes(role);
+}
+
 export function isReadOnlyOwnerRole(role: RoleCode): boolean {
   return role === "OWNER";
 }

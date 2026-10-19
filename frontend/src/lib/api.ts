@@ -1015,6 +1015,16 @@ export function listFinanceTransactionsRequest(
   });
 }
 
+export function getFinanceTransactionRequest(
+  accessToken: string,
+  transactionId: string
+): Promise<FinancialTransactionSingleResponse> {
+  return request<FinancialTransactionSingleResponse>(
+    `/finance/transactions/${encodeURIComponent(transactionId)}`,
+    { method: "GET", accessToken }
+  );
+}
+
 export function getFinanceDumpTruckSummaryRequest(
   accessToken: string,
   period: string

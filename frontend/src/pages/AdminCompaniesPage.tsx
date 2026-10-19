@@ -253,6 +253,17 @@ export function AdminCompaniesPage(): JSX.Element {
     setForm(createFormStateFromCompany(item));
   }
 
+  useEffect(() => {
+    if (!editingCompanyId) return;
+    const frameId = window.requestAnimationFrame(() => {
+      document.getElementById("company-create")?.scrollIntoView({
+        block: "start",
+        behavior: "smooth"
+      });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [editingCompanyId]);
+
   function handleCancelEditCompany(): void {
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -533,6 +544,7 @@ export function AdminCompaniesPage(): JSX.Element {
 
       {canManageCompanies ? <section className="panel company-create-panel">
         <details
+          id="company-create"
           className="mobile-create-disclosure"
           open={isCompanyFormExpanded || isEditingCompany}
           onToggle={(event) => setIsCompanyFormExpanded(event.currentTarget.open)}

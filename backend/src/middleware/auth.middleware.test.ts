@@ -17,6 +17,10 @@ describe("sector operator API restrictions", () => {
   router.use(authenticateAccessToken);
   router.get("/finance/transactions", (_req, res) => res.status(200).json({ ok: true }));
   router.post("/finance/transactions", (_req, res) => res.status(201).json({ ok: true }));
+  router.get("/finance/transactions/:transactionId", (_req, res) => res.status(200).json({ ok: true }));
+  router.patch("/finance/transactions/:transactionId", (_req, res) => res.status(200).json({ ok: true }));
+  router.delete("/finance/transactions/:transactionId", (_req, res) => res.status(200).json({ ok: true }));
+  router.patch("/finance/transactions/:transactionId/review", (_req, res) => res.status(200).json({ ok: true }));
   router.get("/finance/accounts", (_req, res) => res.status(200).json({ ok: true }));
   router.get("/activities", (_req, res) => res.status(200).json({ ok: true }));
   router.get("/activities/HARDWARE/articles", (_req, res) => res.status(200).json({ ok: true }));
@@ -48,6 +52,14 @@ describe("sector operator API restrictions", () => {
     expect((await request(app).get("/finance/accounts").set("Authorization", "Bearer test")).status).toBe(200);
     expect((await request(app).get("/activities").set("Authorization", "Bearer test")).status).toBe(200);
     expect((await request(app).get("/activities/HARDWARE/articles").set("Authorization", "Bearer test")).status).toBe(200);
+  });
+
+  it("allows operators to open and manage a transaction while keeping review restricted", async () => {
+    const path = "/finance/transactions/123e4567-e89b-12d3-a456-426614174000";
+    expect((await request(app).get(path).set("Authorization", "Bearer test")).status).toBe(200);
+    expect((await request(app).patch(path).set("Authorization", "Bearer test")).status).toBe(200);
+    expect((await request(app).delete(path).set("Authorization", "Bearer test")).status).toBe(200);
+    expect((await request(app).patch(`${path}/review`).set("Authorization", "Bearer test")).status).toBe(403);
   });
 
   it.each(["/reports/overview", "/operations/tasks", "/finance/salaries"])(

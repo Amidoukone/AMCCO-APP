@@ -55,8 +55,10 @@ export function isOverdue(value: string | null): boolean {
 }
 
 export function buildDailyActionCards(
-  summary: DashboardSummary
+  summary: DashboardSummary,
+  selectedActivityCode: string | null
 ): DashboardActionCard[] {
+  const activityQuery = selectedActivityCode ? `?activityCode=${selectedActivityCode}` : "";
   return [
     {
       key: "my-work",
@@ -85,7 +87,7 @@ export function buildDailyActionCards(
       value: String(summary.operations.blockedCount),
       note: "Priorisez les blocages actifs.",
       actionLabel: "Voir les blocages",
-      href: "/operations/tasks",
+      href: `/operations/tasks${activityQuery}`,
       tone: summary.operations.blockedCount > 0 || summary.operations.overdueCount > 0 ? "critical" : "neutral"
     }
   ];

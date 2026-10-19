@@ -17,6 +17,7 @@ import {
   exportCompanySalaryCsv,
   exportCompanySalaryExcel,
   getTransactionProofUploadAuth,
+  getCompanyTransaction,
   getCompanySalarySummary,
   getCompanyDumpTruckSummary,
   listCompanyAccounts,
@@ -232,6 +233,20 @@ financeRouter.get(
       role: req.auth.role
     });
     res.status(200).json({ items });
+  })
+);
+
+financeRouter.get(
+  "/finance/transactions/:transactionId",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    const params = txIdParamSchema.parse(req.params);
+    const item = await getCompanyTransaction({
+      actorId: req.auth.userId,
+      companyId: req.auth.companyId,
+      role: req.auth.role
+    }, params.transactionId);
+    res.status(200).json({ item });
   })
 );
 

@@ -12,6 +12,8 @@ function isAllowedSectorOperatorRequest(req: Request, role: RoleCode): boolean {
   }
   if (req.method === "PATCH" && req.path === "/me/password") return true;
   if (req.method === "POST" && req.path === "/finance/transactions") return true;
+  const transactionPath = /^\/finance\/transactions\/[a-f0-9-]+$/i.test(req.path);
+  if (transactionPath && (req.method === "GET" || req.method === "PATCH" || req.method === "DELETE")) return true;
   if (role === "HARDWARE_OPERATOR" && req.method === "GET" && req.path === "/activities/HARDWARE/articles") return true;
   const proofPath = /^\/finance\/transactions\/[a-f0-9-]+\/proofs(?:\/upload-auth)?$/i.test(req.path);
   return proofPath && (req.method === "GET" || req.method === "POST");
