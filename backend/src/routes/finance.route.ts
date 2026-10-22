@@ -5,6 +5,7 @@ import { asyncHandler } from "../lib/async-handler.js";
 import { authenticateAccessToken, authorizeRoles } from "../middleware/auth.middleware.js";
 import { BUSINESS_ACTIVITY_CODES } from "../types/business-activity.js";
 import { getRoleActivityCode } from "../types/role.js";
+import { addCompanyBeverageProduct, countCompanyBeverageStock, getCompanyBeverageStock } from "../services/beverage-stock.service.js";
 import {
   addProofToTransaction,
   confirmCompanySalaryReceipt,
@@ -33,6 +34,7 @@ import {
 } from "../services/finance.service.js";
 
 const listTransactionsQuerySchema = z.object({
+  search: z.string().trim().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   status: z.enum(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]).optional(),
@@ -120,6 +122,32 @@ const reviewSchema = z.object({
 export const financeRouter = Router();
 
 financeRouter.use(authenticateAccessToken);
+
+financeRouter.get("/finance/beverage-products", asyncHandler(async (req, res) => {
+  if (!req.auth) throw new HttpError(401, "Authentification requise.");
+  const items = await getCompanyBeverageStock({ companyId: req.auth.companyId, actorId: req.auth.userId, role: req.auth.role });
+  res.json({ items });
+}));
+
+financeRouter.post("/finance/beverage-products/:productId/count", authorizeRoles("SYS_ADMIN", "ACCOUNTANT"), asyncHandler(async (req, res) => {
+  if (!req.auth) throw new HttpError(401, "Authentification requise.");
+  const quantity = z.string().regex(/^\d{1,9}(\.\d{1,3})?$/);
+  const body = z.object({ expectedQuantity: quantity, countedQuantity: quantity,
+    unitCost: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/).default("0"), reason: z.string().trim().min(5).max(500) }).parse(req.body);
+  await countCompanyBeverageStock({ companyId: req.auth.companyId, actorId: req.auth.userId, role: req.auth.role }, { ...body, productId: z.string().uuid().parse(req.params.productId) });
+  res.json({ status: "ok" });
+}));
+
+financeRouter.post("/finance/beverage-products", authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"), asyncHandler(async (req, res) => {
+  if (!req.auth) throw new HttpError(401, "Authentification requise.");
+  const body = z.object({
+    name: z.string().trim().min(2).max(120), unit: z.string().trim().min(1).max(40),
+    openingQuantity: z.string().regex(/^\d{1,9}(\.\d{1,3})?$/).default("0"),
+    openingUnitCost: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/).default("0")
+  }).parse(req.body);
+  const item = await addCompanyBeverageProduct({ companyId: req.auth.companyId, actorId: req.auth.userId, role: req.auth.role }, body);
+  res.status(201).json({ item });
+}));
 
 financeRouter.get(
   "/finance/accounts",
@@ -229,6 +257,7 @@ financeRouter.get(
       offset: query.offset,
       status: query.status,
       type: query.type,
+      search: query.search,
       activityCode: getRoleActivityCode(req.auth.role) ?? query.activityCode,
       role: req.auth.role
     });

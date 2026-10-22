@@ -1,5 +1,7 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { withBeverageStockWrite } from "./beverage-stock.repository.js";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDbPool, queryRows } from "../lib/db.js";
+import { buildListSearchFilters } from "../utils/list-search.js";
 import { toMetadataStringMap } from "../utils/metadata.js";
 import {
   isBusinessActivityCode,
@@ -590,33 +592,45 @@ export async function createFinancialTransaction(input: {
   createdById: string;
   occurredAt: Date;
 }): Promise<void> {
-  await getDbPool().execute<ResultSetHeader>(
-    `
-      INSERT INTO transactions (
-        id, company_id, account_id, type, amount, currency, activity_code, description, metadata_json,
-        status, requires_proof, salary_confirmation_status, created_by_id, occurred_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?)
-    `,
-    [
-      input.id,
-      input.companyId,
-      input.accountId,
-      input.type,
-      input.amount,
-      input.currency,
-      input.activityCode,
-      input.description,
-      JSON.stringify(input.metadata),
-      input.requiresProof ? 1 : 0,
-      input.salaryConfirmationStatus ?? "NOT_REQUIRED",
-      input.createdById,
-      input.occurredAt
-    ]
-  );
+  const persist = async (executor: Pick<PoolConnection, "execute">, metadata: Record<string, string> = input.metadata) => {
+    await executor.execute<ResultSetHeader>(
+      `
+        INSERT INTO transactions (
+          id, company_id, account_id, type, amount, currency, activity_code, description, metadata_json,
+          status, requires_proof, salary_confirmation_status, created_by_id, occurred_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?)
+      `,
+      [
+        input.id,
+        input.companyId,
+        input.accountId,
+        input.type,
+        input.amount,
+        input.currency,
+        input.activityCode,
+        input.description,
+        JSON.stringify(metadata),
+        input.requiresProof ? 1 : 0,
+        input.salaryConfirmationStatus ?? "NOT_REQUIRED",
+        input.createdById,
+        input.occurredAt
+      ]
+    );
+  };
+  if (input.activityCode === "BEVERAGE_DEPOT") {
+    await withBeverageStockWrite({ companyId: input.companyId, transactionId: input.id, action: "create", activityCode: input.activityCode, metadata: input.metadata, occurredAt: input.occurredAt }, async (connection, metadata) => {
+      Object.keys(input.metadata).forEach((key) => { delete input.metadata[key]; });
+      Object.assign(input.metadata, metadata);
+      await persist(connection, metadata);
+    });
+  } else {
+    await persist(getDbPool());
+  }
 }
 
 export async function updateFinancialTransaction(input: {
+  stockControlled?: boolean;
   companyId: string;
   transactionId: string;
   accountId: string;
@@ -630,59 +644,79 @@ export async function updateFinancialTransaction(input: {
   salaryConfirmationStatus?: SalaryConfirmationStatus;
   occurredAt: Date;
 }): Promise<void> {
-  await getDbPool().execute<ResultSetHeader>(
-    `
-      UPDATE transactions
-      SET account_id = ?,
-          type = ?,
-          amount = ?,
-          currency = ?,
-          activity_code = ?,
-          description = ?,
-          metadata_json = ?,
-          requires_proof = ?,
-          status = 'DRAFT',
-          validated_by_id = NULL,
-          salary_confirmation_status = ?,
-          salary_confirmed_by_id = NULL,
-          salary_confirmed_at = NULL,
-          occurred_at = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE company_id = ?
-        AND id = ?
-    `,
-    [
-      input.accountId,
-      input.type,
-      input.amount,
-      input.currency,
-      input.activityCode,
-      input.description,
-      JSON.stringify(input.metadata),
-      input.requiresProof ? 1 : 0,
-      input.salaryConfirmationStatus ?? "NOT_REQUIRED",
-      input.occurredAt,
-      input.companyId,
-      input.transactionId
-    ]
-  );
+  const persist = async (executor: Pick<PoolConnection, "execute">, metadata: Record<string, string> = input.metadata) => {
+    await executor.execute<ResultSetHeader>(
+      `
+        UPDATE transactions
+        SET account_id = ?,
+            type = ?,
+            amount = ?,
+            currency = ?,
+            activity_code = ?,
+            description = ?,
+            metadata_json = ?,
+            requires_proof = ?,
+            status = 'DRAFT',
+            validated_by_id = NULL,
+            salary_confirmation_status = ?,
+            salary_confirmed_by_id = NULL,
+            salary_confirmed_at = NULL,
+            occurred_at = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = ?
+          AND id = ?
+      `,
+      [
+        input.accountId,
+        input.type,
+        input.amount,
+        input.currency,
+        input.activityCode,
+        input.description,
+        JSON.stringify(metadata),
+        input.requiresProof ? 1 : 0,
+        input.salaryConfirmationStatus ?? "NOT_REQUIRED",
+        input.occurredAt,
+        input.companyId,
+        input.transactionId
+      ]
+    );
+  };
+  if (input.stockControlled || input.activityCode === "BEVERAGE_DEPOT") {
+    await withBeverageStockWrite({ companyId: input.companyId, transactionId: input.transactionId, action: "update", activityCode: input.activityCode, metadata: input.metadata, occurredAt: input.occurredAt }, async (connection, metadata) => {
+      Object.keys(input.metadata).forEach((key) => { delete input.metadata[key]; });
+      Object.assign(input.metadata, metadata);
+      await persist(connection, metadata);
+    });
+  } else {
+    await persist(getDbPool());
+  }
 }
 
 export async function deleteFinancialTransaction(input: {
+  stockControlled?: boolean;
   companyId: string;
   transactionId: string;
 }): Promise<void> {
-  await getDbPool().execute<ResultSetHeader>(
-    `
-      DELETE FROM transactions
-      WHERE company_id = ?
-        AND id = ?
-    `,
-    [input.companyId, input.transactionId]
-  );
+  const persist = async (executor: Pick<PoolConnection, "execute">, metadata: Record<string, string> = {}) => {
+    await executor.execute<ResultSetHeader>(
+      `
+        DELETE FROM transactions
+        WHERE company_id = ?
+          AND id = ?
+      `,
+      [input.companyId, input.transactionId]
+    );
+  };
+  if (input.stockControlled) {
+    await withBeverageStockWrite({ companyId: input.companyId, transactionId: input.transactionId, action: "delete" }, persist);
+  } else {
+    await persist(getDbPool());
+  }
 }
 
 export async function listFinancialTransactions(input: {
+  search?: string;
   companyId: string;
   limit: number;
   offset: number;
@@ -712,7 +746,12 @@ export async function listFinancialTransactions(input: {
     values.push(input.activityCode);
   }
 
-  values.push(input.limit, input.offset);
+  const search = buildListSearchFilters(input.search, [
+    "t.id", "t.description", "fa.name", "fa.account_ref", "cu.email",
+    "CAST(t.amount AS CHAR)", "t.currency", "CAST(t.metadata_json AS CHAR)"
+  ]);
+  filters.push(...search.filters);
+  values.push(...search.values, input.limit, input.offset);
 
   const rows = await queryRows<TransactionRow[]>(
     `
@@ -1242,21 +1281,29 @@ export async function submitTransaction(input: {
 }
 
 export async function reviewTransaction(input: {
+  stockControlled?: boolean;
   companyId: string;
   transactionId: string;
   reviewerId: string;
   status: "APPROVED" | "REJECTED";
 }): Promise<void> {
-  await getDbPool().execute<ResultSetHeader>(
-    `
-      UPDATE transactions
-      SET status = ?, validated_by_id = ?
-      WHERE company_id = ?
-        AND id = ?
-        AND status = 'SUBMITTED'
-    `,
-    [input.status, input.reviewerId, input.companyId, input.transactionId]
-  );
+  const persist = async (executor: Pick<PoolConnection, "execute">, metadata: Record<string, string> = {}) => {
+    await executor.execute<ResultSetHeader>(
+      `
+        UPDATE transactions
+        SET status = ?, validated_by_id = ?
+        WHERE company_id = ?
+          AND id = ?
+          AND status = 'SUBMITTED'
+      `,
+      [input.status, input.reviewerId, input.companyId, input.transactionId]
+    );
+  };
+  if (input.stockControlled) {
+    await withBeverageStockWrite({ companyId: input.companyId, transactionId: input.transactionId, action: input.status === "REJECTED" ? "reject" : "approve" }, persist);
+  } else {
+    await persist(getDbPool());
+  }
 }
 
 export async function confirmSalaryReceipt(input: {

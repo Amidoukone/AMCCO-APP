@@ -1896,6 +1896,180 @@ a {
   gap: 10px;
 }
 
+.finance-transaction-form-beverage .operations-inline-group {
+  min-width: 0;
+}
+
+.finance-transaction-form-beverage input,
+.finance-transaction-form-beverage select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.beverage-stock-panel > .operations-inline-group,
+.beverage-product-form {
+  display: grid;
+  gap: 12px;
+  margin-block: 12px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.beverage-stock-panel input,
+.beverage-stock-panel select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px;
+}
+
+.beverage-stock-panel button:not(.secondary-btn) {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #f5cc51;
+  border-radius: 10px;
+  background: #ffdf65;
+  color: #102a43;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.beverage-stock-panel button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.beverage-stock-metrics,
+.beverage-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-block: 12px;
+}
+
+.beverage-stock-metrics > div,
+.beverage-stock-empty,
+.beverage-stock-unavailable {
+  padding: 14px;
+  border: 1px solid #526383;
+  border-radius: 12px;
+  background: rgba(128, 128, 128, 0.06);
+}
+
+.beverage-stock-metrics span,
+.beverage-stock-metrics strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.beverage-stock-metrics strong {
+  margin-top: 6px;
+  font-size: 20px;
+}
+
+.beverage-product-fields {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  gap: 12px;
+  border: 1px solid #526383;
+  border-radius: 12px;
+}
+
+.beverage-product-fields legend {
+  padding-inline: 6px;
+  font-weight: 700;
+}
+
+.beverage-product-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.beverage-product-grid > label {
+  min-width: 0;
+}
+
+.beverage-opening-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.beverage-stock-panel .beverage-opening-choice input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 2px 0 0;
+  accent-color: #bd930d;
+}
+
+.beverage-product-create,
+.beverage-stock-count {
+  margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .beverage-product-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .beverage-stock-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .beverage-stock-metrics > div {
+    padding: 10px;
+  }
+
+  .beverage-stock-metrics > div:last-child {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .beverage-stock-panel .beverage-stock-table,
+  .beverage-stock-panel .beverage-stock-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .beverage-stock-panel .beverage-stock-table thead {
+    display: none;
+  }
+
+  .beverage-stock-panel .beverage-stock-table tr {
+    display: grid;
+    margin-block: 12px;
+    border: 1px solid #486581;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .beverage-stock-panel .beverage-stock-table td {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+
+  .beverage-stock-panel .beverage-stock-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+  }
+}
+
 .finance-transaction-suggestions {
   display: grid;
   gap: 4px;
@@ -13108,9 +13282,9 @@ textarea {
 
 /* Reports tables keep long labels readable by scrolling horizontally instead of breaking words. */
 .reports-result-scroll {
-  max-height: min(74dvh, 980px);
-  overflow: auto;
-  overscroll-behavior: contain;
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
   scrollbar-gutter: stable;
   padding: 2px 8px 12px 2px;
   -webkit-overflow-scrolling: touch;
@@ -13173,8 +13347,8 @@ textarea {
   }
 
   .reports-result-scroll {
-    max-height: min(68dvh, calc(100dvh - 230px));
-    min-height: 320px;
+    max-height: none;
+    min-height: 0;
     padding-right: 4px;
     scrollbar-width: thin;
   }

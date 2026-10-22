@@ -7,6 +7,7 @@ import type { RoleCode } from "../types/role.js";
 import { getRoleActivityCode } from "../types/role.js";
 
 function isAllowedSectorOperatorRequest(req: Request, role: RoleCode): boolean {
+  if (role === "BEVERAGE_DEPOT_OPERATOR" && req.path === "/finance/beverage-products" && (req.method === "GET" || req.method === "POST")) return true;
   if (req.method === "GET" && (req.path === "/me" || req.path === "/activities" || req.path === "/finance/accounts" || req.path === "/finance/transactions")) {
     return true;
   }

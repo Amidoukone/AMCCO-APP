@@ -14,6 +14,7 @@ import {
   type DashboardActionCard
 } from "../utils/dashboardDisplay";
 import type { DashboardSummary, ReportOperationalMetric } from "../types/reporting";
+import type { BusinessActivityCode } from "../config/businessActivities";
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -74,9 +75,9 @@ function buildOwnerActionCards(
       eyebrow: "Synthèse",
       title: "Rapports",
       value: String(summary.finance.totalsByCurrency.length || 1),
-      note: "Exporter une vue PDF ou Excel.",
+      note: "Exporter une vue PDF du secteur.",
       actionLabel: "Ouvrir les rapports",
-      href: "/reports",
+      href: `/reports${activityQuery}`,
       tone: "neutral"
     }
   ];
@@ -133,7 +134,9 @@ export function DashboardPage(): JSX.Element {
   const navigate = useNavigate();
   const { activeCompany, user } = useAuth();
   const { selectedActivity, selectedActivityCode, isLoading: isLoadingActivities } = useBusinessActivity();
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loadedSummary, setLoadedSummary] = useState<{ companyId: string; activityCode: BusinessActivityCode | null; data: DashboardSummary } | null>(null);
+  const summary = loadedSummary && loadedSummary.companyId === activeCompany?.id && loadedSummary.activityCode === selectedActivityCode
+    ? loadedSummary.data : null;
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasLoadedSummaryRef = useRef(false);
@@ -146,7 +149,7 @@ export function DashboardPage(): JSX.Element {
     if (loadedCompanyIdRef.current === activeCompany?.id) return;
     loadedCompanyIdRef.current = activeCompany?.id;
     hasLoadedSummaryRef.current = false;
-    setSummary(null);
+    setLoadedSummary(null);
     setIsLoading(true);
     setIsRefreshing(false);
     setErrorMessage(null);
@@ -172,7 +175,7 @@ export function DashboardPage(): JSX.Element {
       );
       if (requestId !== summaryLoadRequestRef.current) return;
       hasLoadedSummaryRef.current = true;
-      setSummary(response.item);
+      setLoadedSummary({ companyId: activeCompany?.id ?? "", activityCode: selectedActivityCode, data: response.item });
     } catch (error) {
       if (requestId === summaryLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {

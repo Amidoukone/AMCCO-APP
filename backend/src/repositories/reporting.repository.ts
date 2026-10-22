@@ -576,6 +576,10 @@ export type BeverageDepotReportReconciliation = {
 };
 
 export type BeverageDepotReport = {
+  currentStock?: { asOf: string; products: import("./beverage-stock.repository.js").BeverageProduct[] };
+  netOperatingResultAmount?: string;
+  stockAdjustments?: import("./beverage-stock.repository.js").BeverageStockAdjustment[];
+  stockAdjustmentAmount?: string;
   periodLabel: string;
   transactions: BeverageDepotReportTransaction[];
   inventory: BeverageDepotReportInventory[];
@@ -1009,6 +1013,10 @@ export type FinancialAccountGovernanceItem = {
 };
 
 export type ReportsOverview = {
+  fieldOperationsReport?: {
+    transactions: ReportOperationalTransaction[];
+    tasks: ReportOperationalTask[];
+  } | null;
   generatedAt: string;
   sectorRulesVersion: string;
   filters: {

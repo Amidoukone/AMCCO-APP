@@ -2,6 +2,8 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDbPool, queryRows } from "./db.js";
 import { BUSINESS_ACTIVITIES } from "../types/business-activity.js";
 import { logger } from "./logger.js";
+import { ensureBeverageStockSchemaReady } from "./beverage-stock-schema.js";
+import { createCompanyOwnedTable } from "./schema-identifiers.js";
 
 type CompanyIdRow = RowDataPacket & {
   id: string;
@@ -168,7 +170,7 @@ async function ensureTaskAttachmentsTable(): Promise<void> {
 }
 
 async function ensureCompanyActivitiesTable(): Promise<void> {
-  await getDbPool().execute(
+  await createCompanyOwnedTable(
     `
       CREATE TABLE IF NOT EXISTS company_activities (
         company_id VARCHAR(36) NOT NULL,
@@ -329,7 +331,7 @@ async function ensureFinancialAccountActivitiesTable(): Promise<void> {
 }
 
 async function ensureActivityArticlesTable(): Promise<void> {
-  await getDbPool().execute(
+  await createCompanyOwnedTable(
     `
       CREATE TABLE IF NOT EXISTS activity_articles (
         id VARCHAR(36) PRIMARY KEY,
@@ -356,7 +358,7 @@ async function ensureActivityArticlesTable(): Promise<void> {
 }
 
 async function ensureRentalTenantsTable(): Promise<void> {
-  await getDbPool().execute(
+  await createCompanyOwnedTable(
     `
       CREATE TABLE IF NOT EXISTS rental_tenants (
         id VARCHAR(36) PRIMARY KEY,
@@ -392,7 +394,7 @@ async function ensureRentalTenantsTable(): Promise<void> {
 }
 
 async function ensureGeneralStoreShopsTable(): Promise<void> {
-  await getDbPool().execute(
+  await createCompanyOwnedTable(
     `
       CREATE TABLE IF NOT EXISTS general_store_shops (
         id VARCHAR(36) PRIMARY KEY,
@@ -412,7 +414,7 @@ async function ensureGeneralStoreShopsTable(): Promise<void> {
 }
 
 async function ensureBtpProjectsTable(): Promise<void> {
-  await getDbPool().execute(
+  await createCompanyOwnedTable(
     `
       CREATE TABLE IF NOT EXISTS btp_projects (
         id VARCHAR(36) PRIMARY KEY,
@@ -433,7 +435,7 @@ async function ensureBtpProjectsTable(): Promise<void> {
 }
 
 async function ensureDailyActivityCategoriesTable(): Promise<void> {
-  await getDbPool().execute(
+  await createCompanyOwnedTable(
     `
       CREATE TABLE IF NOT EXISTS daily_activity_categories (
         id VARCHAR(36) PRIMARY KEY,
@@ -495,6 +497,7 @@ export async function ensureBusinessActivitySchemaReady(): Promise<void> {
     await ensureGeneralStoreShopsTable();
     await ensureBtpProjectsTable();
     await ensureDailyActivityCategoriesTable();
+    await ensureBeverageStockSchemaReady();
     await ensureCompanyActivitiesSeeded();
     logger.info("Business activity schema ready");
   } catch (error) {

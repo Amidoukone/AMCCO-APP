@@ -163,6 +163,14 @@ describe("finance.service", () => {
     });
   });
 
+  it("preserves operator isolation when searching another requested sector", async () => {
+    vi.mocked(listFinancialTransactions).mockResolvedValue([]);
+    await listCompanyTransactions({ companyId: actor.companyId, actorId: actor.actorId, role: "HARDWARE_OPERATOR", activityCode: "MINING", search: "ancien ciment", offset: 100 });
+    expect(listFinancialTransactions).toHaveBeenCalledWith(expect.objectContaining({
+      companyId: actor.companyId, createdById: actor.actorId, activityCode: "HARDWARE", search: "ancien ciment", offset: 100
+    }));
+  });
+
   it("keeps accountant transaction lists company-wide", async () => {
     vi.mocked(listFinancialTransactions).mockResolvedValue([]);
 
@@ -2270,7 +2278,8 @@ describe("finance.service", () => {
 
       expect(deleteFinancialTransaction).toHaveBeenCalledWith({
         companyId: actor.companyId,
-        transactionId: "beverage-txn-delete"
+        transactionId: "beverage-txn-delete",
+        stockControlled: true
       });
     });
 

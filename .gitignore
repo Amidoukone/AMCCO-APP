@@ -5,6 +5,7 @@ build/
 .turbo/
 .cache/
 coverage/
+/artifacts/
 *.log
 npm-debug.log*
 yarn-debug.log*

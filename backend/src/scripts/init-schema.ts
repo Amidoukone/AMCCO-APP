@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { closeDbPool, getDbPool } from "../lib/db.js";
+import { ensureBeverageStockSchemaReady } from "../lib/beverage-stock-schema.js";
 
 function splitSqlStatements(sql: string): string[] {
   const statements: string[] = [];
@@ -41,8 +42,9 @@ async function main(): Promise<void> {
   for (const statement of statements) {
     await pool.execute(statement);
   }
+  await ensureBeverageStockSchemaReady();
 
-  console.info(`Schema initialization completed (${statements.length} statements).`);
+  console.info(`Schema initialization completed (${statements.length} base statements and beverage stock schema).`);
 }
 
 main()

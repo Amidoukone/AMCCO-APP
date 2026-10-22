@@ -65,6 +65,7 @@ import type {
   DailyActivityCategorySingleResponse
 } from "../types/daily-activity-categories";
 import type { BusinessActivityCode } from "../config/businessActivities";
+import type { BeverageProduct } from "../types/beverage-stock";
 import type {
   DashboardSummaryResponse,
   GeneralStoreOperationsReportRow,
@@ -983,6 +984,7 @@ export function updateFinanceAccountRequest(
 export function listFinanceTransactionsRequest(
   accessToken: string,
   query: {
+    search?: string;
     limit?: number;
     offset?: number;
     status?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
@@ -991,6 +993,7 @@ export function listFinanceTransactionsRequest(
   } = {}
 ): Promise<FinancialTransactionListResponse> {
   const params = new URLSearchParams();
+  if (query.search?.trim()) params.set("search", query.search.trim());
   if (typeof query.limit === "number") {
     params.set("limit", String(query.limit));
   }
@@ -1055,6 +1058,22 @@ export function createFinanceTransactionRequest(
     body: input,
     accessToken
   });
+}
+
+export function getBeverageStockRequest(accessToken: string): Promise<{ items: BeverageProduct[] }> {
+  return request("/finance/beverage-products", { accessToken });
+}
+
+export function countBeverageStockRequest(accessToken: string, productId: string, input: {
+  expectedQuantity: string; countedQuantity: string; unitCost: string; reason: string;
+}): Promise<{ status: string }> {
+  return request(`/finance/beverage-products/${productId}/count`, { method: "POST", body: input, accessToken });
+}
+
+export function createBeverageProductRequest(accessToken: string, input: {
+  name: string; unit: string; openingQuantity: string; openingUnitCost: string;
+}): Promise<{ item: BeverageProduct }> {
+  return request("/finance/beverage-products", { method: "POST", body: input, accessToken });
 }
 
 export function deleteFinanceAccountRequest(
@@ -1312,6 +1331,7 @@ export function deleteFinanceTransactionRequest(
 export function listOperationsTasksRequest(
   accessToken: string,
   query: {
+    search?: string;
     limit?: number;
     offset?: number;
     status?: TaskStatus;
@@ -1321,6 +1341,7 @@ export function listOperationsTasksRequest(
   } = {}
 ): Promise<OperationTaskListResponse> {
   const params = new URLSearchParams();
+  if (query.search?.trim()) params.set("search", query.search.trim());
   if (typeof query.limit === "number") {
     params.set("limit", String(query.limit));
   }

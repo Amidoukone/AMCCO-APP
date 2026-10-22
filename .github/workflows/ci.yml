@@ -20,7 +20,7 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm install
+        run: npm ci
 
       - name: Backend Tests
         run: npm --workspace backend run test

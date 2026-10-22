@@ -5,6 +5,7 @@ import { canAccessFeature, type FeatureKey } from "../config/permissions";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { getRoleActivityCode } from "../types/role";
+import { getActiveSectorReferenceView, getSectorReferenceView } from "../config/sectorWorkspaces";
 
 export type SectorWorkspaceAction = {
   label: string;
@@ -40,31 +41,33 @@ export function SectorWorkspaceNav({ actions = [] }: { actions?: SectorWorkspace
   if (!user || !selectedActivityCode || !selectedActivity?.isEnabled) return null;
 
   const query = `?activityCode=${encodeURIComponent(selectedActivityCode)}`;
+  const activeReferenceView = getActiveSectorReferenceView(location.pathname, location.search, selectedActivityCode, user.role);
+  const referenceView = getSectorReferenceView(selectedActivityCode, user.role);
 
   return (
     <section className="panel sector-page-shortcuts" aria-label={`Espace ${selectedActivity.label}`}>
       <div className="sector-page-shortcuts-heading">
         <strong>{selectedActivity.label}</strong>
-        <span>{selectedProfile?.reporting.focusArea ?? "Accès au secteur actif"}</span>
+        <span>{user.role === "BEVERAGE_DEPOT_OPERATOR" ? "Enregistrez et consultez vos ventes, achats de stock et dépenses." : selectedProfile?.reporting.focusArea ?? "Accès au secteur actif"}</span>
       </div>
       <nav className="sector-workspace-tabs" aria-label="Pages du secteur">
         {SECTOR_PAGES.filter((page) => canAccessFeature(user.role, page.key)).map((page) => (
           <Link
             key={page.key}
             to={`${page.path}${query}`}
-            className={location.pathname === page.path ? "sector-workspace-tab is-active" : "sector-workspace-tab"}
-            aria-current={location.pathname === page.path ? "page" : undefined}
-            onClick={(event) => {
-              if (
-                location.pathname !== page.path &&
-                document.querySelector('[data-unsaved-sector-form="true"]') &&
-                !window.confirm("Une saisie ou une modification est en cours. Quitter cette page abandonnera le formulaire. Continuer ?")
-              ) event.preventDefault();
-            }}
+            className={location.pathname === page.path && !activeReferenceView ? "sector-workspace-tab is-active" : "sector-workspace-tab"}
+            aria-current={location.pathname === page.path && !activeReferenceView ? "page" : undefined}
           >
-            {page.label}
+            {selectedActivityCode === "DAILY_ACTIVITIES" ? (page.key === "operationsTasks" ? "Activités et accords" : page.key === "financeTransactions" ? "Versements" : page.label) : page.label}
           </Link>
         ))}
+        {referenceView ? (
+          <Link
+            to={`${referenceView.pathname ?? "/finance/transactions"}${query}&view=${referenceView.view}`}
+            className={activeReferenceView ? "sector-workspace-tab is-active" : "sector-workspace-tab"}
+            aria-current={activeReferenceView ? "page" : undefined}
+          >{referenceView.label}</Link>
+        ) : null}
       </nav>
       {actions.length > 0 ? (
         <div className="sector-page-shortcuts-actions" role="group" aria-label="Actions du secteur">

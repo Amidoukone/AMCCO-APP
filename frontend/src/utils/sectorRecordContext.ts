@@ -15,7 +15,7 @@ const CONTEXT_FIELDS: Partial<Record<BusinessActivityCode, ContextField[]>> = {
   SERVICES: [{ key: "clientRef", label: "Client" }, { key: "serviceType", label: "Prestation" }],
   MINING: [{ key: "siteRef", label: "Site" }, { key: "equipmentRef", label: "Équipement" }],
   BEVERAGE_DEPOT: [{ key: "productName", label: "Produit" }, { key: "periodDate", label: "Journée" }],
-  HYDROCARBON: [{ key: "hydrocarbonAssetRef", label: "Citerne / équipement" }, { key: "locationRef", label: "Lieu" }],
+  HYDROCARBON: [{ key: "hydrocarbonAssetRef", label: "Citerne / équipement" }, { key: "counterpartyRef", label: "Fournisseur / client" }, { key: "locationRef", label: "Lieu" }],
   DAILY_ACTIVITIES: [{ key: "agreementRef", label: "Accord" }, { key: "partnerName", label: "Partenaire" }]
 };
 

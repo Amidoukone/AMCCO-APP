@@ -126,6 +126,7 @@ function computeListFilters(actor: ActorContext, scope: TaskScope | undefined): 
 export async function listCompanyTasks(
   actor: ActorContext,
   input: {
+    search?: string;
     limit?: number;
     offset?: number;
     status?: TaskStatus;
@@ -140,6 +141,7 @@ export async function listCompanyTasks(
   const filters = computeListFilters(actor, input.scope);
 
   return listOperationsTasks({
+    search: input.search,
     companyId: actor.companyId,
     limit,
     offset,

@@ -8,6 +8,7 @@ import {
   findOperationTaskById,
   findOperationTaskMinimalById,
   listCompanyTaskAssignees,
+  listOperationsTasks,
   updateOperationTask,
   updateOperationTaskAssignment,
   updateOperationTaskStatus
@@ -19,6 +20,7 @@ import {
   createCompanyTask,
   deleteCompanyTask,
   listCompanyTaskMembers,
+  listCompanyTasks,
   updateCompanyTask,
   updateCompanyTaskStatus
 } from "./tasks.service.js";
@@ -60,6 +62,15 @@ vi.mock("./company-activities.service.js", () => ({
 }));
 
 describe("tasks.service", () => {
+  it("preserves the requested assignment scope when searching task history", async () => {
+    vi.mocked(listOperationsTasks).mockResolvedValue([]);
+    await listCompanyTasks({ actorId: "employee-1", companyId: "company-1", role: "EMPLOYEE" }, {
+      search: "ancien chantier", activityCode: "BTP", scope: "ASSIGNED_TO_ME", offset: 100
+    });
+    expect(listOperationsTasks).toHaveBeenCalledWith(expect.objectContaining({
+      companyId: "company-1", activityCode: "BTP", assignedToId: "employee-1", search: "ancien chantier", offset: 100
+    }));
+  });
   const actor = {
     actorId: "manager-1",
     companyId: "company-1",

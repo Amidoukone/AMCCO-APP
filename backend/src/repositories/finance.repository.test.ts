@@ -12,6 +12,19 @@ import {
 } from "./finance.repository.js";
 
 describe("finance.repository", () => {
+  it("searches the full authorized history before transaction pagination", async () => {
+    queryRowsMock.mockResolvedValue([]);
+    await listFinancialTransactions({ companyId: "company-1", createdById: "operator-1", activityCode: "HARDWARE", search: "ciment 50%", limit: 25, offset: 100 });
+    const [sql, values] = queryRowsMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("t.company_id = ? AND t.activity_code IS NOT NULL");
+    expect(sql).toContain("t.created_by_id = ?");
+    expect(sql).toContain("t.activity_code = ?");
+    expect(sql.indexOf("LIKE ? ESCAPE")).toBeLessThan(sql.indexOf("LIMIT ? OFFSET ?"));
+    expect(sql).not.toContain("ciment");
+    expect(values.slice(0, 3)).toEqual(["company-1", "operator-1", "HARDWARE"]);
+    expect(values.slice(3, -2)).toEqual([...Array(8).fill("%ciment%"), ...Array(8).fill("%50!%%")]);
+    expect(values.slice(-2)).toEqual([25, 100]);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });

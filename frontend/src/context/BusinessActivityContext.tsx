@@ -65,8 +65,13 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   const { activeCompany, user } = useAuth();
   const restrictedActivityCode = user ? getRoleActivityCode(user.role) : null;
   const activeCompanyId = activeCompany?.id;
+  const currentCompanyRef = useRef(activeCompanyId);
+  currentCompanyRef.current = activeCompanyId;
   const [activities, setActivities] = useState<CompanyActivityItem[]>([]);
   const [profiles, setProfiles] = useState<BusinessActivityProfile[]>([]);
+  const [activitiesCompanyId, setActivitiesCompanyId] = useState<string | undefined>();
+  const selectionCompanyRef = useRef<string | undefined>();
+  const isCurrentCompany = activitiesCompanyId === activeCompanyId;
   const [selectedActivityCode, setSelectedActivityCodeState] =
     useState<BusinessActivityCode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +88,8 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
 
       const enabledItems = items.filter((item) => item.isEnabled);
       const persistedCode = readPersistedActivityCode(activeCompany.id);
+      const keepCurrentSelection = selectionCompanyRef.current === activeCompany.id;
+      selectionCompanyRef.current = activeCompany.id;
 
       setSelectedActivityCodeState((currentCode) => {
         if (restrictedActivityCode) {
@@ -91,7 +98,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
           return scopedCode;
         }
         const nextSelectedCode =
-          enabledItems.find((item) => item.code === currentCode)?.code ??
+          (keepCurrentSelection ? enabledItems.find((item) => item.code === currentCode)?.code : undefined) ??
           enabledItems.find((item) => item.code === persistedCode)?.code ??
           enabledItems[0]?.code ??
           null;
@@ -108,6 +115,8 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
     if (!user || !activeCompanyId) {
       setActivities([]);
       setProfiles([]);
+      setActivitiesCompanyId(undefined);
+      selectionCompanyRef.current = undefined;
       setSelectedActivityCodeState(null);
       setIsLoading(false);
       setErrorMessage(null);
@@ -121,14 +130,16 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       const response = await withAuthorizedToken((accessToken) =>
         listCompanyActivitiesRequest(accessToken)
       );
-      if (requestId !== activitiesRequestRef.current) return;
+      if (requestId !== activitiesRequestRef.current || currentCompanyRef.current !== activeCompanyId) return;
       setActivities(response.items);
       setProfiles(response.profiles);
+      setActivitiesCompanyId(activeCompanyId);
       syncSelectedActivity(response.items);
     } catch (error) {
-      if (requestId !== activitiesRequestRef.current) return;
+      if (requestId !== activitiesRequestRef.current || currentCompanyRef.current !== activeCompanyId) return;
       setActivities([]);
       setProfiles([]);
+      setActivitiesCompanyId(activeCompanyId);
       setSelectedActivityCodeState(null);
       setErrorMessage(toErrorMessage(error));
     } finally {
@@ -143,16 +154,18 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   const setSelectedActivityCode = useCallback(
     (activityCode: BusinessActivityCode | null) => {
       if (restrictedActivityCode && activityCode !== restrictedActivityCode) return;
+      if (!isCurrentCompany || (activityCode && !activities.some((item) => item.code === activityCode && item.isEnabled))) return;
       setSelectedActivityCodeState(activityCode);
       if (activeCompany?.id) {
         persistActivityCode(activeCompany.id, activityCode);
       }
     },
-    [activeCompany?.id, restrictedActivityCode]
+    [activeCompany?.id, activities, isCurrentCompany, restrictedActivityCode]
   );
 
   const applyActivityUpdate = useCallback(
     (updatedActivity: CompanyActivityItem) => {
+      if (!isCurrentCompany || currentCompanyRef.current !== activeCompanyId) return;
       const nextActivities = activities.some((item) => item.code === updatedActivity.code)
         ? activities.map((item) =>
             item.code === updatedActivity.code ? updatedActivity : item
@@ -168,7 +181,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
         }
       }
     },
-    [activeCompanyId, activities, selectedActivityCode]
+    [activeCompanyId, activities, isCurrentCompany, selectedActivityCode]
   );
 
   const selectedActivity = useMemo(
@@ -188,14 +201,14 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
 
   const value = useMemo<BusinessActivityContextValue>(
     () => ({
-      activities,
-      enabledActivities,
-      profiles,
-      selectedActivity,
-      selectedProfile,
-      selectedActivityCode,
-      isLoading,
-      errorMessage,
+      activities: isCurrentCompany ? activities : [],
+      enabledActivities: isCurrentCompany ? enabledActivities : [],
+      profiles: isCurrentCompany ? profiles : [],
+      selectedActivity: isCurrentCompany ? selectedActivity : null,
+      selectedProfile: isCurrentCompany ? selectedProfile : null,
+      selectedActivityCode: isCurrentCompany ? selectedActivityCode : null,
+      isLoading: isLoading || !isCurrentCompany,
+      errorMessage: isCurrentCompany ? errorMessage : null,
       setSelectedActivityCode,
       applyActivityUpdate,
       reloadActivities
@@ -207,6 +220,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
       errorMessage,
       isLoading,
       profiles,
+      isCurrentCompany,
       reloadActivities,
       selectedActivity,
       selectedProfile,

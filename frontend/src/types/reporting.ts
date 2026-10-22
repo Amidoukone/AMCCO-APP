@@ -482,6 +482,10 @@ export type WaterOperationsReport = {
 };
 
 export type BeverageDepotReport = {
+  currentStock?: { asOf: string; products: import("./beverage-stock").BeverageProduct[] };
+  netOperatingResultAmount?: string;
+  stockAdjustments?: Array<{ date: string; productName: string; unit: string; quantity: string; value: string; reason: string }>;
+  stockAdjustmentAmount?: string;
   periodLabel: string;
   transactions: Array<{
     date: string;
@@ -989,6 +993,10 @@ export type DailyActivitiesReport = {
 };
 
 export type ReportsOverview = {
+  fieldOperationsReport?: {
+    transactions: Array<{ activityCode: BusinessActivityCode; status: string; type: "CASH_IN" | "CASH_OUT"; amount: string; currency: string; description?: string | null; occurredAt: string; metadata: Record<string, string> }>;
+    tasks: Array<{ activityCode: BusinessActivityCode; title?: string; description?: string | null; status: string; dueDate: string | null; metadata: Record<string, string> }>;
+  } | null;
   generatedAt: string;
   sectorRulesVersion: string;
   filters: {

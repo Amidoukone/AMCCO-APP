@@ -87,7 +87,7 @@ export function buildDailyActionCards(
       value: String(summary.operations.blockedCount),
       note: "Priorisez les blocages actifs.",
       actionLabel: "Voir les blocages",
-      href: `/operations/tasks${activityQuery}`,
+      href: `/operations/tasks${activityQuery}${activityQuery ? "&" : "?"}status=BLOCKED`,
       tone: summary.operations.blockedCount > 0 || summary.operations.overdueCount > 0 ? "critical" : "neutral"
     }
   ];

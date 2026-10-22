@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { RoleCode } from "../types/role.js";
 import { getDbPool, queryRows } from "../lib/db.js";
+import { buildListSearchFilters } from "../utils/list-search.js";
 import { toMetadataStringMap } from "../utils/metadata.js";
 import type { BusinessActivityCode } from "../types/business-activity.js";
 
@@ -177,6 +178,7 @@ function toTaskAttachment(row: TaskAttachmentRow): TaskAttachment {
 }
 
 export async function listOperationsTasks(input: {
+  search?: string;
   companyId: string;
   limit: number;
   offset: number;
@@ -218,7 +220,12 @@ export async function listOperationsTasks(input: {
     filters.push("t.assigned_to_id IS NULL");
   }
 
-  values.push(input.limit, input.offset);
+  const search = buildListSearchFilters(input.search, [
+    "t.id", "t.title", "t.description", "cu.email", "cu.full_name",
+    "au.email", "au.full_name", "CAST(t.metadata_json AS CHAR)"
+  ]);
+  filters.push(...search.filters);
+  values.push(...search.values, input.limit, input.offset);
 
   const rows = await queryRows<OperationTaskRow[]>(
     `

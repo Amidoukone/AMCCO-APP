@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useSearchParams } from "react-router-dom";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
+import { FieldSectorReport } from "../components/FieldSectorReport";
 import {
   ApiError,
   downloadReportExportRequest,
@@ -41,7 +42,7 @@ const REPORT_PERIOD_MODE_OPTIONS: Array<{ value: ReportPeriodMode; label: string
   { value: "CUSTOM", label: "Dates" },
   { value: "MONTH", label: "Mois" },
   { value: "QUARTER", label: "Trimestre" },
-  { value: "YEAR", label: "Annee" }
+  { value: "YEAR", label: "Année" }
 ];
 
 const REPORT_READING_GUIDE_ITEMS: Array<{
@@ -521,7 +522,8 @@ export function ReportsPage(): JSX.Element {
   const withAuthorizedToken = useAuthorizedRequest();
   const { enabledActivities, isLoading: isLoadingActivities, selectedActivity, selectedActivityCode, setSelectedActivityCode } = useBusinessActivity();
   const [, setSearchParams] = useSearchParams();
-  const [overview, setOverview] = useState<ReportsOverview | null>(null);
+  const [loadedOverview, setLoadedOverview] = useState<{ companyId: string; data: ReportsOverview } | null>(null);
+  const overview = loadedOverview && loadedOverview.companyId === activeCompany?.id ? loadedOverview.data : null;
   const [periodForm, setPeriodForm] = useState<PeriodFormState>(() =>
     createDefaultPeriodForm(selectedActivityCode ?? "")
   );
@@ -540,6 +542,9 @@ export function ReportsPage(): JSX.Element {
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
   const [busyExport, setBusyExport] = useState<ExportTarget | null>(null);
+  const exportScope = JSON.stringify([activeCompany?.id, normalizePeriodQuery(appliedPeriod)]);
+  const exportScopeRef = useRef(exportScope);
+  exportScopeRef.current = exportScope;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -547,7 +552,7 @@ export function ReportsPage(): JSX.Element {
     if (loadedCompanyIdRef.current === activeCompany?.id) return;
     loadedCompanyIdRef.current = activeCompany?.id;
     hasLoadedOverviewRef.current = false;
-    setOverview(null);
+    setLoadedOverview(null);
     setIsLoading(true);
     setIsRefreshing(false);
     setErrorMessage(null);
@@ -561,7 +566,7 @@ export function ReportsPage(): JSX.Element {
     }
     if (!appliedPeriod.activityCode) {
       hasLoadedOverviewRef.current = false;
-      setOverview(null);
+      setLoadedOverview(null);
       setIsLoading(false);
       setIsRefreshing(false);
       return;
@@ -579,7 +584,7 @@ export function ReportsPage(): JSX.Element {
       );
       if (requestId !== overviewLoadRequestRef.current) return;
       hasLoadedOverviewRef.current = true;
-      setOverview(response.item);
+      setLoadedOverview({ companyId: activeCompany?.id ?? "", data: response.item });
     } catch (error) {
       if (requestId === overviewLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
@@ -660,6 +665,7 @@ export function ReportsPage(): JSX.Element {
     overview.filters.dateFrom === (currentPeriodQuery.dateFrom ?? null) &&
     overview.filters.dateTo === (currentPeriodQuery.dateTo ?? null);
   const hasFocusedOperationsReport = Boolean(
+    overview?.fieldOperationsReport ||
     overview?.agricultureOperationsReport ||
     overview?.generalStoreOperationsReport ||
     overview?.foodOperationsReport ||
@@ -687,13 +693,15 @@ export function ReportsPage(): JSX.Element {
   );
 
   async function handleExport(): Promise<void> {
-    const validationMessage = validatePeriodForm(periodForm);
+    if (!isOverviewCurrent || isLoading || isRefreshing || busyExport) return;
+    const validationMessage = validatePeriodForm(appliedPeriod);
     if (validationMessage) {
       setErrorMessage(validationMessage);
       return;
     }
 
-    const exportPeriod = periodForm;
+    const exportPeriod = appliedPeriod;
+    const requestedScope = exportScopeRef.current;
     setBusyExport("overview-pdf");
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -706,11 +714,12 @@ export function ReportsPage(): JSX.Element {
           normalizePeriodQuery(exportPeriod)
         )
       );
+      if (exportScopeRef.current !== requestedScope) return;
       triggerBlobDownload(blob, buildExportFileName(exportPeriod));
 
       setSuccessMessage("Export PDF du rapport généré pour la période sélectionnée.");
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (exportScopeRef.current === requestedScope) setErrorMessage(toErrorMessage(error));
     } finally {
       setBusyExport(null);
     }
@@ -719,7 +728,7 @@ export function ReportsPage(): JSX.Element {
   return (
     <div className="reports-page">
       <header className="section-header">
-        <h2>Rapports PDF</h2>
+        <h2>Rapports du secteur</h2>
         <p>{selectedActivityCode === "TRANSPORT"
           ? "Suivi des entrées, sorties et opérations du secteur Transport."
           : "Données du secteur choisi, calculées depuis les transactions, tâches et comptes."}</p>
@@ -819,7 +828,7 @@ export function ReportsPage(): JSX.Element {
           {periodForm.periodMode === "QUARTER" ? (
             <>
               <label className="reports-filter-field" htmlFor="reports-quarter-year">
-                <span>Annee</span>
+                <span>Année</span>
                 <input
                   id="reports-quarter-year"
                   type="number"
@@ -850,14 +859,14 @@ export function ReportsPage(): JSX.Element {
                   <option value="1">T1 - Janvier à Mars</option>
                   <option value="2">T2 - Avril à Juin</option>
                   <option value="3">T3 - Juillet à Septembre</option>
-                  <option value="4">T4 - Octobre a Décembre</option>
+                  <option value="4">T4 - Octobre à Décembre</option>
                 </select>
               </label>
             </>
           ) : null}
           {periodForm.periodMode === "YEAR" ? (
             <label className="reports-filter-field" htmlFor="reports-year">
-              <span>Annee</span>
+              <span>Année</span>
               <input
                 id="reports-year"
                 type="number"
@@ -923,7 +932,23 @@ export function ReportsPage(): JSX.Element {
             aria-label="Détails du rapport"
             tabIndex={0}
           >
-            <p className="reports-scroll-hint">Détails du rapport · Faites défiler cette zone pour consulter toutes les sections.</p>
+            <section className="panel" aria-label="Périmètre du rapport affiché">
+              <h3>{overview.activityProfile?.label ?? selectedActivity?.label}</h3>
+              <p><strong>Période appliquée :</strong> {formatAppliedRange(overview)}</p>
+              <p className="hint">Établi le {formatDateTime(overview.generatedAt)}. Les montants comptabilisés comprennent les opérations enregistrées ou finalisées et excluent les brouillons et rejets. Les devises sont présentées séparément, sans conversion.</p>
+              {["GENERAL_STORE", "RENTAL", "BTP"].includes(selectedActivityCode ?? "") ? <p className="hint">Les situations de boutiques, loyers ou chantiers sont cumulées à la date d’arrêté indiquée dans leurs tableaux ; elles ne se limitent pas aux seuls mouvements de la période.</p> : null}
+              {JSON.stringify(normalizePeriodQuery(periodForm)) !== JSON.stringify(normalizePeriodQuery(appliedPeriod)) ? <p className="hint" role="status">Des filtres ont été modifiés. Cliquez sur « Mettre à jour » pour les appliquer ; le rapport et le PDF conservent la période appliquée ci-dessus.</p> : null}
+              {reportMetrics.accountedCurrencyRows.some((row) => row.currency !== "XOF") ? (
+                <>
+                  <h4>Flux comptabilisés par devise</h4>
+                  <div className="table-wrap"><table className="admin-table">
+                    <thead><tr><th>Devise</th><th>Entrées</th><th>Sorties</th><th>Solde net</th></tr></thead>
+                    <tbody>{reportMetrics.accountedCurrencyRows.map((row) => <tr key={row.currency}><td>{row.currency}</td><td>{formatAmount(row.cashIn, row.currency)}</td><td>{formatAmount(row.cashOut, row.currency)}</td><td>{formatAmount(row.net, row.currency)}</td></tr>)}</tbody>
+                  </table></div>
+                  {["HARDWARE", "GENERAL_STORE", "RENTAL", "AGRICULTURE", "BTP", "FISH_FARMING"].includes(selectedActivityCode ?? "") ? <p className="hint">Les tableaux métier de ce secteur portent sur le XOF. Ce récapitulatif présente aussi les autres devises et figure en complément dans le PDF.</p> : null}
+                </>
+              ) : null}
+            </section>
           {overview.transportOperationsReport ? null : <section className="panel reports-overview-panel">
             <div className="dashboard-panel-header">
               <div>
@@ -977,22 +1002,18 @@ export function ReportsPage(): JSX.Element {
           <section className="panel reports-export-panel">
             <div className="dashboard-panel-header">
               <div>
-                <h3>Export PDF avec les filtres sélectionnés</h3>
-                  <p className="hint">{selectedActivityCode === "TRANSPORT"
-                    ? "Le PDF présente les entrées, sorties et transactions Transport de la période choisie."
-                    : "Le fichier PDF reprend la période et le secteur choisis dans les filtres."}</p>
+                <h3>Export PDF du rapport affiché</h3>
+                  <p className="hint">Le PDF reprend le secteur et la période appliquée affichés ci-dessus. Appliquez vos nouveaux filtres avant de les exporter.</p>
               </div>
               <div className="reports-export-grid">
                 <article className="reports-export-card">
                   <strong className="reports-export-card-title">Rapport PDF</strong>
-                  <p className="hint">{selectedActivityCode === "TRANSPORT"
-                    ? "Synthèse et lignes détaillées des transactions Transport."
-                    : "Synthèse, flux financiers, comptes et tâches du secteur."}</p>
+                  <p className="hint">Synthèse et tableaux métier du secteur, avec pagination et période de référence.</p>
                   <button
                     type="button"
                     className="secondary-btn"
                     onClick={() => void handleExport()}
-                    disabled={busyExport !== null}
+                    disabled={busyExport !== null || isRefreshing}
                   >
                     {busyExport === "overview-pdf" ? "Préparation..." : "Télécharger PDF"}
                   </button>
@@ -1007,10 +1028,11 @@ export function ReportsPage(): JSX.Element {
             open={isReportDetailsExpanded}
             onToggle={(event) => setIsReportDetailsExpanded(event.currentTarget.open)}
           >
-            <summary>{selectedActivityCode === "TRANSPORT" ? "Rapport Transport" : "Rentabilité et activité"}</summary>
+            <summary>Rapport détaillé · {overview.activityProfile?.label ?? selectedActivity?.label}</summary>
 
           {isReportDetailsExpanded ? (
             <>
+          <FieldSectorReport overview={overview} />
           {!hasFocusedOperationsReport ? (
             <>
           {!overview.hardwareMonthlyReport ? (
@@ -2301,7 +2323,7 @@ export function ReportsPage(): JSX.Element {
                   <article className="reports-kpi-card">
                     <span>Marge brute calculable</span>
                     <strong>{formatAmount(report.totals.grossMarginAmount, report.totals.currency)}</strong>
-                    <small>Calculée sur les ventes avec quantité et prix renseignés</small>
+                    <small>Coût moyen du stock pour les nouvelles ventes ; coût déclaré pour l'historique</small>
                   </article>
                   <article className="reports-kpi-card">
                     <span>Valeur déclarée du stock</span>
@@ -2310,6 +2332,9 @@ export function ReportsPage(): JSX.Element {
                   </article>
                 </div>
 
+                {report.netOperatingResultAmount !== undefined ? <p><strong>Résultat d'exploitation : {formatAmount(report.netOperatingResultAmount, "XOF")}</strong><br /><span className="hint">Marge brute + autres recettes − dépenses + écarts de stock valorisés ({formatAmount(report.stockAdjustmentAmount ?? "0", "XOF")}). Les achats alimentent le stock ; leur coût est déduit au moment des ventes.</span></p> : null}
+                {report.stockAdjustments?.length ? <div className="reports-owner-section"><h4>Écarts de stock de la période — hors caisse</h4><div className="table-wrap"><table className="admin-table"><thead><tr><th>Date</th><th>Produit / unité</th><th>Écart quantité</th><th>Écart valorisé</th><th>Motif</th></tr></thead><tbody>{report.stockAdjustments.map((item, index) => <tr key={index}><td>{new Date(item.date).toLocaleDateString("fr-FR")}</td><td>{item.productName} / {item.unit}</td><td>{item.quantity}</td><td>{formatAmount(item.value, "XOF")}</td><td>{item.reason}</td></tr>)}</tbody></table></div></div> : null}
+                {report.currentStock ? <div className="reports-owner-section"><h4>Stock disponible — situation actuelle au {new Date(report.currentStock.asOf).toLocaleString("fr-FR")}</h4><p className="hint">Ce stock correspond aux mouvements enregistrés depuis le comptage de départ, indépendamment de la période du rapport. L'historique antérieur n'est pas déduit une seconde fois.</p><div className="table-wrap"><table className="admin-table"><thead><tr><th>Produit / unité</th><th>Disponible</th><th>Coût moyen d'achat</th><th>Valeur</th></tr></thead><tbody>{report.currentStock.products.map((product) => <tr key={product.id}><td>{product.name} / {product.unit}</td><td>{product.quantity}</td><td>{formatAmount(product.averageUnitCost, "XOF")}</td><td>{formatAmount(product.stockValue, "XOF")}</td></tr>)}</tbody></table></div></div> : null}
                 <div className="reports-owner-section">
                   <h4 className="reports-owner-section-title">Répartition des flux</h4>
                   <div className="table-wrap">

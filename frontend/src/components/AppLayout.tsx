@@ -11,6 +11,8 @@ import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { getRoleActivityCode } from "../types/role";
 import { enhanceMobileTables } from "../lib/mobileTables";
+import { useUnsavedChangesGuard } from "../lib/useUnsavedChangesGuard";
+import { getActiveSectorReferenceView } from "../config/sectorWorkspaces";
 
 const amccoLogoUrl = "/logo-amcco-web.jpg";
 
@@ -127,6 +129,8 @@ export function AppLayout(): JSX.Element {
   } = useBusinessActivity();
   const location = useLocation();
   const navigate = useNavigate();
+  const activeReferenceView = getActiveSectorReferenceView(location.pathname, location.search, selectedActivityCode, user?.role);
+  const { dialog: unsavedChangesDialog, navigateAfterConfirmation } = useUnsavedChangesGuard();
   const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
   const [isSwitchingCompany, setIsSwitchingCompany] = useState(false);
   const [companySwitchError, setCompanySwitchError] = useState<string | null>(null);
@@ -449,21 +453,22 @@ export function AppLayout(): JSX.Element {
     ) return;
     setSelectedActivityCode(nextActivityCode);
     if (location.pathname.startsWith("/operations/tasks/")) {
-      navigate(
+      navigateAfterConfirmation(() => navigate(
         nextActivityCode
           ? `/operations/tasks?activityCode=${encodeURIComponent(nextActivityCode)}`
           : "/operations/tasks",
         { replace: true }
-      );
+      ));
     } else if (["/dashboard", "/finance/transactions", "/operations/tasks", "/reports"].includes(location.pathname)) {
       const params = new URLSearchParams(location.search);
       if (nextActivityCode) params.set("activityCode", nextActivityCode);
       else params.delete("activityCode");
       if (location.pathname === "/finance/transactions") params.delete("transactionId");
-      navigate(
+      params.delete("view");
+      navigateAfterConfirmation(() => navigate(
         { pathname: location.pathname, search: params.toString(), hash: "" },
         { replace: true }
-      );
+      ));
     }
     setIsMobileMenuOpen(false);
   }
@@ -481,6 +486,10 @@ export function AppLayout(): JSX.Element {
     setIsSwitchingCompany(true);
     try {
       await switchCompany(nextCompanyId);
+      const pathname = location.pathname.startsWith("/operations/tasks/") ? "/operations/tasks" : location.pathname;
+      const params = new URLSearchParams(location.search);
+      for (const key of ["activityCode", "view", "transactionId", "editTaskId"]) params.delete(key);
+      navigateAfterConfirmation(() => navigate({ pathname, search: params.toString(), hash: "" }, { replace: true }));
       setIsMobileMenuOpen(false);
     } catch (error) {
       setCompanySwitchError(
@@ -494,6 +503,8 @@ export function AppLayout(): JSX.Element {
   }
 
   async function handleLogout(): Promise<void> {
+    if (document.querySelector('[data-unsaved-sector-form="true"]') &&
+      !window.confirm("Des modifications ne sont pas enregistrées. Se déconnecter abandonnera la saisie. Continuer ?")) return;
     await logout();
     setIsMobileMenuOpen(false);
     navigate("/login", { replace: true });
@@ -501,6 +512,7 @@ export function AppLayout(): JSX.Element {
 
   return (
     <div className="app-shell">
+      {unsavedChangesDialog}
       <a className="skip-to-main" href="#main-content">
         Aller au contenu principal
       </a>
@@ -588,7 +600,7 @@ export function AppLayout(): JSX.Element {
               <span aria-hidden="true" />
             </button>
             <div className="mobile-title-block">
-              <p className="header-mobile-title">{activeNavigationItem?.label ?? "Pilotage"}</p>
+              <p className="header-mobile-title">{activeReferenceView?.label ?? activeNavigationItem?.label ?? "Pilotage"}</p>
             </div>
             <div className="mobile-top-actions">
               {!isBootstrapMode ? (

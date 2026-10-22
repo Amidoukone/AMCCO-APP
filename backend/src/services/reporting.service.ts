@@ -1,4 +1,6 @@
+import { drawSectorReportHeader, drawSectorReportFooter, drawReportTable } from "./report-pdf-layout.js";
 import { Buffer } from "node:buffer";
+import { listBeverageProducts, listBeverageStockAdjustments } from "../repositories/beverage-stock.repository.js";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
@@ -764,12 +766,12 @@ function toDisplayTransactionStatusLabel(
     return "Brouillon";
   }
   if (status === "SUBMITTED") {
-    return "Enregistree";
+    return "Enregistrée";
   }
   if (status === "APPROVED") {
-    return "Finalisee";
+    return "Finalisée";
   }
-  return "Rejetee";
+  return "Rejetée";
 }
 
 function isReportableFinancialStatus(
@@ -790,12 +792,12 @@ function isSectorReportableTransaction(
 }
 
 function toDisplayTransactionTypeLabel(type: "CASH_IN" | "CASH_OUT"): string {
-  return type === "CASH_IN" ? "Entree" : "Sortie";
+  return type === "CASH_IN" ? "Entrée" : "Sortie";
 }
 
 function toDisplayTaskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"): string {
   if (status === "TODO") {
-    return "A faire";
+    return "À faire";
   }
   if (status === "IN_PROGRESS") {
     return "En cours";
@@ -803,7 +805,7 @@ function toDisplayTaskStatusLabel(status: "TODO" | "IN_PROGRESS" | "DONE" | "BLO
   if (status === "DONE") {
     return "Terminée";
   }
-  return "Bloquee";
+  return "Bloquée";
 }
 
 function drawAmccoPdfLogo(doc: PDFKit.PDFDocument, x: number, y: number, size = 28): void {
@@ -984,6 +986,11 @@ const HARDWARE_PDF_COLUMNS: PdfTableColumn[] = [
   { label: "DESTINATAIRE", width: 137, align: "center" }
 ];
 
+function fitPdfColumns(doc: PDFKit.PDFDocument, columns: PdfTableColumn[]): PdfTableColumn[] {
+  const scale = (doc.page.width - PDF_PAGE_MARGIN * 2) / columns.reduce((sum, column) => sum + column.width, 0);
+  return columns.map((column) => ({ ...column, width: column.width * scale }));
+}
+
 function drawPdfTableCell(
   doc: PDFKit.PDFDocument,
   text: string,
@@ -1092,63 +1099,7 @@ function drawPdfReadingGuideBox(doc: PDFKit.PDFDocument): void {
 }
 
 function drawHardwareReportHeader(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 110;
-  const centerWidth = pageWidth - margin * 2 - 210;
-
-  drawHardwareInventoryMark(doc, margin, 23);
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
-
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(17)
-    .text(HARDWARE_REPORT_BRANDING.title, centerX, 24, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#2f7d32")
-    .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text(HARDWARE_REPORT_BRANDING.agency, centerX, 43, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#d21f1f")
-    .font("Helvetica-Bold")
-    .fontSize(12.5)
-    .text(`"${HARDWARE_REPORT_BRANDING.brand}"`, centerX, 57, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#173fcb")
-    .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text(`${HARDWARE_REPORT_BRANDING.fiscal}     ${HARDWARE_REPORT_BRANDING.phone}`, centerX, 72, {
-      width: centerWidth,
-      align: "center"
-    });
-
-  doc
-    .moveTo(margin, 100)
-    .lineTo(pageWidth - margin, 100)
-    .strokeColor("#173fcb")
-    .lineWidth(2)
-    .stroke();
-
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(16)
-    .text(toHardwarePdfTitle(report), margin, 116, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
-  doc.y = 144;
+  drawSectorReportHeader(doc, "QUINCAILLERIE", toHardwarePdfTitle(report), (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawHardwareContinuationHeader(doc: PDFKit.PDFDocument, report: HardwareMonthlyReport): void {
@@ -1519,38 +1470,7 @@ function drawHardwarePdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc
-    .moveTo(margin, pageHeight - 44)
-    .lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#d7e3f1")
-    .lineWidth(1)
-    .stroke();
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8)
-    .text(`AMCCO MBAG - Rapport quincaillerie | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 300,
-      lineBreak: false
-    });
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "center",
-      lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Rapport quincaillerie", periodLabel, pageNumber, totalPages);
 }
 
 function renderHardwareReportsPdf(
@@ -2118,30 +2038,7 @@ const HYDROCARBON_REPORT_BRANDING = {
 };
 
 function drawHydrocarbonReportHeader(doc: PDFKit.PDFDocument, report: HydrocarbonOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 78;
-  const centerWidth = pageWidth - margin * 2 - 156;
-
-  drawAmccoPdfLogo(doc, margin, 19, 58);
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(17)
-    .text(HYDROCARBON_REPORT_BRANDING.title, centerX, 24, { width: centerWidth, align: "center" });
-  doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(10.5)
-    .text(HYDROCARBON_REPORT_BRANDING.agency, centerX, 43, { width: centerWidth, align: "center" });
-  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(12.5)
-    .text(`"${HYDROCARBON_REPORT_BRANDING.brand}"`, centerX, 57, { width: centerWidth, align: "center" });
-  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(10.5)
-    .text(`${HYDROCARBON_REPORT_BRANDING.fiscal}     ${HYDROCARBON_REPORT_BRANDING.phone}`, centerX, 72, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#64748b").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16)
-    .text(`${HYDROCARBON_REPORT_BRANDING.title} — ${report.periodLabel.toUpperCase()}`, margin, 116, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
-  doc.y = 144;
+  drawSectorReportHeader(doc, HYDROCARBON_REPORT_BRANDING.title, `${HYDROCARBON_REPORT_BRANDING.title} — ${report.periodLabel.toUpperCase()}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawHydrocarbonContinuationHeader(doc: PDFKit.PDFDocument, report: HydrocarbonOperationsReport): void {
@@ -2154,24 +2051,7 @@ function drawHydrocarbonPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#cbd5e1").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
-    .text(`AMCCO - Hydrocarbures | ${periodLabel}`, margin, pageHeight - 32, { width: 330, lineBreak: false });
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "right",
-      lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Hydrocarbures", periodLabel, pageNumber, totalPages);
 }
 
 function formatHydrocarbonMoney(value: string, currency: string): string {
@@ -2414,31 +2294,7 @@ function drawBeverageDepotIcon(doc: PDFKit.PDFDocument, x: number, y: number): v
 }
 
 function drawBeverageDepotReportHeader(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 118;
-  const centerWidth = pageWidth - margin * 2 - 220;
-
-  drawBeverageDepotIcon(doc, margin, 18);
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(17)
-    .text(BEVERAGE_DEPOT_REPORT_BRANDING.title, centerX, 24, { width: centerWidth, align: "center" });
-  doc.fillColor("#92400e").font("Helvetica-Bold").fontSize(10.5)
-    .text(BEVERAGE_DEPOT_REPORT_BRANDING.agency, centerX, 43, { width: centerWidth, align: "center" });
-  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(12.5)
-    .text(`"${BEVERAGE_DEPOT_REPORT_BRANDING.brand}"`, centerX, 57, { width: centerWidth, align: "center" });
-  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(10.5)
-    .text(`${BEVERAGE_DEPOT_REPORT_BRANDING.fiscal}     ${BEVERAGE_DEPOT_REPORT_BRANDING.phone}`, centerX, 72, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#f59e0b").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16)
-    .text(`${BEVERAGE_DEPOT_REPORT_BRANDING.title} — ${report.periodLabel.toUpperCase()}`, margin, 116, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
-  doc.y = 144;
+  drawSectorReportHeader(doc, BEVERAGE_DEPOT_REPORT_BRANDING.title, `${BEVERAGE_DEPOT_REPORT_BRANDING.title} — ${report.periodLabel.toUpperCase()}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawBeverageDepotContinuationHeader(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
@@ -2451,24 +2307,7 @@ function drawBeverageDepotPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#fde68a").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
-    .text(`AMCCO - Dépôt de boissons | ${periodLabel}`, margin, pageHeight - 32, { width: 330, lineBreak: false });
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "right",
-      lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "D\u00e9p\u00f4t de boissons", periodLabel, pageNumber, totalPages);
 }
 
 function buildEmptyBeverageDepotReport(filters: ReportPeriodFilter): BeverageDepotReport {
@@ -2645,7 +2484,9 @@ function drawBeverageDepotTable(
 function drawBeverageDepotReadingNotes(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
   const margin = PDF_PAGE_MARGIN;
   const width = doc.page.width - margin * 2;
-  const height = 50;
+  const readingText = "Lecture : pour les ventes liées au stock, la marge brute utilise le coût moyen pondéré enregistré par le serveur lors de la vente. Les anciennes ventes conservent leur coût déclaré et ne modifient pas le stock de départ compté. Le résultat d'exploitation correspond à la marge brute + autres recettes - dépenses + écarts de stock valorisés. Le stock disponible est une situation actuelle. La valeur du stock clôturé reprend le dernier inventaire clôturé sur la période pour chaque produit. Les versements ne sont pas de nouvelles ventes.";
+  doc.font("Helvetica").fontSize(8.5);
+  const height = doc.heightOfString(readingText, { width: width - 20 }) + 20;
   if (needsPdfPageBreak(doc, height + 12)) {
     doc.addPage();
     drawBeverageDepotContinuationHeader(doc, report);
@@ -2655,10 +2496,10 @@ function drawBeverageDepotReadingNotes(doc: PDFKit.PDFDocument, report: Beverage
   doc.rect(margin, y, width, height).strokeColor("#d9e2ec").lineWidth(0.8).stroke();
   doc.fillColor("#334e68").font("Helvetica").fontSize(8.5)
     .text(
-      "Lecture : la marge brute ne retient que les ventes avec quantité et prix d'achat et de vente renseignés. La valeur du stock reprend le dernier inventaire clôturé sur la période pour chaque produit. Les versements sont suivis dans le rapprochement et ne sont pas ajoutés une seconde fois aux recettes.",
+      readingText,
       margin + 10,
       y + 9,
-      { width: width - 20, height: height - 14 }
+      { width: width - 20 }
     );
   doc.y = y + height + 12;
 }
@@ -2783,6 +2624,25 @@ function renderBeverageDepotReportsPdf(
     ]),
     "Aucun rapprochement enregistré sur la période sélectionnée."
   );
+  if (report.currentStock) {
+    drawBeverageDepotTable(doc, report, `Stock disponible au ${formatPdfDate(report.currentStock.asOf)} (situation actuelle)`,
+      [{ label: "Produit / unité", width: 180, align: "left" }, { label: "Disponible", width: 85, align: "right" }, { label: "Coût moyen", width: 95, align: "right" }, { label: "Valeur XOF", width: 95, align: "right" }],
+      report.currentStock.products.map((product) => [
+        { value: `${product.name} / ${product.unit}` }, { value: product.quantity },
+        { value: formatPdfMoney(product.averageUnitCost) }, { value: formatPdfMoney(product.stockValue) }
+      ]), "Aucun produit initialisé pour le suivi de stock.");
+  }
+  if (report.stockAdjustments?.length) {
+    drawBeverageDepotTable(doc, report, "Écarts de stock constatés sur la période (hors caisse)",
+      [{ label: "Date / produit", width: 200, align: "left" }, { label: "Écart quantité", width: 90, align: "right" }, { label: "Écart valorisé", width: 90, align: "right" }, { label: "Motif", width: 115, align: "left" }],
+      report.stockAdjustments.map((item) => [{ value: `${formatPdfDate(item.date)} / ${item.productName} (${item.unit})` }, { value: item.quantity }, { value: formatPdfMoney(item.value) }, { value: item.reason }]), "Aucun écart.");
+  }
+  if (report.netOperatingResultAmount !== undefined) {
+    if (doc.y + 45 > doc.page.height - 64) { doc.addPage(); drawBeverageDepotContinuationHeader(doc, report); }
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#334e68").text(
+      `Résultat d'exploitation de la période : ${formatPdfMoney(report.netOperatingResultAmount)} (marge brute + autres recettes - dépenses + écarts de stock valorisés).`,
+      PDF_PAGE_MARGIN, doc.y, { width: doc.page.width - PDF_PAGE_MARGIN * 2 });
+  }
   drawBeverageDepotReadingNotes(doc, report);
 }
 
@@ -2805,30 +2665,9 @@ function drawTransportReportHeader(
   report: TransportOperationsReport,
   generatedAt: string
 ): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 80;
-  const centerWidth = pageWidth - margin * 2 - 160;
-
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
-  doc.fillColor("#0f2544").font("Helvetica-Bold").fontSize(18)
-    .text("TRANSPORT", centerX, 25, { width: centerWidth, align: "center" });
-  doc.fillColor("#486581").font("Helvetica-Bold").fontSize(10)
-    .text("Agence Mandingue de Courtage de Conseil et d'Orientation", centerX, 48, {
-      width: centerWidth, align: "center"
-    });
-  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11)
-    .text('"AMCCO"', centerX, 63, { width: centerWidth, align: "center" });
-  doc.moveTo(margin, 91).lineTo(pageWidth - margin, 91).strokeColor("#0f766e").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(14)
-    .text(`SUIVI DES TRANSACTIONS — ${report.periodLabel.toUpperCase()}`, margin, 105, {
-      width: pageWidth - margin * 2, align: "center"
-    });
-  doc.fillColor("#486581").font("Helvetica").fontSize(8.5)
-    .text(`Généré le ${formatPdfDate(generatedAt)} · opérations soumises ou approuvées`, margin, 126, {
-      width: pageWidth - margin * 2, align: "center"
-    });
-  doc.y = 148;
+  drawSectorReportHeader(doc, "TRANSPORT", `SUIVI DES TRANSACTIONS — ${report.periodLabel.toUpperCase()}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
+  doc.fillColor("#486581").font("Helvetica").fontSize(8).text(`G\u00e9n\u00e9r\u00e9 le ${formatPdfDate(generatedAt)} - op\u00e9rations soumises ou approuv\u00e9es`, PDF_PAGE_MARGIN, doc.y, { width: doc.page.width - PDF_PAGE_MARGIN * 2 });
+  doc.y += 12;
 }
 
 function drawTransportContinuationHeader(doc: PDFKit.PDFDocument, report: TransportOperationsReport): void {
@@ -2985,22 +2824,7 @@ function drawTransportPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#99f6e4").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
-    .text(`AMCCO - Transport | ${periodLabel}`, margin, pageHeight - 32, { width: 300, lineBreak: false });
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80, align: "right", lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Transport", periodLabel, pageNumber, totalPages);
 }
 
 const DAILY_ACTIVITIES_REPORT_BRANDING = {
@@ -3012,38 +2836,7 @@ const DAILY_ACTIVITIES_REPORT_BRANDING = {
 };
 
 function drawDailyActivitiesReportHeader(doc: PDFKit.PDFDocument, report: DailyActivitiesReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 94;
-  const centerWidth = pageWidth - margin * 2 - 188;
-
-  doc.save();
-  doc.roundedRect(margin, 21, 80, 58, 6).fill("#ecfeff");
-  doc.roundedRect(margin, 21, 80, 58, 6).strokeColor("#0f766e").lineWidth(1).stroke();
-  doc.roundedRect(margin + 21, 32, 38, 34, 3).fill("#ffffff");
-  doc.roundedRect(margin + 21, 32, 38, 34, 3).strokeColor("#0f766e").lineWidth(1).stroke();
-  doc.rect(margin + 21, 32, 38, 9).fill("#0f766e");
-  doc.moveTo(margin + 28, 50).lineTo(margin + 34, 56).lineTo(margin + 50, 46)
-    .strokeColor("#0f766e").lineWidth(2).stroke();
-  doc.restore();
-
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(17)
-    .text(DAILY_ACTIVITIES_REPORT_BRANDING.title, centerX, 23, { width: centerWidth, align: "center" });
-  doc.fillColor("#0f766e").font("Helvetica-Bold").fontSize(10)
-    .text(DAILY_ACTIVITIES_REPORT_BRANDING.agency, centerX, 44, { width: centerWidth, align: "center" });
-  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(12)
-    .text(`"${DAILY_ACTIVITIES_REPORT_BRANDING.brand}"`, centerX, 58, { width: centerWidth, align: "center" });
-  doc.fillColor("#334155").font("Helvetica-Bold").fontSize(9)
-    .text(`${DAILY_ACTIVITIES_REPORT_BRANDING.fiscal}     ${DAILY_ACTIVITIES_REPORT_BRANDING.phone}`, centerX, 74, {
-      width: centerWidth, align: "center"
-    });
-  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#0f766e").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(15)
-    .text(`SUIVI DES ACTIVITÉS — ${report.periodLabel.toUpperCase()}`, margin, 115, {
-      width: pageWidth - margin * 2, align: "center"
-    });
-  doc.y = 143;
+  drawSectorReportHeader(doc, DAILY_ACTIVITIES_REPORT_BRANDING.title, `SUIVI DES ACTIVITÉS — ${report.periodLabel.toUpperCase()}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawDailyActivitiesContinuationHeader(doc: PDFKit.PDFDocument, report: DailyActivitiesReport): void {
@@ -3290,19 +3083,7 @@ function renderDailyActivitiesReportsPdf(doc: PDFKit.PDFDocument, overview: Repo
 }
 
 function drawDailyActivitiesPdfFooter(doc: PDFKit.PDFDocument, pageNumber: number, totalPages: number, periodLabel: string): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#99f6e4").lineWidth(1).stroke();
-  doc.fillColor("#64748b").font("Helvetica").fontSize(8)
-    .text(`AMCCO - Activités quotidiennes | ${periodLabel}`, margin, pageHeight - 32, { width: 420, lineBreak: false });
-  doc.fillColor("#64748b").font("Helvetica").fontSize(8)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 85, pageHeight - 32, { width: 85, align: "right", lineBreak: false });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Activit\u00e9s quotidiennes", periodLabel, pageNumber, totalPages);
 }
 
 const AGRICULTURE_PDF_COLUMNS: PdfTableColumn[] = [
@@ -3368,60 +3149,7 @@ function drawAgricultureFieldMark(doc: PDFKit.PDFDocument, x: number, y: number)
 }
 
 function drawAgricultureReportHeader(doc: PDFKit.PDFDocument, report: AgricultureOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 118;
-  const centerWidth = pageWidth - margin * 2 - 220;
-
-  drawAgricultureFieldMark(doc, margin, 16);
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(16.5)
-    .text(AGRICULTURE_REPORT_BRANDING.title, centerX, 22, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#2f7d32")
-    .font("Helvetica")
-    .fontSize(9.2)
-    .text(AGRICULTURE_REPORT_BRANDING.agency, centerX, 42, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#d21f1f")
-    .font("Helvetica-Bold")
-    .fontSize(11)
-    .text(`"${AGRICULTURE_REPORT_BRANDING.brand}"`, centerX, 55, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#14532d")
-    .font("Helvetica-Bold")
-    .fontSize(9.2)
-    .text(AGRICULTURE_REPORT_BRANDING.subtitle, centerX, 69, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .moveTo(margin, 100)
-    .lineTo(pageWidth - margin, 100)
-    .strokeColor("#2f7d32")
-    .lineWidth(2)
-    .stroke();
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(13)
-    .text("SUIVI DES OPERATIONS AGRICOLES PAR CAMPAGNE", margin, 114, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
-  doc.y = 140;
+  drawSectorReportHeader(doc, AGRICULTURE_REPORT_BRANDING.title, "SUIVI DES OPERATIONS AGRICOLES PAR CAMPAGNE", (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawAgricultureMetadataStrip(
@@ -3532,7 +3260,7 @@ function drawAgricultureMetricCards(doc: PDFKit.PDFDocument, report: Agriculture
 
 function drawAgricultureTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
-  for (const column of AGRICULTURE_PDF_COLUMNS) {
+  for (const column of fitPdfColumns(doc, AGRICULTURE_PDF_COLUMNS)) {
     drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
       align: "center",
       fill: "#dcfce7",
@@ -3562,7 +3290,7 @@ function drawAgricultureDataRow(
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
-    const column = AGRICULTURE_PDF_COLUMNS[index];
+    const column = fitPdfColumns(doc, AGRICULTURE_PDF_COLUMNS)[index];
     drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
       align: item.align,
       fontSize: 7.2
@@ -3573,7 +3301,7 @@ function drawAgricultureDataRow(
 }
 
 function drawAgricultureTotalsRow(doc: PDFKit.PDFDocument, report: AgricultureOperationsReport, y: number): number {
-  const firstColumnsWidth = AGRICULTURE_PDF_COLUMNS.slice(0, 4).reduce((sum, item) => sum + item.width, 0);
+  const firstColumnsWidth = fitPdfColumns(doc, AGRICULTURE_PDF_COLUMNS).slice(0, 4).reduce((sum, item) => sum + item.width, 0);
   let x = PDF_PAGE_MARGIN;
   drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
     align: "center",
@@ -3591,7 +3319,7 @@ function drawAgricultureTotalsRow(doc: PDFKit.PDFDocument, report: AgricultureOp
     `${formatPdfNumber(report.totals.executionRate, 1)}%`
   ];
   for (let index = 0; index < values.length; index += 1) {
-    const column = AGRICULTURE_PDF_COLUMNS[index + 4];
+    const column = fitPdfColumns(doc, AGRICULTURE_PDF_COLUMNS)[index + 4];
     drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
       align: "right",
       fill: "#f0fdf4",
@@ -3755,38 +3483,7 @@ function drawAgriculturePdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc
-    .moveTo(margin, pageHeight - 44)
-    .lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#bbf7d0")
-    .lineWidth(1)
-    .stroke();
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`AMCCO - Rapport agricole | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 300,
-      lineBreak: false
-    });
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "right",
-      lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Rapport agricole", periodLabel, pageNumber, totalPages);
 }
 
 function renderAgricultureReportsPdf(
@@ -3835,46 +3532,7 @@ const GENERAL_STORE_PDF_COLUMNS: PdfTableColumn[] = [
 ];
 
 function drawGeneralStoreReportHeader(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 92;
-  const centerWidth = pageWidth - margin * 2 - 184;
-
-  doc.save();
-  doc.roundedRect(margin, 22, 86, 58, 6).fill("#eef2ff");
-  doc.roundedRect(margin, 22, 86, 58, 6).strokeColor("#4338ca").lineWidth(1).stroke();
-  doc.rect(margin + 16, 45, 54, 24).fill("#4f46e5");
-  doc.moveTo(margin + 16, 45).lineTo(margin + 43, 30).lineTo(margin + 70, 45).strokeColor("#4338ca").lineWidth(2).stroke();
-  doc.moveTo(margin + 14, 69).lineTo(margin + 72, 69).strokeColor("#4338ca").lineWidth(2).stroke();
-  doc.restore();
-
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(15).text(GENERAL_STORE_REPORT_BRANDING.title, centerX, 22, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#3730a3").font("Helvetica").fontSize(9.2).text(GENERAL_STORE_REPORT_BRANDING.agency, centerX, 42, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11).text(`"${GENERAL_STORE_REPORT_BRANDING.brand}"`, centerX, 55, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(8.5).text(`${GENERAL_STORE_REPORT_BRANDING.fiscal}     ${GENERAL_STORE_REPORT_BRANDING.phone}`, centerX, 69, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#312e81").font("Helvetica-Bold").fontSize(8.2).text(GENERAL_STORE_REPORT_BRANDING.subtitle, centerX, 82, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#4f46e5").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION CUMULÉE DES BOUTIQUES AU ${report.asOfLabel.toUpperCase()}`, margin, 114, {
-    width: pageWidth - margin * 2,
-    align: "center"
-  });
-  doc.y = 144;
+  drawSectorReportHeader(doc, GENERAL_STORE_REPORT_BRANDING.title, `SITUATION CUMULÉE DES BOUTIQUES AU ${report.asOfLabel.toUpperCase()}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawGeneralStoreContinuationHeader(doc: PDFKit.PDFDocument, report: GeneralStoreOperationsReport): void {
@@ -4171,25 +3829,7 @@ function drawGeneralStorePdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#c7d2fe").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport boutiques | ${periodLabel}`, margin, pageHeight - 32, {
-    width: 330,
-    lineBreak: false
-  });
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-    width: 80,
-    align: "right",
-    lineBreak: false
-  });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Rapport boutiques", periodLabel, pageNumber, totalPages);
 }
 
 function renderGeneralStoreReportsPdf(
@@ -4710,60 +4350,7 @@ function drawRentalPropertyMark(doc: PDFKit.PDFDocument, x: number, y: number): 
 }
 
 function drawRentalReportHeader(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 118;
-  const centerWidth = pageWidth - margin * 2 - 220;
-
-  drawRentalPropertyMark(doc, margin, 20);
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(17)
-    .text(RENTAL_REPORT_BRANDING.title, centerX, 24, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#0f766e")
-    .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text(RENTAL_REPORT_BRANDING.agency, centerX, 43, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#d21f1f")
-    .font("Helvetica-Bold")
-    .fontSize(12.5)
-    .text(`"${RENTAL_REPORT_BRANDING.brand}"`, centerX, 57, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#115e59")
-    .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text(`${RENTAL_REPORT_BRANDING.fiscal}     ${RENTAL_REPORT_BRANDING.phone}`, centerX, 72, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .moveTo(margin, 100)
-    .lineTo(pageWidth - margin, 100)
-    .strokeColor("#14b8a6")
-    .lineWidth(2)
-    .stroke();
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(16)
-    .text(toRentalPdfTitle(report), margin, 116, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
-  doc.y = 144;
+  drawSectorReportHeader(doc, RENTAL_REPORT_BRANDING.title, toRentalPdfTitle(report), (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawRentalContinuationHeader(doc: PDFKit.PDFDocument, report: RentalOperationsReport): void {
@@ -5254,38 +4841,7 @@ function drawRentalPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc
-    .moveTo(margin, pageHeight - 44)
-    .lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#99f6e4")
-    .lineWidth(1)
-    .stroke();
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`AMCCO - Situation des loyers | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 330,
-      lineBreak: false
-    });
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "right",
-      lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Situation des loyers", periodLabel, pageNumber, totalPages);
 }
 
 function renderRentalReportsPdf(
@@ -5756,63 +5312,7 @@ const WATER_PDF_COLUMNS: PdfTableColumn[] = [
 ];
 
 function drawWaterReportHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 118;
-  const centerWidth = pageWidth - margin * 2 - 220;
-
-  drawWaterIcon(doc, margin, 18);
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 15, 72);
-
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(17)
-    .text(WATER_REPORT_BRANDING.title, centerX, 24, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#1e3a8a")
-    .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text(WATER_REPORT_BRANDING.agency, centerX, 43, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#d21f1f")
-    .font("Helvetica-Bold")
-    .fontSize(12.5)
-    .text(`"${WATER_REPORT_BRANDING.brand}"`, centerX, 57, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#1e40af")
-    .font("Helvetica-Bold")
-    .fontSize(10.5)
-    .text(`${WATER_REPORT_BRANDING.fiscal}     ${WATER_REPORT_BRANDING.phone}`, centerX, 72, {
-      width: centerWidth,
-      align: "center"
-    });
-
-  doc
-    .moveTo(margin, 100)
-    .lineTo(pageWidth - margin, 100)
-    .strokeColor("#3b82f6")
-    .lineWidth(2)
-    .stroke();
-
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(16)
-    .text(`PRODUCTION D'EAU POTABLE - ${report.periodLabel.toUpperCase()}`, margin, 116, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
-  doc.y = 144;
+  drawSectorReportHeader(doc, WATER_REPORT_BRANDING.title, `PRODUCTION D'EAU POTABLE - ${report.periodLabel.toUpperCase()}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawWaterContinuationHeader(doc: PDFKit.PDFDocument, report: WaterOperationsReport): void {
@@ -6182,38 +5682,7 @@ function drawWaterPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc
-    .moveTo(margin, pageHeight - 44)
-    .lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#bfdbfe")
-    .lineWidth(1)
-    .stroke();
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8)
-    .text(`AMCCO - Production d'eau potable | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 300,
-      lineBreak: false
-    });
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "right",
-      lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Production d'eau potable", periodLabel, pageNumber, totalPages);
 }
 
 function renderWaterReportsPdf(
@@ -6543,48 +6012,7 @@ const BTP_PDF_COLUMNS: PdfTableColumn[] = [
 ];
 
 function drawBtpReportHeader(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 92;
-  const centerWidth = pageWidth - margin * 2 - 184;
-
-  doc.save();
-  doc.roundedRect(margin, 22, 86, 58, 6).fill("#fff7ed");
-  doc.roundedRect(margin, 22, 86, 58, 6).strokeColor("#b45309").lineWidth(1).stroke();
-  doc.rect(margin + 16, 55, 54, 14).fill("#d97706");
-  doc.rect(margin + 22, 46, 12, 9).fill("#f59e0b");
-  doc.rect(margin + 40, 40, 12, 15).fill("#f59e0b");
-  doc.rect(margin + 58, 34, 12, 21).fill("#f59e0b");
-  doc.moveTo(margin + 14, 69).lineTo(margin + 72, 69).strokeColor("#b45309").lineWidth(2).stroke();
-  doc.restore();
-
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(15).text(BTP_REPORT_BRANDING.title, centerX, 22, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#92400e").font("Helvetica").fontSize(9.2).text(BTP_REPORT_BRANDING.agency, centerX, 42, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#d21f1f").font("Helvetica-Bold").fontSize(11).text(`"${BTP_REPORT_BRANDING.brand}"`, centerX, 55, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(8.5).text(`${BTP_REPORT_BRANDING.fiscal}     ${BTP_REPORT_BRANDING.phone}`, centerX, 69, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.fillColor("#78350f").font("Helvetica-Bold").fontSize(8.2).text(BTP_REPORT_BRANDING.subtitle, centerX, 82, {
-    width: centerWidth,
-    align: "center"
-  });
-  doc.moveTo(margin, 100).lineTo(pageWidth - margin, 100).strokeColor("#d97706").lineWidth(2).stroke();
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(16).text(`SITUATION CUMULÉE DES CHANTIERS AU ${report.asOfLabel.toUpperCase()}`, margin, 114, {
-    width: pageWidth - margin * 2,
-    align: "center"
-  });
-  doc.y = 144;
+  drawSectorReportHeader(doc, BTP_REPORT_BRANDING.title, `SITUATION CUMULÉE DES CHANTIERS AU ${report.asOfLabel.toUpperCase()}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawBtpContinuationHeader(doc: PDFKit.PDFDocument, report: BtpOperationsReport): void {
@@ -6648,16 +6076,17 @@ function drawBtpMetricCards(doc: PDFKit.PDFDocument, report: BtpOperationsReport
   ] as const;
   const categoryGap = 7;
   const categoryWidth = (pageWidth - margin * 2 - categoryGap * 4) / 5;
+  const categoriesY = doc.y;
   categories.forEach(([label, amount], index) => {
     const x = margin + index * (categoryWidth + categoryGap);
-    doc.fillColor("#486581").font("Helvetica").fontSize(7.7).text(label, x, doc.y, {
+    doc.fillColor("#486581").font("Helvetica").fontSize(7.7).text(label, x, categoriesY, {
       width: categoryWidth, align: "center", lineBreak: false
     });
-    doc.fillColor("#1f2937").font("Helvetica-Bold").fontSize(8.5).text(formatPdfMoney(amount), x, doc.y + 11, {
+    doc.fillColor("#1f2937").font("Helvetica-Bold").fontSize(8.5).text(formatPdfMoney(amount), x, categoriesY + 11, {
       width: categoryWidth, align: "center", lineBreak: false
     });
   });
-  doc.y += 32;
+  doc.y = categoriesY + 32;
 }
 
 function drawBtpTableHeader(doc: PDFKit.PDFDocument, y: number): number {
@@ -6905,25 +6334,7 @@ function drawBtpPdfFooter(
   totalPages: number,
   asOfLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc.moveTo(margin, pageHeight - 44).lineTo(pageWidth - margin, pageHeight - 44).strokeColor("#fed7aa").lineWidth(1).stroke();
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`AMCCO - Rapport BTP | Cumul au ${asOfLabel}`, margin, pageHeight - 32, {
-    width: 330,
-    lineBreak: false
-  });
-  doc.fillColor("#627d98").font("Helvetica").fontSize(8.5).text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-    width: 80,
-    align: "right",
-    lineBreak: false
-  });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Rapport BTP", `Cumul au ${asOfLabel}`, pageNumber, totalPages);
 }
 
 function renderBtpReportsPdf(
@@ -7024,60 +6435,7 @@ function drawFishFarmingPondMark(doc: PDFKit.PDFDocument, x: number, y: number):
 }
 
 function drawFishFarmingReportHeader(doc: PDFKit.PDFDocument, report: FishFarmingOperationsReport): void {
-  const pageWidth = doc.page.width;
-  const margin = PDF_PAGE_MARGIN;
-  const centerX = margin + 122;
-  const centerWidth = pageWidth - margin * 2 - 224;
-
-  drawFishFarmingPondMark(doc, margin, 16);
-  drawAmccoPdfLogo(doc, pageWidth - margin - 72, 14, 72);
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(16.5)
-    .text(FISH_FARMING_REPORT_BRANDING.title, centerX, 22, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#0369a1")
-    .font("Helvetica")
-    .fontSize(9.2)
-    .text(FISH_FARMING_REPORT_BRANDING.agency, centerX, 42, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#d21f1f")
-    .font("Helvetica-Bold")
-    .fontSize(11)
-    .text(`"${FISH_FARMING_REPORT_BRANDING.brand}"`, centerX, 55, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .fillColor("#0f766e")
-    .font("Helvetica-Bold")
-    .fontSize(9)
-    .text(FISH_FARMING_REPORT_BRANDING.subtitle, centerX, 69, {
-      width: centerWidth,
-      align: "center"
-    });
-  doc
-    .moveTo(margin, 100)
-    .lineTo(pageWidth - margin, 100)
-    .strokeColor("#0284c7")
-    .lineWidth(2)
-    .stroke();
-  doc
-    .fillColor("#111827")
-    .font("Helvetica-Bold")
-    .fontSize(13)
-    .text("SUIVI DES OPERATIONS PISCICOLES PAR BASSIN", margin, 114, {
-      width: pageWidth - margin * 2,
-      align: "center"
-    });
-  doc.y = 140;
+  drawSectorReportHeader(doc, FISH_FARMING_REPORT_BRANDING.title, "SUIVI DES OPERATIONS PISCICOLES PAR BASSIN", (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
 }
 
 function drawFishFarmingMetadataStrip(
@@ -7190,12 +6548,12 @@ function drawFishFarmingMetricCards(doc: PDFKit.PDFDocument, report: FishFarming
 
 function drawFishFarmingTableHeader(doc: PDFKit.PDFDocument, y: number): number {
   let x = PDF_PAGE_MARGIN;
-  for (const column of FISH_FARMING_PDF_COLUMNS) {
+  for (const column of fitPdfColumns(doc, FISH_FARMING_PDF_COLUMNS)) {
     drawPdfTableCell(doc, column.label, x, y, column.width, 22, {
       align: "center",
       fill: "#e0f2fe",
       font: "Helvetica-Bold",
-      fontSize: 6.2
+      fontSize: 8
     });
     x += column.width;
   }
@@ -7222,10 +6580,10 @@ function drawFishFarmingDataRow(
   ];
   let x = PDF_PAGE_MARGIN;
   values.forEach((item, index) => {
-    const column = FISH_FARMING_PDF_COLUMNS[index];
+    const column = fitPdfColumns(doc, FISH_FARMING_PDF_COLUMNS)[index];
     drawPdfTableCell(doc, item.value, x, y, column.width, 20, {
       align: item.align,
-      fontSize: 6.1
+      fontSize: 8
     });
     x += column.width;
   });
@@ -7237,7 +6595,7 @@ function drawFishFarmingTotalsRow(
   report: FishFarmingOperationsReport,
   y: number
 ): number {
-  const firstColumnsWidth = FISH_FARMING_PDF_COLUMNS.slice(0, 3).reduce((sum, item) => sum + item.width, 0);
+  const firstColumnsWidth = fitPdfColumns(doc, FISH_FARMING_PDF_COLUMNS).slice(0, 3).reduce((sum, item) => sum + item.width, 0);
   let x = PDF_PAGE_MARGIN;
   drawPdfTableCell(doc, "TOTAL", x, y, firstColumnsWidth, 22, {
     align: "center",
@@ -7258,12 +6616,12 @@ function drawFishFarmingTotalsRow(
     `${formatPdfNumber(report.totals.executionRate, 0)}%`
   ];
   for (let index = 0; index < values.length; index += 1) {
-    const column = FISH_FARMING_PDF_COLUMNS[index + 3];
+    const column = fitPdfColumns(doc, FISH_FARMING_PDF_COLUMNS)[index + 3];
     drawPdfTableCell(doc, values[index], x, y, column.width, 22, {
       align: "right",
       fill: "#f0f9ff",
       font: "Helvetica-Bold",
-      fontSize: 6.1
+      fontSize: 8
     });
     x += column.width;
   }
@@ -7422,38 +6780,7 @@ function drawFishFarmingPdfFooter(
   totalPages: number,
   periodLabel: string
 ): void {
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = PDF_PAGE_MARGIN;
-  const bottomMargin = doc.page.margins.bottom;
-
-  doc.save();
-  doc.page.margins.bottom = 0;
-  doc
-    .moveTo(margin, pageHeight - 44)
-    .lineTo(pageWidth - margin, pageHeight - 44)
-    .strokeColor("#bae6fd")
-    .lineWidth(1)
-    .stroke();
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`AMCCO - Rapport pisciculture | ${periodLabel}`, margin, pageHeight - 32, {
-      width: 320,
-      lineBreak: false
-    });
-  doc
-    .fillColor("#627d98")
-    .font("Helvetica")
-    .fontSize(8.5)
-    .text(`Page ${pageNumber} / ${totalPages}`, pageWidth - margin - 80, pageHeight - 32, {
-      width: 80,
-      align: "right",
-      lineBreak: false
-    });
-  doc.page.margins.bottom = bottomMargin;
-  doc.restore();
+  drawSectorReportFooter(doc, "Rapport pisciculture", periodLabel, pageNumber, totalPages);
 }
 
 function renderFishFarmingReportsPdf(
@@ -8998,6 +8325,9 @@ function buildBeverageDepotReport(
   }
   const sum = (items: ReportOperationalTransaction[]) => items.reduce((total, item) => total + toNumberAmount(item.amount), 0);
   const grossMargin = sales.reduce((total, item) => {
+    if (item.metadata.beverageStockManaged === "1" && item.metadata.beverageStockCost) {
+      return total + toNumberAmount(item.amount) - getMetadataNumber(item.metadata, "beverageStockCost");
+    }
     const quantity = getMetadataNumber(item.metadata, "quantity");
     const salePrice = getMetadataNumber(item.metadata, "saleUnitPrice");
     const purchasePrice = getMetadataNumber(item.metadata, "purchaseUnitPrice");
@@ -9007,6 +8337,7 @@ function buildBeverageDepotReport(
   const taskDate = inventoryDate;
   return {
     periodLabel: toDisplayPeriodLabel(filters),
+    netOperatingResultAmount: toMoneyString(grossMargin + sum(otherIncome) - sum(expenses)),
     transactions: [...sectorTransactions].sort((left, right) => left.occurredAt.localeCompare(right.occurredAt)).map((item) => {
       return {
         date: toReportDate(item.occurredAt),
@@ -13147,7 +12478,9 @@ export async function getCompanyReportsOverview(
     generalStoreInventorySnapshots,
     hardwareTransactions,
     btpTransactions,
-    btpProjects
+    btpProjects,
+    beverageProducts,
+    beverageAdjustments
   ] =
     await Promise.all([
       listReportFinanceByStatus(actor.companyId, filters),
@@ -13181,7 +12514,9 @@ export async function getCompanyReportsOverview(
         : Promise.resolve([] as ReportOperationalTransaction[]),
       shouldLoadBtpData
         ? listBtpProjects({ companyId: actor.companyId, activeOnly: true })
-        : Promise.resolve([] as BtpProject[])
+        : Promise.resolve([] as BtpProject[]),
+      filters.activityCode === "BEVERAGE_DEPOT" ? listBeverageProducts(actor.companyId) : Promise.resolve([]),
+      filters.activityCode === "BEVERAGE_DEPOT" ? listBeverageStockAdjustments(actor.companyId, filters) : Promise.resolve([])
     ]);
 
   const financeByActivitySummary = buildReportFinanceByActivitySummary(financeByActivity)
@@ -13234,6 +12569,10 @@ export async function getCompanyReportsOverview(
     operationalPerformance: isTransportReport
       ? []
       : buildOperationalPerformance(operationalTransactions, operationalTasks),
+    fieldOperationsReport: filters.activityCode === "SERVICES" || filters.activityCode === "MINING" ? {
+      transactions: operationalTransactions.filter((row) => row.activityCode === filters.activityCode),
+      tasks: operationalTasks.filter((row) => row.activityCode === filters.activityCode)
+    } : null,
     hardwareMonthlyReport: buildHardwareMonthlyReport(operationalTransactions, hardwareTransactions, filters),
     agricultureOperationsReport: buildAgricultureOperationsReport(operationalTransactions, operationalTasks, filters),
     generalStoreOperationsReport: buildGeneralStoreOperationsReport(
@@ -13250,7 +12589,13 @@ export async function getCompanyReportsOverview(
     hotelOperationsReport: buildHotelOperationsReport(operationalTransactions, operationalTasks, filters),
     waterOperationsReport: buildWaterOperationsReport(operationalTransactions, filters),
     beverageDepotReport: filters.activityCode === "BEVERAGE_DEPOT"
-      ? buildBeverageDepotReport(operationalTransactions, operationalTasks, filters)
+      ? (() => {
+          const report = buildBeverageDepotReport(operationalTransactions, operationalTasks, filters);
+          const adjustmentAmount = beverageAdjustments.reduce((sum, item) => sum + toNumberAmount(item.value), 0);
+          return { ...report, currentStock: { asOf: new Date().toISOString(), products: beverageProducts },
+            stockAdjustments: beverageAdjustments, stockAdjustmentAmount: toMoneyString(adjustmentAmount),
+            netOperatingResultAmount: toMoneyString(toNumberAmount(report.netOperatingResultAmount ?? "0") + adjustmentAmount) };
+        })()
       : null,
     hydrocarbonOperationsReport: filters.activityCode === "HYDROCARBON"
       ? buildHydrocarbonOperationsReport(operationalTransactions, operationalTasks, filters)
@@ -14364,6 +13709,70 @@ export async function exportCompanyTasksExcel(
   ]);
 }
 
+function reportCurrencySummary(overview: ReportsOverview) {
+  const currencies = new Map<string, { currency: string; cashIn: number; cashOut: number }>();
+  for (const row of overview.financeByType) {
+    const total = currencies.get(row.currency) ?? { currency: row.currency, cashIn: 0, cashOut: 0 };
+    if (row.type === "CASH_IN") total.cashIn += toNumberAmount(row.approvedAmount);
+    else total.cashOut += toNumberAmount(row.approvedAmount);
+    currencies.set(row.currency, total);
+  }
+  return [...currencies.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+function renderReportCurrencySummary(doc: PDFKit.PDFDocument, overview: ReportsOverview, nextPage: () => void): void {
+  drawReportTable(doc, "Flux comptabilisés par devise", [
+    { label: "DEVISE", share: 1 }, { label: "ENTRÉES", share: 2, align: "right" },
+    { label: "SORTIES", share: 2, align: "right" }, { label: "SOLDE NET", share: 2, align: "right" }
+  ], reportCurrencySummary(overview).map((row) => [row.currency, formatPdfNumber(row.cashIn, 2), formatPdfNumber(row.cashOut, 2), formatPdfNumber(row.cashIn - row.cashOut, 2)]), nextPage);
+}
+
+function fieldReportContext(activityCode: BusinessActivityCode, metadata: Record<string, string>): string {
+  const fields = activityCode === "MINING"
+    ? [["siteRef", "Site"], ["equipmentRef", "Équipement"]]
+    : [["clientRef", "Client"], ["serviceType", "Prestation"], ["serviceCategory", "Catégorie"]];
+  return fields.filter(([key]) => metadata[key]?.trim()).map(([key, label]) => `${label} : ${metadata[key]}`).join("\n") || "Non renseigné";
+}
+
+function renderFieldSectorReportsPdf(doc: PDFKit.PDFDocument, overview: ReportsOverview, filters: ReportPeriodFilter): void {
+  const title = toDisplayActivityLabel(filters.activityCode);
+  const period = toDisplayPeriodLabel(filters);
+  const nextPage = () => { doc.addPage(); drawSectorContinuationHeader(doc, title, period); };
+  drawSectorReportHeader(doc, title.toUpperCase(), `RAPPORT D'ACTIVITÉ - ${period}`, (x, y, size) => drawAmccoPdfLogo(doc, x, y, size));
+  doc.fillColor("#486581").font("Helvetica").fontSize(9).text(`Période : ${period}\nÉtabli le ${formatPdfDate(overview.generatedAt)}. Les totaux comprennent les opérations enregistrées ou finalisées ; les brouillons et rejets en sont exclus. Aucune conversion entre devises.`, PDF_PAGE_MARGIN, doc.y, { width: doc.page.width - PDF_PAGE_MARGIN * 2 });
+  doc.y += 18;
+  renderReportCurrencySummary(doc, overview, nextPage);
+  const data = overview.fieldOperationsReport;
+  const transactions = (data?.transactions ?? []).filter((row) => isReportableFinancialStatus(row.status));
+  const currencies = [...new Set(transactions.map((row) => row.currency))].sort();
+  if (!currencies.length) {
+    drawReportTable(doc, "Opérations comptabilisées", [{ label: "DÉTAIL", share: 1 }], [], nextPage, "Aucune opération comptabilisée sur la période sélectionnée.");
+  }
+  for (const currency of currencies) {
+    for (const type of ["CASH_IN", "CASH_OUT"] as const) {
+      const rows = transactions.filter((row) => row.currency === currency && row.type === type).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+      if (!rows.length) continue;
+      drawReportTable(doc, `${type === "CASH_IN" ? "Recettes" : "Dépenses"} - ${currency}`, [
+        { label: "DATE", share: 1 }, { label: "RÉFÉRENCES", share: 2.4 },
+        { label: "DÉSIGNATION", share: 3.4 }, { label: `MONTANT ${currency}`, share: 1.5, align: "right" }
+      ], rows.map((row) => [formatPdfDate(row.occurredAt), fieldReportContext(row.activityCode, row.metadata), row.description?.trim() || "Non renseignée", formatPdfNumber(row.amount, 2)]), nextPage);
+    }
+  }
+  drawReportTable(doc, filters.activityCode === "MINING" ? "Suivi par site et équipement - XOF" : "Suivi par client et prestation - XOF", [
+    { label: "DIMENSION", share: 1.5 }, { label: "RÉFÉRENCE", share: 2.2 },
+    { label: "ENTRÉES XOF", share: 1.3, align: "right" }, { label: "SORTIES XOF", share: 1.3, align: "right" },
+    { label: "NET XOF", share: 1.3, align: "right" }, { label: "TÂCHES", share: 0.8, align: "right" },
+    { label: "BLOQUÉES", share: 0.9, align: "right" }, { label: "EXÉC. %", share: 0.8, align: "right" }
+  ], overview.operationalPerformance.filter((row) => row.scope === "SUBSECTION" && row.activityCode === filters.activityCode).map((row) => [row.dimensionLabel, row.itemLabel, formatPdfNumber(row.approvedCashIn, 2), formatPdfNumber(row.approvedCashOut, 2), formatPdfNumber(row.netProfit, 2), String(row.totalTasksCount), String(row.blockedTasksCount), formatPdfNumber(row.executionRate, 1)]), nextPage, "Aucune référence métier suivie sur la période sélectionnée.");
+  drawReportTable(doc, "Suivi des tâches", [
+    { label: "STATUT", share: 2 }, { label: "TÂCHES", share: 1, align: "right" }
+  ], overview.taskByStatus.map((row) => [toDisplayTaskStatusLabel(row.status), String(row.count)]), nextPage, "Aucune tâche sur la période sélectionnée.");
+  drawReportTable(doc, "Interventions et échéances", [
+    { label: "INTERVENTION", share: 3 }, { label: "RÉFÉRENCES", share: 2.5 },
+    { label: "STATUT", share: 1.2 }, { label: "ÉCHÉANCE", share: 1.3 }
+  ], (data?.tasks ?? []).map((row) => [row.title || row.description || "Non renseignée", fieldReportContext(row.activityCode, row.metadata), toDisplayTaskStatusLabel(row.status), row.dueDate ? formatPdfDate(row.dueDate) : "Sans échéance"]), nextPage);
+}
+
 export async function exportCompanyReportsPdf(
   actor: ActorContext,
   input: ReportFiltersInput = {}
@@ -14373,9 +13782,34 @@ export async function exportCompanyReportsPdf(
   ensureSectorReportFilter(filters);
   const overview = await getCompanyReportsOverview(actor, input);
   const periodLabel = toDisplayPeriodLabel(filters);
+  const buildSectorPdf = (
+    render: (doc: PDFKit.PDFDocument) => void,
+    decorate: (doc: PDFKit.PDFDocument, pageNumber: number, totalPages: number) => void,
+    options?: { layout?: "portrait" | "landscape" }
+  ) => buildPdfBuffer((doc) => {
+    doc.info.Title = `${toDisplayActivityLabel(filters.activityCode)} - ${periodLabel}`;
+    doc.info.Author = "AMCCO";
+    doc.info.Subject = `Rapport sectoriel | ${periodLabel}`;
+    doc.info.CreationDate = new Date(overview.generatedAt);
+    render(doc);
+    const xofFocused = ["HARDWARE", "GENERAL_STORE", "RENTAL", "AGRICULTURE", "BTP", "FISH_FARMING"];
+    if (filters.activityCode && xofFocused.includes(filters.activityCode) && overview.financeByType.some((row) => row.currency !== "XOF")) {
+      const nextPage = () => { doc.addPage(); drawSectorContinuationHeader(doc, toDisplayActivityLabel(filters.activityCode), periodLabel); };
+      nextPage();
+      doc.fillColor("#486581").font("Helvetica").fontSize(9).text("Complément financier : les tableaux métier précédents portent sur le XOF. Les autres devises sont présentées séparément ci-dessous, sans conversion.", PDF_PAGE_MARGIN, doc.y, { width: doc.page.width - PDF_PAGE_MARGIN * 2 });
+      doc.y += 18;
+      renderReportCurrencySummary(doc, overview, nextPage);
+    }
+  }, decorate, options);
+
+  if (filters.activityCode === "SERVICES" || filters.activityCode === "MINING") {
+    return buildSectorPdf((doc) => renderFieldSectorReportsPdf(doc, overview, filters),
+      (doc, page, total) => drawSectorReportFooter(doc, toDisplayActivityLabel(filters.activityCode), periodLabel, page, total),
+      { layout: "landscape" });
+  }
 
   if (filters.activityCode === "HARDWARE") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderHardwareReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawHardwarePdfFooter(doc, pageNumber, totalPages, overview.hardwareMonthlyReport?.periodLabel ?? periodLabel);
@@ -14388,7 +13822,7 @@ export async function exportCompanyReportsPdf(
       rows: [],
       currencySummaries: []
     };
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderTransportOperationsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawTransportPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
@@ -14396,7 +13830,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "GENERAL_EXPENSES") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderGeneralExpensesReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawGeneralExpensesPdfFooter(
@@ -14409,7 +13843,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "DAILY_ACTIVITIES") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderDailyActivitiesReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawDailyActivitiesPdfFooter(
@@ -14422,7 +13856,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "AGRICULTURE") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderAgricultureReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawAgriculturePdfFooter(
@@ -14431,11 +13865,11 @@ export async function exportCompanyReportsPdf(
         totalPages,
         overview.agricultureOperationsReport?.periodLabel ?? periodLabel
       );
-    });
+    }, { layout: "landscape" });
   }
 
   if (filters.activityCode === "GENERAL_STORE") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderGeneralStoreReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawGeneralStorePdfFooter(
@@ -14448,7 +13882,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "FOOD") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderFoodReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawFoodPdfFooter(
@@ -14461,7 +13895,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "RENTAL") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderRentalReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawRentalPdfFooter(
@@ -14474,7 +13908,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "HOTEL_LODGING") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderHotelReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawHotelPdfFooter(
@@ -14487,7 +13921,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "WATER") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderWaterReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawWaterPdfFooter(
@@ -14501,7 +13935,7 @@ export async function exportCompanyReportsPdf(
 
   if (filters.activityCode === "BEVERAGE_DEPOT") {
     const report = overview.beverageDepotReport ?? buildEmptyBeverageDepotReport(filters);
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderBeverageDepotReportsPdf(doc, report, overview.generatedAt);
     }, (doc, pageNumber, totalPages) => {
       drawBeverageDepotPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
@@ -14510,7 +13944,7 @@ export async function exportCompanyReportsPdf(
 
   if (filters.activityCode === "HYDROCARBON") {
     const report = overview.hydrocarbonOperationsReport ?? buildHydrocarbonOperationsReport([], [], filters);
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderHydrocarbonReportsPdf(doc, report, overview.generatedAt);
     }, (doc, pageNumber, totalPages) => {
       drawHydrocarbonPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
@@ -14518,7 +13952,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "REAL_ESTATE_AGENCY") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderAgencyReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawAgencyPdfFooter(
@@ -14531,7 +13965,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "BTP") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderBtpReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawBtpPdfFooter(
@@ -14544,7 +13978,7 @@ export async function exportCompanyReportsPdf(
   }
 
   if (filters.activityCode === "FISH_FARMING") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderFishFarmingReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawFishFarmingPdfFooter(
@@ -14553,11 +13987,11 @@ export async function exportCompanyReportsPdf(
         totalPages,
         overview.fishFarmingOperationsReport?.periodLabel ?? periodLabel
       );
-    });
+    }, { layout: "landscape" });
   }
 
   if (filters.activityCode === "LIVESTOCK") {
-    return buildPdfBuffer((doc) => {
+    return buildSectorPdf((doc) => {
       renderLivestockReportsPdf(doc, overview, filters);
     }, (doc, pageNumber, totalPages) => {
       drawLivestockPdfFooter(
@@ -14569,7 +14003,7 @@ export async function exportCompanyReportsPdf(
     });
   }
 
-  return buildPdfBuffer((doc) => {
+  return buildSectorPdf((doc) => {
     doc.on("pageAdded", () => {
       doc.y = PDF_CONTENT_TOP;
     });

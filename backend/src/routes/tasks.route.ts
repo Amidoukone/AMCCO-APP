@@ -26,6 +26,7 @@ const taskStatusSchema = z.enum(["TODO", "IN_PROGRESS", "DONE", "BLOCKED"]);
 const taskScopeSchema = z.enum(["ALL", "ASSIGNED_TO_ME", "CREATED_BY_ME", "MINE"]);
 
 const listTasksQuerySchema = z.object({
+  search: z.string().trim().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   status: taskStatusSchema.optional(),
@@ -117,6 +118,7 @@ tasksRouter.get(
         status: query.status,
         activityCode: query.activityCode,
         scope: query.scope,
+        search: query.search,
         unassignedOnly: query.unassignedOnly === "true"
       }
     );

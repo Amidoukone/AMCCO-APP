@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { getSectorReferenceView, getActiveSectorReferenceView, hasSectorReferenceWorkspace } from "../config/sectorWorkspaces";
+import { SectorTransactionActions } from "../components/SectorTransactionActions";
+import { SectorTransactionSummary } from "../components/SectorTransactionSummary";
+import { BeverageStockPanel } from "../components/BeverageStockPanel";
+import { useBeverageStock } from "../lib/useBeverageStock";
+import { getSectorTransactionWorkspace, type SectorTransactionPreset } from "../config/sectorTransactionWorkspaces";
+import { useDebouncedValue } from "../lib/useDebouncedValue";
+import { useFormChanges } from "../lib/useFormChanges";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
 import { PageGuide } from "../components/PageGuide";
+import { RentalTenantsPanel } from "../components/RentalTenantsPanel";
+import { GeneralStoreShopsPanel } from "../components/GeneralStoreShopsPanel";
+import { BtpProjectsPanel } from "../components/BtpProjectsPanel";
+import { HardwareArticlesPanel } from "../components/HardwareArticlesPanel";
 import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
 import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
@@ -24,7 +36,6 @@ import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
-import { buildQuickSearchText, createQuickSearchMatcher } from "../lib/quickSearch";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -83,7 +94,7 @@ import {
   getAccountGovernanceLines,
   getTransactionGovernanceLines
 } from "../utils/governanceDisplay";
-import { canManageSectorTransactions } from "../config/permissions";
+import { canAccessFeature, canManageSectorTransactions } from "../config/permissions";
 import { getSectorRecordContext, getSectorSearchHint } from "../utils/sectorRecordContext";
 
 const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
@@ -500,7 +511,7 @@ const BEVERAGE_NUMERIC_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice
 const BEVERAGE_AMOUNT_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice", "saleUnitPrice"]);
 const BEVERAGE_METADATA_FIELDS = new Set([
   BEVERAGE_OPERATION_KIND_KEY, "productName", "quantity", "purchaseUnitPrice",
-  "saleUnitPrice", "supplierRef", "invoiceRef", "expenseCategory"
+  "saleUnitPrice", "supplierRef", "invoiceRef", "expenseCategory", "beverageProductId", "beverageUnit", "beverageStockManaged", "beverageStockCost"
 ]);
 const DAILY_AGREEMENT_OPERATION_KEY = "financialOperationKind";
 type DailyAgreementOperationKind = "PARTNER_PAYMENT" | "AGREEMENT_PROFIT" | "CAPITAL_RETURN" | "AGREEMENT_EXPENSE";
@@ -2349,11 +2360,11 @@ function getVisibleFinanceMetadataFields(
     const kind = getBeverageOperationKind(type, metadata);
     const visibleKeys = new Set<string>([
       "invoiceRef",
-      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"] : []),
-      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"] : []),
+      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice", "beverageProductId", "beverageUnit"] : []),
+      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef", "beverageProductId", "beverageUnit"] : []),
       ...(kind === "DEPENSE" ? ["expenseCategory", "supplierRef"] : [])
     ]);
-    return fields.filter((field) => field.key !== BEVERAGE_OPERATION_KIND_KEY && visibleKeys.has(field.key));
+    return fields.filter((field) => field.key !== BEVERAGE_OPERATION_KIND_KEY && field.key !== "beverageUnit" && visibleKeys.has(field.key));
   }
 
   if (activityCode === "DAILY_ACTIVITIES") {
@@ -2576,11 +2587,12 @@ function cleanSectorFinanceMetadata(
     const kind = getBeverageOperationKind(type, metadata);
     const visibleKeys = new Set<string>([
       "invoiceRef",
-      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"] : []),
-      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"] : []),
+      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice", "beverageProductId", "beverageUnit"] : []),
+      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef", "beverageProductId", "beverageUnit"] : []),
       ...(kind === "DEPENSE" ? ["expenseCategory", "supplierRef"] : [])
     ]);
-    return Object.fromEntries(Object.entries(metadata).map(([key, value]) => [
+    // Persist the same operation shown by the select, including a fresh form after saving.
+    return Object.fromEntries(Object.entries({ ...metadata, [BEVERAGE_OPERATION_KIND_KEY]: kind }).map(([key, value]) => [
       key,
       BEVERAGE_METADATA_FIELDS.has(key) && key !== BEVERAGE_OPERATION_KIND_KEY && !visibleKeys.has(key) ? "" : value
     ]));
@@ -3021,10 +3033,10 @@ function syncMetadataState(
   previous: Record<string, string>,
   fields: ActivityFieldDefinition[]
 ): Record<string, string> {
-  return Object.fromEntries(fields.map((field) => {
+  return { ...previous, ...Object.fromEntries(fields.map((field) => {
     const value = previous[field.key] ?? "";
     return [field.key, isMoneyMetadataField(field.key) ? formatAmountForInput(value) : value];
-  }));
+  })) };
 }
 
 function sameStringRecord(
@@ -3070,6 +3082,21 @@ function getLockedAccountMessage(account: FinancialAccount): string | null {
   return null;
 }
 
+function getSectorTransactionLabel(transaction: FinancialTransaction): string | null {
+  if (transaction.activityCode === "AGRICULTURE") return AGRICULTURE_OPERATION_LABELS[getAgricultureOperationKind(transaction.type, transaction.metadata)];
+  if (transaction.activityCode === "FISH_FARMING") return FISH_FARMING_OPERATION_LABELS[getFishFarmingOperationKind(transaction.type, transaction.metadata)];
+  if (transaction.activityCode === "DAILY_ACTIVITIES") return DAILY_AGREEMENT_OPERATION_LABELS[transaction.metadata.financialOperationKind as DailyAgreementOperationKind] ?? null;
+  if (transaction.activityCode === "WATER") return WATER_OPERATION_LABELS[getWaterOperationKind(transaction.type, transaction.metadata)];
+  if (transaction.activityCode === "BEVERAGE_DEPOT") return BEVERAGE_OPERATION_LABELS[getBeverageOperationKind(transaction.type, transaction.metadata)];
+  if (transaction.activityCode === "GENERAL_EXPENSES") {
+    const kind = getGeneralExpenseKind(transaction.metadata);
+    return `${getGeneralExpenseOwner(kind) === "PDG" ? "PDG" : "Employé"} : ${GENERAL_EXPENSE_KIND_LABELS[kind]}`;
+  }
+  if (transaction.activityCode === "HYDROCARBON") return transaction.metadata.hydrocarbonCategory || null;
+  if (transaction.activityCode === "SERVICES") return transaction.metadata.serviceCategory || transaction.metadata.serviceType || null;
+  return null;
+}
+
 function formatMetadataSummary(
   metadata: Record<string, string>,
   fields: ActivityFieldDefinition[]
@@ -3077,7 +3104,10 @@ function formatMetadataSummary(
   const items = fields
     .map((field) => {
       const value = metadata[field.key]?.trim();
-      return value ? `${field.label}: ${formatMetadataValue(field.key, value)}` : null;
+      const label = field.key === "beverageStockCost" && metadata.beverageOperationKind === "ACHAT_STOCK"
+        ? "Coût du stock acheté"
+        : field.label;
+      return value ? `${label}: ${formatMetadataValue(field.key, value)}` : null;
     })
     .filter((value): value is string => value !== null);
 
@@ -3092,6 +3122,9 @@ function formatMetadataSummary(
 }
 
 function formatMetadataValue(key: string, value: string): string {
+  if (key === "beverageStockCost") {
+    return `${formatAmountForDisplay(value)} XOF`;
+  }
   if (key === DUMP_TRUCK_OPERATION_KEY) {
     return DUMP_TRUCK_OPERATION_LABELS[value] ?? value;
   }
@@ -3176,18 +3209,6 @@ function buildDefaultArticleForm(): {
 function currentMonthInputValue(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function formatTenancyStartLabel(tenancyStart: string): string {
-  const parsed = new Date(`${tenancyStart}-01T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime())) {
-    return tenancyStart;
-  }
-  return parsed.toLocaleDateString("fr-FR", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC"
-  });
 }
 
 function buildDefaultTenantForm(): {
@@ -3289,6 +3310,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSelectedActivityCode
   } = useBusinessActivity();
   const financeEnabledActivities = enabledActivities;
+  const beverageStock = useBeverageStock(activeCompany?.id, selectedActivityCode === "BEVERAGE_DEPOT" && !isLoadingActivities);
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [hasLoadedAccounts, setHasLoadedAccounts] = useState(false);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
@@ -3298,6 +3320,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   const dailyCategoriesLoadRequestRef = useRef(0);
   const [articles, setArticles] = useState<ActivityArticle[]>([]);
   const articlesLoadRequestRef = useRef(0);
+  const [isLoadingArticles, setIsLoadingArticles] = useState(false);
+  const [hasLoadedArticles, setHasLoadedArticles] = useState(false);
   const [hardwareCustomArticleMode, setHardwareCustomArticleMode] = useState(false);
   const [showGeneralExpenseCalculator, setShowGeneralExpenseCalculator] = useState(false);
   const [articleForm, setArticleForm] = useState(buildDefaultArticleForm());
@@ -3307,6 +3331,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [articlePendingDelete, setArticlePendingDelete] = useState<ActivityArticle | null>(null);
   const [tenants, setTenants] = useState<RentalTenant[]>([]);
   const tenantsLoadRequestRef = useRef(0);
+  const loadedTenantsContextRef = useRef<string | null>(null);
+  const [isLoadingTenants, setIsLoadingTenants] = useState(true);
+  const [hasLoadedTenants, setHasLoadedTenants] = useState(false);
   const [tenantForm, setTenantForm] = useState(buildDefaultTenantForm());
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
   const [busyTenantId, setBusyTenantId] = useState<string | null>(null);
@@ -3314,6 +3341,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [tenantPendingDelete, setTenantPendingDelete] = useState<RentalTenant | null>(null);
   const [shops, setShops] = useState<GeneralStoreShop[]>([]);
   const shopsLoadRequestRef = useRef(0);
+  const loadedShopsContextRef = useRef<string | null>(null);
+  const [isLoadingShops, setIsLoadingShops] = useState(true);
+  const [hasLoadedShops, setHasLoadedShops] = useState(false);
   const [shopForm, setShopForm] = useState(buildDefaultShopForm());
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
   const [busyShopId, setBusyShopId] = useState<string | null>(null);
@@ -3321,6 +3351,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [shopPendingDelete, setShopPendingDelete] = useState<GeneralStoreShop | null>(null);
   const [projects, setProjects] = useState<BtpProject[]>([]);
   const projectsLoadRequestRef = useRef(0);
+  const loadedProjectsContextRef = useRef<string | null>(null);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [hasLoadedProjects, setHasLoadedProjects] = useState(false);
   const [projectForm, setProjectForm] = useState(buildDefaultProjectForm());
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
@@ -3368,29 +3401,13 @@ export function FinanceTransactionsPage(): JSX.Element {
     return user ? canManageSectorTransactions(user.role) : false;
   }, [user?.role]);
 
-  const canManageArticles = useMemo(() => {
-    return (
-      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
-    );
-  }, [user?.role]);
-
-  const canManageTenants = useMemo(() => {
-    return (
-      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
-    );
-  }, [user?.role]);
-
-  const canManageShops = useMemo(() => {
-    return (
-      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
-    );
-  }, [user?.role]);
-
-  const canManageProjects = useMemo(() => {
-    return (
-      user?.role === "SYS_ADMIN" || user?.role === "ACCOUNTANT" || user?.role === "SUPERVISOR"
-    );
-  }, [user?.role]);
+  const sectorReferenceView = getSectorReferenceView(selectedActivityCode, user?.role);
+  const referenceView = sectorReferenceView?.pathname ? null : sectorReferenceView;
+  const activeReferenceView = getActiveSectorReferenceView(location.pathname, location.search, selectedActivityCode, user?.role);
+  const isHardwareArticlesView = activeReferenceView?.view === "articles";
+  const isDirectorySector = hasSectorReferenceWorkspace(selectedActivityCode);
+  const transactionWorkspace = getSectorTransactionWorkspace(selectedActivityCode);
+  const isListFirstSector = isDirectorySector || Boolean(transactionWorkspace);
 
   const canMutateTransaction = useCallback(
     (transaction: FinancialTransaction): boolean => {
@@ -3437,6 +3454,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   );
   const [filters, setFilters] = usePersistedViewState(transactionsViewStorageKey, initialFilters);
   const [searchQuery, setSearchQuery] = usePersistedViewState(transactionsSearchStorageKey, "");
+  const debouncedSearch = useDebouncedValue(searchQuery.trim());
   const [visibleTransactionsPageSize, setVisibleTransactionsPageSize] = usePersistedViewState(
     transactionsVisiblePageSizeStorageKey,
     DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE
@@ -3453,17 +3471,23 @@ export function FinanceTransactionsPage(): JSX.Element {
     occurredAt: ""
   });
   const [transactionProofFile, setTransactionProofFile] = useState<File | null>(null);
-  const [hasUnsavedTransactionChanges, setHasUnsavedTransactionChanges] = useState(false);
   const editingTransactionActivityRef = useRef<BusinessActivityCode | null>(null);
   const sectorFormScopeRef = useRef({ companyId: activeCompany?.id, activityCode: selectedActivityCode });
   const [isSavingTransaction, setIsSavingTransaction] = useState(false);
   const [isTransactionFormExpanded, setIsTransactionFormExpanded] = useState(
-    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+    () => !isListFirstSector && (typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches)
   );
   const [isArticleManagementExpanded, setIsArticleManagementExpanded] = useState(false);
   const [isTenantManagementExpanded, setIsTenantManagementExpanded] = useState(false);
   const [isShopManagementExpanded, setIsShopManagementExpanded] = useState(false);
   const [isProjectManagementExpanded, setIsProjectManagementExpanded] = useState(false);
+  const formScope = `${activeCompany?.id ?? ""}:${selectedActivityCode ?? ""}`;
+  const accountChanges = useFormChanges(accountForm, `${formScope}:account:${editingAccountId ?? "new"}`);
+  const articleChanges = useFormChanges(articleForm, `${formScope}:article:${editingArticleId ?? "new"}`);
+  const tenantChanges = useFormChanges(tenantForm, `${formScope}:tenant:${editingTenantId ?? "new"}`);
+  const shopChanges = useFormChanges(shopForm, `${formScope}:shop:${editingShopId ?? "new"}`);
+  const projectChanges = useFormChanges(projectForm, `${formScope}:project:${editingProjectId ?? "new"}`);
+  const transactionChanges = useFormChanges({ transactionForm, proof: transactionProofFile?.name }, `${formScope}:transaction:${editingTransactionId ?? "new"}`);
   const [isCompactScreen] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
   );
@@ -3532,6 +3556,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const beverageOperationKind = selectedActivityCode === "BEVERAGE_DEPOT"
     ? getBeverageOperationKind(transactionForm.type, transactionForm.metadata)
     : "VENTE";
+  const originalBeverageEdit = transactions.find((item) => item.id === editingTransactionId) ?? (linkedTransaction?.id === editingTransactionId ? linkedTransaction : undefined);
+  const isLegacyBeverageEdit = selectedActivityCode === "BEVERAGE_DEPOT" && Boolean(editingTransactionId) && !originalBeverageEdit?.metadata.beverageProductId;
+  const selectedBeverageProduct = beverageStock.items.find((product) => product.id === transactionForm.metadata.beverageProductId);
   const agencyOperationKind = selectedActivityCode === "REAL_ESTATE_AGENCY"
     ? getAgencyOperationKind(transactionForm.type, transactionForm.metadata)
     : "SALE_COMMISSION";
@@ -3705,20 +3732,6 @@ export function FinanceTransactionsPage(): JSX.Element {
     () => (selectedTransaction && !isSelectedTransactionArchived ? canMutateTransaction(selectedTransaction) : false),
     [canMutateTransaction, isSelectedTransactionArchived, selectedTransaction]
   );
-  const transactionSearchTextById = useMemo(() => new Map(transactions.map((item) => [
-    item.id,
-    buildQuickSearchText([
-      item.accountName,
-      item.accountRef,
-      item.description,
-      item.createdByEmail,
-      item.amount,
-      item.currency,
-      item.type === "CASH_IN" ? "Entree" : "Sortie",
-      item.activityCode ? getBusinessActivityLabel(item.activityCode) : "Charge transversale entreprise",
-      ...Object.values(item.metadata)
-    ])
-  ])), [transactions]);
   const serviceCategorySuggestions = useMemo(() => {
     if (selectedActivityCode !== "SERVICES") return [];
     const values = new Set(["Morgue"]);
@@ -3729,10 +3742,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
     return [...values].sort((left, right) => left.localeCompare(right, "fr"));
   }, [selectedActivityCode, sectorTransactions]);
-  const displayTransactions = useMemo(() => {
-    const matchesSearch = createQuickSearchMatcher(searchQuery);
-    return sectorTransactions.filter((item) => matchesSearch(transactionSearchTextById.get(item.id) ?? ""));
-  }, [searchQuery, sectorTransactions, transactionSearchTextById]);
+  const displayTransactions = sectorTransactions;
   const totalVisibleTransactionPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTransactions.length / visibleTransactionsPageSize));
   }, [displayTransactions.length, visibleTransactionsPageSize]);
@@ -3751,33 +3761,38 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [displayTransactions.length, visibleTransactionsPage, visibleTransactionsPageSize]);
   const resetAccountForm = useCallback(() => {
     setEditingAccountId(null);
+    accountChanges.markClean();
     setAccountForm(buildDefaultAccountForm(selectedActivityCode, canManageGlobalAccounts));
   }, [canManageGlobalAccounts, selectedActivityCode]);
 
   const resetArticleForm = useCallback(() => {
     setEditingArticleId(null);
+    articleChanges.markClean();
     setArticleForm(buildDefaultArticleForm());
   }, []);
 
   const resetTenantForm = useCallback(() => {
     setEditingTenantId(null);
+    tenantChanges.markClean();
     setTenantForm(buildDefaultTenantForm());
   }, []);
 
   const resetShopForm = useCallback(() => {
     setEditingShopId(null);
+    shopChanges.markClean();
     setShopForm(buildDefaultShopForm());
   }, []);
 
   const resetProjectForm = useCallback(() => {
     setEditingProjectId(null);
+    projectChanges.markClean();
     setProjectForm(buildDefaultProjectForm());
   }, []);
 
   const resetTransactionForm = useCallback(() => {
     setEditingTransactionId(null);
     editingTransactionActivityRef.current = null;
-    setHasUnsavedTransactionChanges(false);
+    transactionChanges.markClean();
     setTransactionProofFile(null);
     const defaultMetadata = syncMetadataState({}, financeMetadataFields);
     setTransactionForm((prev) => ({
@@ -3793,6 +3808,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       metadata:
         selectedActivityCode === "HARDWARE"
           ? { ...defaultMetadata, [HARDWARE_OPERATION_KIND_KEY]: "ITEM_ENTRY" }
+          : selectedActivityCode === "BEVERAGE_DEPOT"
+            ? { ...defaultMetadata, [BEVERAGE_OPERATION_KIND_KEY]: "VENTE" }
           : defaultMetadata,
       // Kept from the previous entry so entering many lines from the same paper
       // ledger (same day, same account) doesn't require reselecting them each time.
@@ -3800,14 +3817,33 @@ export function FinanceTransactionsPage(): JSX.Element {
     }));
   }, [accounts, allowedCurrencies, financeMetadataFields, selectedActivityCode]);
 
+  const referenceViewKey = activeReferenceView?.view ?? "transactions";
+  const previousReferenceView = useRef(referenceViewKey);
+  useEffect(() => {
+    const previousView = previousReferenceView.current;
+    if (previousView === referenceViewKey) return;
+    previousReferenceView.current = referenceViewKey;
+    if (previousView === "articles") resetArticleForm();
+    else if (previousView === "tenants") resetTenantForm();
+    else if (previousView === "shops") resetShopForm();
+    else if (previousView === "projects") resetProjectForm();
+    else resetTransactionForm();
+    setIsArticleManagementExpanded(false);
+    setIsTenantManagementExpanded(false);
+    setIsShopManagementExpanded(false);
+    setIsProjectManagementExpanded(false);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }, [referenceViewKey, resetArticleForm, resetTenantForm, resetShopForm, resetProjectForm, resetTransactionForm]);
+
   useEffect(() => {
     const previous = sectorFormScopeRef.current;
     if (previous.companyId === activeCompany?.id && previous.activityCode === selectedActivityCode) return;
     sectorFormScopeRef.current = { companyId: activeCompany?.id, activityCode: selectedActivityCode };
-    const hadUnsavedWork = hasUnsavedTransactionChanges || Boolean(editingTransactionId);
+    const hadUnsavedWork = transactionChanges.isDirty;
     setEditingTransactionId(null);
     editingTransactionActivityRef.current = null;
-    setHasUnsavedTransactionChanges(false);
+    transactionChanges.markClean();
     setTransactionProofFile(null);
     setTransactionForm({
       accountId: "",
@@ -3818,6 +3854,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       metadata: syncMetadataState({}, financeMetadataFields),
       occurredAt: ""
     });
+    if (isListFirstSector && location.hash !== "#transaction-create") setIsTransactionFormExpanded(false);
     resetAccountForm();
     resetArticleForm();
     resetTenantForm();
@@ -3831,7 +3868,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setLinkedTransaction(null);
     setErrorMessage(null);
     setSuccessMessage(hadUnsavedWork ? "Le formulaire a été réinitialisé pour le nouveau secteur." : null);
-  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, financeMetadataFields, hasUnsavedTransactionChanges, location.search, resetAccountForm, resetArticleForm, resetProjectForm, resetShopForm, resetTenantForm, selectedActivityCode]);
+  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, financeMetadataFields, transactionChanges.isDirty, location.search, resetAccountForm, resetArticleForm, resetProjectForm, resetShopForm, resetTenantForm, selectedActivityCode]);
 
   const canManageAccount = useCallback(
     (account: FinancialAccount): boolean => {
@@ -4114,7 +4151,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       setIsLoadingMoreTransactions(true);
     } else {
       setIsLoadingMoreTransactions(false);
-      if (!silent && !hasLoadedTransactionsRef.current) setIsLoading(true);
+      if (!silent) setIsLoading(true);
     }
     setErrorMessage(null);
     try {
@@ -4128,6 +4165,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         const transactionsResp = await listFinanceTransactionsRequest(accessToken, {
           limit: pageSize,
           offset,
+          search: debouncedSearch || undefined,
           type: filters.type === "ALL" ? undefined : filters.type,
           activityCode: selectedActivityCode
         });
@@ -4139,7 +4177,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         !append &&
         selectedActivityCode &&
         isQuickFillSectorActivity(selectedActivityCode) &&
-        filters.type === "ALL"
+        filters.type === "ALL" && !debouncedSearch
       ) {
         setSectorSuggestionHistory(payload.transactions);
       }
@@ -4151,9 +4189,6 @@ export function FinanceTransactionsPage(): JSX.Element {
         return [...prev, ...payload.transactions.filter((item) => !seen.has(item.id))];
       });
       if (!append) {
-        setEditingTransactionId((prev) =>
-          prev && (prev === requestedTransactionIdRef.current || payload.transactions.some((item) => item.id === prev)) ? prev : null
-        );
         setSelectedTransactionId((prev) => {
           const requestedId = requestedTransactionIdRef.current;
           if (requestedId) {
@@ -4186,7 +4221,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         }
       }
     }
-  }, [activeCompany?.id, filters.type, isLoadingActivities, selectedActivityCode, transactionsFetchPageSize, withAuthorizedToken]);
+  }, [activeCompany?.id, debouncedSearch, filters.type, isLoadingActivities, selectedActivityCode, transactionsFetchPageSize, withAuthorizedToken]);
 
   const loadSectorSuggestionHistory = useCallback(async () => {
     const requestId = ++sectorSuggestionLoadRequestRef.current;
@@ -4195,7 +4230,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       !isTransactionFormExpanded ||
       !selectedActivityCode ||
       !isQuickFillSectorActivity(selectedActivityCode) ||
-      filters.type === "ALL"
+      (filters.type === "ALL" && !debouncedSearch)
     ) {
       if (!isQuickFillSectorActivity(selectedActivityCode)) {
         setSectorSuggestionHistory([]);
@@ -4221,6 +4256,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
   }, [
     activeCompany?.id,
+    debouncedSearch,
     filters.type,
     isLoadingActivities,
     isTransactionFormExpanded,
@@ -4319,17 +4355,22 @@ export function FinanceTransactionsPage(): JSX.Element {
       setArticles([]);
       return;
     }
-    if (!isTransactionFormExpanded && !isArticleManagementExpanded) return;
+    if (!isTransactionFormExpanded && !isArticleManagementExpanded && !isHardwareArticlesView) return;
+    setIsLoadingArticles(true);
+    setHasLoadedArticles(false);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listActivityArticlesRequest(accessToken, "HARDWARE")
       );
       if (requestId !== articlesLoadRequestRef.current) return;
       setArticles(payload.items);
+      setHasLoadedArticles(true);
     } catch (error) {
       if (requestId === articlesLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+    } finally {
+      if (requestId === articlesLoadRequestRef.current) setIsLoadingArticles(false);
     }
-  }, [activeCompany?.id, isArticleManagementExpanded, isLoadingActivities, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, isArticleManagementExpanded, isHardwareArticlesView, isLoadingActivities, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
     void loadArticles();
@@ -4342,21 +4383,28 @@ export function FinanceTransactionsPage(): JSX.Element {
       setTenants([]);
       return;
     }
-    if (!isTransactionFormExpanded && !isTenantManagementExpanded) return;
+    if (!isTransactionFormExpanded && !isTenantManagementExpanded && activeReferenceView?.view !== "tenants") return;
+    setIsLoadingTenants(true);
+    setHasLoadedTenants(false);
+    setErrorMessage(null);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listRentalTenantsRequest(accessToken)
       );
       if (requestId !== tenantsLoadRequestRef.current) return;
+      loadedTenantsContextRef.current = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
       setTenants(payload.items);
+      setHasLoadedTenants(true);
     } catch (error) {
       if (requestId === tenantsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+    } finally {
+      if (requestId === tenantsLoadRequestRef.current) setIsLoadingTenants(false);
     }
-  }, [activeCompany?.id, isLoadingActivities, isTenantManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, activeReferenceView?.view, isLoadingActivities, isTenantManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
-    void loadTenants();
-  }, [loadTenants]);
+    if (loadedTenantsContextRef.current !== `${activeCompany?.id ?? ""}:${selectedActivityCode}`) void loadTenants();
+  }, [activeCompany?.id, loadTenants, selectedActivityCode]);
 
   const loadShops = useCallback(async () => {
     const requestId = ++shopsLoadRequestRef.current;
@@ -4365,21 +4413,28 @@ export function FinanceTransactionsPage(): JSX.Element {
       setShops([]);
       return;
     }
-    if (!isTransactionFormExpanded && !isShopManagementExpanded) return;
+    if (!isTransactionFormExpanded && !isShopManagementExpanded && activeReferenceView?.view !== "shops") return;
+    setIsLoadingShops(true);
+    setHasLoadedShops(false);
+    setErrorMessage(null);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listGeneralStoreShopsRequest(accessToken)
       );
       if (requestId !== shopsLoadRequestRef.current) return;
+      loadedShopsContextRef.current = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
       setShops(payload.items);
+      setHasLoadedShops(true);
     } catch (error) {
       if (requestId === shopsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+    } finally {
+      if (requestId === shopsLoadRequestRef.current) setIsLoadingShops(false);
     }
-  }, [activeCompany?.id, isLoadingActivities, isShopManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, activeReferenceView?.view, isLoadingActivities, isShopManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
-    void loadShops();
-  }, [loadShops]);
+    if (loadedShopsContextRef.current !== `${activeCompany?.id ?? ""}:${selectedActivityCode}`) void loadShops();
+  }, [activeCompany?.id, loadShops, selectedActivityCode]);
 
   const loadProjects = useCallback(async () => {
     const requestId = ++projectsLoadRequestRef.current;
@@ -4388,21 +4443,28 @@ export function FinanceTransactionsPage(): JSX.Element {
       setProjects([]);
       return;
     }
-    if (!isTransactionFormExpanded && !isProjectManagementExpanded) return;
+    if (!isTransactionFormExpanded && !isProjectManagementExpanded && activeReferenceView?.view !== "projects") return;
+    setIsLoadingProjects(true);
+    setHasLoadedProjects(false);
+    setErrorMessage(null);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listBtpProjectsRequest(accessToken)
       );
       if (requestId !== projectsLoadRequestRef.current) return;
+      loadedProjectsContextRef.current = `${activeCompany?.id ?? ""}:${selectedActivityCode}`;
       setProjects(payload.items);
+      setHasLoadedProjects(true);
     } catch (error) {
       if (requestId === projectsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+    } finally {
+      if (requestId === projectsLoadRequestRef.current) setIsLoadingProjects(false);
     }
-  }, [activeCompany?.id, isLoadingActivities, isProjectManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
+  }, [activeCompany?.id, activeReferenceView?.view, isLoadingActivities, isProjectManagementExpanded, isTransactionFormExpanded, selectedActivityCode, withAuthorizedToken]);
 
   useEffect(() => {
-    void loadProjects();
-  }, [loadProjects]);
+    if (loadedProjectsContextRef.current !== `${activeCompany?.id ?? ""}:${selectedActivityCode}`) void loadProjects();
+  }, [activeCompany?.id, loadProjects, selectedActivityCode]);
 
   async function handleLoadMoreTransactions(): Promise<void> {
     if (isLoading || isLoadingMoreTransactions || !hasMoreTransactions) {
@@ -4490,7 +4552,7 @@ export function FinanceTransactionsPage(): JSX.Element {
         metadata: nextMetadata
       };
     });
-  }, [allowedCurrencies, financeMetadataFields]);
+  }, [allowedCurrencies, financeMetadataFields, transactionWorkspace]);
 
   useEffect(() => {
     setTransactionForm((prev) => {
@@ -4601,6 +4663,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       return;
     }
 
+    if (!accountChanges.confirmDiscard()) return;
+    accountChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingAccountId(account.id);
@@ -4617,6 +4681,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleCancelEditAccount(): void {
+    if (!accountChanges.confirmDiscard()) return;
+    accountChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     resetAccountForm();
@@ -4701,6 +4767,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleStartEditArticle(article: ActivityArticle): void {
+    if (!articleChanges.confirmDiscard()) return;
+    articleChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingArticleId(article.id);
@@ -4716,6 +4784,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleCancelEditArticle(): void {
+    if (!articleChanges.confirmDiscard()) return;
+    articleChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     resetArticleForm();
@@ -4787,6 +4857,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleStartEditTenant(tenant: RentalTenant): void {
+    if (!tenantChanges.confirmDiscard()) return;
+    tenantChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingTenantId(tenant.id);
@@ -4802,6 +4874,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleCancelEditTenant(): void {
+    if (!tenantChanges.confirmDiscard()) return;
+    tenantChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     resetTenantForm();
@@ -4869,6 +4943,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleStartEditShop(shop: GeneralStoreShop): void {
+    if (!shopChanges.confirmDiscard()) return;
+    shopChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingShopId(shop.id);
@@ -4882,6 +4958,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleCancelEditShop(): void {
+    if (!shopChanges.confirmDiscard()) return;
+    shopChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     resetShopForm();
@@ -4950,6 +5028,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleStartEditProject(project: BtpProject): void {
+    if (!projectChanges.confirmDiscard()) return;
+    projectChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingProjectId(project.id);
@@ -4964,6 +5044,8 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleCancelEditProject(): void {
+    if (!projectChanges.confirmDiscard()) return;
+    projectChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     resetProjectForm();
@@ -5001,6 +5083,19 @@ export function FinanceTransactionsPage(): JSX.Element {
     event.preventDefault();
     if (!selectedActivityCode) {
       return;
+    }
+    if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK")) {
+      if (beverageStock.loading || beverageStock.error || !selectedBeverageProduct) {
+        setErrorMessage("Choisissez un produit dans le stock disponible. Ajoutez d'abord le produit si nécessaire.");
+        return;
+      }
+      const editedSale = [...transactions, ...(linkedTransaction ? [linkedTransaction] : [])].find((item) => item.id === editingTransactionId && item.metadata.beverageProductId === selectedBeverageProduct.id && item.metadata.beverageOperationKind === "VENTE" && item.status !== "REJECTED");
+      const available = Number(selectedBeverageProduct.quantity) + (editedSale ? toAmountNumber(editedSale.metadata.quantity ?? "0") : 0);
+      if (beverageOperationKind === "VENTE" && toAmountNumber(transactionForm.metadata.quantity ?? "0") > available) {
+        setErrorMessage(`Stock insuffisant pour ${selectedBeverageProduct.name}. Disponible : ${available} ${selectedBeverageProduct.unit}.`);
+        void beverageStock.refresh();
+        return;
+      }
     }
     if (editingTransactionId && editingTransactionActivityRef.current !== selectedActivityCode) {
       setErrorMessage("Cette transaction appartient à un autre secteur. Rouvrez-la depuis son secteur.");
@@ -5079,6 +5174,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       );
       resetTransactionForm();
       void loadAccounts();
+      if (selectedActivityCode === "BEVERAGE_DEPOT") void beverageStock.refresh();
       if (proofFileToUpload) {
         void uploadTransactionProof(response.item.id, proofFileToUpload)
           .then((proofItems) => {
@@ -5101,6 +5197,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
     } catch (error) {
       setErrorMessage(toErrorMessage(error));
+      if (selectedActivityCode === "BEVERAGE_DEPOT" && error instanceof ApiError && error.statusCode === 409) void beverageStock.refresh();
     } finally {
       setIsSavingTransaction(false);
     }
@@ -5114,10 +5211,11 @@ export function FinanceTransactionsPage(): JSX.Element {
       return;
     }
 
+    if (!transactionChanges.confirmDiscard()) return;
     setTransactionProofFile(null);
     setEditingTransactionId(transaction.id);
     editingTransactionActivityRef.current = transaction.activityCode;
-    setHasUnsavedTransactionChanges(false);
+    transactionChanges.markClean();
     setIsTransactionFormExpanded(true);
     scrollToFinanceSection("transaction-create");
     const metadata = syncMetadataState(transaction.metadata, financeMetadataFields);
@@ -5142,12 +5240,15 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function handleCancelEditTransaction(): void {
+    if (!transactionChanges.confirmDiscard()) return;
+    transactionChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     resetTransactionForm();
   }
 
   function applyGeneralExpenseSuggestion(suggestion: FinancialTransaction): void {
+    transactionChanges.onChangeCapture();
     const kind = getGeneralExpenseKind(suggestion.metadata);
     setTransactionForm((prev) => {
       const metadata = cleanSectorFinanceMetadata("GENERAL_EXPENSES", "CASH_OUT", {
@@ -5171,6 +5272,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   function applySectorTransactionSuggestion(suggestion: FinancialTransaction): void {
+    transactionChanges.onChangeCapture();
     if (!isQuickFillSectorActivity(selectedActivityCode)) {
       return;
     }
@@ -5250,6 +5352,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
       setSuccessMessage("Transaction supprimée.");
       setTransactionPendingDelete(null);
+      if (transaction.activityCode === "BEVERAGE_DEPOT") void beverageStock.refresh();
       setTransactions((prev) => prev.filter((item) => item.id !== transaction.id));
       setLinkedTransaction((prev) => prev?.id === transaction.id ? null : prev);
       setSectorSuggestionHistory((prev) => prev.filter((item) => item.id !== transaction.id));
@@ -5439,13 +5542,384 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
   }
 
+  function openReferenceForm(): void {
+    if (!activeReferenceView) return;
+    if (activeReferenceView.view === "articles") {
+      if (isSavingArticle || !articleChanges.confirmDiscard()) return;
+      resetArticleForm();
+      setIsArticleManagementExpanded(true);
+    } else if (activeReferenceView.view === "tenants") {
+      if (isSavingTenant || !tenantChanges.confirmDiscard()) return;
+      resetTenantForm();
+      setIsTenantManagementExpanded(true);
+    } else if (activeReferenceView.view === "shops") {
+      if (isSavingShop || !shopChanges.confirmDiscard()) return;
+      resetShopForm();
+      setIsShopManagementExpanded(true);
+    } else {
+      if (isSavingProject || !projectChanges.confirmDiscard()) return;
+      resetProjectForm();
+      setIsProjectManagementExpanded(true);
+    }
+    scrollToFinanceSection(activeReferenceView.sectionId);
+  }
+
+  useEffect(() => {
+    if (isLoadingActivities || !referenceView || location.hash !== `#${referenceView.sectionId}`) return;
+    if (!activeReferenceView) {
+      const next = new URLSearchParams(location.search);
+      next.set("view", referenceView.view);
+      next.delete("transactionId");
+      navigate({ pathname: location.pathname, search: next.toString(), hash: location.hash }, { replace: true });
+      return;
+    }
+    if (activeReferenceView.view === "articles") setIsArticleManagementExpanded(true);
+    else if (activeReferenceView.view === "tenants") setIsTenantManagementExpanded(true);
+    else if (activeReferenceView.view === "shops") setIsShopManagementExpanded(true);
+    else setIsProjectManagementExpanded(true);
+    scrollToFinanceSection(activeReferenceView.sectionId);
+    navigate({ pathname: location.pathname, search: location.search, hash: "" }, { replace: true });
+  }, [activeReferenceView, isLoadingActivities, location.hash, location.pathname, location.search, navigate, referenceView, setSearchParams]);
+
+  function openSectorTransaction(preset: SectorTransactionPreset): boolean {
+    if (!selectedActivityCode || !canManageTransactions || isSavingTransaction ||
+      !transactionWorkspace?.presets.some((candidate) => candidate.id === preset.id) ||
+      !selectedProfile?.finance.allowedTransactionTypes.includes(preset.type)) return false;
+    if (!transactionChanges.confirmDiscard()) return false;
+    resetTransactionForm();
+    setShowGeneralExpenseCalculator(false);
+    setTransactionForm((previous) => ({
+      ...previous,
+      type: preset.type,
+      metadata: cleanSectorFinanceMetadata(selectedActivityCode, preset.type, {
+        ...syncMetadataState({}, financeMetadataFields), ...preset.metadata
+      })
+    }));
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsTransactionFormExpanded(true);
+    scrollToFinanceSection("transaction-create");
+    return true;
+  }
+
+  function renderTransactionProof(): JSX.Element {
+    return (
+<details
+            className="finance-transaction-form-options finance-proof-callout"
+            open={Boolean(transactionProofFile)}
+          >
+            <summary>
+              {transactionProofFile ? `Justificatif · ${transactionProofFile.name}` : "Justificatif (optionnel)"}
+            </summary>
+            <div className="finance-transaction-form-options-body">
+              <div className="finance-proof-callout-copy">
+                <p className="hint">
+                  Le fichier sera envoyé automatiquement après l'enregistrement de la transaction.
+                  Formats acceptés: PDF, JPG ou PNG.
+                </p>
+              </div>
+              <label className="finance-proof-upload" htmlFor="transaction-proof-file">
+                <span>Fichier de preuve</span>
+                <input
+                  key={`${transactionProofFile?.name ?? "empty"}-${transactionProofFile?.size ?? 0}`}
+                  id="transaction-proof-file"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                  onChange={(event) => setTransactionProofFile(event.target.files?.[0] ?? null)}
+                  disabled={isSavingTransaction}
+                />
+              </label>
+              {transactionProofFile ? (
+                <div className="finance-proof-selected">
+                  <strong>{transactionProofFile.name}</strong>
+                  <span>{formatFileSize(transactionProofFile.size)}</span>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => setTransactionProofFile(null)}
+                    disabled={isSavingTransaction}
+                  >
+                    Retirer
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </details>
+    );
+  }
+
+  function renderTransactionsList(): JSX.Element {
+    return (
+<section id="transactions-list" className="panel finance-page-panel">
+        <h3>{transactionWorkspace?.listTitle ?? "Transactions"}</h3>
+        {!isLoading && sectorTransactions.length === 0 ? (
+          <EmptyState
+            title={errorMessage ? "Liste indisponible" : searchQuery.trim() ? "Aucun résultat" : "Aucune transaction dans cette vue"}
+            description={errorMessage ? "Le chargement a échoué. Actualisez la liste pour réessayer." : searchQuery.trim() ? "Aucune transaction ne correspond à la recherche et aux filtres sélectionnés. Effacez la recherche ou modifiez les filtres." : "Enregistrez une première entrée ou sortie, ou changez les filtres pour retrouver les transactions existantes."}
+            actionLabel={canManageTransactions ? "Préparer une transaction" : undefined}
+            onAction={canManageTransactions ? () => {
+              setIsTransactionFormExpanded(true);
+              window.requestAnimationFrame(() => {
+                document.getElementById("transaction-create")?.scrollIntoView({
+                  block: "start",
+                  behavior: "smooth"
+                });
+              });
+            } : undefined}
+          />
+        ) : null}
+        {!isLoading && sectorTransactions.length > 0 && displayTransactions.length === 0 ? (
+          <EmptyState
+            title="Aucun résultat"
+            description="Aucune transaction ne correspond à la recherche ou aux filtres appliqués."
+            actionLabel="Réinitialiser les filtres"
+            onAction={() => {
+              setSearchQuery("");
+              setFilters({
+                type: "ALL"
+              });
+            }}
+          />
+        ) : null}
+        {!isLoading && displayTransactions.length > 0 ? (
+          <>
+          {renderVisibleTransactionsPagination()}
+          <div
+            className="table-wrap finance-transactions-table-wrap mobile-card-table"
+            role="region"
+            aria-label="Liste des transactions"
+            tabIndex={0}
+          >
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Compte</th>
+                  <th>Montant</th>
+                  <th>Justificatifs</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedTransactions.map((tx) => {
+                  const isBusy = busyTransactionId === tx.id;
+                  const sectorContext = getSectorRecordContext(tx.activityCode, tx.metadata);
+                  const operationLabel = getSectorTransactionLabel(tx);
+                  const isProofsOpen = openProofs[tx.id] === true;
+                  const proofs = proofsByTransaction[tx.id] ?? [];
+                  const isProofsLoading = loadingProofsByTransaction[tx.id] === true;
+                  const canEditTransaction = canMutateTransaction(tx);
+                  const canDeleteTransaction = canMutateTransaction(tx);
+
+                  return (
+                    <tr
+                      key={tx.id}
+                      className={`finance-transaction-row ${
+                        tx.type === "CASH_IN" ? "is-cash-in" : "is-cash-out"
+                      }`}
+                    >
+                      <td data-label="Date">
+                        {new Date(tx.occurredAt).toLocaleString("fr-FR")}
+                        <span className={`finance-transaction-mobile-status is-${tx.status.toLowerCase()}`}>
+                          {financeStatusLabel(tx.status)}
+                        </span>
+                      </td>
+                      <td data-label="Compte">
+                        <strong>{tx.accountName}</strong>
+                        <div className="hint">
+                          {tx.type === "CASH_IN" ? "Entrée" : "Sortie"} |{" "}
+                          {tx.activityCode
+                            ? getBusinessActivityLabel(tx.activityCode)
+                            : "Charge transversale entreprise"}
+                        </div>
+                        {operationLabel ? <div className="finance-transaction-description">{operationLabel}</div> : null}
+                        {tx.description?.trim() ? (
+                          <div className="finance-transaction-description">{tx.description}</div>
+                        ) : null}
+                        {sectorContext.length > 0 ? (
+                          <div className="sector-record-context">
+                            {sectorContext.map(({ label, value }) => (
+                              <span key={label}><strong>{label} :</strong> {value}</span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td data-label="Montant" className="finance-transaction-amount-cell">
+                        {formatAmountForDisplay(tx.amount)} {tx.currency}
+                      </td>
+                      <td data-label="Justificatifs" className="finance-transaction-proof-cell">
+                        <div>
+                          {tx.proofsCount} preuve{tx.proofsCount > 1 ? "s" : ""}
+                        </div>
+                        <p
+                          className={`hint finance-transaction-proof-requirement ${
+                            tx.requiresProof ? "is-required" : "is-optional"
+                          }`}
+                        >
+                          {tx.requiresProof ? "Justificatif requis" : "Justificatif libre"}
+                        </p>
+                      </td>
+                      <td data-label="Actions" className="finance-transaction-actions-cell">
+                        <div className="actions-inline">
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => handleOpenTransactionDetails(tx.id, tx.activityCode)}
+                          >
+                            Voir le détail
+                          </button>
+                          {canEditTransaction ? (
+                            <button
+                              type="button"
+                              className="secondary-btn mobile-hide-secondary-transaction-action"
+                              onClick={() => handleStartEditTransaction(tx)}
+                              disabled={isBusy}
+                            >
+                              Modifier
+                            </button>
+                          ) : null}
+                          {canDeleteTransaction ? (
+                            <button
+                              type="button"
+                              className="danger-btn mobile-hide-secondary-transaction-action"
+                              onClick={() => void handleDeleteTransaction(tx)}
+                              disabled={isBusy}
+                            >
+                              Supprimer
+                            </button>
+                          ) : null}
+                        </div>
+                        <details className="table-inline-details">
+                          <summary className="table-inline-summary">Contexte et justificatifs</summary>
+                          <div className="table-inline-content">
+                            <p className="hint">
+                              <strong>Portée du compte:</strong>{" "}
+                              {formatAccountScopeLabel({
+                                scopeType: tx.accountScopeType,
+                                primaryActivityCode: tx.accountPrimaryActivityCode,
+                                allowedActivityCodes: tx.accountAllowedActivityCodes
+                              })}
+                            </p>
+                            {tx.description?.trim() ? (
+                              <p className="hint">
+                                <strong>Description:</strong> {tx.description}
+                              </p>
+                            ) : null}
+                            <p className="hint">
+                              <strong>Contexte:</strong>{" "}
+                              {formatMetadataSummary(tx.metadata, financeMetadataFields)}
+                            </p>
+                            {getTransactionGovernanceLines(tx).map((line) => (
+                              <p key={`${tx.id}-${line}`} className="hint">
+                                {line}
+                              </p>
+                            ))}
+                            <div className="table-inline-meta">
+                              {tx.proofsCount > 0 ? (
+                                <button
+                                  type="button"
+                                  className="secondary-btn"
+                                  onClick={() => void handleToggleProofs(tx.id)}
+                                  disabled={isProofsLoading}
+                                >
+                                  {isProofsOpen ? "Masquer les preuves" : "Voir les preuves"}
+                                </button>
+                              ) : (
+                                <p className="hint proof-none">Aucune preuve disponible</p>
+                              )}
+                            </div>
+                            {isProofsOpen ? (
+                              <div className="proof-list">
+                                {isProofsLoading ? <p>Chargement des preuves...</p> : null}
+                                {!isProofsLoading && proofs.length === 0 ? (
+                                  <p>Aucune preuve ajoutee.</p>
+                                ) : null}
+                                {!isProofsLoading && proofs.length > 0 ? (
+                                  <ul>
+                                    {proofs.map((proof) => (
+                                      <li key={proof.id}>
+                                        {proof.publicUrl ? (
+                                          <a href={proof.publicUrl} target="_blank" rel="noreferrer">
+                                            {proof.fileName}
+                                          </a>
+                                        ) : (
+                                          <span>{proof.fileName} (lien indisponible)</span>
+                                        )}
+                                        <small>
+                                          {formatFileSize(proof.fileSize)} |{" "}
+                                          {new Date(proof.uploadedAt).toLocaleString("fr-FR")}
+                                        </small>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            {canMutateTransaction(tx) ? <div className="proof-inline-form">
+                              <input
+                                type="file"
+                                aria-label={`Preuve pour la transaction ${tx.accountName}`}
+                                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
+                                onChange={(event) =>
+                                  setProofFiles((prev) => ({
+                                    ...prev,
+                                    [tx.id]: event.target.files?.[0] ?? null
+                                  }))
+                                }
+                                disabled={isBusy}
+                              />
+                              <button
+                                type="button"
+                                className="secondary-btn"
+                                onClick={() => void handleAddProof(tx.id)}
+                                disabled={isBusy}
+                              >
+                                Ajouter une preuve
+                              </button>
+                            </div> : null}
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {hasMoreTransactions ? (
+            <div className="list-pagination">
+              <p className="hint list-pagination-meta">
+                {displayTransactions.length} transaction(s) filtrée(s)
+                {displayTransactions.length !== transactions.length
+                  ? ` sur ${transactions.length} chargee(s)`
+                  : ""}
+                {" sur plusieurs pages."}
+              </p>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleLoadMoreTransactions()}
+                disabled={isLoading || isLoadingMoreTransactions || searchQuery.trim() !== debouncedSearch}
+              >
+                {isLoadingMoreTransactions ? "Chargement..." : "Charger plus"}
+              </button>
+            </div>
+          ) : null}
+          {renderVisibleTransactionsPagination("bottom")}
+          </>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <>
       <header
         className={`${isReadOnlyOwner ? "section-header owner-lite-header" : "section-header"} mobile-title-duplicate`}
       >
-        <h2>Transactions financières</h2>
-        <p>Suivi financier opérationnel.</p>
+        <h2>{activeReferenceView ? `${activeReferenceView.label} · ${selectedActivity?.label ?? "Secteur actif"}` : "Transactions financières"}</h2>
+        <p>{activeReferenceView ? "Consultez les fiches du secteur et ouvrez une saisie à la demande." : "Suivi financier opérationnel."}</p>
       </header>
 
       {!selectedActivityCode && !isLoadingActivities ? (
@@ -5455,17 +5929,23 @@ export function FinanceTransactionsPage(): JSX.Element {
         </p>
       ) : null}
 
-      <PageGuide
+      {!activeReferenceView ? <PageGuide
         title={
           selectedActivity
             ? `Guide des transactions · ${selectedActivity.label}`
             : "Guide des transactions"
         }
         description={
-          selectedProfile?.operationsModel ??
+          selectedActivityCode === "BEVERAGE_DEPOT"
+            ? "Les achats alimentent le stock des produits et les ventes le diminuent. Le bénéfice brut utilise le coût du stock enregistré."
+            : selectedProfile?.operationsModel ??
           `Les écritures affichées sont filtrées par secteur: ${selectedActivity?.label ?? "aucun secteur actif"}.`
         }
-        items={selectedProfile?.finance.workflow.length
+        items={selectedActivityCode === "BEVERAGE_DEPOT" ? [
+          { term: "Stock", description: "Ajoutez chaque produit avec son unité et le stock de départ compté. Utilisez ensuite Approvisionner pour les achats et Vendre pour les ventes." },
+          { term: "Vente", description: "Choisissez le produit, la quantité et le prix de vente. Le coût d'achat vient du stock ; une vente au-delà du disponible est bloquée." },
+          { term: "Enregistrer", description: "Vérifiez le montant et la date, puis enregistrez. La précision et le justificatif sont facultatifs." }
+        ] : selectedProfile?.finance.workflow.length
           ? selectedProfile.finance.workflow.map((step) => ({
               term: step.label,
               description: step.description
@@ -5488,11 +5968,11 @@ export function FinanceTransactionsPage(): JSX.Element {
                 description: "Les champs métier alimentent les rapports sectoriels et les exports."
               }
             ]}
-      />
+      /> : null}
 
-      <SectorWorkspaceNav actions={[
+      <SectorWorkspaceNav actions={activeReferenceView ? [{ label: activeReferenceView.createLabel, onClick: openReferenceForm }] : [
         { label: "Voir les transactions", onClick: () => scrollToFinanceSection("transactions-list") },
-        ...(canManageTransactions ? [{
+        ...(canManageTransactions && !transactionWorkspace ? [{
           label: "Enregistrer une transaction",
           onClick: () => {
             setIsTransactionFormExpanded(true);
@@ -5506,36 +5986,33 @@ export function FinanceTransactionsPage(): JSX.Element {
             scrollToFinanceSection("accounts-list");
           }
         },
-        ...(selectedActivityCode === "HARDWARE" && canManageArticles ? [{
-          label: "Gérer les articles",
-          onClick: () => {
-            setIsArticleManagementExpanded(true);
-            scrollToFinanceSection("article-management");
-          }
+        ...(referenceView ? [{
+          label: `Gérer les ${referenceView.label.toLocaleLowerCase("fr")}`,
+          onClick: () => navigate(`/finance/transactions?activityCode=${selectedActivityCode}&view=${referenceView.view}`)
         }] : []),
-        ...(selectedActivityCode === "RENTAL" && canManageTenants ? [{
-          label: "Gérer les locataires",
-          onClick: () => {
-            setIsTenantManagementExpanded(true);
-            scrollToFinanceSection("tenant-management");
-          }
-        }] : []),
-        ...(selectedActivityCode === "GENERAL_STORE" && canManageShops ? [{
-          label: "Gérer les boutiques",
-          onClick: () => {
-            setIsShopManagementExpanded(true);
-            scrollToFinanceSection("shop-management");
-          }
-        }] : []),
-        ...(selectedActivityCode === "BTP" && canManageProjects ? [{
-          label: "Gérer les chantiers",
-          onClick: () => {
-            setIsProjectManagementExpanded(true);
-            scrollToFinanceSection("project-management");
-          }
+        ...(selectedActivityCode === "GENERAL_STORE" && user && !isReadOnlyOwner && canAccessFeature(user.role, "operationsTasks") ? [{
+          label: "Préparer un inventaire",
+          onClick: () => navigate("/operations/tasks?activityCode=GENERAL_STORE#task-create")
         }] : [])
       ]} />
 
+      {selectedActivityCode === "BEVERAGE_DEPOT" ? <BeverageStockPanel key={activeCompany?.id} {...beverageStock}
+        canManage={Boolean(user && ["SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"].includes(user.role))}
+        canCount={Boolean(user && ["SYS_ADMIN", "ACCOUNTANT"].includes(user.role))}
+        onOperation={(product, kind) => {
+          const preset = transactionWorkspace?.presets.find((item) => item.metadata?.beverageOperationKind === kind);
+          if (!preset || !openSectorTransaction(preset)) return;
+          setTransactionForm((previous) => ({ ...previous, metadata: { ...previous.metadata, beverageProductId: product.id,
+            productName: product.name, beverageUnit: product.unit, purchaseUnitPrice: kind === "VENTE" ? product.averageUnitCost : "" } }));
+        }} /> : null}
+      {!activeReferenceView && transactionWorkspace && canManageTransactions ? (
+        <SectorTransactionActions workspace={transactionWorkspace} onSelect={openSectorTransaction} disabled={isLoadingActivities || isSavingTransaction} />
+      ) : null}
+
+      {!activeReferenceView ? (<>
+      {transactionWorkspace ? renderTransactionsList() : null}
+      {transactionWorkspace ? <SectorTransactionSummary transactions={displayTransactions} /> : (<>
+      <p className="hint">Indicateurs calculés sur les transactions chargées après recherche et filtres. Consultez les rapports pour les totaux de la période complète.</p>
       <section className={isReadOnlyOwner ? "grid finance-summary-grid owner-lite-metrics" : "grid finance-summary-grid"}>
         {financePageCards.map((card) => (
           <article key={card.title} className="metric-card finance-overview-card">
@@ -5545,6 +6022,8 @@ export function FinanceTransactionsPage(): JSX.Element {
           </article>
         ))}
       </section>
+
+      </>)}
 
       {dumpTruckSummaryCards.length > 0 ? (
         <section className="panel finance-page-panel" aria-label="Synthèse des camions bennes">
@@ -5592,7 +6071,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                   : "Nouveau compte financier."}
               </small>
             </summary>
-            <form className="finance-account-form" onSubmit={handleSaveAccount} data-unsaved-sector-form={editingAccountId ? "true" : undefined}>
+            <form className="finance-account-form" onSubmit={handleSaveAccount} onChangeCapture={accountChanges.onChangeCapture} data-unsaved-sector-form={accountChanges.isDirty ? "true" : undefined}>
             <label className="operations-inline-group">
               <span>Nom du compte</span>
               <input
@@ -5760,580 +6239,68 @@ export function FinanceTransactionsPage(): JSX.Element {
         </section>
       ) : null}
 
-      {selectedActivityCode === "HARDWARE" && canManageArticles ? (
-        <section className="panel finance-page-panel">
-          <details
-            id="article-management"
-            className="finance-section-toggle"
-            open={isArticleManagementExpanded}
-            onToggle={(event) => setIsArticleManagementExpanded(event.currentTarget.open)}
-          >
-            <summary className="finance-section-summary">
-              <span>{editingArticleId ? "Modifier un article" : "Gérer mes articles"}</span>
-              <small>
-                {editingArticleId
-                  ? "Modification d'un article du catalogue."
-                  : "Ajoutez les articles vendus par la quincaillerie pour les retrouver en sélection."}
-              </small>
-            </summary>
-            <form className="finance-account-form" onSubmit={handleSaveArticle} data-unsaved-sector-form={editingArticleId ? "true" : undefined}>
-              <label className="operations-inline-group">
-                <span>Nom de l'article</span>
-                <input
-                  type="text"
-                  placeholder="Ex: Ciment, Barre fer 08, Tôle 4kg"
-                  value={articleForm.name}
-                  onChange={(event) =>
-                    setArticleForm((prev) => ({
-                      ...prev,
-                      name: event.target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Prix d'achat de référence</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Optionnel, ex: 5000"
-                  value={articleForm.defaultPurchaseUnitPrice}
-                  onChange={(event) =>
-                    setArticleForm((prev) => ({
-                      ...prev,
-                      defaultPurchaseUnitPrice: formatEditableAmountForInput(event.target.value)
-                    }))
-                  }
-                  onBlur={() =>
-                    setArticleForm((prev) => ({
-                      ...prev,
-                      defaultPurchaseUnitPrice: formatAmountForInput(prev.defaultPurchaseUnitPrice)
-                    }))
-                  }
-                />
-                <small className="hint">
-                  Pré-remplit le prix d'achat quand cet article est choisi dans une opération.
-                </small>
-              </label>
-              <label className="operations-inline-group">
-                <span>Bénéfice de référence</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Optionnel, ex: 1500"
-                  value={articleForm.defaultMargin}
-                  onChange={(event) =>
-                    setArticleForm((prev) => ({
-                      ...prev,
-                      defaultMargin: formatEditableAmountForInput(event.target.value)
-                    }))
-                  }
-                  onBlur={() =>
-                    setArticleForm((prev) => ({
-                      ...prev,
-                      defaultMargin: formatAmountForInput(prev.defaultMargin)
-                    }))
-                  }
-                />
-              </label>
-              <div className="mobile-sticky-form-actions">
-                <button type="submit" disabled={isSavingArticle}>
-                  {isSavingArticle ? (
-                    <>
-                      <ButtonSpinner />
-                      Enregistrement...
-                    </>
-                  ) : editingArticleId ? (
-                    "Enregistrer les modifications"
-                  ) : (
-                    "Ajouter l'article"
-                  )}
-                </button>
-                {editingArticleId ? (
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={handleCancelEditArticle}
-                    disabled={isSavingArticle}
-                  >
-                    Annuler la modification
-                  </button>
-                ) : null}
-              </div>
-            </form>
-            {articles.length > 0 ? (
-              <div className="operations-member-grid">
-                {articles.map((article) => {
-                  const isBusy = busyArticleId === article.id;
-                  return (
-                    <article key={article.id} className="operations-member-card">
-                      <h4>{article.name}</h4>
-                      <p className="hint">
-                        Prix d'achat de référence:{" "}
-                        {article.defaultPurchaseUnitPrice
-                          ? formatAmountForDisplay(article.defaultPurchaseUnitPrice)
-                          : "Non défini"}
-                      </p>
-                      <p className="hint">
-                        Bénéfice de référence:{" "}
-                        {article.defaultMargin ? formatAmountForDisplay(article.defaultMargin) : "Non défini"}
-                      </p>
-                      <div className="actions-inline">
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => handleStartEditArticle(article)}
-                          disabled={isBusy}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          onClick={() => handleDeleteArticle(article)}
-                          disabled={isBusy}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="hint">Aucun article enregistré pour le moment.</p>
-            )}
-          </details>
-        </section>
+      </>) : null}
+
+      {isHardwareArticlesView ? (
+        <>
+          <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
+          <HardwareArticlesPanel
+            articles={articles} articleForm={articleForm} setArticleForm={setArticleForm}
+            editingArticleId={editingArticleId} busyArticleId={busyArticleId}
+            isSavingArticle={isSavingArticle} articleChanges={articleChanges}
+            isArticleManagementExpanded={isArticleManagementExpanded}
+            setIsArticleManagementExpanded={setIsArticleManagementExpanded}
+            isLoadingArticles={isLoadingArticles} hasLoadedArticles={hasLoadedArticles}
+            onReload={() => void loadArticles()} handleSaveArticle={handleSaveArticle}
+            handleCancelEditArticle={handleCancelEditArticle}
+            handleStartEditArticle={handleStartEditArticle} handleDeleteArticle={handleDeleteArticle}
+          />
+        </>
       ) : null}
 
-      {selectedActivityCode === "RENTAL" && canManageTenants ? (
-        <section className="panel finance-page-panel">
-          <details
-            id="tenant-management"
-            className="finance-section-toggle"
-            open={isTenantManagementExpanded}
-            onToggle={(event) => setIsTenantManagementExpanded(event.currentTarget.open)}
-          >
-            <summary className="finance-section-summary">
-              <span>{editingTenantId ? "Modifier un locataire" : "Gérer mes locataires"}</span>
-              <small>
-                {editingTenantId
-                  ? "Modification d'un locataire enregistré."
-                  : "Ajoutez vos locataires (nom, logement occupé et loyer mensuel) pour les retrouver en sélection lors du paiement."}
-              </small>
-            </summary>
-            <form className="finance-account-form" onSubmit={handleSaveTenant} data-unsaved-sector-form={editingTenantId ? "true" : undefined}>
-              <label className="operations-inline-group">
-                <span>Nom du locataire</span>
-                <input
-                  type="text"
-                  placeholder="Ex: Issa Guido"
-                  value={tenantForm.name}
-                  onChange={(event) =>
-                    setTenantForm((prev) => ({
-                      ...prev,
-                      name: event.target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Logement occupé</span>
-                <input
-                  type="text"
-                  placeholder="Ex: Appartement 2 chambres salon, Boutique n°3"
-                  value={tenantForm.unitLabel}
-                  onChange={(event) =>
-                    setTenantForm((prev) => ({
-                      ...prev,
-                      unitLabel: event.target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Loyer mensuel</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Ex: 30000"
-                  value={tenantForm.monthlyRent}
-                  onChange={(event) =>
-                    setTenantForm((prev) => ({
-                      ...prev,
-                      monthlyRent: formatEditableAmountForInput(event.target.value)
-                    }))
-                  }
-                  onBlur={() =>
-                    setTenantForm((prev) => ({
-                      ...prev,
-                      monthlyRent: formatAmountForInput(prev.monthlyRent)
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Téléphone</span>
-                <input
-                  type="text"
-                  placeholder="Optionnel"
-                  value={tenantForm.phone}
-                  onChange={(event) =>
-                    setTenantForm((prev) => ({
-                      ...prev,
-                      phone: event.target.value
-                    }))
-                  }
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Locataire depuis</span>
-                <input
-                  type="month"
-                  value={tenantForm.tenancyStart}
-                  onChange={(event) =>
-                    setTenantForm((prev) => ({
-                      ...prev,
-                      tenancyStart: event.target.value
-                    }))
-                  }
-                  required
-                />
-                <small className="hint">
-                  Mois d'entrée du locataire, utilisé pour calculer les retards de paiement. Pour un
-                  locataire déjà en place, indiquez son mois d'entrée réel.
-                </small>
-              </label>
-              <div className="mobile-sticky-form-actions">
-                <button type="submit" disabled={isSavingTenant}>
-                  {isSavingTenant ? (
-                    <>
-                      <ButtonSpinner />
-                      Enregistrement...
-                    </>
-                  ) : editingTenantId ? (
-                    "Enregistrer les modifications"
-                  ) : (
-                    "Ajouter le locataire"
-                  )}
-                </button>
-                {editingTenantId ? (
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={handleCancelEditTenant}
-                    disabled={isSavingTenant}
-                  >
-                    Annuler la modification
-                  </button>
-                ) : null}
-              </div>
-            </form>
-            {tenants.length > 0 ? (
-              <div className="operations-member-grid">
-                {tenants.map((tenant) => {
-                  const isBusy = busyTenantId === tenant.id;
-                  return (
-                    <article key={tenant.id} className="operations-member-card">
-                      <h4>{tenant.name}</h4>
-                      <p className="hint">
-                        {tenant.unitLabel} | Loyer mensuel: {formatAmountForDisplay(tenant.monthlyRent)}
-                      </p>
-                      <p className="hint">Locataire depuis: {formatTenancyStartLabel(tenant.tenancyStart)}</p>
-                      <div className="actions-inline">
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => handleStartEditTenant(tenant)}
-                          disabled={isBusy}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          onClick={() => handleDeleteTenant(tenant)}
-                          disabled={isBusy}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="hint">Aucun locataire enregistré pour le moment.</p>
-            )}
-          </details>
-        </section>
+      {activeReferenceView?.view === "tenants" ? (
+        <>
+          <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
+          <RentalTenantsPanel
+            key={formScope} tenants={tenants.filter((record) => record.companyId === activeCompany?.id)} tenantForm={tenantForm} setTenantForm={setTenantForm}
+            editingTenantId={editingTenantId} busyTenantId={busyTenantId} isSavingTenant={isSavingTenant}
+            isTenantManagementExpanded={isTenantManagementExpanded} setIsTenantManagementExpanded={setIsTenantManagementExpanded}
+            tenantChanges={tenantChanges} isLoading={isLoadingTenants} hasLoaded={hasLoadedTenants}
+            onReload={() => void loadTenants()} handleSaveTenant={handleSaveTenant}
+            handleCancelEditTenant={handleCancelEditTenant} handleStartEditTenant={handleStartEditTenant} handleDeleteTenant={handleDeleteTenant}
+          />
+        </>
       ) : null}
 
-      {selectedActivityCode === "GENERAL_STORE" && canManageShops ? (
-        <section className="panel finance-page-panel">
-          <details
-            id="shop-management"
-            className="finance-section-toggle"
-            open={isShopManagementExpanded}
-            onToggle={(event) => setIsShopManagementExpanded(event.currentTarget.open)}
-          >
-            <summary className="finance-section-summary">
-              <span>{editingShopId ? "Modifier une boutique" : "Gérer mes boutiques"}</span>
-              <small>
-                {editingShopId
-                  ? "Modification d'une boutique enregistrée."
-                  : "Ajoutez les boutiques ou magasins livrés pour les retrouver en sélection lors des achats et recouvrements."}
-              </small>
-            </summary>
-            <form className="finance-account-form" onSubmit={handleSaveShop} data-unsaved-sector-form={editingShopId ? "true" : undefined}>
-              <label className="operations-inline-group">
-                <span>Nom de la boutique</span>
-                <input
-                  type="text"
-                  placeholder="Ex: Boutique Nord"
-                  value={shopForm.name}
-                  onChange={(event) =>
-                    setShopForm((prev) => ({
-                      ...prev,
-                      name: event.target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Emplacement</span>
-                <input
-                  type="text"
-                  placeholder="Optionnel, ex: Marché central"
-                  value={shopForm.location}
-                  onChange={(event) =>
-                    setShopForm((prev) => ({
-                      ...prev,
-                      location: event.target.value
-                    }))
-                  }
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Téléphone</span>
-                <input
-                  type="text"
-                  placeholder="Optionnel"
-                  value={shopForm.phone}
-                  onChange={(event) =>
-                    setShopForm((prev) => ({
-                      ...prev,
-                      phone: event.target.value
-                    }))
-                  }
-                />
-              </label>
-              <div className="mobile-sticky-form-actions">
-                <button type="submit" disabled={isSavingShop}>
-                  {isSavingShop ? (
-                    <>
-                      <ButtonSpinner />
-                      Enregistrement...
-                    </>
-                  ) : editingShopId ? (
-                    "Enregistrer les modifications"
-                  ) : (
-                    "Ajouter la boutique"
-                  )}
-                </button>
-                {editingShopId ? (
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={handleCancelEditShop}
-                    disabled={isSavingShop}
-                  >
-                    Annuler la modification
-                  </button>
-                ) : null}
-              </div>
-            </form>
-            {shops.length > 0 ? (
-              <div className="operations-member-grid">
-                {shops.map((shop) => {
-                  const isBusy = busyShopId === shop.id;
-                  return (
-                    <article key={shop.id} className="operations-member-card">
-                      <h4>{shop.name}</h4>
-                      {shop.location ? <p className="hint">{shop.location}</p> : null}
-                      {shop.phone ? <p className="hint">Tél: {shop.phone}</p> : null}
-                      <div className="actions-inline">
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => handleStartEditShop(shop)}
-                          disabled={isBusy}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          onClick={() => handleDeleteShop(shop)}
-                          disabled={isBusy}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="hint">Aucune boutique enregistrée pour le moment.</p>
-            )}
-          </details>
-        </section>
+      {activeReferenceView?.view === "shops" ? (
+        <>
+          <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
+          <GeneralStoreShopsPanel
+            key={formScope} shops={shops.filter((record) => record.companyId === activeCompany?.id)} shopForm={shopForm} setShopForm={setShopForm}
+            editingShopId={editingShopId} busyShopId={busyShopId} isSavingShop={isSavingShop}
+            isShopManagementExpanded={isShopManagementExpanded} setIsShopManagementExpanded={setIsShopManagementExpanded}
+            shopChanges={shopChanges} isLoading={isLoadingShops} hasLoaded={hasLoadedShops}
+            onReload={() => void loadShops()} handleSaveShop={handleSaveShop}
+            handleCancelEditShop={handleCancelEditShop} handleStartEditShop={handleStartEditShop} handleDeleteShop={handleDeleteShop}
+          />
+        </>
       ) : null}
 
-      {selectedActivityCode === "BTP" && canManageProjects ? (
-        <section className="panel finance-page-panel">
-          <details
-            id="project-management"
-            className="finance-section-toggle"
-            open={isProjectManagementExpanded}
-            onToggle={(event) => setIsProjectManagementExpanded(event.currentTarget.open)}
-          >
-            <summary className="finance-section-summary">
-              <span>{editingProjectId ? "Modifier un chantier" : "Gérer mes chantiers"}</span>
-              <small>
-                {editingProjectId
-                  ? "Modification d'un chantier enregistré."
-                  : "Ajoutez vos chantiers (client, marché, lieu) pour les retrouver en sélection lors des opérations."}
-              </small>
-            </summary>
-            <form className="finance-account-form" onSubmit={handleSaveProject} data-unsaved-sector-form={editingProjectId ? "true" : undefined}>
-              <label className="operations-inline-group">
-                <span>Nom du chantier</span>
-                <input
-                  type="text"
-                  placeholder="Ex: Chantier Kalaban"
-                  value={projectForm.name}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      name: event.target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Client / maitre d'ouvrage</span>
-                <input
-                  type="text"
-                  placeholder="Optionnel"
-                  value={projectForm.clientRef}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      clientRef: event.target.value
-                    }))
-                  }
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Marché / devis</span>
-                <input
-                  type="text"
-                  placeholder="Optionnel, ex: DEV-2026-10"
-                  value={projectForm.contractRef}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      contractRef: event.target.value
-                    }))
-                  }
-                />
-              </label>
-              <label className="operations-inline-group">
-                <span>Localisation</span>
-                <input
-                  type="text"
-                  placeholder="Optionnel, ex: Kalaban"
-                  value={projectForm.location}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      location: event.target.value
-                    }))
-                  }
-                />
-              </label>
-              <div className="mobile-sticky-form-actions">
-                <button type="submit" disabled={isSavingProject}>
-                  {isSavingProject ? (
-                    <>
-                      <ButtonSpinner />
-                      Enregistrement...
-                    </>
-                  ) : editingProjectId ? (
-                    "Enregistrer les modifications"
-                  ) : (
-                    "Ajouter le chantier"
-                  )}
-                </button>
-                {editingProjectId ? (
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={handleCancelEditProject}
-                    disabled={isSavingProject}
-                  >
-                    Annuler la modification
-                  </button>
-                ) : null}
-              </div>
-            </form>
-            {projects.length > 0 ? (
-              <div className="operations-member-grid">
-                {projects.map((project) => {
-                  const isBusy = busyProjectId === project.id;
-                  return (
-                    <article key={project.id} className="operations-member-card">
-                      <h4>{project.name}</h4>
-                      {project.clientRef ? <p className="hint">Client: {project.clientRef}</p> : null}
-                      {project.contractRef ? <p className="hint">Marché: {project.contractRef}</p> : null}
-                      {project.location ? <p className="hint">{project.location}</p> : null}
-                      <div className="actions-inline">
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => handleStartEditProject(project)}
-                          disabled={isBusy}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          onClick={() => handleDeleteProject(project)}
-                          disabled={isBusy}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="hint">Aucun chantier enregistré pour le moment.</p>
-            )}
-          </details>
-        </section>
+      {activeReferenceView?.view === "projects" ? (
+        <>
+          <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
+          <BtpProjectsPanel
+            key={formScope} projects={projects.filter((record) => record.companyId === activeCompany?.id)} projectForm={projectForm} setProjectForm={setProjectForm}
+            editingProjectId={editingProjectId} busyProjectId={busyProjectId} isSavingProject={isSavingProject}
+            isProjectManagementExpanded={isProjectManagementExpanded} setIsProjectManagementExpanded={setIsProjectManagementExpanded}
+            projectChanges={projectChanges} isLoading={isLoadingProjects} hasLoaded={hasLoadedProjects}
+            onReload={() => void loadProjects()} handleSaveProject={handleSaveProject}
+            handleCancelEditProject={handleCancelEditProject} handleStartEditProject={handleStartEditProject} handleDeleteProject={handleDeleteProject}
+          />
+        </>
       ) : null}
+
+      {!activeReferenceView ? (<>
 
       {canManageSalaries ? (
         <section className="panel finance-page-panel">
@@ -6390,13 +6357,19 @@ export function FinanceTransactionsPage(): JSX.Element {
               className="quick-search-input"
               placeholder={`Rechercher : ${getSectorSearchHint(selectedActivityCode)}...`}
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
+              onChange={(event) => setSearchQuery(event.target.value.slice(0, 200))}
             />
           </label>
           <button type="submit" className="mobile-hide-redundant-action">Actualiser</button>
         </form>
+        <p className="hint" role="status">{searchQuery.trim() !== debouncedSearch || isLoading
+          ? "Recherche dans l’historique du secteur…"
+          : "Recherche dans tout l’historique autorisé du secteur, avec les filtres sélectionnés."}</p>
       </section>
 
+      {isListFirstSector && !transactionWorkspace ? renderTransactionsList() : null}
+
+      {!transactionWorkspace || canManageTransactions ? (
       <section className="panel finance-page-panel">
         <details
           id="transaction-create"
@@ -6419,10 +6392,10 @@ export function FinanceTransactionsPage(): JSX.Element {
             </p>
           ) : null}
           <form
-            className="finance-transaction-form"
+            className={`finance-transaction-form${selectedActivityCode === "BEVERAGE_DEPOT" ? " finance-transaction-form-beverage" : ""}`}
             onSubmit={handleSaveTransaction}
-            onChangeCapture={() => setHasUnsavedTransactionChanges(true)}
-            data-unsaved-sector-form={hasUnsavedTransactionChanges || editingTransactionId ? "true" : undefined}
+            onChangeCapture={transactionChanges.onChangeCapture}
+            data-unsaved-sector-form={transactionChanges.isDirty || isSavingTransaction ? "true" : undefined}
           >
           <fieldset className="finance-transaction-form-section">
             <legend>Informations principales</legend>
@@ -6458,10 +6431,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                     value={storeOperationKind}
                     onChange={(event) => {
                       const nextValue = event.target.value;
-                      if (nextValue === "INVENTAIRE") {
-                        navigate(`/operations/tasks?activityCode=${encodeURIComponent(selectedActivityCode)}`);
-                        return;
-                      }
                       const nextKind = nextValue as StoreOperationKind;
                       setTransactionForm((prev) => {
                         const nextType = getStoreOperationType(nextKind);
@@ -6483,7 +6452,6 @@ export function FinanceTransactionsPage(): JSX.Element {
                   >
                     <option value="ACHAT">{STORE_OPERATION_LABELS.ACHAT}</option>
                     <option value="RECOUVREMENT">{STORE_OPERATION_LABELS.RECOUVREMENT}</option>
-                    <option value="INVENTAIRE">Inventaire (vers Tâches)</option>
                   </select>
                 </label>
 
@@ -6860,15 +6828,17 @@ export function FinanceTransactionsPage(): JSX.Element {
             ) : selectedActivityCode === "BEVERAGE_DEPOT" ? (
               <>
                 <label className="operations-inline-group">
-                  <span>Catégorie du dépôt</span>
+                  <span>Opération</span>
                   <select
                     value={beverageOperationKind}
+                    disabled={isLegacyBeverageEdit}
                     onChange={(event) => {
                       const nextKind = event.target.value as BeverageOperationKind;
                       setTransactionForm((prev) => {
                         const nextType = nextKind === "VENTE" || nextKind === "AUTRE_RECETTE" ? "CASH_IN" : "CASH_OUT";
                         const nextMetadata = cleanSectorFinanceMetadata(selectedActivityCode, nextType, {
                           ...prev.metadata,
+                          ...(nextKind === "ACHAT_STOCK" && getBeverageOperationKind(prev.type, prev.metadata) !== "ACHAT_STOCK" ? { purchaseUnitPrice: "" } : {}),
                           [BEVERAGE_OPERATION_KIND_KEY]: nextKind
                         });
                         return {
@@ -6886,10 +6856,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                   </select>
                 </label>
                 <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>{transactionForm.type === "CASH_IN" ? "Recette du dépôt" : "Décaissement du dépôt"}</strong>
+                  <span>Mouvement de caisse</span>
+                  <strong>{transactionForm.type === "CASH_IN" ? "Entrée d'argent" : "Sortie d'argent"}</strong>
                 </div>
-                <p className="form-help-text">Les versements et reliquats se suivent dans les tâches de rapprochement; ils ne doivent pas être enregistrés une seconde fois comme des ventes.</p>
               </>
             ) : selectedActivityCode === "WATER" ? (
               <>
@@ -7157,6 +7126,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 inputMode="numeric"
                 placeholder="Montant"
                 value={transactionForm.amount}
+                readOnly={selectedActivityCode === "BEVERAGE_DEPOT" && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK")}
                 onChange={(event) =>
                   setTransactionForm((prev) => ({
                     ...prev,
@@ -7171,6 +7141,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                 }
                 required
               />
+              {selectedActivityCode === "BEVERAGE_DEPOT" && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK") ? (
+                <span className="hint">Total calculé automatiquement : quantité × prix {beverageOperationKind === "VENTE" ? "de vente" : "d'achat"} unitaire.</span>
+              ) : null}
             </label>
 
             <label className="operations-inline-group">
@@ -7202,51 +7175,23 @@ export function FinanceTransactionsPage(): JSX.Element {
             </span>
           </div>
 
-          <details
-            className="finance-transaction-form-options finance-proof-callout"
-            open={Boolean(transactionProofFile)}
-          >
-            <summary>
-              {transactionProofFile ? `Justificatif · ${transactionProofFile.name}` : "Justificatif (optionnel)"}
-            </summary>
-            <div className="finance-transaction-form-options-body">
-              <div className="finance-proof-callout-copy">
-                <p className="hint">
-                  Le fichier sera envoyé automatiquement après l'enregistrement de la transaction.
-                  Formats acceptés: PDF, JPG ou PNG.
-                </p>
-              </div>
-              <label className="finance-proof-upload" htmlFor="transaction-proof-file">
-                <span>Fichier de preuve</span>
-                <input
-                  key={`${transactionProofFile?.name ?? "empty"}-${transactionProofFile?.size ?? 0}`}
-                  id="transaction-proof-file"
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                  onChange={(event) => setTransactionProofFile(event.target.files?.[0] ?? null)}
-                  disabled={isSavingTransaction}
-                />
-              </label>
-              {transactionProofFile ? (
-                <div className="finance-proof-selected">
-                  <strong>{transactionProofFile.name}</strong>
-                  <span>{formatFileSize(transactionProofFile.size)}</span>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => setTransactionProofFile(null)}
-                    disabled={isSavingTransaction}
-                  >
-                    Retirer
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </details>
+          {!transactionWorkspace ? renderTransactionProof() : null}
 
-          <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails}>
+          <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails || Boolean(transactionWorkspace)}>
             <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : selectedActivityCode === "HYDROCARBON" ? "Détails Hydrocarbure" : "Détails de l'opération"}</summary>
             <div className="finance-transaction-form-options-body">
+              {selectedActivityCode === "BEVERAGE_DEPOT" ? (
+                <p className="hint finance-form-mode-hint">
+                  {beverageOperationKind === "VENTE"
+                    ? isLegacyBeverageEdit ? "Historique antérieur au suivi de stock : les produits, quantités et prix sont conservés. Les références et précisions restent modifiables. Le stock actuel n'est pas modifié." : "Choisissez le produit en stock, puis la quantité et le prix de vente dans son unité. Le coût d'achat provient automatiquement du stock."
+                    : beverageOperationKind === "ACHAT_STOCK"
+                      ? isLegacyBeverageEdit ? "Achat historique : les produits, quantités et prix sont conservés. Cette modification ne crée pas une nouvelle entrée de stock." : "Choisissez le produit, puis le fournisseur, la quantité reçue et le prix d'achat dans l'unité du produit. Le stock augmente à l'enregistrement."
+                      : beverageOperationKind === "DEPENSE"
+                        ? "Choisissez la nature de la dépense et saisissez le montant payé."
+                        : "Saisissez le montant reçu pour une recette qui n'est pas une vente de boissons."}
+                  {" Les champs marqués * sont obligatoires."}
+                </p>
+              ) : null}
               {selectedActivityCode === "HYDROCARBON" ? (
                 <p className="hint finance-form-mode-hint">Choisissez d'abord le produit ou l'équipement. La quantité et le partenaire sont utiles pour les produits ; la référence est demandée pour une citerne.</p>
               ) : null}
@@ -7398,7 +7343,7 @@ export function FinanceTransactionsPage(): JSX.Element {
               </label>
 
               <label className="operations-inline-group">
-                <span>Description</span>
+                <span>{selectedActivityCode === "BEVERAGE_DEPOT" ? "Précision (facultative)" : transactionWorkspace ? selectedProfile?.finance.fields.find((field) => field.key === "description")?.label ?? "Description" : "Description"}</span>
                 <input
                   type="text"
                   placeholder={
@@ -7420,6 +7365,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                         : undefined
                   }
                 />
+                {selectedActivityCode === "BEVERAGE_DEPOT" ? <span className="hint">Vous pouvez laisser ce champ vide. Ajoutez un client ou une remarque si nécessaire.</span> : null}
                 {selectedActivityCode === "GENERAL_EXPENSES" ? (
                   <datalist id="general-expense-description-options">
                     {generalExpenseDescriptionSuggestions.map((value) => (
@@ -7453,6 +7399,18 @@ export function FinanceTransactionsPage(): JSX.Element {
               ) : null}
 
               {visibleFinanceMetadataFields.map((field) => {
+                if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && beverageOperationKind === "VENTE" && field.key === "purchaseUnitPrice") return null;
+                if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && field.key === "productName") return (
+                  <label key={field.key} className="operations-inline-group"><span>Produit en stock *</span>
+                    <select required disabled={beverageStock.loading || Boolean(beverageStock.error)} value={transactionForm.metadata.beverageProductId ?? ""} onChange={(event) => {
+                      const product = beverageStock.items.find((item) => item.id === event.target.value);
+                      setTransactionForm((previous) => ({ ...previous, metadata: { ...previous.metadata,
+                        beverageProductId: product?.id ?? "", productName: product?.name ?? "", beverageUnit: product?.unit ?? "",
+                        purchaseUnitPrice: beverageOperationKind === "VENTE" ? product?.averageUnitCost ?? "" : "" } }));
+                    }}><option value="">Choisir un produit</option>{beverageStock.items.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.quantity} {product.unit} disponible(s)</option>)}</select>
+                    {selectedBeverageProduct ? <span className="hint">Unité : {selectedBeverageProduct.unit}. Disponible : {selectedBeverageProduct.quantity}. {beverageOperationKind === "VENTE" ? `Coût moyen d'achat : ${formatLocalizedAmountForDisplay(selectedBeverageProduct.averageUnitCost)} XOF par ${selectedBeverageProduct.unit}.` : ""}</span> : <span className="hint">Produit absent ? Ajoutez-le dans Stock disponible avant de saisir l'opération.</span>}
+                  </label>
+                );
                 const beverageRequiredFields = beverageOperationKind === "VENTE"
                   ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"]
                   : beverageOperationKind === "ACHAT_STOCK"
@@ -7480,6 +7438,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                       transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] ?? ""
                     ) && field.key === "expenseCategory"))
                 );
+                const fieldLabel = selectedActivityCode === "BEVERAGE_DEPOT"
+                  ? `${field.label}${isFieldRequired ? " *" : " (facultatif)"}`
+                  : field.label;
                 if (
                   selectedActivityCode === "GENERAL_EXPENSES" &&
                   !showGeneralExpenseCalculator &&
@@ -7532,8 +7493,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                       </select>
                       {tenants.length === 0 ? (
                         <small className="hint">
-                          Aucun locataire enregistré. Ajoutez-en un dans "Gérer mes locataires"
-                          ci-dessus.
+                          Aucun locataire enregistré. {referenceView?.view === "tenants"
+                            ? <Link to="/finance/transactions?activityCode=RENTAL&view=tenants">Ouvrir les locataires</Link>
+                            : "Demandez à un responsable d'ajouter le locataire."}
                         </small>
                       ) : null}
                     </label>
@@ -7571,8 +7533,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                       </select>
                       {shops.length === 0 ? (
                         <small className="hint">
-                          Aucune boutique enregistrée. Ajoutez-en une dans "Gérer mes boutiques"
-                          ci-dessus.
+                          Aucune boutique enregistrée. {referenceView?.view === "shops"
+                            ? <Link to="/finance/transactions?activityCode=GENERAL_STORE&view=shops">Ouvrir les boutiques</Link>
+                            : "Demandez à un responsable d'ajouter la boutique."}
                         </small>
                       ) : null}
                     </label>
@@ -7613,8 +7576,9 @@ export function FinanceTransactionsPage(): JSX.Element {
                       </select>
                       {projects.length === 0 ? (
                         <small className="hint">
-                          Aucun chantier enregistré. Ajoutez-en un dans "Gérer mes chantiers"
-                          ci-dessus.
+                          Aucun chantier enregistré. {referenceView?.view === "projects"
+                            ? <Link to="/finance/transactions?activityCode=BTP&view=projects">Ouvrir les chantiers</Link>
+                            : "Demandez à un responsable d'ajouter le chantier."}
                         </small>
                       ) : selectedProject ? (
                         <small className="hint">
@@ -7769,7 +7733,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                           const category = event.target.value;
                           setTransactionForm((prev) => {
                             const operationKind = category === "Camion benne"
-                              ? prev.metadata[DUMP_TRUCK_OPERATION_KEY] || "TRAVAUX"
+                              ? prev.metadata[DUMP_TRUCK_OPERATION_KEY] || (prev.type === "CASH_OUT" ? "DEPENSE" : "TRAVAUX")
                               : "";
                             const nextMetadata = {
                               ...prev.metadata,
@@ -7891,7 +7855,7 @@ export function FinanceTransactionsPage(): JSX.Element {
                 if (field.options?.length) {
                   return (
                     <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
+                      <span>{fieldLabel}</span>
                       <select value={transactionForm.metadata[field.key] ?? ""} onChange={(event) => setTransactionForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={isFieldRequired}>
                         <option value="">Choisir une catégorie</option>
                         {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -7902,13 +7866,14 @@ export function FinanceTransactionsPage(): JSX.Element {
 
                 return (
                 <label key={field.key} className="operations-inline-group">
-                  <span>{field.label}</span>
+                  <span>{fieldLabel}</span>
                   <input
                     type="text"
                     list={selectedActivityCode === "SERVICES" && field.key === "serviceCategory" ? "finance-service-categories" : undefined}
                     inputMode={isMoneyMetadataField(field.key) ? "numeric" : getMetadataInputMode(field.key)}
                     placeholder={field.helpText || field.label}
                     value={transactionForm.metadata[field.key] ?? ""}
+                    readOnly={isLegacyBeverageEdit && ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"].includes(field.key)}
                     onChange={(event) => {
                       const nextValue = isMoneyMetadataField(field.key)
                         ? formatEditableAmountForInput(event.target.value)
@@ -7977,6 +7942,8 @@ export function FinanceTransactionsPage(): JSX.Element {
             ) : null}
           </details>
 
+          {transactionWorkspace ? renderTransactionProof() : null}
+
           <div className="mobile-sticky-form-actions">
             <button
               type="submit"
@@ -8015,270 +7982,15 @@ export function FinanceTransactionsPage(): JSX.Element {
         </details>
       </section>
 
+      ) : null}
+
       <FeedbackBanner
         errorMessage={errorMessage}
         successMessage={successMessage}
         isLoading={isLoading}
       />
 
-      <section id="transactions-list" className="panel finance-page-panel">
-        <h3>Transactions</h3>
-        {!isLoading && sectorTransactions.length === 0 ? (
-          <EmptyState
-            title="Aucune transaction dans cette vue"
-            description="Enregistrez une premiere entree ou sortie, ou changez les filtres pour retrouver les transactions existantes."
-            actionLabel={canManageTransactions ? "Préparer une transaction" : undefined}
-            onAction={canManageTransactions ? () => {
-              setIsTransactionFormExpanded(true);
-              window.requestAnimationFrame(() => {
-                document.getElementById("transaction-create")?.scrollIntoView({
-                  block: "start",
-                  behavior: "smooth"
-                });
-              });
-            } : undefined}
-          />
-        ) : null}
-        {!isLoading && sectorTransactions.length > 0 && displayTransactions.length === 0 ? (
-          <EmptyState
-            title="Aucun résultat"
-            description="Aucune transaction ne correspond à la recherche ou aux filtres appliqués."
-            actionLabel="Réinitialiser les filtres"
-            onAction={() => {
-              setSearchQuery("");
-              setFilters({
-                type: "ALL"
-              });
-            }}
-          />
-        ) : null}
-        {!isLoading && displayTransactions.length > 0 ? (
-          <>
-          {renderVisibleTransactionsPagination()}
-          <div
-            className="table-wrap finance-transactions-table-wrap mobile-card-table"
-            role="region"
-            aria-label="Liste des transactions"
-            tabIndex={0}
-          >
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Compte</th>
-                  <th>Montant</th>
-                  <th>Justificatifs</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedTransactions.map((tx) => {
-                  const isBusy = busyTransactionId === tx.id;
-                  const sectorContext = getSectorRecordContext(tx.activityCode, tx.metadata);
-                  const isProofsOpen = openProofs[tx.id] === true;
-                  const proofs = proofsByTransaction[tx.id] ?? [];
-                  const isProofsLoading = loadingProofsByTransaction[tx.id] === true;
-                  const canEditTransaction = canMutateTransaction(tx);
-                  const canDeleteTransaction = canMutateTransaction(tx);
-
-                  return (
-                    <tr
-                      key={tx.id}
-                      className={`finance-transaction-row ${
-                        tx.type === "CASH_IN" ? "is-cash-in" : "is-cash-out"
-                      }`}
-                    >
-                      <td data-label="Date">
-                        {new Date(tx.occurredAt).toLocaleString("fr-FR")}
-                        <span className={`finance-transaction-mobile-status is-${tx.status.toLowerCase()}`}>
-                          {financeStatusLabel(tx.status)}
-                        </span>
-                      </td>
-                      <td data-label="Compte">
-                        <strong>{tx.accountName}</strong>
-                        <div className="hint">
-                          {tx.type === "CASH_IN" ? "Entrée" : "Sortie"} |{" "}
-                          {tx.activityCode
-                            ? getBusinessActivityLabel(tx.activityCode)
-                            : "Charge transversale entreprise"}
-                        </div>
-                        {tx.description?.trim() ? (
-                          <div className="finance-transaction-description">{tx.description}</div>
-                        ) : null}
-                        {sectorContext.length > 0 ? (
-                          <div className="sector-record-context">
-                            {sectorContext.map(({ label, value }) => (
-                              <span key={label}><strong>{label} :</strong> {value}</span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td data-label="Montant" className="finance-transaction-amount-cell">
-                        {formatAmountForDisplay(tx.amount)} {tx.currency}
-                      </td>
-                      <td data-label="Justificatifs" className="finance-transaction-proof-cell">
-                        <div>
-                          {tx.proofsCount} preuve{tx.proofsCount > 1 ? "s" : ""}
-                        </div>
-                        <p
-                          className={`hint finance-transaction-proof-requirement ${
-                            tx.requiresProof ? "is-required" : "is-optional"
-                          }`}
-                        >
-                          {tx.requiresProof ? "Justificatif requis" : "Justificatif libre"}
-                        </p>
-                      </td>
-                      <td data-label="Actions" className="finance-transaction-actions-cell">
-                        <div className="actions-inline">
-                          <button
-                            type="button"
-                            className="secondary-btn"
-                            onClick={() => handleOpenTransactionDetails(tx.id, tx.activityCode)}
-                          >
-                            Voir le détail
-                          </button>
-                          {canEditTransaction ? (
-                            <button
-                              type="button"
-                              className="secondary-btn mobile-hide-secondary-transaction-action"
-                              onClick={() => handleStartEditTransaction(tx)}
-                              disabled={isBusy}
-                            >
-                              Modifier
-                            </button>
-                          ) : null}
-                          {canDeleteTransaction ? (
-                            <button
-                              type="button"
-                              className="danger-btn mobile-hide-secondary-transaction-action"
-                              onClick={() => void handleDeleteTransaction(tx)}
-                              disabled={isBusy}
-                            >
-                              Supprimer
-                            </button>
-                          ) : null}
-                        </div>
-                        <details className="table-inline-details">
-                          <summary className="table-inline-summary">Contexte et justificatifs</summary>
-                          <div className="table-inline-content">
-                            <p className="hint">
-                              <strong>Portée du compte:</strong>{" "}
-                              {formatAccountScopeLabel({
-                                scopeType: tx.accountScopeType,
-                                primaryActivityCode: tx.accountPrimaryActivityCode,
-                                allowedActivityCodes: tx.accountAllowedActivityCodes
-                              })}
-                            </p>
-                            {tx.description?.trim() ? (
-                              <p className="hint">
-                                <strong>Description:</strong> {tx.description}
-                              </p>
-                            ) : null}
-                            <p className="hint">
-                              <strong>Contexte:</strong>{" "}
-                              {formatMetadataSummary(tx.metadata, financeMetadataFields)}
-                            </p>
-                            {getTransactionGovernanceLines(tx).map((line) => (
-                              <p key={`${tx.id}-${line}`} className="hint">
-                                {line}
-                              </p>
-                            ))}
-                            <div className="table-inline-meta">
-                              {tx.proofsCount > 0 ? (
-                                <button
-                                  type="button"
-                                  className="secondary-btn"
-                                  onClick={() => void handleToggleProofs(tx.id)}
-                                  disabled={isProofsLoading}
-                                >
-                                  {isProofsOpen ? "Masquer les preuves" : "Voir les preuves"}
-                                </button>
-                              ) : (
-                                <p className="hint proof-none">Aucune preuve disponible</p>
-                              )}
-                            </div>
-                            {isProofsOpen ? (
-                              <div className="proof-list">
-                                {isProofsLoading ? <p>Chargement des preuves...</p> : null}
-                                {!isProofsLoading && proofs.length === 0 ? (
-                                  <p>Aucune preuve ajoutee.</p>
-                                ) : null}
-                                {!isProofsLoading && proofs.length > 0 ? (
-                                  <ul>
-                                    {proofs.map((proof) => (
-                                      <li key={proof.id}>
-                                        {proof.publicUrl ? (
-                                          <a href={proof.publicUrl} target="_blank" rel="noreferrer">
-                                            {proof.fileName}
-                                          </a>
-                                        ) : (
-                                          <span>{proof.fileName} (lien indisponible)</span>
-                                        )}
-                                        <small>
-                                          {formatFileSize(proof.fileSize)} |{" "}
-                                          {new Date(proof.uploadedAt).toLocaleString("fr-FR")}
-                                        </small>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                ) : null}
-                              </div>
-                            ) : null}
-
-                            {canMutateTransaction(tx) ? <div className="proof-inline-form">
-                              <input
-                                type="file"
-                                aria-label={`Preuve pour la transaction ${tx.accountName}`}
-                                accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf"
-                                onChange={(event) =>
-                                  setProofFiles((prev) => ({
-                                    ...prev,
-                                    [tx.id]: event.target.files?.[0] ?? null
-                                  }))
-                                }
-                                disabled={isBusy}
-                              />
-                              <button
-                                type="button"
-                                className="secondary-btn"
-                                onClick={() => void handleAddProof(tx.id)}
-                                disabled={isBusy}
-                              >
-                                Ajouter une preuve
-                              </button>
-                            </div> : null}
-                          </div>
-                        </details>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {hasMoreTransactions ? (
-            <div className="list-pagination">
-              <p className="hint list-pagination-meta">
-                {displayTransactions.length} transaction(s) filtrée(s)
-                {displayTransactions.length !== transactions.length
-                  ? ` sur ${transactions.length} chargee(s)`
-                  : ""}
-                {" sur plusieurs pages."}
-              </p>
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => void handleLoadMoreTransactions()}
-                disabled={isLoadingMoreTransactions}
-              >
-                {isLoadingMoreTransactions ? "Chargement..." : "Charger plus"}
-              </button>
-            </div>
-          ) : null}
-          {renderVisibleTransactionsPagination("bottom")}
-          </>
-        ) : null}
-      </section>
+      {!isListFirstSector ? renderTransactionsList() : null}
 
       {requestedTransactionId && !selectedTransaction && !isLoading ? (
         <p className="hint" role="status">Ouverture de la transaction...</p>
@@ -8570,6 +8282,8 @@ export function FinanceTransactionsPage(): JSX.Element {
           </details>
         </section>
       ) : null}
+
+      </>) : null}
 
       <ConfirmDialog
         open={accountPendingDelete !== null}

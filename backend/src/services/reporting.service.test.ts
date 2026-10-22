@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { listBeverageProducts, listBeverageStockAdjustments } from "../repositories/beverage-stock.repository.js";
+vi.mock("../repositories/beverage-stock.repository.js", () => ({ listBeverageProducts: vi.fn().mockResolvedValue([]), listBeverageStockAdjustments: vi.fn().mockResolvedValue([]) }));
 import { inflateSync } from "node:zlib";
 import * as XLSX from "xlsx";
+import { mkdir, writeFile } from "node:fs/promises";
 import {
   exportCompanyReportsPdf,
   exportCompanyTransactionsExcel,
@@ -90,6 +93,25 @@ vi.mock("../repositories/btp-projects.repository.js", () => ({
   listBtpProjects: vi.fn()
 }));
 
+async function saveReportArtifact(pdf: Buffer, name: string): Promise<void> {
+  if (!process.env.AMCCO_REPORT_ARTIFACTS) return;
+  const directory = new URL("../../../artifacts/sector-reports/", import.meta.url);
+  await mkdir(directory, { recursive: true });
+  await writeFile(new URL(`${name}.pdf`, directory), pdf);
+}
+
+let reportArtifactSequence = 0;
+async function renderReportArtifact(actor: Parameters<typeof exportCompanyReportsPdf>[0], filters: Parameters<typeof exportCompanyReportsPdf>[1]): Promise<Buffer> {
+  const pdf = await exportCompanyReportsPdf(actor, filters);
+  if (process.env.AMCCO_REPORT_ARTIFACTS) {
+    const overview = await getCompanyReportsOverview(actor, filters);
+    const name = `${filters?.activityCode}-preview-${++reportArtifactSequence}`;
+    await saveReportArtifact(pdf, name);
+    await writeFile(new URL(`../../../artifacts/sector-reports/${name}.json`, import.meta.url), JSON.stringify(overview));
+  }
+  return pdf;
+}
+
 function extractPdfText(pdf: Buffer): string {
   const pdfLatin1 = pdf.toString("latin1");
   const decodedStreams = [...pdfLatin1.matchAll(/stream\r?\n/g)]
@@ -97,8 +119,11 @@ function extractPdfText(pdf: Buffer): string {
       const start = (match.index ?? 0) + match[0].length;
       const end = pdfLatin1.indexOf("endstream", start);
       if (end < 0) return "";
+      const dictionary = pdfLatin1.slice(pdfLatin1.lastIndexOf(" obj", match.index), match.index);
+      const length = Number([...dictionary.matchAll(/\/Length\s+(\d+)\b/g)].at(-1)?.[1]);
       try {
-        return inflateSync(Buffer.from(pdfLatin1.slice(start, end).replace(/\r?\n$/, ""), "latin1")).toString("latin1");
+        const stream = length > 0 ? pdfLatin1.slice(start, start + length) : pdfLatin1.slice(start, end).replace(/\r?\n$/, "");
+        return inflateSync(Buffer.from(stream, "latin1")).toString("latin1");
       } catch {
         return "";
       }
@@ -487,11 +512,12 @@ describe("reporting.service", () => {
     });
     expect(yearlyResult.hardwareMonthlyReport?.periodLabel).toBe("annee 2026");
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "HARDWARE",
       dateFrom: "2026-05-01T00:00:00.000Z",
       dateTo: "2026-05-31T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "HARDWARE-example-1");
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
     const pdfText = extractPdfText(pdf);
@@ -557,11 +583,12 @@ describe("reporting.service", () => {
       unassignedPurchasesCount: 1,
       unassignedCollectionsCount: 1
     });
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "HARDWARE",
       dateFrom: "2026-05-01T00:00:00.000Z",
       dateTo: "2026-05-31T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "HARDWARE-example-2");
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     const pdfText = extractPdfText(pdf);
     expect(pdfText).toContain("SITUATION CUMULATIVE DES REMISES ET RECOUVREMENTS");
@@ -598,11 +625,12 @@ describe("reporting.service", () => {
     vi.mocked(listReportHardwareTransactions).mockResolvedValue(longHardwareReportTransactions);
     vi.mocked(listReportOperationalTransactions).mockResolvedValue(longHardwareReportTransactions);
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "HARDWARE",
       dateFrom: "2026-05-01T00:00:00.000Z",
       dateTo: "2026-05-31T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "HARDWARE-example-3");
     const pdfText = extractPdfText(pdf);
     expect(pdfText).toMatch(/Page 2 \/ \d+/);
     expect(pdfText).toContain("Quincaillerie 30");
@@ -671,7 +699,7 @@ describe("reporting.service", () => {
       ]
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, filters);
+    const pdf = await renderReportArtifact(actor, filters);
     const pdfText = extractPdfText(pdf);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdfText).toContain("HYDROCARBURES");
@@ -730,13 +758,14 @@ describe("reporting.service", () => {
         metadata: {}
       }))
     );
-    const longPdf = await exportCompanyReportsPdf(actor, filters);
+    const longPdf = await renderReportArtifact(actor, filters);
     const longPdfText = extractPdfText(longPdf);
     expect(longPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
     expect(longPdfText).toContain("Flux financiers détaillés (100 ligne(s)) (suite)");
     expect(longPdfText).toContain("Opération test hydrocarbure 100");
     expect(longPdfText).toContain("Actions détaillées (40 ligne(s)) (suite)");
     expect(longPdfText).toContain("Action test hydrocarbure 40");
+    await saveReportArtifact(longPdf, "HYDROCARBON-example-long");
   });
 
   it("builds the general expenses report split between PDG and employees", async () => {
@@ -882,11 +911,12 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "GENERAL_EXPENSES",
       dateFrom: "2026-06-01T00:00:00.000Z",
       dateTo: "2026-06-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "GENERAL_EXPENSES-example-4");
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
     const extractedPdfText = extractPdfText(pdf);
@@ -1060,11 +1090,12 @@ describe("reporting.service", () => {
     expect(listReportTaskByActivity).not.toHaveBeenCalled();
     expect(listReportOperationalTasks).not.toHaveBeenCalled();
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "TRANSPORT",
       dateFrom: "2026-09-01T00:00:00.000Z",
       dateTo: "2026-09-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "TRANSPORT-example-5");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -1195,7 +1226,7 @@ describe("reporting.service", () => {
       })
     ]));
 
-    const pdf = await exportCompanyReportsPdf(actor, filters);
+    const pdf = await renderReportArtifact(actor, filters);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
     expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBe(3);
@@ -1226,6 +1257,31 @@ describe("reporting.service", () => {
     expect(extractedPdfText).toContain("Les montants indicatifs ou prévisionnels sans devise déclarée sont exclus");
     expect(extractedPdfText).toContain("USD-PENDING-01");
     expect(extractedPdfText).toContain("9 000 USD");
+    await saveReportArtifact(pdf, "DAILY_ACTIVITIES-example");
+  });
+
+  it("uses the server stock cost for beverage margins and includes current catalog stock in the PDF", async () => {
+    vi.mocked(listBeverageProducts).mockResolvedValueOnce([{ id: "coca", name: "Coca stock contrôlé", unit: "casier", quantity: "1", stockValue: "200", averageUnitCost: "200", openingQuantity: "4", initializedAt: "2026-10-22T00:00:00Z" }]);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      { activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_IN", amount: "900", currency: "XOF", occurredAt: "2026-10-22T12:00:00Z", metadata: { beverageOperationKind: "VENTE", quantity: "3", saleUnitPrice: "300", purchaseUnitPrice: "1", beverageStockManaged: "1", beverageStockCost: "600.000000000" } },
+      { activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_OUT", amount: "100", currency: "XOF", occurredAt: "2026-10-22T12:00:00Z", metadata: { beverageOperationKind: "DEPENSE" } }
+    ]);
+    const filters = { activityCode: "BEVERAGE_DEPOT" as const };
+    const adjustments = [{ date: "2026-10-22T14:00:00Z", productName: "Coca stock contrôlé", unit: "casier", quantity: "-0.25", value: "-50", reason: "Bouteilles cassées" }];
+    vi.mocked(listBeverageStockAdjustments).mockResolvedValueOnce(adjustments);
+    const overview = await getCompanyReportsOverview(actor, filters);
+    expect(overview.beverageDepotReport?.totals.grossMarginAmount).toBe("300.00");
+    expect(overview.beverageDepotReport?.netOperatingResultAmount).toBe("150.00");
+    expect(overview.beverageDepotReport?.stockAdjustmentAmount).toBe("-50.00");
+    expect(overview.beverageDepotReport?.currentStock?.products[0].quantity).toBe("1");
+    vi.mocked(listBeverageProducts).mockResolvedValueOnce(overview.beverageDepotReport!.currentStock!.products);
+    vi.mocked(listBeverageStockAdjustments).mockResolvedValueOnce(adjustments);
+    const exported = await exportCompanyReportsPdf(actor, filters);
+    const pdfText = extractPdfText(exported);
+    await saveReportArtifact(exported, "BEVERAGE_DEPOT-stock-control");
+    expect(pdfText).toContain("Coca stock contrôlé / casier");
+    expect(pdfText).toContain("situation actuelle");
+    expect(pdfText).toContain("Bouteilles cassées");
   });
 
   it("reports beverage sales, stock purchases, expenses and inventory tasks without treating deposits as sales", async () => {
@@ -1326,7 +1382,7 @@ describe("reporting.service", () => {
       ])
     );
 
-    const pdf = await exportCompanyReportsPdf(actor, filters);
+    const pdf = await renderReportArtifact(actor, filters);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
     const pdfLatin1 = pdf.toString("latin1");
@@ -1433,7 +1489,7 @@ describe("reporting.service", () => {
         }))
       ]
     );
-    const longPdf = await exportCompanyReportsPdf(actor, filters);
+    const longPdf = await renderReportArtifact(actor, filters);
     const longPdfText = extractPdfText(longPdf);
     expect(longPdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
     expect(longPdfText).toContain("Transactions détaillées (50 ligne(s)) (suite)");
@@ -1442,6 +1498,7 @@ describe("reporting.service", () => {
     expect(longPdfText).toContain("32 000 F CFA");
     expect(longPdfText).toContain("Dépense de test 50");
     expect(longPdfText).toContain("Produit 36");
+    await saveReportArtifact(longPdf, "BEVERAGE_DEPOT-example-long");
   });
 
   it("builds the agriculture opérations report from campaign metadata", async () => {
@@ -1604,11 +1661,12 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "AGRICULTURE",
       dateFrom: "2026-06-01T00:00:00.000Z",
       dateTo: "2026-06-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "AGRICULTURE-example-6");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -1685,10 +1743,11 @@ describe("reporting.service", () => {
       })
     ]);
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "GENERAL_STORE",
       dateTo: "2026-10-01T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "GENERAL_STORE-example-7");
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(extractPdfText(pdf)).not.toContain("-1 200 000");
 
@@ -1940,11 +1999,12 @@ describe("reporting.service", () => {
       }))
     );
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "GENERAL_STORE",
       dateFrom: "2026-09-01T00:00:00.000Z",
       dateTo: "2026-09-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "GENERAL_STORE-example-8");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -2201,11 +2261,12 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "FOOD",
       dateFrom: "2026-12-01T00:00:00.000Z",
       dateTo: "2026-12-31T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "FOOD-example-9");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -2401,11 +2462,12 @@ describe("reporting.service", () => {
       }))
     );
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "BTP",
       dateFrom: "2026-10-01T00:00:00.000Z",
       dateTo: "2026-10-31T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "BTP-example-10");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -2650,11 +2712,12 @@ describe("reporting.service", () => {
       }))
     );
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "RENTAL",
       dateFrom: "2026-11-01T00:00:00.000Z",
       dateTo: "2026-11-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "RENTAL-example-11");
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
     const pdfText = extractPdfText(pdf);
@@ -2939,11 +3002,12 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "HOTEL_LODGING",
       dateFrom: "2026-04-01T00:00:00.000Z",
       dateTo: "2026-04-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "HOTEL_LODGING-example-12");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -3197,11 +3261,12 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "WATER",
       dateFrom: "2026-05-01T00:00:00.000Z",
       dateTo: "2026-05-31T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "WATER-example-13");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -3228,7 +3293,7 @@ describe("reporting.service", () => {
         description: `Dépense de test ${index + 1}`
       }))
     );
-    const longPdf = await exportCompanyReportsPdf(actor, {
+    const longPdf = await renderReportArtifact(actor, {
       activityCode: "WATER",
       dateFrom: "2026-05-01T00:00:00.000Z",
       dateTo: "2026-05-31T23:59:59.999Z"
@@ -3576,11 +3641,12 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "REAL_ESTATE_AGENCY",
       dateFrom: "2026-06-01T00:00:00.000Z",
       dateTo: "2026-06-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "REAL_ESTATE_AGENCY-example-14");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -3766,11 +3832,12 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "FISH_FARMING",
       dateFrom: "2026-07-01T00:00:00.000Z",
       dateTo: "2026-07-31T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "FISH_FARMING-example-15");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
@@ -3980,14 +4047,86 @@ describe("reporting.service", () => {
       currency: "XOF"
     });
 
-    const pdf = await exportCompanyReportsPdf(actor, {
+    const pdf = await renderReportArtifact(actor, {
       activityCode: "LIVESTOCK",
       dateFrom: "2026-09-01T00:00:00.000Z",
       dateTo: "2026-09-30T23:59:59.999Z"
     });
+    await saveReportArtifact(pdf, "LIVESTOCK-example-16");
 
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  const activeReportSectors = ["HARDWARE", "GENERAL_STORE", "RENTAL", "AGRICULTURE", "BTP", "FISH_FARMING", "TRANSPORT", "SERVICES", "MINING", "WATER", "BEVERAGE_DEPOT", "HYDROCARBON", "GENERAL_EXPENSES", "DAILY_ACTIVITIES"] as const;
+
+  it.each(activeReportSectors)("renders an explicit empty report for %s", async (activityCode) => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    const pdf = await renderReportArtifact(actor, { activityCode, dateFrom: "2026-05-01", dateTo: "2026-05-31" });
+    await saveReportArtifact(pdf, `${activityCode}-empty`);
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    const text = extractPdfText(pdf);
+    expect(text).toContain("AMCCO");
+    expect(text).toContain("Page 1 /");
+    expect(text).toMatch(/Aucun|Aucune/);
+    expect(text).not.toMatch(/NaN|undefined|Infinity/);
+    await saveReportArtifact(pdf, `${activityCode}-empty`);
+  });
+
+  it.each(["SERVICES", "MINING"] as const)("exports every %s row with separate currencies, complete long text and repeated headings", async (activityCode) => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([{ status: "APPROVED", currency: "XOF", count: 46, totalAmount: "46000.00" }]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([
+      { type: "CASH_IN", currency: "XOF", count: 45, totalAmount: "45000.00", approvedAmount: "45000.00" },
+      { type: "CASH_OUT", currency: "USD", count: 1, totalAmount: "21.50", approvedAmount: "21.50" }
+    ]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([{ status: "BLOCKED", count: 1 }]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    const longDescription = `${"Description longue conservée dans le tableau. ".repeat(180)}FIN-DESCRIPTION-COMPLETE`;
+    const rows = Array.from({ length: 45 }, (_, index) => ({
+      activityCode, status: "APPROVED" as const, type: "CASH_IN" as const, amount: "1000.00", currency: "XOF",
+      occurredAt: "2026-05-03T09:00:00.000Z", description: index === 0 ? longDescription : `OPERATION-${String(index + 1).padStart(3, "0")}`,
+      metadata: { siteRef: `SITE-${index}`, equipmentRef: "ENGIN-01", clientRef: `CLIENT-${index}`, serviceType: "Prestation" }
+    }));
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      ...rows,
+      { ...rows[1], type: "CASH_OUT", currency: "USD", amount: "21.50", description: "DEPENSE-USD" },
+      { ...rows[1], status: "DRAFT", description: "BROUILLON-EXCLU" },
+      { ...rows[1], status: "REJECTED", description: "REJET-EXCLU" },
+      { ...rows[1], activityCode: "HARDWARE", description: "AUTRE-SECTEUR-EXCLU" }
+    ]);
+    vi.mocked(listReportOperationalTasks).mockResolvedValue([{ activityCode, title: "INTERVENTION-BLOQUEE", status: "BLOCKED", dueDate: "2026-05-04T12:00:00.000Z", metadata: rows[0].metadata }]);
+    const pdf = await renderReportArtifact(actor, { activityCode, dateFrom: "2026-05-01", dateTo: "2026-05-31" });
+    const text = extractPdfText(pdf);
+    expect(text).toContain("OPERATION-045");
+    expect(text).toContain("FIN-DESCRIPTION-COMPLETE");
+    expect(text).toContain("DEPENSE-USD");
+    expect(text).toContain("INTERVENTION-BLOQUEE");
+    expect(text).toContain("45 000");
+    expect(text).toContain("21,5");
+    expect(text).not.toContain("BROUILLON-EXCLU");
+    expect(text).not.toContain("REJET-EXCLU");
+    expect(text).not.toContain("AUTRE-SECTEUR-EXCLU");
+    expect((text.match(/MONTANT XOF/g) ?? []).length).toBeGreaterThan(1);
+    await saveReportArtifact(pdf, `${activityCode}-long`);
+  });
+
+  it("includes foreign currency totals alongside XOF-focused business tables", async () => {
+    vi.mocked(listReportFinanceByStatus).mockResolvedValue([]);
+    vi.mocked(listReportFinanceByType).mockResolvedValue([{ type: "CASH_IN", currency: "USD", count: 1, totalAmount: "123.45", approvedAmount: "123.45" }]);
+    vi.mocked(listReportFinanceByActivity).mockResolvedValue([]);
+    vi.mocked(listReportTaskByStatus).mockResolvedValue([]);
+    vi.mocked(listReportTaskByActivity).mockResolvedValue([]);
+    const pdf = await renderReportArtifact(actor, { activityCode: "AGRICULTURE", dateFrom: "2026-05-01", dateTo: "2026-05-31" });
+    const text = extractPdfText(pdf);
+    expect(text).toContain("Complément financier");
+    expect(text).toContain("USD");
+    expect(text).toContain("123,45");
+    await saveReportArtifact(pdf, "AGRICULTURE-currencies");
   });
 
   it("exports transaction governance columns in CSV", async () => {
@@ -4017,7 +4156,6 @@ describe("reporting.service", () => {
       createdAt: "2026-04-21T09:00:00.000Z",
       updatedAt: "2026-04-21T10:05:00.000Z"
     });
-
     const csv = await exportCompanyTransactionsCsv(actor, {
       activityCode: "MINING"
     });

@@ -35,7 +35,7 @@ export function QuickActions({
     canUse("reports")
       ? {
           label: "Rapports",
-          to: "/reports",
+          to: `/reports${activityQuery}`,
           tone: "primary",
           description: "Ouvrir les synthèses et exports"
         }
@@ -87,7 +87,7 @@ export function QuickActions({
       : null,
     canUse("reports")
       ? {
-          label: "Rapport du jour",
+          label: "Rapports",
           to: `/reports${activityQuery}`,
           tone: "neutral",
           description: "Générer une synthèse du périmètre"

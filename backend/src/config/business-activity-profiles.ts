@@ -1483,6 +1483,8 @@ const BUSINESS_ACTIVITY_PROFILES: Record<BusinessActivityCode, BusinessActivityP
       ],
       metadataFields: [
         field("beverageOperationKind", "Catégorie", true, "Choisissez la nature réelle du flux.", ["VENTE", "ACHAT_STOCK", "DEPENSE", "AUTRE_RECETTE"]),
+        field("beverageUnit", "Unité de stock", false, "Unité définie pour ce produit dans le stock du dépôt."),
+        field("beverageStockCost", "Coût du stock vendu", false, "Coût total calculé et enregistré par le serveur pour ce mouvement."),
         field("productName", "Produit", false, "Nom de la boisson vendue ou achetée."),
         field("quantity", "Quantité", false, "Nombre de casiers, cartons ou unités."),
         field("purchaseUnitPrice", "Prix d'achat unitaire", false, "Prix par unité lors d'un achat de stock."),
@@ -1904,9 +1906,9 @@ export function assertTransactionInputMatchesActivityProfile(
       throw new Error("Le type de flux ne correspond pas à la catégorie du dépôt de boissons.");
     }
     const requiredFields = operationKind === "VENTE"
-      ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"]
+      ? ["quantity", "saleUnitPrice", ...(metadata.beverageProductId ? [] : ["productName", "purchaseUnitPrice"])]
       : operationKind === "ACHAT_STOCK"
-        ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"]
+        ? ["quantity", "purchaseUnitPrice", "supplierRef", ...(metadata.beverageProductId ? [] : ["productName"])]
         : operationKind === "DEPENSE"
           ? ["expenseCategory"]
           : [];
@@ -1930,11 +1932,12 @@ export function assertTransactionInputMatchesActivityProfile(
         throw new Error("La quantité et le prix unitaire doivent être des nombres supérieurs à zéro.");
       }
       const purchaseUnitPrice = parseMetadataNumber(metadata.purchaseUnitPrice);
-      if (operationKind === "VENTE" && (!Number.isFinite(purchaseUnitPrice) || purchaseUnitPrice <= 0)) {
+      if (operationKind === "VENTE" && !metadata.beverageProductId && (!Number.isFinite(purchaseUnitPrice) || purchaseUnitPrice <= 0)) {
         throw new Error("Le prix d'achat unitaire est requis pour calculer la marge brute de la vente.");
       }
       const amount = Number(input.amount ?? "");
-      if (!Number.isFinite(amount) || Math.round(amount * 100) !== Math.round(quantity * unitPrice * 100)) {
+      const expectedAmount = metadata.beverageProductId ? Math.round(quantity * unitPrice) : quantity * unitPrice;
+      if (!Number.isFinite(amount) || Math.round(amount * 100) !== Math.round(expectedAmount * 100)) {
         throw new Error("Le montant doit correspondre à la quantité multipliée par le prix unitaire.");
       }
     }

@@ -9,17 +9,21 @@ import {
   type MouseEvent
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useDebouncedValue } from "../lib/useDebouncedValue";
+import { useFormChanges } from "../lib/useFormChanges";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
 import { PageGuide } from "../components/PageGuide";
 import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
+import { SectorDirectoryPanel } from "../components/SectorDirectoryPanel";
+import { getActiveSectorReferenceView } from "../config/sectorWorkspaces";
+import { getSectorFieldWorkspace } from "../config/sectorFieldWorkspaces";
 import { ButtonSpinner } from "../components/ButtonSpinner";
 import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
-import { buildQuickSearchText, createQuickSearchMatcher } from "../lib/quickSearch";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import {
   resolveImageKitFileName,
@@ -362,7 +366,7 @@ function syncMetadataState(
   previous: Record<string, string>,
   fields: ActivityFieldDefinition[]
 ): Record<string, string> {
-  return Object.fromEntries(fields.map((field) => [field.key, previous[field.key] ?? ""]));
+  return { ...previous, ...Object.fromEntries(fields.map((field) => [field.key, previous[field.key] ?? ""])) };
 }
 
 function isAgricultureTaskKind(value: string | undefined): value is AgricultureTaskKind {
@@ -574,6 +578,8 @@ export function OperationsTasksPage(): JSX.Element {
     selectedActivityCode,
     selectedProfile
   } = useBusinessActivity();
+  const fieldWorkspace = getSectorFieldWorkspace(selectedActivityCode);
+  const isCategoriesView = getActiveSectorReferenceView(location.pathname, location.search, selectedActivityCode, user?.role)?.view === "categories";
   const [tasks, setTasks] = useState<OperationTask[]>([]);
   const [members, setMembers] = useState<OperationTaskMember[]>([]);
   const [shops, setShops] = useState<GeneralStoreShop[]>([]);
@@ -587,6 +593,8 @@ export function OperationsTasksPage(): JSX.Element {
   const [isDailyActivityCategoriesExpanded, setIsDailyActivityCategoriesExpanded] = useState(false);
   const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [hasLoadedCategories, setHasLoadedCategories] = useState(false);
   const [categoryPendingDelete, setCategoryPendingDelete] = useState<DailyActivityCategory | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -602,7 +610,6 @@ export function OperationsTasksPage(): JSX.Element {
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [hasUnsavedTaskChanges, setHasUnsavedTaskChanges] = useState(false);
   const editingTaskActivityRef = useRef<BusinessActivityCode | null>(null);
   const sectorFormScopeRef = useRef({ companyId: activeCompany?.id, activityCode: selectedActivityCode });
   const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
@@ -611,10 +618,10 @@ export function OperationsTasksPage(): JSX.Element {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSavingTaskForm, setIsSavingTaskForm] = useState(false);
   const [isTaskFormExpanded, setIsTaskFormExpanded] = useState(
-    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+    () => !fieldWorkspace && (typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches)
   );
   const [isTaskAttachmentExpanded, setIsTaskAttachmentExpanded] = useState(
-    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
+    () => !fieldWorkspace && (typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches)
   );
 
   useEffect(() => {
@@ -644,14 +651,26 @@ export function OperationsTasksPage(): JSX.Element {
   );
   const [filters, setFilters] = usePersistedViewState(tasksViewStorageKey, initialFilters);
   const [searchQuery, setSearchQuery] = usePersistedViewState(tasksSearchStorageKey, "");
+  const debouncedSearch = useDebouncedValue(searchQuery.trim());
   const [visibleTasksPageSize, setVisibleTasksPageSize] = usePersistedViewState(
     tasksVisiblePageSizeStorageKey,
     DEFAULT_TASKS_VISIBLE_PAGE_SIZE
   );
   const [visibleTasksPage, setVisibleTasksPage] = useState(1);
+  const requestedStatus = new URLSearchParams(location.search).get("status");
+  useEffect(() => {
+    if (!requestedStatus || !["TODO", "IN_PROGRESS", "DONE", "BLOCKED"].includes(requestedStatus)) return;
+    setFilters({ status: requestedStatus as TaskStatus });
+    setSearchQuery("");
+    setVisibleTasksPage(1);
+  }, [requestedStatus, activeCompany?.id, selectedActivityCode, setFilters, setSearchQuery]);
 
   const [createForm, setCreateForm] = useState(createDefaultTaskForm);
   const [taskAttachmentFile, setTaskAttachmentFile] = useState<File | null>(null);
+
+  const formScope = `${activeCompany?.id ?? ""}:${selectedActivityCode ?? ""}`;
+  const categoryChanges = useFormChanges(categoryForm, `${formScope}:category:${editingCategoryId ?? "new"}`);
+  const taskChanges = useFormChanges({ createForm, attachment: taskAttachmentFile?.name }, `${formScope}:task:${editingTaskId ?? "new"}`);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [assignmentNotes, setAssignmentNotes] = useState<Record<string, string>>({});
@@ -679,14 +698,41 @@ export function OperationsTasksPage(): JSX.Element {
   }, [user?.role]);
 
   const taskMetadataFields = selectedProfile?.tasks.metadataFields ?? [];
+  const previousCategoriesView = useRef(isCategoriesView);
+  useEffect(() => {
+    if (previousCategoriesView.current === isCategoriesView) return;
+    previousCategoriesView.current = isCategoriesView;
+    // Navigation was confirmed by the shared guard before changing views.
+    categoryChanges.markClean();
+    setEditingCategoryId(null);
+    setCategoryForm({ name: "" });
+    setIsDailyActivityCategoriesExpanded(false);
+    taskChanges.markClean();
+    setEditingTaskId(null);
+    editingTaskActivityRef.current = null;
+    setCreateForm({ ...createDefaultTaskForm(), metadata: syncMetadataState({}, taskMetadataFields) });
+    setTaskAttachmentFile(null);
+    setIsTaskFormExpanded(false);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }, [isCategoriesView, taskMetadataFields]);
+
+  useEffect(() => {
+    if (selectedActivityCode !== "DAILY_ACTIVITIES" || location.hash !== "#daily-activity-categories" || !canManageDailyActivityCategories) return;
+    if (!isCategoriesView) {
+      navigate(`/operations/tasks?activityCode=DAILY_ACTIVITIES&view=categories#daily-activity-categories`, { replace: true });
+    } else {
+      setIsDailyActivityCategoriesExpanded(true);
+      navigate(`${location.pathname}${location.search}`, { replace: true });
+    }
+  }, [selectedActivityCode, location.hash, location.pathname, location.search, isCategoriesView, canManageDailyActivityCategories, navigate]);
   useEffect(() => {
     const previous = sectorFormScopeRef.current;
     if (previous.companyId === activeCompany?.id && previous.activityCode === selectedActivityCode) return;
     sectorFormScopeRef.current = { companyId: activeCompany?.id, activityCode: selectedActivityCode };
-    const hadUnsavedWork = hasUnsavedTaskChanges || Boolean(editingTaskId);
+    const hadUnsavedWork = taskChanges.isDirty;
     setEditingTaskId(null);
     editingTaskActivityRef.current = null;
-    setHasUnsavedTaskChanges(false);
     setCreateForm({
       ...createDefaultTaskForm(),
       metadata: syncMetadataState({}, taskMetadataFields)
@@ -697,10 +743,13 @@ export function OperationsTasksPage(): JSX.Element {
     hasLoadedTasksRef.current = false;
     setIsLoading(true);
     setEditingCategoryId(null);
+    categoryChanges.markClean();
     setCategoryForm({ name: "" });
+    setIsDailyActivityCategoriesExpanded(false);
+    if (fieldWorkspace && location.hash !== "#task-create") setIsTaskFormExpanded(false);
     setErrorMessage(null);
     setSuccessMessage(hadUnsavedWork ? "Le formulaire a été réinitialisé pour le nouveau secteur." : null);
-  }, [activeCompany?.id, editingTaskId, hasUnsavedTaskChanges, selectedActivityCode, taskMetadataFields]);
+  }, [activeCompany?.id, editingTaskId, taskChanges.isDirty, selectedActivityCode, taskMetadataFields]);
   const hasRequiredTaskMetadata = taskMetadataFields.some((field) => field.required);
   const visibleTaskMetadataFields = selectedActivityCode === "TRANSPORT"
     ? taskMetadataFields.filter((field) => [
@@ -712,19 +761,6 @@ export function OperationsTasksPage(): JSX.Element {
           (field.key === "hydrocarbonAssetRef" && createForm.metadata.hydrocarbonCategory === "Citerne")
         )
     : taskMetadataFields;
-  const taskSearchTextById = useMemo(() => new Map(tasks.map((task) => [
-    task.id,
-    buildQuickSearchText([
-      task.title,
-      task.description,
-      task.createdByEmail,
-      task.createdByFullName,
-      task.assignedToEmail,
-      task.assignedToFullName,
-      task.activityCode ? getBusinessActivityLabel(task.activityCode) : "",
-      ...Object.values(task.metadata)
-    ])
-  ])), [tasks]);
   const sectorTasks = useMemo(
     () => tasks.filter((task) => task.companyId === activeCompany?.id && task.activityCode === selectedActivityCode),
     [activeCompany?.id, selectedActivityCode, tasks]
@@ -739,10 +775,7 @@ export function OperationsTasksPage(): JSX.Element {
     }
     return [...values].sort((left, right) => left.localeCompare(right, "fr"));
   }, [selectedActivityCode, sectorTasks]);
-  const displayTasks = useMemo(() => {
-    const matchesSearch = createQuickSearchMatcher(searchQuery);
-    return sectorTasks.filter((task) => matchesSearch(taskSearchTextById.get(task.id) ?? ""));
-  }, [searchQuery, sectorTasks, taskSearchTextById]);
+  const displayTasks = sectorTasks;
   const totalVisibleTaskPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTasks.length / visibleTasksPageSize));
   }, [displayTasks.length, visibleTasksPageSize]);
@@ -855,13 +888,14 @@ export function OperationsTasksPage(): JSX.Element {
       setIsLoadingMoreTasks(true);
     } else {
       setIsLoadingMoreTasks(false);
-      if (!silent && !hasLoadedTasksRef.current) setIsLoading(true);
+      if (!silent) setIsLoading(true);
     }
     setErrorMessage(null);
     try {
       const query = {
         limit: pageSize,
         offset,
+        search: debouncedSearch || undefined,
         status: filters.status === "ALL" ? undefined : filters.status,
         activityCode: selectedActivityCode,
         scope: canViewAllTasks ? ("ALL" as TaskScope) : ("ASSIGNED_TO_ME" as TaskScope)
@@ -909,6 +943,7 @@ export function OperationsTasksPage(): JSX.Element {
     canViewAllTasks,
     activeCompany?.id,
     filters.status,
+    debouncedSearch,
     isLoadingActivities,
     selectedActivityCode,
     tasksFetchPageSize,
@@ -1068,16 +1103,23 @@ export function OperationsTasksPage(): JSX.Element {
     if (isLoadingActivities) return;
     if (selectedActivityCode !== "DAILY_ACTIVITIES") {
       setDailyActivityCategories([]);
+      setHasLoadedCategories(false);
+      setIsLoadingCategories(false);
       return;
     }
+    setIsLoadingCategories(true);
+    setHasLoadedCategories(false);
     try {
       const payload = await withAuthorizedToken((accessToken) =>
         listDailyActivityCategoriesRequest(accessToken)
       );
       if (requestId !== dailyCategoriesLoadRequestRef.current) return;
       setDailyActivityCategories(payload.items);
+      setHasLoadedCategories(true);
     } catch (error) {
       if (requestId === dailyCategoriesLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+    } finally {
+      if (requestId === dailyCategoriesLoadRequestRef.current) setIsLoadingCategories(false);
     }
   }, [activeCompany?.id, isLoadingActivities, selectedActivityCode, withAuthorizedToken]);
 
@@ -1087,6 +1129,7 @@ export function OperationsTasksPage(): JSX.Element {
 
   function resetCategoryForm(): void {
     setEditingCategoryId(null);
+    categoryChanges.markClean();
     setCategoryForm({ name: "" });
   }
 
@@ -1118,6 +1161,8 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   function handleStartEditCategory(category: DailyActivityCategory): void {
+    if (!categoryChanges.confirmDiscard()) return;
+    categoryChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     setEditingCategoryId(category.id);
@@ -1126,6 +1171,8 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   function handleCancelEditCategory(): void {
+    if (!categoryChanges.confirmDiscard()) return;
+    categoryChanges.markClean();
     setErrorMessage(null);
     setSuccessMessage(null);
     resetCategoryForm();
@@ -1237,7 +1284,7 @@ export function OperationsTasksPage(): JSX.Element {
       ...prev,
       metadata: syncMetadataState(prev.metadata, taskMetadataFields)
     }));
-  }, [taskMetadataFields]);
+  }, [taskMetadataFields, fieldWorkspace]);
 
   async function uploadTaskAttachment(
     taskId: string,
@@ -1343,7 +1390,7 @@ export function OperationsTasksPage(): JSX.Element {
       );
       setEditingTaskId(null);
       editingTaskActivityRef.current = null;
-      setHasUnsavedTaskChanges(false);
+      taskChanges.markClean();
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsTaskFormExpanded(false);
       }
@@ -1433,9 +1480,10 @@ export function OperationsTasksPage(): JSX.Element {
       return;
     }
 
+    if (!taskChanges.confirmDiscard()) return;
+    taskChanges.markClean();
     setEditingTaskId(task.id);
     editingTaskActivityRef.current = task.activityCode;
-    setHasUnsavedTaskChanges(false);
     setIsTaskFormExpanded(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -1507,9 +1555,10 @@ export function OperationsTasksPage(): JSX.Element {
   }, [canCreateTasks, enabledActivities, isLoadingActivities, location.pathname, location.search, navigate, selectedActivityCode, selectedProfile, taskMetadataFields, user?.id, withAuthorizedToken]);
 
   function handleCancelEditTask(): void {
+    if (!taskChanges.confirmDiscard()) return;
+    taskChanges.markClean();
     setEditingTaskId(null);
     editingTaskActivityRef.current = null;
-    setHasUnsavedTaskChanges(false);
     setIsTaskFormExpanded(false);
     setCreateForm({
       ...createDefaultTaskForm(),
@@ -1681,10 +1730,342 @@ export function OperationsTasksPage(): JSX.Element {
     }
   }
 
+  function renderTasksList(): JSX.Element {
+    return (
+      <section id="tasks-list" className="panel">
+        <div className="operations-list-header">
+          <h3>{fieldWorkspace?.title ?? "Tâches"}</h3>
+          {false ? (
+            <label className="inline-checkbox">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={(event) =>
+                  setSelectedTasks((prev) => ({
+                    ...prev,
+                    ...Object.fromEntries(
+                      displayTasks.map((task) => [task.id, event.target.checked])
+                    )
+                  }))
+                }
+              />
+              <span>Tout sélectionner</span>
+            </label>
+          ) : !isReadOnlyOwner ? <p className="hint">{displayTasks.length} tâche(s) filtrée(s)</p> : null}
+        </div>
+        {!isLoading && sectorTasks.length === 0 ? (
+          <EmptyState
+            title={errorMessage ? "Liste indisponible" : searchQuery.trim() ? "Aucun résultat" : "Aucune tâche dans cette vue"}
+            description={errorMessage ? "Le chargement a échoué. Actualisez la liste pour réessayer." : searchQuery.trim() ? "Aucune tâche ne correspond à la recherche et aux filtres sélectionnés. Effacez la recherche ou modifiez les filtres." : "Créez la première tâche du secteur actif ou changez les filtres pour retrouver les actions existantes."}
+            actionLabel={canCreateTasks ? "Préparer une tâche" : undefined}
+            onAction={canCreateTasks ? () => {
+              setIsTaskFormExpanded(true);
+              window.requestAnimationFrame(() => {
+                document.getElementById("task-create")?.scrollIntoView({
+                  block: "start",
+                  behavior: "smooth"
+                });
+              });
+            } : undefined}
+          />
+        ) : null}
+        {!isLoading && sectorTasks.length > 0 && displayTasks.length === 0 ? (
+          <EmptyState
+            title="Aucun résultat"
+            description="Aucune tâche ne correspond à la recherche ou aux filtres appliqués."
+            actionLabel="Réinitialiser les filtres"
+            onAction={() => {
+              setSearchQuery("");
+              setFilters({
+                status: "ALL"
+              });
+            }}
+          />
+        ) : null}
+        {!isLoading && displayTasks.length > 0 ? (
+          <>
+          {renderVisibleTasksPagination()}
+          <div
+            className="operations-task-list operations-task-list-scroll"
+            role="region"
+            aria-label="Liste des tâches"
+            tabIndex={0}
+          >
+            {paginatedTasks.map((task) => {
+              const isBusy = busyTaskId === task.id;
+              const sectorContext = getSectorRecordContext(task.activityCode, task.metadata);
+              const canUpdate = canUpdateTask(task);
+              const isCompleted = task.status === "DONE";
+              const editLockMessage = getTaskEditLockMessage(task);
+              const deleteLockMessage = getTaskDeleteLockMessage(task);
+              const canDelete = canDeleteTask(task);
+              const selectedAssignee = assignments[task.id] ?? "";
+              const selectedOrNull = selectedAssignee || null;
+              const assignmentChanged = task.assignedToId !== selectedOrNull;
+
+              return (
+                <article
+                  key={task.id}
+                  className="operations-task-card clickable"
+                  onClick={() => openTaskDetails(task.id)}
+                  onKeyDown={(event) => onTaskCardKeyDown(event, task.id)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div
+                    className="operations-task-top"
+                    onClick={preventCardNavigation}
+                    onKeyDown={preventCardKeyboardNavigation}
+                  >
+                    <span className={`task-status-chip status-${task.status.toLowerCase()}`}>
+                      {statusLabel(task.status)}
+                    </span>
+                  </div>
+
+                  <h4 className="operations-task-title">{task.title}</h4>
+                  <p
+                    className={
+                      task.description?.trim()
+                        ? "operations-task-description"
+                        : "operations-task-description mobile-empty-description"
+                    }
+                  >
+                    {task.description?.trim() || (
+                      <span className="mobile-generic-placeholder">Aucune description fournie.</span>
+                    )}
+                  </p>
+
+                  <div className="operations-task-meta">
+                    {sectorContext.length > 0 ? (
+                      <p className="sector-record-context">
+                        {sectorContext.map(({ label, value }) => (
+                          <span key={label}><strong>{label} :</strong> {value}</span>
+                        ))}
+                      </p>
+                    ) : null}
+                    <p>
+                      <strong>Activité:</strong> {getBusinessActivityLabel(task.activityCode)}
+                    </p>
+                    <p>
+                      <strong>Assigné:</strong>{" "}
+                      {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignée"}
+                    </p>
+                    {canAssignTasks ? (
+                      <p className="operations-task-meta-secondary">
+                        <strong>Créateur:</strong> {task.createdByFullName} ({task.createdByEmail})
+                      </p>
+                    ) : null}
+                    <p>
+                      <strong>Échéance:</strong> {formatDate(task.dueDate)}
+                    </p>
+                    <p className="operations-task-meta-secondary">
+                      <strong>Mise à jour:</strong> {formatDate(task.updatedAt)}
+                    </p>
+                    {Object.keys(task.metadata).length > 0 ? (
+                      <p className="operations-task-metadata">
+                        <strong>Contexte:</strong> {formatMetadataSummary(task.metadata, taskMetadataFields)}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div
+                    className="operations-actions"
+                    onClick={preventCardNavigation}
+                    onKeyDown={preventCardKeyboardNavigation}
+                  >
+                    <div className="operations-actions-primary">
+                      <button
+                        type="button"
+                        className="secondary-btn operations-primary-action"
+                        onClick={() => openTaskDetails(task.id)}
+                      >
+                        Voir
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => handleStartEditTask(task)}
+                        disabled={isBusy || editingTaskId === task.id || editLockMessage !== null}
+                        title={editLockMessage ?? undefined}
+                      >
+                        Modifier
+                      </button>
+                    </div>
+
+                    {isCompleted ? (
+                      <div className="operations-actions-secondary-content">
+                        <div className="operations-task-closed-note">
+                          Tâche terminée: statut et assignation verrouillés.
+                        </div>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="danger-btn"
+                            onClick={() => void handleDeleteTask(task)}
+                            disabled={isBusy}
+                            title={deleteLockMessage ?? undefined}
+                          >
+                            Supprimer
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : !canAssignTasks ? (
+                      <div className="operations-actions-secondary-content">
+                        {canUpdate ? (
+                          <div className="operations-inline-group">
+                            <label>Statut</label>
+                            <select
+                              value={task.status}
+                              onChange={(event) =>
+                                void handleChangeStatus(task.id, event.target.value as TaskStatus)
+                              }
+                              disabled={isBusy || isBulkAssigning}
+                            >
+                              <option value="TODO">À faire</option>
+                              <option value="IN_PROGRESS">En cours</option>
+                              <option value="DONE">Terminée</option>
+                              <option value="BLOCKED">Bloquée</option>
+                            </select>
+                          </div>
+                        ) : null}
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="danger-btn"
+                            onClick={() => void handleDeleteTask(task)}
+                            disabled={isBusy}
+                            title={deleteLockMessage ?? undefined}
+                          >
+                            Supprimer
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <details
+                        className="operations-actions-secondary"
+                        onToggle={(event) => {
+                          if (event.currentTarget.open) void loadMembers();
+                        }}
+                      >
+                        <summary>Statut et assignation</summary>
+                        <div className="operations-actions-secondary-content">
+                        {canUpdate ? (
+                          <div className="operations-inline-group">
+                            <label>Statut</label>
+                            <select
+                              value={task.status}
+                              onChange={(event) =>
+                                void handleChangeStatus(task.id, event.target.value as TaskStatus)
+                              }
+                              disabled={isBusy || isBulkAssigning}
+                            >
+                              <option value="TODO">À faire</option>
+                              <option value="IN_PROGRESS">En cours</option>
+                              <option value="DONE">Terminée</option>
+                              <option value="BLOCKED">Bloquée</option>
+                            </select>
+                          </div>
+                        ) : null}
+
+                        {canAssignTasks ? (
+                          <div className="operations-assign-card">
+                            <div className="operations-inline-group">
+                              <label>Assigner à</label>
+                              <select
+                                value={selectedAssignee}
+                                onChange={(event) =>
+                                  setAssignments((prev) => ({
+                                    ...prev,
+                                    [task.id]: event.target.value
+                                  }))
+                                }
+                                disabled={isBusy || isBulkAssigning}
+                              >
+                                <option value="">Non assignée</option>
+                                {isLoadingMembers ? (
+                                  <option value="" disabled>Chargement des membres…</option>
+                                ) : null}
+                                {members.map((member) => (
+                                  <option key={member.userId} value={member.userId}>
+                                    {memberLabel(member)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="operations-inline-group">
+                              <label>Note (optionnel)</label>
+                              <input
+                                type="text"
+                                placeholder="Motif d'assignation"
+                                value={assignmentNotes[task.id] ?? ""}
+                                onChange={(event) =>
+                                  setAssignmentNotes((prev) => ({
+                                    ...prev,
+                                    [task.id]: event.target.value
+                                  }))
+                                }
+                                disabled={isBusy || isBulkAssigning}
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() => void handleSaveAssignment(task.id)}
+                              disabled={!assignmentChanged || isBusy || isBulkAssigning}
+                            >
+                              Enregistrer assignation
+                            </button>
+                          </div>
+                        ) : null}
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              className="danger-btn"
+                              onClick={() => void handleDeleteTask(task)}
+                              disabled={isBusy}
+                              title={deleteLockMessage ?? undefined}
+                            >
+                              Supprimer
+                            </button>
+                          ) : null}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {hasMoreTasks ? (
+            <div className="list-pagination">
+              <p className="hint list-pagination-meta">
+                {displayTasks.length} tâche(s) affichée(s)
+                {displayTasks.length !== tasks.length ? ` sur ${tasks.length} chargée(s)` : ""}
+                {" sur plusieurs pages."}
+              </p>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => void handleLoadMoreTasks()}
+                disabled={isLoading || isLoadingMoreTasks || searchQuery.trim() !== debouncedSearch}
+              >
+                {isLoadingMoreTasks ? "Chargement..." : "Charger plus"}
+              </button>
+            </div>
+          ) : null}
+          {renderVisibleTasksPagination("bottom")}
+          </>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <>
       <header className="section-header mobile-title-duplicate">
-        <h2>Suivi des tâches</h2>
+        <h2>{selectedActivityCode === "DAILY_ACTIVITIES" ? "Activités et accords" : "Suivi des tâches"}</h2>
       </header>
 
       {!selectedActivityCode && !isLoadingActivities ? (
@@ -1727,11 +2108,34 @@ export function OperationsTasksPage(): JSX.Element {
             ]}
       />
 
-      <SectorWorkspaceNav actions={[
+      <SectorWorkspaceNav actions={isCategoriesView ? [{
+        label: "Ajouter une catégorie",
+        onClick: () => {
+          if (!categoryChanges.confirmDiscard()) return;
+          resetCategoryForm();
+          setIsDailyActivityCategoriesExpanded(true);
+          scrollToTaskSection("daily-activity-categories");
+        }
+      }] : [
         { label: "Voir les tâches", onClick: () => scrollToTaskSection("tasks-list") },
         ...(canCreateTasks ? [{
-          label: "Créer une tâche",
+          label: selectedActivityCode === "DAILY_ACTIVITIES" ? "Créer une activité" : "Créer une tâche",
           onClick: () => {
+            setIsTaskFormExpanded(true);
+            scrollToTaskSection("task-create");
+          }
+        }] : []),
+        ...(selectedActivityCode === "DAILY_ACTIVITIES" && canCreateTasks ? [{
+          label: "Créer une fiche d’accord",
+          onClick: () => {
+            if (!taskChanges.confirmDiscard()) return;
+            taskChanges.markClean();
+            setEditingTaskId(null);
+            editingTaskActivityRef.current = null;
+            setCreateForm({ ...createDefaultTaskForm(), metadata: { ...syncMetadataState({}, taskMetadataFields), dailyActivityKind: DAILY_PROTOCOL_CATEGORY } });
+            setTaskAttachmentFile(null);
+            setErrorMessage(null);
+            setSuccessMessage(null);
             setIsTaskFormExpanded(true);
             scrollToTaskSection("task-create");
           }
@@ -1739,11 +2143,78 @@ export function OperationsTasksPage(): JSX.Element {
         ...(selectedActivityCode === "DAILY_ACTIVITIES" && canManageDailyActivityCategories ? [{
           label: "Gérer les catégories",
           onClick: () => {
-            setIsDailyActivityCategoriesExpanded(true);
-            scrollToTaskSection("daily-activity-categories");
+            navigate("/operations/tasks?activityCode=DAILY_ACTIVITIES&view=categories");
           }
         }] : [])
       ]} />
+
+      {isCategoriesView ? (
+        <>
+          <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} isLoading={false} />
+          <SectorDirectoryPanel
+            key={activeCompany?.id}
+            title="Catégories d’activité"
+            searchLabel="Rechercher une catégorie"
+            emptyMessage="Aucune catégorie enregistrée pour le moment."
+            noResultsMessage="Aucune catégorie ne correspond à la recherche."
+            records={dailyActivityCategories.filter((category) => category.companyId === activeCompany?.id)}
+            getSearchValues={(category) => [category.name]}
+            renderDetails={(category) => !category.isActive ? <p className="hint">Désactivée</p> : null}
+            busyId={busyCategoryId}
+            isSaving={isSavingCategory}
+            isLoading={isLoadingCategories}
+            hasLoaded={hasLoadedCategories}
+            onReload={() => void loadDailyActivityCategories()}
+            onEdit={handleStartEditCategory}
+            onDelete={handleDeleteCategory}
+            sectionId="daily-activity-categories"
+            formTitle={editingCategoryId ? "Modifier une catégorie" : "Ajouter une catégorie"}
+            formDescription="Les activités déjà enregistrées conservent leur historique."
+            isExpanded={isDailyActivityCategoriesExpanded || Boolean(editingCategoryId)}
+            onExpandedChange={setIsDailyActivityCategoriesExpanded}
+          >
+            <form className="finance-account-form" onSubmit={handleSaveCategory} onChangeCapture={categoryChanges.onChangeCapture} data-unsaved-sector-form={categoryChanges.isDirty ? "true" : undefined}>
+              <label className="operations-inline-group">
+                <span>Nom de la catégorie</span>
+                <input
+                  type="text"
+                  placeholder="Ex: Rendez-vous"
+                  value={categoryForm.name}
+                  onChange={(event) => setCategoryForm({ name: event.target.value })}
+                  required
+                />
+              </label>
+              <div className="mobile-sticky-form-actions">
+                <button type="submit" disabled={isSavingCategory}>
+                  {isSavingCategory ? (
+                    <>
+                      <ButtonSpinner />
+                      Enregistrement...
+                    </>
+                  ) : editingCategoryId ? (
+                    "Enregistrer les modifications"
+                  ) : (
+                    "Ajouter la catégorie"
+                  )}
+                </button>
+                {editingCategoryId ? (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={handleCancelEditCategory}
+                    disabled={isSavingCategory}
+                  >
+                    Annuler la modification
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          </SectorDirectoryPanel>
+        </>
+      ) : null}
+
+      {!isCategoriesView ? (<>
+      {fieldWorkspace ? <p className="hint">{fieldWorkspace.helpText}</p> : null}
 
       <section className="panel">
         {!isReadOnlyOwner ? <h3>Recherche</h3> : null}
@@ -1759,7 +2230,7 @@ export function OperationsTasksPage(): JSX.Element {
             className="quick-search-input"
             placeholder={`Rechercher : ${getSectorSearchHint(selectedActivityCode)}...`}
             value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
+            onChange={(event) => setSearchQuery(event.target.value.slice(0, 200))}
           />
 
           <select
@@ -1780,7 +2251,12 @@ export function OperationsTasksPage(): JSX.Element {
 
           <button type="submit" className="mobile-hide-redundant-action">Actualiser</button>
         </form>
+        <p className="hint" role="status">{searchQuery.trim() !== debouncedSearch || isLoading
+          ? "Recherche dans l’historique du secteur…"
+          : "Recherche dans tout l’historique autorisé du secteur, avec les filtres sélectionnés."}</p>
       </section>
+
+      {fieldWorkspace ? renderTasksList() : null}
 
       {false ? <section className="panel operations-status-panel">
         <div className="operations-status-panel-header">
@@ -1821,20 +2297,20 @@ export function OperationsTasksPage(): JSX.Element {
           open={isTaskFormExpanded || Boolean(editingTaskId) || Boolean(requestedEditTaskId)}
           onToggle={(event) => setIsTaskFormExpanded(event.currentTarget.open)}
         >
-          <summary>{editingTaskId ? "Modifier une tâche" : requestedEditTaskId ? "Ouverture de la tâche..." : "Nouvelle tâche"}</summary>
+          <summary>{editingTaskId ? (selectedActivityCode === "DAILY_ACTIVITIES" ? "Modifier une activité" : "Modifier une tâche") : requestedEditTaskId ? "Ouverture de la tâche..." : selectedActivityCode === "DAILY_ACTIVITIES" ? "Nouvelle activité" : "Nouvelle tâche"}</summary>
           {requestedEditTaskId && !editingTaskId ? <p className="hint" role="status">Chargement de la tâche à modifier...</p> : (
           <form
             className="operations-task-form"
             onSubmit={handleCreateTask}
-            onChangeCapture={() => setHasUnsavedTaskChanges(true)}
-            data-unsaved-sector-form={hasUnsavedTaskChanges || editingTaskId ? "true" : undefined}
+            onChangeCapture={taskChanges.onChangeCapture}
+            data-unsaved-sector-form={taskChanges.isDirty || isSavingTaskForm ? "true" : undefined}
           >
             <div className="operations-task-form-primary">
               <input
                 type="text"
                 placeholder={selectedActivityCode === "TRANSPORT"
                   ? "Ex. : Entretien du véhicule TR-001"
-                  : "Titre de la tâche"}
+                  : selectedActivityCode === "DAILY_ACTIVITIES" ? "Titre de l’activité" : "Titre de la tâche"}
                 value={createForm.title}
                 onChange={(event) =>
                   setCreateForm((prev) => ({
@@ -2506,7 +2982,7 @@ export function OperationsTasksPage(): JSX.Element {
                 ) : editingTaskId ? (
                   "Enregistrer les modifications"
                 ) : (
-                  "Enregistrer la tâche"
+                  selectedActivityCode === "DAILY_ACTIVITIES" ? "Enregistrer l’activité" : "Enregistrer la tâche"
                 )}
               </button>
               {editingTaskId ? (
@@ -2523,95 +2999,6 @@ export function OperationsTasksPage(): JSX.Element {
           </form>
           )}
         </details>
-      ) : null}
-
-      {selectedActivityCode === "DAILY_ACTIVITIES" && canManageDailyActivityCategories ? (
-        <section className="panel">
-          <details
-            id="daily-activity-categories"
-            className="finance-section-toggle"
-            open={isDailyActivityCategoriesExpanded || Boolean(editingCategoryId)}
-            onToggle={(event) => setIsDailyActivityCategoriesExpanded(event.currentTarget.open)}
-          >
-            <summary className="finance-section-summary">
-              <span>{editingCategoryId ? "Modifier une catégorie" : "Gérer les catégories d'activité"}</span>
-              <small>
-                {editingCategoryId
-                  ? "Modification d'une catégorie enregistrée."
-                  : "Ajoutez vos propres catégories (rendez-vous, décision, partenaire...) pour les retrouver en sélection lors de la saisie."}
-              </small>
-            </summary>
-            <form className="finance-account-form" onSubmit={handleSaveCategory} data-unsaved-sector-form={editingCategoryId ? "true" : undefined}>
-              <label className="operations-inline-group">
-                <span>Nom de la catégorie</span>
-                <input
-                  type="text"
-                  placeholder="Ex: Rendez-vous"
-                  value={categoryForm.name}
-                  onChange={(event) => setCategoryForm({ name: event.target.value })}
-                  required
-                />
-              </label>
-              <div className="mobile-sticky-form-actions">
-                <button type="submit" disabled={isSavingCategory}>
-                  {isSavingCategory ? (
-                    <>
-                      <ButtonSpinner />
-                      Enregistrement...
-                    </>
-                  ) : editingCategoryId ? (
-                    "Enregistrer les modifications"
-                  ) : (
-                    "Ajouter la catégorie"
-                  )}
-                </button>
-                {editingCategoryId ? (
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={handleCancelEditCategory}
-                    disabled={isSavingCategory}
-                  >
-                    Annuler la modification
-                  </button>
-                ) : null}
-              </div>
-            </form>
-            {dailyActivityCategories.length > 0 ? (
-              <div className="operations-member-grid">
-                {dailyActivityCategories.map((category) => {
-                  const isBusy = busyCategoryId === category.id;
-                  return (
-                    <article key={category.id} className="operations-member-card">
-                      <h4>{category.name}</h4>
-                      {!category.isActive ? <p className="hint">Désactivée</p> : null}
-                      <div className="actions-inline">
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => handleStartEditCategory(category)}
-                          disabled={isBusy}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          onClick={() => handleDeleteCategory(category)}
-                          disabled={isBusy}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="hint">Aucune catégorie enregistrée pour le moment.</p>
-            )}
-          </details>
-        </section>
       ) : null}
 
       {false && canAssignTasks ? (
@@ -2672,333 +3059,8 @@ export function OperationsTasksPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section id="tasks-list" className="panel">
-        <div className="operations-list-header">
-          <h3>Tâches</h3>
-          {false ? (
-            <label className="inline-checkbox">
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={(event) =>
-                  setSelectedTasks((prev) => ({
-                    ...prev,
-                    ...Object.fromEntries(
-                      displayTasks.map((task) => [task.id, event.target.checked])
-                    )
-                  }))
-                }
-              />
-              <span>Tout sélectionner</span>
-            </label>
-          ) : !isReadOnlyOwner ? <p className="hint">{displayTasks.length} tâche(s) filtrée(s)</p> : null}
-        </div>
-        {!isLoading && sectorTasks.length === 0 ? (
-          <EmptyState
-            title="Aucune tâche dans cette vue"
-            description="Créez la première tâche du secteur actif ou changez les filtres pour retrouver les actions existantes."
-            actionLabel={canCreateTasks ? "Préparer une tâche" : undefined}
-            onAction={canCreateTasks ? () => {
-              setIsTaskFormExpanded(true);
-              window.requestAnimationFrame(() => {
-                document.getElementById("task-create")?.scrollIntoView({
-                  block: "start",
-                  behavior: "smooth"
-                });
-              });
-            } : undefined}
-          />
-        ) : null}
-        {!isLoading && sectorTasks.length > 0 && displayTasks.length === 0 ? (
-          <EmptyState
-            title="Aucun résultat"
-            description="Aucune tâche ne correspond à la recherche ou aux filtres appliqués."
-            actionLabel="Réinitialiser les filtres"
-            onAction={() => {
-              setSearchQuery("");
-              setFilters({
-                status: "ALL"
-              });
-            }}
-          />
-        ) : null}
-        {!isLoading && displayTasks.length > 0 ? (
-          <>
-          {renderVisibleTasksPagination()}
-          <div
-            className="operations-task-list operations-task-list-scroll"
-            role="region"
-            aria-label="Liste des tâches"
-            tabIndex={0}
-          >
-            {paginatedTasks.map((task) => {
-              const isBusy = busyTaskId === task.id;
-              const sectorContext = getSectorRecordContext(task.activityCode, task.metadata);
-              const canUpdate = canUpdateTask(task);
-              const isCompleted = task.status === "DONE";
-              const editLockMessage = getTaskEditLockMessage(task);
-              const deleteLockMessage = getTaskDeleteLockMessage(task);
-              const canDelete = canDeleteTask(task);
-              const selectedAssignee = assignments[task.id] ?? "";
-              const selectedOrNull = selectedAssignee || null;
-              const assignmentChanged = task.assignedToId !== selectedOrNull;
-
-              return (
-                <article
-                  key={task.id}
-                  className="operations-task-card clickable"
-                  onClick={() => openTaskDetails(task.id)}
-                  onKeyDown={(event) => onTaskCardKeyDown(event, task.id)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div
-                    className="operations-task-top"
-                    onClick={preventCardNavigation}
-                    onKeyDown={preventCardKeyboardNavigation}
-                  >
-                    <span className={`task-status-chip status-${task.status.toLowerCase()}`}>
-                      {statusLabel(task.status)}
-                    </span>
-                  </div>
-
-                  <h4 className="operations-task-title">{task.title}</h4>
-                  <p
-                    className={
-                      task.description?.trim()
-                        ? "operations-task-description"
-                        : "operations-task-description mobile-empty-description"
-                    }
-                  >
-                    {task.description?.trim() || (
-                      <span className="mobile-generic-placeholder">Aucune description fournie.</span>
-                    )}
-                  </p>
-
-                  <div className="operations-task-meta">
-                    {sectorContext.length > 0 ? (
-                      <p className="sector-record-context">
-                        {sectorContext.map(({ label, value }) => (
-                          <span key={label}><strong>{label} :</strong> {value}</span>
-                        ))}
-                      </p>
-                    ) : null}
-                    <p>
-                      <strong>Activité:</strong> {getBusinessActivityLabel(task.activityCode)}
-                    </p>
-                    <p>
-                      <strong>Assigné:</strong>{" "}
-                      {task.assignedToFullName ? `${task.assignedToFullName} (${task.assignedToEmail})` : "Non assignée"}
-                    </p>
-                    {canAssignTasks ? (
-                      <p className="operations-task-meta-secondary">
-                        <strong>Créateur:</strong> {task.createdByFullName} ({task.createdByEmail})
-                      </p>
-                    ) : null}
-                    <p>
-                      <strong>Échéance:</strong> {formatDate(task.dueDate)}
-                    </p>
-                    <p className="operations-task-meta-secondary">
-                      <strong>Mise à jour:</strong> {formatDate(task.updatedAt)}
-                    </p>
-                    {Object.keys(task.metadata).length > 0 ? (
-                      <p className="operations-task-metadata">
-                        <strong>Contexte:</strong> {formatMetadataSummary(task.metadata, taskMetadataFields)}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div
-                    className="operations-actions"
-                    onClick={preventCardNavigation}
-                    onKeyDown={preventCardKeyboardNavigation}
-                  >
-                    <div className="operations-actions-primary">
-                      <button
-                        type="button"
-                        className="secondary-btn operations-primary-action"
-                        onClick={() => openTaskDetails(task.id)}
-                      >
-                        Voir
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={() => handleStartEditTask(task)}
-                        disabled={isBusy || editingTaskId === task.id || editLockMessage !== null}
-                        title={editLockMessage ?? undefined}
-                      >
-                        Modifier
-                      </button>
-                    </div>
-
-                    {isCompleted ? (
-                      <div className="operations-actions-secondary-content">
-                        <div className="operations-task-closed-note">
-                          Tâche terminée: statut et assignation verrouillés.
-                        </div>
-                        {canDelete ? (
-                          <button
-                            type="button"
-                            className="danger-btn"
-                            onClick={() => void handleDeleteTask(task)}
-                            disabled={isBusy}
-                            title={deleteLockMessage ?? undefined}
-                          >
-                            Supprimer
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : !canAssignTasks ? (
-                      <div className="operations-actions-secondary-content">
-                        {canUpdate ? (
-                          <div className="operations-inline-group">
-                            <label>Statut</label>
-                            <select
-                              value={task.status}
-                              onChange={(event) =>
-                                void handleChangeStatus(task.id, event.target.value as TaskStatus)
-                              }
-                              disabled={isBusy || isBulkAssigning}
-                            >
-                              <option value="TODO">À faire</option>
-                              <option value="IN_PROGRESS">En cours</option>
-                              <option value="DONE">Terminée</option>
-                              <option value="BLOCKED">Bloquée</option>
-                            </select>
-                          </div>
-                        ) : null}
-                        {canDelete ? (
-                          <button
-                            type="button"
-                            className="danger-btn"
-                            onClick={() => void handleDeleteTask(task)}
-                            disabled={isBusy}
-                            title={deleteLockMessage ?? undefined}
-                          >
-                            Supprimer
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <details
-                        className="operations-actions-secondary"
-                        onToggle={(event) => {
-                          if (event.currentTarget.open) void loadMembers();
-                        }}
-                      >
-                        <summary>Statut et assignation</summary>
-                        <div className="operations-actions-secondary-content">
-                        {canUpdate ? (
-                          <div className="operations-inline-group">
-                            <label>Statut</label>
-                            <select
-                              value={task.status}
-                              onChange={(event) =>
-                                void handleChangeStatus(task.id, event.target.value as TaskStatus)
-                              }
-                              disabled={isBusy || isBulkAssigning}
-                            >
-                              <option value="TODO">À faire</option>
-                              <option value="IN_PROGRESS">En cours</option>
-                              <option value="DONE">Terminée</option>
-                              <option value="BLOCKED">Bloquée</option>
-                            </select>
-                          </div>
-                        ) : null}
-
-                        {canAssignTasks ? (
-                          <div className="operations-assign-card">
-                            <div className="operations-inline-group">
-                              <label>Assigner à</label>
-                              <select
-                                value={selectedAssignee}
-                                onChange={(event) =>
-                                  setAssignments((prev) => ({
-                                    ...prev,
-                                    [task.id]: event.target.value
-                                  }))
-                                }
-                                disabled={isBusy || isBulkAssigning}
-                              >
-                                <option value="">Non assignée</option>
-                                {isLoadingMembers ? (
-                                  <option value="" disabled>Chargement des membres…</option>
-                                ) : null}
-                                {members.map((member) => (
-                                  <option key={member.userId} value={member.userId}>
-                                    {memberLabel(member)}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="operations-inline-group">
-                              <label>Note (optionnel)</label>
-                              <input
-                                type="text"
-                                placeholder="Motif d'assignation"
-                                value={assignmentNotes[task.id] ?? ""}
-                                onChange={(event) =>
-                                  setAssignmentNotes((prev) => ({
-                                    ...prev,
-                                    [task.id]: event.target.value
-                                  }))
-                                }
-                                disabled={isBusy || isBulkAssigning}
-                              />
-                            </div>
-
-                            <button
-                              type="button"
-                              className="secondary-btn"
-                              onClick={() => void handleSaveAssignment(task.id)}
-                              disabled={!assignmentChanged || isBusy || isBulkAssigning}
-                            >
-                              Enregistrer assignation
-                            </button>
-                          </div>
-                        ) : null}
-                          {canDelete ? (
-                            <button
-                              type="button"
-                              className="danger-btn"
-                              onClick={() => void handleDeleteTask(task)}
-                              disabled={isBusy}
-                              title={deleteLockMessage ?? undefined}
-                            >
-                              Supprimer
-                            </button>
-                          ) : null}
-                        </div>
-                      </details>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          {hasMoreTasks ? (
-            <div className="list-pagination">
-              <p className="hint list-pagination-meta">
-                {displayTasks.length} tâche(s) affichée(s)
-                {displayTasks.length !== tasks.length ? ` sur ${tasks.length} chargée(s)` : ""}
-                {" sur plusieurs pages."}
-              </p>
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => void handleLoadMoreTasks()}
-                disabled={isLoadingMoreTasks}
-              >
-                {isLoadingMoreTasks ? "Chargement..." : "Charger plus"}
-              </button>
-            </div>
-          ) : null}
-          {renderVisibleTasksPagination("bottom")}
-          </>
-        ) : null}
-      </section>
+      {!fieldWorkspace ? renderTasksList() : null}
+      </>) : null}
 
       <ConfirmDialog
         open={taskPendingDelete !== null}

@@ -21,10 +21,15 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function AdminActivitiesPage(): JSX.Element {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
+  const currentCompanyRef = useRef(companyId);
+  currentCompanyRef.current = companyId;
   const withAuthorizedToken = useAuthorizedRequest();
   const { applyActivityUpdate } = useBusinessActivity();
-  const [items, setItems] = useState<CompanyActivityItem[]>([]);
+  const [loadedItems, setItems] = useState<CompanyActivityItem[]>([]);
+  const [itemsCompanyId, setItemsCompanyId] = useState<string>();
+  const items = itemsCompanyId === companyId ? loadedItems : [];
   const [isLoading, setIsLoading] = useState(true);
   const loadRequestRef = useRef(0);
   const [busyActivityCode, setBusyActivityCode] = useState<BusinessActivityCode | null>(null);
@@ -44,18 +49,21 @@ export function AdminActivitiesPage(): JSX.Element {
     const requestId = ++loadRequestRef.current;
     setIsLoading(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
+    setBusyActivityCode(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listAdminCompanyActivitiesRequest(accessToken)
       );
-      if (requestId !== loadRequestRef.current) return;
+      if (requestId !== loadRequestRef.current || currentCompanyRef.current !== companyId) return;
       setItems(response.items);
+      setItemsCompanyId(companyId);
     } catch (error) {
-      if (requestId === loadRequestRef.current) setErrorMessage(toErrorMessage(error));
+      if (requestId === loadRequestRef.current && currentCompanyRef.current === companyId) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (requestId === loadRequestRef.current) setIsLoading(false);
+      if (requestId === loadRequestRef.current && currentCompanyRef.current === companyId) setIsLoading(false);
     }
-  }, [withAuthorizedToken]);
+  }, [companyId, withAuthorizedToken]);
 
   useEffect(() => {
     if (!canViewActivities) {
@@ -73,6 +81,7 @@ export function AdminActivitiesPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         updateAdminCompanyActivityRequest(accessToken, item.code, !item.isEnabled)
       );
+      if (currentCompanyRef.current !== companyId) return;
       setItems((prev) =>
         prev.map((row) => (row.code === response.item.code ? response.item : row))
       );
@@ -83,9 +92,9 @@ export function AdminActivitiesPage(): JSX.Element {
           : `Secteur ${response.item.label} désactivé.`
       );
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (currentCompanyRef.current === companyId) setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyActivityCode(null);
+      if (currentCompanyRef.current === companyId) setBusyActivityCode(null);
     }
   }
 

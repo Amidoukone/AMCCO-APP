@@ -16,5 +16,8 @@
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces"
+  },
+  "devDependencies": {
+    "playwright-core": "1.63.0"
   }
 }

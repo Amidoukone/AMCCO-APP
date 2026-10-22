@@ -977,6 +977,7 @@ export async function updateCompanyTransaction(
   await updateFinancialTransaction({
     companyId: actor.companyId,
     transactionId: existing.id,
+    ...(existing.activityCode === "BEVERAGE_DEPOT" ? { stockControlled: true } : {}),
     accountId: input.accountId,
     type: input.type,
     amount: input.amount,
@@ -1676,6 +1677,7 @@ export async function exportCompanySalaryExcel(input: {
 }
 
 export async function listCompanyTransactions(input: {
+  search?: string;
   companyId: string;
   actorId: string;
   limit?: number;
@@ -1689,6 +1691,7 @@ export async function listCompanyTransactions(input: {
   const offset = Math.max(input.offset ?? 0, 0);
 
   return listFinancialTransactions({
+    search: input.search,
     companyId: input.companyId,
     limit,
     offset,
@@ -1809,7 +1812,8 @@ export async function deleteCompanyTransaction(
   const account = await findFinancialAccountById(actor.companyId, existing.accountId);
   await deleteFinancialTransaction({
     companyId: actor.companyId,
-    transactionId: existing.id
+    transactionId: existing.id,
+    ...(existing.activityCode === "BEVERAGE_DEPOT" ? { stockControlled: true } : {})
   });
 
   await createAuditLogRecord({
@@ -2078,7 +2082,8 @@ export async function submitCompanyTransaction(
     companyId: actor.companyId,
     transactionId: transaction.id,
     reviewerId: actor.actorId,
-    status: "APPROVED"
+    status: "APPROVED",
+    ...(transaction.activityCode === "BEVERAGE_DEPOT" ? { stockControlled: true } : {})
   });
 
   const actionCode = salarySnapshot ? "FINANCE_SALARY_SUBMITTED" : "FINANCE_TRANSACTION_SUBMITTED";
@@ -2233,7 +2238,8 @@ export async function reviewCompanyTransaction(
     companyId: actor.companyId,
     transactionId: transaction.id,
     reviewerId: actor.actorId,
-    status: input.decision
+    status: input.decision,
+    ...(transaction.activityCode === "BEVERAGE_DEPOT" ? { stockControlled: true } : {})
   });
 
   await createAuditLogRecord({
