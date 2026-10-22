@@ -4,6 +4,7 @@ import { BUSINESS_ACTIVITIES } from "../types/business-activity.js";
 import { logger } from "./logger.js";
 import { ensureBeverageStockSchemaReady } from "./beverage-stock-schema.js";
 import { createCompanyOwnedTable } from "./schema-identifiers.js";
+import { ensureOperatorFinancialAccountsReady } from "./operator-account-bootstrap.js";
 
 type CompanyIdRow = RowDataPacket & {
   id: string;
@@ -499,6 +500,7 @@ export async function ensureBusinessActivitySchemaReady(): Promise<void> {
     await ensureDailyActivityCategoriesTable();
     await ensureBeverageStockSchemaReady();
     await ensureCompanyActivitiesSeeded();
+    await ensureOperatorFinancialAccountsReady();
     logger.info("Business activity schema ready");
   } catch (error) {
     logger.error({ error }, "Failed to ensure business activity schema");

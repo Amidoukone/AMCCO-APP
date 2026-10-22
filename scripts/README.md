@@ -51,7 +51,13 @@ Pour cibler une correction : `verify-sector-cashflows.mjs --beverage-only` couvr
 
 ```powershell
 node scripts/verify-mysql-stock.mjs --local
+node scripts/verify-operator-accounts.mjs --local
 ```
+
+Le contrôle des comptes opérateurs vérifie la création des caisses manquantes
+dans les trois secteurs, leur visibilité par l'API, la conservation des comptes
+existants, les démarrages concurrents, l'idempotence et le rollback sur erreur.
+Il utilise une base temporaire locale `amcco_review_operators_<date>`.
 
 Ce contrôle exige MySQL 8 local et un compte autorisé à créer et supprimer ses bases de recette. Il utilise `AMCCO_REVIEW_MYSQL_URL` ou, à défaut, les paramètres de connexion de `backend/.env`. Une adresse distante est refusée. Aucune requête métier n'utilise la base indiquée dans cette URL : chaque cas crée une base temporaire nommée `amcco_review_<date>_<cas>` et la supprime dans le nettoyage final.
 

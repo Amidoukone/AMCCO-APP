@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { HttpError } from "../errors/http-error.js";
 import { hashPassword } from "../lib/password.js";
+import { ensureOperatorFinancialAccountsReady } from "../lib/operator-account-bootstrap.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import {
   countOwnersInCompany,
@@ -121,6 +122,10 @@ export async function createCompanyUser(
     throw new HttpError(500, "Impossible de créer le rattachement utilisateur.");
   }
 
+  if (getRoleActivityCode(input.role)) {
+    await ensureOperatorFinancialAccountsReady(actor.companyId);
+  }
+
   await createAuditLogRecord({
     auditId: randomUUID(),
     companyId: actor.companyId,
@@ -220,6 +225,10 @@ export async function changeCompanyUserRole(
   const updatedMembership = await findMembershipByCompanyAndUser(actor.companyId, input.userId);
   if (!updatedMembership) {
     throw new HttpError(500, "Impossible de recharger le rôle mis à jour.");
+  }
+
+  if (getRoleActivityCode(input.role)) {
+    await ensureOperatorFinancialAccountsReady(actor.companyId);
   }
 
   await createAuditLogRecord({

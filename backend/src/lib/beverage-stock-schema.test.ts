@@ -3,6 +3,8 @@ const db = vi.hoisted(() => ({ execute: vi.fn(), queryRows: vi.fn() }));
 vi.mock("./db.js", () => ({ getDbPool: () => ({ execute: db.execute }), queryRows: db.queryRows }));
 import { ensureBeverageStockSchemaReady } from "./beverage-stock-schema.js";
 import { ensureBusinessActivitySchemaReady } from "./schema-bootstrap.js";
+import { ensureOperatorFinancialAccountsReady } from "./operator-account-bootstrap.js";
+vi.mock("./operator-account-bootstrap.js", () => ({ ensureOperatorFinancialAccountsReady: vi.fn() }));
 
 beforeEach(() => {
   db.execute.mockReset().mockResolvedValue([{}]);
@@ -25,6 +27,7 @@ describe("stock schema initialization", () => {
     const productIndex = statements.findIndex((sql) => sql.includes("CREATE TABLE IF NOT EXISTS beverage_products"));
     expect(productIndex).toBeGreaterThanOrEqual(0);
     expect(statements[productIndex + 1]).toContain("CREATE TABLE IF NOT EXISTS beverage_stock_movements");
+    expect(ensureOperatorFinancialAccountsReady).toHaveBeenCalledOnce();
   });
   it("fails startup when stock preparation fails, instead of serving a broken stock screen", async () => {
     const failure = new Error("DDL permission denied");

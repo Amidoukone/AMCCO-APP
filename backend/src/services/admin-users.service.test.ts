@@ -15,6 +15,9 @@ import {
 import { listAllCompanyIds } from "../repositories/companies.repository.js";
 import { createAuditLogRecord } from "../repositories/audit.repository.js";
 import { hashPassword } from "../lib/password.js";
+import { ensureOperatorFinancialAccountsReady } from "../lib/operator-account-bootstrap.js";
+
+vi.mock("../lib/operator-account-bootstrap.js", () => ({ ensureOperatorFinancialAccountsReady: vi.fn() }));
 
 vi.mock("node:crypto", () => ({
   randomUUID: vi.fn()
@@ -172,6 +175,7 @@ describe("admin-users.service", () => {
     expect(createMembershipIfMissing).not.toHaveBeenCalled();
     expect(listAllCompanyIds).not.toHaveBeenCalled();
     expect(result.role).toBe("HARDWARE_OPERATOR");
+    expect(ensureOperatorFinancialAccountsReady).toHaveBeenCalledWith("company-1");
   });
 
   it("creates a beverage depot operator only in the active company", async () => {
@@ -210,6 +214,7 @@ describe("admin-users.service", () => {
     expect(createMembershipIfMissing).not.toHaveBeenCalled();
     expect(listAllCompanyIds).not.toHaveBeenCalled();
     expect(result.role).toBe("BEVERAGE_DEPOT_OPERATOR");
+    expect(ensureOperatorFinancialAccountsReady).toHaveBeenCalledWith("company-1");
   });
 
   it("does not assign a sector role to a previously shared user", async () => {
