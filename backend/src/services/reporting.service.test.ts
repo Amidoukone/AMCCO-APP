@@ -2,12 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listBeverageProducts, listBeverageStockAdjustments } from "../repositories/beverage-stock.repository.js";
 vi.mock("../repositories/beverage-stock.repository.js", () => ({ listBeverageProducts: vi.fn().mockResolvedValue([]), listBeverageStockAdjustments: vi.fn().mockResolvedValue([]) }));
 import { inflateSync } from "node:zlib";
-import * as XLSX from "xlsx";
 import { mkdir, writeFile } from "node:fs/promises";
 import {
   exportCompanyReportsPdf,
-  exportCompanyTransactionsExcel,
-  exportCompanyTransactionsCsv,
   getCompanyDashboardSummary,
   getCompanyReportsOverview
 } from "./reporting.service.js";
@@ -35,8 +32,6 @@ import {
   listReportRoleDistribution,
   listReportTaskByActivity,
   listReportTaskByStatus,
-  listTransactionsForExport,
-  toTransactionExportRecord
 } from "../repositories/reporting.repository.js";
 import {
   getFinancialAccountsSummary,
@@ -70,10 +65,6 @@ vi.mock("../repositories/reporting.repository.js", () => ({
   listReportRoleDistribution: vi.fn(),
   listReportTaskByActivity: vi.fn(),
   listReportTaskByStatus: vi.fn(),
-  listTasksForExport: vi.fn(),
-  listTransactionsForExport: vi.fn(),
-  toTaskExportRecord: vi.fn(),
-  toTransactionExportRecord: vi.fn()
 }));
 
 vi.mock("../repositories/finance.repository.js", () => ({
@@ -168,7 +159,7 @@ describe("reporting.service", () => {
     vi.mocked(listBtpProjects).mockResolvedValue([]);
   });
 
-  it("filters dashboard finance and opérations by the selected activity", async () => {
+  it.each([undefined, true, false])("filters dashboard finance and opérations by the selected activity (details=%s)", async (includeDetails) => {
     vi.mocked(getDashboardCompanySummary).mockResolvedValue({
       companyId: "company-1",
       companyName: "AMCCO",
@@ -228,7 +219,8 @@ describe("reporting.service", () => {
     ]);
 
     const result = await getCompanyDashboardSummary(actor, {
-      activityCode: "MINING"
+      activityCode: "MINING",
+      includeDetails
     });
 
     expect(getDashboardFinanceSummary).toHaveBeenCalledWith(actor.companyId, {
@@ -249,13 +241,19 @@ describe("reporting.service", () => {
       actor.actorId,
       { activityCode: "MINING" }
     );
-    expect(listDashboardWorkload).toHaveBeenCalledWith(actor.companyId, 5, {
-      activityCode: "MINING"
-    });
+    expect(listDashboardWorkload).not.toHaveBeenCalled();
     expect(result.finance.totalTransactionsCount).toBe(4);
     expect(result.finance.accountsSummary.compatibleCount).toBe(2);
     expect(result.finance.accountsSummary.dedicatedToSelectedActivityCount).toBe(1);
     expect(result.operations.totalTasksCount).toBe(6);
+    if (includeDetails === false) {
+      expect(listDashboardOperationalTransactions).not.toHaveBeenCalled();
+      expect(listDashboardOperationalTasks).not.toHaveBeenCalled();
+      expect(result.operationalPerformance).toEqual([]);
+    } else {
+      expect(listDashboardOperationalTransactions).toHaveBeenCalledTimes(1);
+      expect(listDashboardOperationalTasks).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("adds sector profile and dedicated highlights when an activity filter is applied", async () => {
@@ -1751,22 +1749,6 @@ describe("reporting.service", () => {
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(extractPdfText(pdf)).not.toContain("-1 200 000");
 
-    vi.mocked(listTransactionsForExport).mockResolvedValue([]);
-    const workbookBuffer = await exportCompanyTransactionsExcel(actor, {
-      activityCode: "GENERAL_STORE",
-      dateTo: "2026-10-01T23:59:59.999Z"
-    });
-    const workbook = XLSX.read(workbookBuffer, { type: "buffer" });
-    const storeRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.Magasins!);
-    expect(storeRows).toEqual([
-      expect.objectContaining({
-        shopRef: "Boutique Nioumala",
-        purchaseAmount: "0.00",
-        remainingStockValue: "1200000.00",
-        estimatedSoldAmount: "",
-        varianceAmount: ""
-      })
-    ]);
   });
 
   it("builds the général store opérations report as a per-boutique ledger", async () => {
@@ -2011,30 +1993,6 @@ describe("reporting.service", () => {
     expect(extractPdfText(pdf)).not.toContain("-1 150 000");
     expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length).toBeGreaterThan(1);
 
-    vi.mocked(listTransactionsForExport).mockResolvedValue([]);
-    const workbookBuffer = await exportCompanyTransactionsExcel(actor, {
-      activityCode: "GENERAL_STORE",
-      dateFrom: "2026-09-01T00:00:00.000Z",
-      dateTo: "2026-09-30T23:59:59.999Z"
-    });
-    const workbook = XLSX.read(workbookBuffer, { type: "buffer" });
-    expect(workbook.SheetNames).toEqual(expect.arrayContaining([
-      "Magasins", "MagasinsMouvements", "MagasinsSynthese", "MagasinsLecture"
-    ]));
-    const movementRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-      workbook.Sheets.MagasinsMouvements!
-    );
-    expect(movementRows).toHaveLength(6);
-    expect(movementRows[0]).toMatchObject({
-      shopRef: "Boutique Nord",
-      operationKind: "RECOUVREMENT",
-      status: "SUBMITTED",
-      amount: "2000.00"
-    });
-    const readingRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-      workbook.Sheets.MagasinsLecture!
-    );
-    expect(readingRows[0]?.definition).toContain("soumises ou approuvées");
   });
 
   it("builds the food opérations report from product and batch metadata", async () => {
@@ -3318,338 +3276,12 @@ describe("reporting.service", () => {
     expect(emptyPdfText).not.toContain("TOTAL DÉPENSES");
   });
 
-  it("builds the real estate agency opérations report from mandate and deal metadata", async () => {
-    vi.mocked(listReportFinanceByStatus).mockResolvedValue([
-      { status: "APPROVED", currency: "XOF", count: 10, totalAmount: "655000.00" }
-    ]);
-    vi.mocked(listReportFinanceByType).mockResolvedValue([
-      {
-        type: "CASH_IN",
-        currency: "XOF",
-        count: 5,
-        totalAmount: "515000.00",
-        approvedAmount: "515000.00"
-      },
-      {
-        type: "CASH_OUT",
-        currency: "XOF",
-        count: 5,
-        totalAmount: "140000.00",
-        approvedAmount: "140000.00"
-      }
-    ]);
-    vi.mocked(listReportFinanceByActivity).mockResolvedValue([
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        count: 10,
-        totalAmount: "655000.00",
-        approvedAmount: "655000.00"
-      }
-    ]);
-    vi.mocked(listReportTaskByStatus).mockResolvedValue([
-      { status: "DONE", count: 1 },
-      { status: "BLOCKED", count: 1 }
-    ]);
-    vi.mocked(listReportTaskByActivity).mockResolvedValue([
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        totalCount: 2,
-        openCount: 1,
-        blockedCount: 1,
-        doneCount: 1
-      }
-    ]);
-
-    const commonMetadata = {
-      mandateRef: "MAND-01",
-      propertyRef: "Villa Faso",
-      mandateType: "Vente / location",
-      propertyType: "Villa",
-      locationZone: "ACI",
-      ownerRef: "Propriétaire Traore",
-      clientRef: "Client Diallo",
-      prospectRef: "Lead-01",
-      dealRef: "AFF-01",
-      dealStage: "Compromis"
-    };
-
-    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_IN",
-        amount: "300000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-03T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "SALE_COMMISSION",
-          dealAmount: "10000000",
-          commissionRate: "3",
-          commissionAmount: "300000",
-          invoiceRef: "COM-V-01",
-          paymentRef: "PAY-COM-V-01"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_IN",
-        amount: "120000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-04T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "RENTAL_COMMISSION",
-          dealAmount: "2400000",
-          commissionRate: "5",
-          commissionAmount: "120000",
-          invoiceRef: "COM-L-01",
-          paymentRef: "PAY-COM-L-01"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_IN",
-        amount: "50000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-05T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "MANDATE_FEE",
-          feeAmount: "50000",
-          documentRef: "MANDAT-SIGNE",
-          paymentRef: "PAY-MAND-01"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_IN",
-        amount: "20000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-06T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "VISIT_FEE",
-          visitCount: "2",
-          unitPrice: "10000",
-          paymentRef: "PAY-VIS-01"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_IN",
-        amount: "25000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-07T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "FILE_FEE",
-          feeAmount: "25000",
-          documentRef: "DOSSIER-01",
-          paymentRef: "PAY-DOS-01"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_OUT",
-        amount: "30000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-08T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "ADVERTISING_EXPENSE",
-          advertisingChannel: "Portail immobilier",
-          supplierRef: "Annonceur",
-          invoiceRef: "ADV-01",
-          expenseAmount: "30000"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_OUT",
-        amount: "10000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-09T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "FIELD_VISIT_EXPENSE",
-          visitCount: "2",
-          unitPrice: "5000",
-          supplierRef: "Carburant",
-          invoiceRef: "DEP-01",
-          expenseAmount: "10000"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_OUT",
-        amount: "60000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-10T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "BROKER_PAYOUT",
-          supplierRef: "Courtier Keita",
-          payoutAmount: "60000",
-          paymentRef: "PAY-COURT-01"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_OUT",
-        amount: "15000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-11T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "DOCUMENT_EXPENSE",
-          documentRef: "Attestation",
-          supplierRef: "Mairie",
-          invoiceRef: "DOC-01",
-          expenseAmount: "15000"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "APPROVED",
-        type: "CASH_OUT",
-        amount: "25000.00",
-        currency: "XOF",
-        occurredAt: "2026-06-12T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyOperationKind: "CUSTOMER_REFUND",
-          refundAmount: "5000",
-          expenseAmount: "20000",
-          paymentRef: "PAY-REM-01"
-        }
-      }
-    ]);
-    vi.mocked(listReportOperationalTasks).mockResolvedValue([
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "DONE",
-        dueDate: "2026-06-13T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyTaskKind: "VISIT_SCHEDULE"
-        }
-      },
-      {
-        activityCode: "REAL_ESTATE_AGENCY",
-        status: "BLOCKED",
-        dueDate: "2026-06-14T09:00:00.000Z",
-        metadata: {
-          ...commonMetadata,
-          agencyTaskKind: "DOCUMENT_COLLECTION",
-          issueRef: "Titre foncier manquant"
-        }
-      }
-    ]);
-
-    const result = await getCompanyReportsOverview(actor, {
+  it("rejects the retired real estate agency report", async () => {
+    await expect(getCompanyReportsOverview(actor, {
       activityCode: "REAL_ESTATE_AGENCY",
       dateFrom: "2026-06-01T00:00:00.000Z",
       dateTo: "2026-06-30T23:59:59.999Z"
-    });
-
-    expect(result.agencyOperationsReport?.periodLabel).toBe("juin 2026");
-    expect(result.agencyOperationsReport?.rows).toEqual([
-      expect.objectContaining({
-        mandateRef: "MAND-01",
-        propertyRef: "Villa Faso",
-        mandateType: "Vente / location",
-        propertyType: "Villa",
-        locationZone: "ACI",
-        clientRef: "Client Diallo",
-        dealStage: "Compromis",
-        dealAmount: "12400000.00",
-        saleCommissionAmount: "300000.00",
-        rentalCommissionAmount: "120000.00",
-        mandateFeeAmount: "50000.00",
-        visitFeeAmount: "20000.00",
-        fileFeeAmount: "25000.00",
-        advertisingExpenseAmount: "30000.00",
-        fieldVisitExpenseAmount: "10000.00",
-        brokerPayoutAmount: "60000.00",
-        documentExpenseAmount: "15000.00",
-        officeExpenseAmount: "0.00",
-        refundAmount: "25000.00",
-        transactionsCount: 10,
-        tasksCount: 2,
-        doneTasksCount: 1,
-        openTasksCount: 1,
-        blockedTasksCount: 1,
-        cashInAmount: "515000.00",
-        cashOutAmount: "140000.00",
-        netAmount: "375000.00",
-        commissionRate: 3.39,
-        executionRate: 50,
-        currency: "XOF"
-      })
-    ]);
-    expect(result.agencyOperationsReport?.operationRows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ operationLabel: "Commission vente", cashInAmount: "300000.00" }),
-        expect.objectContaining({ operationLabel: "Commission location", cashInAmount: "120000.00" }),
-        expect.objectContaining({ operationLabel: "Frais mandat", cashInAmount: "50000.00" }),
-        expect.objectContaining({ operationLabel: "Frais visite", cashInAmount: "20000.00" }),
-        expect.objectContaining({ operationLabel: "Frais dossier", cashInAmount: "25000.00" }),
-        expect.objectContaining({ operationLabel: "Publicité", cashOutAmount: "30000.00" }),
-        expect.objectContaining({ operationLabel: "Déplacement visite", cashOutAmount: "10000.00" }),
-        expect.objectContaining({ operationLabel: "Reversement courtier", cashOutAmount: "60000.00" }),
-        expect.objectContaining({ operationLabel: "Frais document", cashOutAmount: "15000.00" }),
-        expect.objectContaining({ operationLabel: "Remboursement client", cashOutAmount: "25000.00" }),
-        expect.objectContaining({ operationLabel: "Tâche: Visite", tasksCount: 1 }),
-        expect.objectContaining({ operationLabel: "Tâche: Collecte documents", tasksCount: 1 })
-      ])
-    );
-    expect(result.agencyOperationsReport?.totals).toMatchObject({
-      mandatesCount: 1,
-      propertiesCount: 1,
-      clientsCount: 1,
-      dealAmount: "12400000.00",
-      saleCommissionAmount: "300000.00",
-      rentalCommissionAmount: "120000.00",
-      mandateFeeAmount: "50000.00",
-      visitFeeAmount: "20000.00",
-      fileFeeAmount: "25000.00",
-      advertisingExpenseAmount: "30000.00",
-      fieldVisitExpenseAmount: "10000.00",
-      brokerPayoutAmount: "60000.00",
-      documentExpenseAmount: "15000.00",
-      officeExpenseAmount: "0.00",
-      refundAmount: "25000.00",
-      transactionsCount: 10,
-      tasksCount: 2,
-      doneTasksCount: 1,
-      openTasksCount: 1,
-      blockedTasksCount: 1,
-      cashInAmount: "515000.00",
-      cashOutAmount: "140000.00",
-      netAmount: "375000.00",
-      commissionRate: 3.39,
-      executionRate: 50,
-      currency: "XOF"
-    });
-
-    const pdf = await renderReportArtifact(actor, {
-      activityCode: "REAL_ESTATE_AGENCY",
-      dateFrom: "2026-06-01T00:00:00.000Z",
-      dateTo: "2026-06-30T23:59:59.999Z"
-    });
-    await saveReportArtifact(pdf, "REAL_ESTATE_AGENCY-example-14");
-
-    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
-    expect(pdf.length).toBeGreaterThan(1000);
+    })).rejects.toMatchObject({ statusCode: 410 });
   });
 
   it("builds the fish farming opérations report from pond and cycle metadata", async () => {
@@ -4129,41 +3761,4 @@ describe("reporting.service", () => {
     await saveReportArtifact(pdf, "AGRICULTURE-currencies");
   });
 
-  it("exports transaction governance columns in CSV", async () => {
-    vi.mocked(listTransactionsForExport).mockResolvedValue([
-      {
-        id: "txn-1"
-      } as never
-    ]);
-    vi.mocked(toTransactionExportRecord).mockReturnValue({
-      id: "txn-1",
-      occurredAt: "2026-04-21T10:00:00.000Z",
-      status: "APPROVED",
-      type: "CASH_OUT",
-      amount: "1200.00",
-      currency: "XOF",
-      activityCode: "MINING",
-      accountName: "Caisse mine",
-      accountRef: "MIN-01",
-      accountScopeType: "DEDICATED",
-      accountPrimaryActivityCode: "MINING",
-      accountAllowedActivityCodes: ["MINING"],
-      accountSupportsTransactionActivity: true,
-      createdByEmail: "owner@amcco.test",
-      validatedByEmail: "acc@amcco.test",
-      proofsCount: 2,
-      description: "Achat terrain",
-      createdAt: "2026-04-21T09:00:00.000Z",
-      updatedAt: "2026-04-21T10:05:00.000Z"
-    });
-    const csv = await exportCompanyTransactionsCsv(actor, {
-      activityCode: "MINING"
-    });
-
-    expect(csv).toContain("account_scope_type");
-    expect(csv).toContain("account_allowed_activity_codes");
-    expect(csv).toContain("\"DEDICATED\"");
-    expect(csv).toContain("\"MINING\"");
-    expect(csv).toContain("\"YES\"");
-  });
 });

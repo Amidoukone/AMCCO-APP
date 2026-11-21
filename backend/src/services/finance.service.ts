@@ -1,6 +1,4 @@
-import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
-import * as XLSX from "xlsx";
 import {
   assertTransactionInputMatchesActivityProfile,
   getBusinessActivityProfile,
@@ -412,35 +410,6 @@ function centsToMoney(input: number): string {
   return `${isNegative ? "-" : ""}${whole}.${String(decimals).padStart(2, "0")}`;
 }
 
-function escapeCsvValue(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  const normalized = String(value).replace(/\r?\n/g, " ").replace(/"/g, '""');
-  return `"${normalized}"`;
-}
-
-function buildCsv(headers: string[], rows: Array<Array<string | number | null | undefined>>): string {
-  const headerLine = headers.map((header) => escapeCsvValue(header)).join(",");
-  const lines = rows.map((row) => row.map((value) => escapeCsvValue(value)).join(","));
-  return [headerLine, ...lines].join("\n");
-}
-
-function buildWorkbookBuffer(sheets: Array<{ name: string; rows: Array<Record<string, unknown>> }>): Buffer {
-  const workbook = XLSX.utils.book_new();
-
-  for (const sheet of sheets) {
-    const worksheet = XLSX.utils.json_to_sheet(sheet.rows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
-  }
-
-  return XLSX.write(workbook, {
-    type: "buffer",
-    bookType: "xlsx"
-  }) as Buffer;
-}
-
 function isSalaryPaymentMethod(value: string): value is SalaryPaymentMethod {
   return ["BANK_TRANSFER", "CASH", "MOBILE_MONEY", "CHEQUE"].includes(value);
 }
@@ -809,16 +778,25 @@ export async function createCompanyTransaction(
     description?: string;
     metadata?: Record<string, string>;
     occurredAt?: string;
-  }
+  },
 ) {
   const scopedActivityCode = getRoleActivityCode(actor.role);
   if (scopedActivityCode && input.activityCode !== scopedActivityCode) {
-    throw new HttpError(403, "Vous ne pouvez saisir que les transactions de votre secteur.");
+    throw new HttpError(
+      403,
+      "Vous ne pouvez saisir que les transactions de votre secteur.",
+    );
   }
-  const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode)
+  const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(
+    actor.companyId,
+    input.activityCode,
+  )
     .then(() => ({ ok: true as const }))
     .catch((error: unknown) => ({ ok: false as const, error }));
-  const account = await findFinancialAccountById(actor.companyId, input.accountId);
+  const account = await findFinancialAccountById(
+    actor.companyId,
+    input.accountId,
+  );
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
   }
@@ -826,9 +804,15 @@ export async function createCompanyTransaction(
   if (
     scopedActivityCode &&
     (account.scopeType === "GLOBAL" ||
-      (account.scopeType === "RESTRICTED" && account.allowedActivityCodes.some((code) => code !== scopedActivityCode)))
+      (account.scopeType === "RESTRICTED" &&
+        account.allowedActivityCodes.some(
+          (code) => code !== scopedActivityCode,
+        )))
   ) {
-    throw new HttpError(403, "Utilisez un compte financier dédié à votre secteur.");
+    throw new HttpError(
+      403,
+      "Utilisez un compte financier dédié à votre secteur.",
+    );
   }
 
   const activityCheck = await activityCheckPromise;
@@ -844,10 +828,13 @@ export async function createCompanyTransaction(
       amount: input.amount,
       currency,
       description,
-      metadata
+      metadata,
     });
   } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
+    throw new HttpError(
+      400,
+      error instanceof Error ? error.message : "Règle métier invalide.",
+    );
   }
   const profile = getBusinessActivityProfile(input.activityCode);
 
@@ -855,7 +842,7 @@ export async function createCompanyTransaction(
   const governanceMetadata = buildFinanceGovernanceMetadata({
     account,
     activityCode: input.activityCode,
-    transactionId
+    transactionId,
   });
   await createFinancialTransaction({
     id: transactionId,
@@ -869,11 +856,7 @@ export async function createCompanyTransaction(
     metadata,
     requiresProof: profile.finance.requiresProof,
     createdById: actor.actorId,
-    occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date()
-  });
-
-  await submitCompanyTransaction(actor, {
-    transactionId
+    occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(),
   });
 
   const [created] = await Promise.all([
@@ -895,9 +878,9 @@ export async function createCompanyTransaction(
         activityLabel: profile.label,
         metadata,
         requiresProof: profile.finance.requiresProof,
-        financeWorkflow: profile.finance.workflow.map((step) => step.code)
-      })
-    })
+        financeWorkflow: profile.finance.workflow.map((step) => step.code),
+      }),
+    }),
   ]);
   if (!created) {
     throw new HttpError(500, "Impossible de recharger la transaction créée.");
@@ -917,17 +900,23 @@ export async function updateCompanyTransaction(
     description?: string;
     metadata?: Record<string, string>;
     occurredAt?: string;
-  }
+  },
 ) {
   ensureTransactionManagementAccess(actor.role);
 
-  const existing = await findFinancialTransactionById(actor.companyId, input.transactionId);
+  const existing = await findFinancialTransactionById(
+    actor.companyId,
+    input.transactionId,
+  );
   if (!existing) {
     throw new HttpError(404, "Transaction introuvable.");
   }
 
   if (extractSalarySnapshot(existing.metadata)) {
-    throw new HttpError(400, "Les salaires doivent être gérés depuis la page salaires.");
+    throw new HttpError(
+      400,
+      "Les salaires doivent être gérés depuis la page salaires.",
+    );
   }
 
   ensureSectorTransactionAccess(actor.role, existing.activityCode);
@@ -935,13 +924,22 @@ export async function updateCompanyTransaction(
 
   const scopedActivityCode = getRoleActivityCode(actor.role);
   if (scopedActivityCode && input.activityCode !== scopedActivityCode) {
-    throw new HttpError(403, "Vous ne pouvez modifier que les transactions de votre secteur.");
+    throw new HttpError(
+      403,
+      "Vous ne pouvez modifier que les transactions de votre secteur.",
+    );
   }
 
-  const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode)
+  const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(
+    actor.companyId,
+    input.activityCode,
+  )
     .then(() => ({ ok: true as const }))
     .catch((error: unknown) => ({ ok: false as const, error }));
-  const account = await findFinancialAccountById(actor.companyId, input.accountId);
+  const account = await findFinancialAccountById(
+    actor.companyId,
+    input.accountId,
+  );
   if (!account) {
     throw new HttpError(404, "Compte financier introuvable.");
   }
@@ -949,9 +947,15 @@ export async function updateCompanyTransaction(
   if (
     scopedActivityCode &&
     (account.scopeType === "GLOBAL" ||
-      (account.scopeType === "RESTRICTED" && account.allowedActivityCodes.some((code) => code !== scopedActivityCode)))
+      (account.scopeType === "RESTRICTED" &&
+        account.allowedActivityCodes.some(
+          (code) => code !== scopedActivityCode,
+        )))
   ) {
-    throw new HttpError(403, "Utilisez un compte financier dédié à votre secteur.");
+    throw new HttpError(
+      403,
+      "Utilisez un compte financier dédié à votre secteur.",
+    );
   }
 
   const activityCheck = await activityCheckPromise;
@@ -967,17 +971,22 @@ export async function updateCompanyTransaction(
       amount: input.amount,
       currency,
       description,
-      metadata
+      metadata,
     });
   } catch (error) {
-    throw new HttpError(400, error instanceof Error ? error.message : "Règle métier invalide.");
+    throw new HttpError(
+      400,
+      error instanceof Error ? error.message : "Règle métier invalide.",
+    );
   }
 
   const profile = getBusinessActivityProfile(input.activityCode);
   await updateFinancialTransaction({
     companyId: actor.companyId,
     transactionId: existing.id,
-    ...(existing.activityCode === "BEVERAGE_DEPOT" ? { stockControlled: true } : {}),
+    ...(existing.activityCode === "BEVERAGE_DEPOT"
+      ? { stockControlled: true }
+      : {}),
     accountId: input.accountId,
     type: input.type,
     amount: input.amount,
@@ -986,11 +995,9 @@ export async function updateCompanyTransaction(
     description: description || null,
     metadata,
     requiresProof: profile.finance.requiresProof,
-    occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(existing.occurredAt)
-  });
-
-  await submitCompanyTransaction(actor, {
-    transactionId: existing.id
+    occurredAt: input.occurredAt
+      ? new Date(input.occurredAt)
+      : new Date(existing.occurredAt),
   });
 
   const [updated] = await Promise.all([
@@ -1006,7 +1013,7 @@ export async function updateCompanyTransaction(
         ...buildFinanceGovernanceMetadata({
           account,
           activityCode: input.activityCode,
-          transactionId: existing.id
+          transactionId: existing.id,
         }),
         previousStatus: existing.status,
         accountId: input.accountId,
@@ -1017,19 +1024,22 @@ export async function updateCompanyTransaction(
         activityLabel: profile.label,
         metadata,
         requiresProof: profile.finance.requiresProof,
-        financeWorkflow: profile.finance.workflow.map((step) => step.code)
-      })
-    })
+        financeWorkflow: profile.finance.workflow.map((step) => step.code),
+      }),
+    }),
   ]);
   if (!updated) {
-    throw new HttpError(500, "Impossible de recharger la transaction modifiée.");
+    throw new HttpError(
+      500,
+      "Impossible de recharger la transaction modifiée.",
+    );
   }
 
   await alertTransactionMutationWatchers({
     actor,
     transaction: updated,
     code: "FINANCE_TRANSACTION_UPDATED",
-    actionLabel: "modifiée"
+    actionLabel: "modifiée",
   });
 
   return updated;
@@ -1367,10 +1377,6 @@ export async function createCompanySalaryTransaction(
     occurredAt: new Date(input.occurredAt)
   });
 
-  await submitCompanyTransaction(actor, {
-    transactionId
-  });
-
   await createAuditLogRecord({
     auditId: randomUUID(),
     companyId: actor.companyId,
@@ -1397,6 +1403,8 @@ export async function createCompanySalaryTransaction(
   if (!salarySnapshot) {
     throw new HttpError(500, "Impossible de reconstruire les informations du salaire.");
   }
+
+  await notifyRecordedSalary(actor, created.id, salarySnapshot, "FINANCE_SALARY_CREATED");
 
   return {
     ...created,
@@ -1488,10 +1496,6 @@ export async function updateCompanySalaryTransaction(
     occurredAt: new Date(input.occurredAt)
   });
 
-  await submitCompanyTransaction(actor, {
-    transactionId: existing.id
-  });
-
   await createAuditLogRecord({
     auditId: randomUUID(),
     companyId: actor.companyId,
@@ -1551,6 +1555,8 @@ export async function updateCompanySalaryTransaction(
     });
   }
 
+  await notifyRecordedSalary(actor, updated.id, updatedSnapshot, "FINANCE_SALARY_UPDATED");
+
   return {
     ...updated,
     ...updatedSnapshot,
@@ -1558,122 +1564,38 @@ export async function updateCompanySalaryTransaction(
   };
 }
 
-export async function exportCompanySalaryCsv(input: {
-  companyId: string;
-  role: RoleCode;
-  payPeriod: string;
-  employeeUserId?: string;
-}): Promise<string> {
-  const summary = await getCompanySalarySummary(input);
-
-  return buildCsv(
-    [
-      "salary_id",
-      "pay_period",
-      "employee_full_name",
-      "employee_email",
-      "employee_role",
-      "account_name",
-      "gross_amount",
-      "bonus_amount",
-      "deduction_amount",
-      "net_amount",
-      "currency",
-      "payment_method",
-      "created_by_email",
-      "occurred_at",
-      "created_at",
-      "updated_at",
-      "note"
-    ],
-    summary.items.map((item) => [
-      item.id,
-      item.payPeriod,
-      item.employeeFullName,
-      item.employeeEmail,
-      item.employeeRole,
-      item.accountName,
-      item.grossAmount,
-      item.bonusAmount,
-      item.deductionAmount,
-      item.netAmount,
-      item.currency,
-      item.paymentMethod,
-      item.createdByEmail,
-      item.occurredAt,
-      item.createdAt,
-      item.updatedAt,
-      item.note
-    ])
-  );
-}
-
-export async function exportCompanySalaryExcel(input: {
-  companyId: string;
-  role: RoleCode;
-  payPeriod: string;
-  employeeUserId?: string;
-}): Promise<Buffer> {
-  const summary = await getCompanySalarySummary(input);
-
-  return buildWorkbookBuffer([
-    {
-      name: "Resume",
-      rows: [
-        {
-          payPeriod: summary.payPeriod,
-          totalCount: summary.totalCount,
-          totalGrossAmount: summary.totalGrossAmount,
-          totalBonusAmount: summary.totalBonusAmount,
-          totalDeductionAmount: summary.totalDeductionAmount,
-          totalNetAmount: summary.totalNetAmount,
-          recordedNetAmount: summary.approvedNetAmount,
-          draftCount: summary.pendingCount
-        }
-      ]
-    },
-    {
-      name: "Par paiement",
-      rows: summary.byPaymentMethod.map((item) => ({
-        paymentMethod: item.paymentMethod,
-        count: item.count,
-        netAmount: item.netAmount
-      }))
-    },
-    {
-      name: "Par collaborateur",
-      rows: summary.byEmployee.map((item) => ({
-        employeeFullName: item.employeeFullName,
-        employeeEmail: item.employeeEmail,
-        employeeRole: item.employeeRole,
-        count: item.count,
-        grossAmount: item.grossAmount,
-        bonusAmount: item.bonusAmount,
-        deductionAmount: item.deductionAmount,
-        netAmount: item.netAmount
-      }))
-    },
-    {
-      name: "Salaires",
-      rows: summary.items.map((item) => ({
-        salaryId: item.id,
-        payPeriod: item.payPeriod,
-        employeeFullName: item.employeeFullName,
-        employeeEmail: item.employeeEmail,
-        employeeRole: item.employeeRole,
-        accountName: item.accountName,
-        grossAmount: item.grossAmount,
-        bonusAmount: item.bonusAmount,
-        deductionAmount: item.deductionAmount,
-        netAmount: item.netAmount,
-        currency: item.currency,
-        paymentMethod: item.paymentMethod,
-        createdByEmail: item.createdByEmail,
-        occurredAt: item.occurredAt,
-        note: item.note ?? ""
-      }))
-    }
-  ]);
+async function notifyRecordedSalary(
+  actor: ActorContext,
+  transactionId: string,
+  salary: SalarySnapshot,
+  code: "FINANCE_SALARY_CREATED" | "FINANCE_SALARY_UPDATED"
+): Promise<void> {
+  const metadata = { transactionId, salary, status: "APPROVED", actorRole: actor.role };
+  const writes: Promise<unknown>[] = [createUserTargetedAlerts({
+    companyId: actor.companyId,
+    recipientUserIds: [salary.employeeUserId],
+    code,
+    message: `Votre salaire ${toSalaryActionLabel(salary)} a été enregistré et est disponible dans votre suivi.`,
+    severity: "INFO",
+    entityType: "SALARY",
+    entityId: transactionId,
+    metadata
+  })];
+  // System-admin updates already send the owner warning above.
+  if (code === "FINANCE_SALARY_CREATED" || actor.role !== "SYS_ADMIN") {
+    writes.push(createRoleTargetedAlerts({
+      companyId: actor.companyId,
+      recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
+      excludeUserIds: [actor.actorId],
+      code,
+      message: `Le salaire ${toSalaryActionLabel(salary)} a été enregistré dans le suivi de paie.`,
+      severity: "INFO",
+      entityType: "SALARY",
+      entityId: transactionId,
+      metadata
+    }));
+  }
+  await Promise.all(writes);
 }
 
 export async function listCompanyTransactions(input: {

@@ -10,6 +10,7 @@ import { FeedbackBanner } from "../components/FeedbackBanner";
 import { PageGuide } from "../components/PageGuide";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
+import { useActionScope } from "../lib/useActionScope";
 import type { CompanyActivityItem } from "../types/activities";
 import type { BusinessActivityCode } from "../config/businessActivities";
 
@@ -23,8 +24,8 @@ function toErrorMessage(error: unknown): string {
 export function AdminActivitiesPage(): JSX.Element {
   const { user, activeCompany } = useAuth();
   const companyId = activeCompany?.id;
-  const currentCompanyRef = useRef(companyId);
-  currentCompanyRef.current = companyId;
+  const actionScopeKey = JSON.stringify([companyId, user?.id, user?.role]);
+  const captureActionScope = useActionScope(actionScopeKey);
   const withAuthorizedToken = useAuthorizedRequest();
   const { applyActivityUpdate } = useBusinessActivity();
   const [loadedItems, setItems] = useState<CompanyActivityItem[]>([]);
@@ -32,7 +33,7 @@ export function AdminActivitiesPage(): JSX.Element {
   const items = itemsCompanyId === companyId ? loadedItems : [];
   const [isLoading, setIsLoading] = useState(true);
   const loadRequestRef = useRef(0);
-  const [busyActivityCode, setBusyActivityCode] = useState<BusinessActivityCode | null>(null);
+  const [busyActivities, setBusyActivities] = useState<Partial<Record<BusinessActivityCode, boolean>>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -45,25 +46,30 @@ export function AdminActivitiesPage(): JSX.Element {
   const enabledActivitiesCount = useMemo(() => items.filter((item) => item.isEnabled).length, [items]);
   const disabledActivitiesCount = items.length - enabledActivitiesCount;
 
+  useEffect(() => {
+    setBusyActivities({});
+    setSuccessMessage(null);
+  }, [actionScopeKey]);
+
   const loadData = useCallback(async () => {
+    const isCurrentAction = captureActionScope();
     const requestId = ++loadRequestRef.current;
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-    setBusyActivityCode(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listAdminCompanyActivitiesRequest(accessToken)
       );
-      if (requestId !== loadRequestRef.current || currentCompanyRef.current !== companyId) return;
+      if (!isCurrentAction() || requestId !== loadRequestRef.current) return;
       setItems(response.items);
       setItemsCompanyId(companyId);
     } catch (error) {
-      if (requestId === loadRequestRef.current && currentCompanyRef.current === companyId) setErrorMessage(toErrorMessage(error));
+      if (isCurrentAction() && requestId === loadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (requestId === loadRequestRef.current && currentCompanyRef.current === companyId) setIsLoading(false);
+      if (isCurrentAction() && requestId === loadRequestRef.current) setIsLoading(false);
     }
-  }, [companyId, withAuthorizedToken]);
+  }, [actionScopeKey, captureActionScope, companyId, withAuthorizedToken]);
 
   useEffect(() => {
     if (!canViewActivities) {
@@ -74,14 +80,16 @@ export function AdminActivitiesPage(): JSX.Element {
   }, [canViewActivities, loadData]);
 
   async function handleToggleActivity(item: CompanyActivityItem): Promise<void> {
-    setBusyActivityCode(item.code);
+    if (!canManageActivities || busyActivities[item.code]) return;
+    const isCurrentAction = captureActionScope();
+    setBusyActivities((prev) => ({ ...prev, [item.code]: true }));
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) =>
         updateAdminCompanyActivityRequest(accessToken, item.code, !item.isEnabled)
       );
-      if (currentCompanyRef.current !== companyId) return;
+      if (!isCurrentAction()) return;
       setItems((prev) =>
         prev.map((row) => (row.code === response.item.code ? response.item : row))
       );
@@ -92,9 +100,9 @@ export function AdminActivitiesPage(): JSX.Element {
           : `Secteur ${response.item.label} désactivé.`
       );
     } catch (error) {
-      if (currentCompanyRef.current === companyId) setErrorMessage(toErrorMessage(error));
+      if (isCurrentAction()) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (currentCompanyRef.current === companyId) setBusyActivityCode(null);
+      if (isCurrentAction()) setBusyActivities((prev) => ({ ...prev, [item.code]: false }));
     }
   }
 
@@ -165,8 +173,8 @@ export function AdminActivitiesPage(): JSX.Element {
         {!isLoading ? (
           items.length === 0 ? (
             <EmptyState
-              title="Aucun secteur configuré"
-              description="Aucun secteur métier n'est disponible pour cette entreprise."
+              title={errorMessage ? "Liste indisponible" : "Aucun secteur configuré"}
+              description={errorMessage ? "La liste des secteurs n'a pas pu être chargée." : "Aucun secteur métier n'est disponible pour cette entreprise."}
               actionLabel="Actualiser"
               onAction={() => void loadData()}
             />
@@ -196,9 +204,9 @@ export function AdminActivitiesPage(): JSX.Element {
                       type="button"
                       className="secondary-btn"
                       onClick={() => void handleToggleActivity(item)}
-                      disabled={busyActivityCode === item.code}
+                      disabled={busyActivities[item.code] === true}
                     >
-                      {busyActivityCode === item.code
+                      {busyActivities[item.code]
                         ? "Mise à jour..."
                         : item.isEnabled
                           ? "Désactiver"

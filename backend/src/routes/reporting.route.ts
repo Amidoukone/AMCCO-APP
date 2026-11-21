@@ -6,19 +6,16 @@ import { authenticateAccessToken, authorizeRoles } from "../middleware/auth.midd
 import { BUSINESS_ACTIVITY_CODES } from "../types/business-activity.js";
 import {
   exportCompanyReportsPdf,
-  exportCompanyTasksCsv,
-  exportCompanyTasksExcel,
-  exportCompanyTransactionsCsv,
-  exportCompanyTransactionsExcel,
   getCompanyGeneralStoreLedgerRows,
   getCompanyDashboardSummary,
-  getCompanyReportsOverview
+  getCompanyReportsOverview,
 } from "../services/reporting.service.js";
 
 const reportsQuerySchema = z.object({
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
-  activityCode: z.enum(BUSINESS_ACTIVITY_CODES)
+  activityCode: z.enum(BUSINESS_ACTIVITY_CODES),
+  details: z.enum(["true", "false"]).optional(),
 });
 
 export const reportingRouter = Router();
@@ -57,16 +54,18 @@ function buildExportPeriodFilePart(query: {
 
 function buildReportExportFileName(
   kind: "rapport" | "transactions" | "taches",
-  format: "pdf" | "csv" | "xlsx",
+  format: "pdf",
   input: {
     companyId: string;
     dateFrom?: string;
     dateTo?: string;
     activityCode?: string;
-  }
+  },
 ): string {
   const companyPart = toFileNamePart(input.companyId);
-  const activityPart = input.activityCode ? toFileNamePart(input.activityCode) : "tous-secteurs";
+  const activityPart = input.activityCode
+    ? toFileNamePart(input.activityCode)
+    : "tous-secteurs";
   const periodPart = buildExportPeriodFilePart(input);
 
   return `amcco-${kind}-${companyPart}-${activityPart}-${periodPart}-${buildDownloadTimestamp()}.${format}`;
@@ -82,7 +81,8 @@ reportingRouter.get(
     }
     const query = z
       .object({
-        activityCode: z.enum(BUSINESS_ACTIVITY_CODES).optional()
+        activityCode: z.enum(BUSINESS_ACTIVITY_CODES).optional(),
+        details: z.enum(["true", "false"]).optional(),
       })
       .parse(req.query);
 
@@ -90,15 +90,16 @@ reportingRouter.get(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
-        activityCode: query.activityCode
-      }
+        activityCode: query.activityCode,
+        includeDetails: query.details !== "false",
+      },
     );
 
     res.status(200).json({ item });
-  })
+  }),
 );
 
 reportingRouter.get(
@@ -112,11 +113,11 @@ reportingRouter.get(
     const result = await getCompanyGeneralStoreLedgerRows({
       actorId: req.auth.userId,
       companyId: req.auth.companyId,
-      role: req.auth.role
+      role: req.auth.role,
     });
 
     res.status(200).json(result);
-  })
+  }),
 );
 
 reportingRouter.get(
@@ -128,18 +129,22 @@ reportingRouter.get(
     }
     const query = reportsQuerySchema.parse(req.query);
 
-    const item = await getCompanyReportsOverview({
-      actorId: req.auth.userId,
-      companyId: req.auth.companyId,
-      role: req.auth.role
-    }, {
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
-      activityCode: query.activityCode
-    });
+    const item = await getCompanyReportsOverview(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role,
+      },
+      {
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        activityCode: query.activityCode,
+        includeDetails: query.details === "true",
+      },
+    );
 
     res.status(200).json({ item });
-  })
+  }),
 );
 
 reportingRouter.get(
@@ -155,13 +160,13 @@ reportingRouter.get(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
-        activityCode: query.activityCode
-      }
+        activityCode: query.activityCode,
+      },
     );
 
     res.setHeader("Content-Type", "application/pdf");
@@ -171,153 +176,9 @@ reportingRouter.get(
         companyId: req.auth.companyId,
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
-        activityCode: query.activityCode
-      })}"`
+        activityCode: query.activityCode,
+      })}"`,
     );
     res.status(200).send(pdf);
-  })
-);
-
-reportingRouter.get(
-  "/reports/exports/transactions.csv",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const query = reportsQuerySchema.parse(req.query);
-
-    const csv = await exportCompanyTransactionsCsv({
-      actorId: req.auth.userId,
-      companyId: req.auth.companyId,
-      role: req.auth.role
-    }, {
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
-      activityCode: query.activityCode
-    });
-
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${buildReportExportFileName("transactions", "csv", {
-        companyId: req.auth.companyId,
-        dateFrom: query.dateFrom,
-        dateTo: query.dateTo,
-        activityCode: query.activityCode
-      })}"`
-    );
-    res.status(200).send(`\uFEFF${csv}`);
-  })
-);
-
-reportingRouter.get(
-  "/reports/exports/transactions.xlsx",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const query = reportsQuerySchema.parse(req.query);
-
-    const workbook = await exportCompanyTransactionsExcel(
-      {
-        actorId: req.auth.userId,
-        companyId: req.auth.companyId,
-        role: req.auth.role
-      },
-      {
-        dateFrom: query.dateFrom,
-        dateTo: query.dateTo,
-        activityCode: query.activityCode
-      }
-    );
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${buildReportExportFileName("transactions", "xlsx", {
-        companyId: req.auth.companyId,
-        dateFrom: query.dateFrom,
-        dateTo: query.dateTo,
-        activityCode: query.activityCode
-      })}"`
-    );
-    res.status(200).send(workbook);
-  })
-);
-
-reportingRouter.get(
-  "/reports/exports/tasks.csv",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const query = reportsQuerySchema.parse(req.query);
-
-    const csv = await exportCompanyTasksCsv({
-      actorId: req.auth.userId,
-      companyId: req.auth.companyId,
-      role: req.auth.role
-    }, {
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
-      activityCode: query.activityCode
-    });
-
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${buildReportExportFileName("taches", "csv", {
-        companyId: req.auth.companyId,
-        dateFrom: query.dateFrom,
-        dateTo: query.dateTo,
-        activityCode: query.activityCode
-      })}"`
-    );
-    res.status(200).send(`\uFEFF${csv}`);
-  })
-);
-
-reportingRouter.get(
-  "/reports/exports/tasks.xlsx",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const query = reportsQuerySchema.parse(req.query);
-
-    const workbook = await exportCompanyTasksExcel(
-      {
-        actorId: req.auth.userId,
-        companyId: req.auth.companyId,
-        role: req.auth.role
-      },
-      {
-        dateFrom: query.dateFrom,
-        dateTo: query.dateTo,
-        activityCode: query.activityCode
-      }
-    );
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${buildReportExportFileName("taches", "xlsx", {
-        companyId: req.auth.companyId,
-        dateFrom: query.dateFrom,
-        dateTo: query.dateTo,
-        activityCode: query.activityCode
-      })}"`
-    );
-    res.status(200).send(workbook);
-  })
+  }),
 );

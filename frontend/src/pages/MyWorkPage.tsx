@@ -59,7 +59,8 @@ export function MyWorkPage(): JSX.Element {
     try {
       const response = await withAuthorizedToken((accessToken) =>
         getDashboardSummaryRequest(accessToken, {
-          activityCode: selectedActivityCode ?? undefined
+          activityCode: selectedActivityCode ?? undefined,
+          includeDetails: false
         })
       );
       if (requestId !== summaryLoadRequestRef.current) return;

@@ -11,6 +11,8 @@
     "frontend"
   ],
   "scripts": {
+    "db:check": "node scripts/check-local-db.mjs",
+    "dev:recette": "node scripts/local-recipe.mjs dev",
     "dev:backend": "npm --workspace backend run dev",
     "dev:frontend": "npm --workspace frontend run dev",
     "build": "npm run build --workspaces",

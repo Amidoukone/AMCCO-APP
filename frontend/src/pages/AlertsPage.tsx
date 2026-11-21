@@ -43,8 +43,8 @@ function formatDateTime(value: string | null): string {
   return new Date(value).toLocaleString("fr-FR");
 }
 
-function notifyAlertsChanged(change: { delta?: number; unreadCount?: number }): void {
-  window.dispatchEvent(new CustomEvent("amcco-alerts-changed", { detail: change }));
+function notifyAlertsChanged(change: { delta?: number; unreadCount?: number }, companyId?: string, userId?: string): void {
+  window.dispatchEvent(new CustomEvent("amcco-alerts-changed", { detail: { ...change, companyId, userId } }));
 }
 
 function entityTypeLabel(entityType: string | null): string {
@@ -89,6 +89,17 @@ export function AlertsPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeCompany, user } = useAuth();
+  const contextKey = JSON.stringify([activeCompany?.id, user?.id]);
+  const contextRef = useRef({ key: contextKey, generation: 0 });
+  const alertMutationRef = useRef(false);
+  const activeAlertsLoadRef = useRef<number | null>(null);
+  const needsAlertsRefreshRef = useRef(false);
+  if (contextRef.current.key !== contextKey) {
+    contextRef.current = { key: contextKey, generation: contextRef.current.generation + 1 };
+    alertMutationRef.current = false;
+    activeAlertsLoadRef.current = null;
+    needsAlertsRefreshRef.current = false;
+  }
   const isReadOnlyOwner = user?.role === "OWNER";
   const withAuthorizedToken = useAuthorizedRequest();
   const [items, setItems] = useState<AlertItem[]>([]);
@@ -97,7 +108,7 @@ export function AlertsPage(): JSX.Element {
   const hasLoadedAlertsRef = useRef(false);
   const hasStartedAlertsLoadRef = useRef(false);
   const alertsLoadRequestRef = useRef(0);
-  const loadedCompanyIdRef = useRef(activeCompany?.id);
+  const loadedContextKeyRef = useRef(contextKey);
   const [busyAlertId, setBusyAlertId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [isDeletingSelection, setIsDeletingSelection] = useState(false);
@@ -139,6 +150,11 @@ export function AlertsPage(): JSX.Element {
   }, [isReadOnlyOwner, searchParams, setFilters]);
 
   const loadData = useCallback(async (options?: { offset?: number; append?: boolean; silent?: boolean }) => {
+    if (alertMutationRef.current) {
+      needsAlertsRefreshRef.current = true;
+      return;
+    }
+    const generation = contextRef.current.generation;
     const requestId = ++alertsLoadRequestRef.current;
     const offset = options?.offset ?? 0;
     const append = options?.append === true;
@@ -152,13 +168,14 @@ export function AlertsPage(): JSX.Element {
       return;
     }
     hasStartedAlertsLoadRef.current = true;
+    activeAlertsLoadRef.current = requestId;
     if (append) {
       setIsLoadingMore(true);
     } else {
       setIsLoadingMore(false);
       if (!silent && !hasLoadedAlertsRef.current) setIsLoading(true);
     }
-    setErrorMessage(null);
+    if (!silent) setErrorMessage(null);
 
     try {
       const response = await withAuthorizedToken((accessToken) =>
@@ -172,20 +189,22 @@ export function AlertsPage(): JSX.Element {
               : undefined
         })
       );
-      if (requestId !== alertsLoadRequestRef.current) return;
+      if (generation !== contextRef.current.generation || requestId !== alertsLoadRequestRef.current) return;
 
       setItems((prev) => (append ? [...prev, ...response.items] : response.items));
       setHasMoreItems(response.items.length === ALERTS_PAGE_SIZE);
       setUnreadCount(response.unreadCount);
+      notifyAlertsChanged({ unreadCount: response.unreadCount }, activeCompany.id, user?.id);
       if (!append) {
         setSelectedAlertIds((prev) =>
           prev.filter((alertId) => response.items.some((item) => item.id === alertId))
         );
       }
     } catch (error) {
-      if (requestId === alertsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+      if (generation === contextRef.current.generation && requestId === alertsLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
     } finally {
-      if (requestId === alertsLoadRequestRef.current) {
+      if (activeAlertsLoadRef.current === requestId) activeAlertsLoadRef.current = null;
+      if (generation === contextRef.current.generation && requestId === alertsLoadRequestRef.current) {
         if (append) {
           setIsLoadingMore(false);
         } else if (!silent) {
@@ -194,11 +213,13 @@ export function AlertsPage(): JSX.Element {
         }
       }
     }
-  }, [activeCompany?.id, filters.entityType, filters.unreadOnly, isReadOnlyOwner, withAuthorizedToken]);
+  }, [activeCompany?.id, user?.id, filters.entityType, filters.unreadOnly, isReadOnlyOwner, withAuthorizedToken]);
+  const latestAlertsLoadRef = useRef(loadData);
+  latestAlertsLoadRef.current = loadData;
 
   useEffect(() => {
-    if (loadedCompanyIdRef.current === activeCompany?.id) return;
-    loadedCompanyIdRef.current = activeCompany?.id;
+    if (loadedContextKeyRef.current === contextKey) return;
+    loadedContextKeyRef.current = contextKey;
     setItems([]);
     setUnreadCount(0);
     setHasMoreItems(false);
@@ -207,7 +228,12 @@ export function AlertsPage(): JSX.Element {
     hasStartedAlertsLoadRef.current = false;
     setIsLoading(true);
     setErrorMessage(null);
-  }, [activeCompany?.id]);
+    setSuccessMessage(null);
+    setBusyAlertId(null);
+    setIsMarkingAll(false);
+    setIsDeletingSelection(false);
+    setIsLoadingMore(false);
+  }, [contextKey]);
 
   useEffect(() => {
     const delay = hasStartedAlertsLoadRef.current ? 250 : 0;
@@ -215,12 +241,33 @@ export function AlertsPage(): JSX.Element {
     return () => window.clearTimeout(timeoutId);
   }, [loadData]);
 
+  function beginAlertMutation(): boolean {
+    if (alertMutationRef.current) return false;
+    alertMutationRef.current = true;
+    needsAlertsRefreshRef.current = activeAlertsLoadRef.current !== null;
+    activeAlertsLoadRef.current = null;
+    alertsLoadRequestRef.current += 1;
+    setIsLoadingMore(false);
+    return true;
+  }
+
+  function finishAlertMutation(): void {
+    alertMutationRef.current = false;
+    if (needsAlertsRefreshRef.current) {
+      needsAlertsRefreshRef.current = false;
+      void latestAlertsLoadRef.current({ silent: true });
+    }
+  }
+
   async function handleRead(alertId: string): Promise<void> {
+    if (!beginAlertMutation()) return;
+    const generation = contextRef.current.generation;
     setBusyAlertId(alertId);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => markAlertReadRequest(accessToken, alertId));
+      if (generation !== contextRef.current.generation) return;
       const wasUnread = items.some((item) => item.id === alertId && item.readAt === null);
       setItems((prev) =>
         filters.unreadOnly && wasUnread
@@ -233,40 +280,52 @@ export function AlertsPage(): JSX.Element {
         setUnreadCount((prev) => Math.max(0, prev - 1));
       }
       setSuccessMessage("Alerte marquée comme lue.");
-      notifyAlertsChanged({ delta: wasUnread ? -1 : 0 });
+      notifyAlertsChanged({ delta: wasUnread ? -1 : 0 }, activeCompany?.id, user?.id);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (generation === contextRef.current.generation) setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyAlertId(null);
+      if (generation === contextRef.current.generation) {
+        setBusyAlertId(null);
+        finishAlertMutation();
+      }
     }
   }
 
   async function handleReadAll(): Promise<void> {
+    if (!beginAlertMutation()) return;
+    const generation = contextRef.current.generation;
     setIsMarkingAll(true);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => markAllAlertsReadRequest(accessToken));
+      if (generation !== contextRef.current.generation) return;
       const readAt = new Date().toISOString();
       setItems((prev) =>
         filters.unreadOnly ? [] : prev.map((item) => ({ ...item, readAt: item.readAt ?? readAt }))
       );
       setUnreadCount(0);
       setSuccessMessage("Toutes les alertes ont été marquées comme lues.");
-      notifyAlertsChanged({ unreadCount: 0 });
+      notifyAlertsChanged({ unreadCount: 0 }, activeCompany?.id, user?.id);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (generation === contextRef.current.generation) setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsMarkingAll(false);
+      if (generation === contextRef.current.generation) {
+        setIsMarkingAll(false);
+        finishAlertMutation();
+      }
     }
   }
 
   async function handleDelete(alertId: string): Promise<void> {
+    if (!beginAlertMutation()) return;
+    const generation = contextRef.current.generation;
     setBusyAlertId(alertId);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteAlertRequest(accessToken, alertId));
+      if (generation !== contextRef.current.generation) return;
       const deletedAlert = items.find((item) => item.id === alertId);
       setItems((prev) => prev.filter((item) => item.id !== alertId));
       if (deletedAlert?.readAt === null) {
@@ -274,18 +333,24 @@ export function AlertsPage(): JSX.Element {
       }
       setSelectedAlertIds((prev) => prev.filter((item) => item !== alertId));
       setSuccessMessage("Alerte supprimée.");
-      notifyAlertsChanged({ delta: deletedAlert?.readAt === null ? -1 : 0 });
+      notifyAlertsChanged({ delta: deletedAlert?.readAt === null ? -1 : 0 }, activeCompany?.id, user?.id);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (generation === contextRef.current.generation) setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyAlertId(null);
+      if (generation === contextRef.current.generation) {
+        setBusyAlertId(null);
+        finishAlertMutation();
+      }
     }
   }
 
   async function handleDeleteSelection(): Promise<void> {
+    const generation = contextRef.current.generation;
     if (selectedAlertIds.length === 0) {
       return;
     }
+
+    if (!beginAlertMutation()) return;
 
     setIsDeletingSelection(true);
     setErrorMessage(null);
@@ -295,6 +360,7 @@ export function AlertsPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         deleteManyAlertsRequest(accessToken, selectedAlertIds)
       );
+      if (generation !== contextRef.current.generation) return;
       setItems((prev) => prev.filter((item) => !selectedAlertIds.includes(item.id)));
       const deletedUnreadCount = selectedAlerts.filter((item) => item.readAt === null).length;
       if (deletedUnreadCount > 0) {
@@ -302,11 +368,14 @@ export function AlertsPage(): JSX.Element {
       }
       setSelectedAlertIds([]);
       setSuccessMessage("Alertes supprimées.");
-      notifyAlertsChanged({ delta: -deletedUnreadCount });
+      notifyAlertsChanged({ delta: -deletedUnreadCount }, activeCompany?.id, user?.id);
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (generation === contextRef.current.generation) setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsDeletingSelection(false);
+      if (generation === contextRef.current.generation) {
+        setIsDeletingSelection(false);
+        finishAlertMutation();
+      }
     }
   }
 
@@ -351,6 +420,7 @@ export function AlertsPage(): JSX.Element {
     filters.unreadOnly || (!isReadOnlyOwner && filters.entityType.trim().length > 0);
   const allVisibleSelected =
     items.length > 0 && items.every((item) => selectedAlertIds.includes(item.id));
+  const isAlertMutationBusy = busyAlertId !== null || isMarkingAll || isDeletingSelection;
   return (
     <>
       <header
@@ -414,7 +484,7 @@ export function AlertsPage(): JSX.Element {
                   type="button"
                   className="secondary-btn"
                   onClick={() => void handleReadAll()}
-                  disabled={isMarkingAll}
+                  disabled={isAlertMutationBusy}
                 >
                   Tout marquer comme lu
                 </button>
@@ -424,7 +494,7 @@ export function AlertsPage(): JSX.Element {
                   type="button"
                   className="danger-btn"
                   onClick={() => void handleDeleteSelection()}
-                  disabled={isDeletingSelection || isMarkingAll}
+                  disabled={isAlertMutationBusy}
                 >
                   Supprimer la sélection ({selectedAlertIds.length})
                 </button>
@@ -631,7 +701,7 @@ export function AlertsPage(): JSX.Element {
                           type="button"
                           className="secondary-btn"
                           onClick={() => void handleRead(item.id)}
-                          disabled={busyAlertId === item.id || isMarkingAll}
+                          disabled={isAlertMutationBusy}
                         >
                           Marquer comme lu
                         </button>
@@ -640,7 +710,7 @@ export function AlertsPage(): JSX.Element {
                         type="button"
                         className="danger-btn"
                         onClick={() => void handleDelete(item.id)}
-                        disabled={busyAlertId === item.id || isDeletingSelection || isMarkingAll}
+                        disabled={isAlertMutationBusy}
                       >
                         Supprimer
                       </button>
@@ -658,7 +728,7 @@ export function AlertsPage(): JSX.Element {
                   type="button"
                   className="secondary-btn"
                   onClick={() => void handleLoadMore()}
-                  disabled={isLoadingMore}
+                  disabled={isLoadingMore || isAlertMutationBusy}
                 >
                   {isLoadingMore ? "Chargement..." : "Charger plus"}
                 </button>

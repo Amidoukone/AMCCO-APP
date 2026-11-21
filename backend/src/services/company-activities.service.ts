@@ -63,7 +63,7 @@ export async function ensureCompanyActivityEnabledOrThrow(
   if (activityCode === "REAL_ESTATE_AGENCY") {
     throw new HttpError(
       400,
-      "Le secteur Agence immobilière est retiré. Utilisez Location immobilière pour les nouvelles opérations."
+      "Le secteur Gestion immobilière est retiré et ne permet plus de nouvelles opérations."
     );
   }
 

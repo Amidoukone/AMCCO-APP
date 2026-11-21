@@ -9,7 +9,7 @@ import {
   type ReactNode
 } from "react";
 import {
-  isBusinessActivityCode,
+  isSelectableBusinessActivityCode,
   type BusinessActivityCode
 } from "../config/businessActivities";
 import { ApiError, listCompanyActivitiesRequest } from "../lib/api";
@@ -42,7 +42,7 @@ function getStorageKey(companyId: string): string {
 
 function readPersistedActivityCode(companyId: string): BusinessActivityCode | null {
   const stored = window.localStorage.getItem(getStorageKey(companyId));
-  return stored && isBusinessActivityCode(stored) ? stored : null;
+  return stored && isSelectableBusinessActivityCode(stored) ? stored : null;
 }
 
 function persistActivityCode(companyId: string, activityCode: BusinessActivityCode | null): void {
@@ -86,7 +86,9 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
         return;
       }
 
-      const enabledItems = items.filter((item) => item.isEnabled);
+      const enabledItems = items.filter(
+        (item) => item.isEnabled && item.code !== "REAL_ESTATE_AGENCY"
+      );
       const persistedCode = readPersistedActivityCode(activeCompany.id);
       const keepCurrentSelection = selectionCompanyRef.current === activeCompany.id;
       selectionCompanyRef.current = activeCompany.id;
@@ -131,7 +133,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
         listCompanyActivitiesRequest(accessToken)
       );
       if (requestId !== activitiesRequestRef.current || currentCompanyRef.current !== activeCompanyId) return;
-      setActivities(response.items);
+      setActivities(response.items.filter((item) => item.code !== "REAL_ESTATE_AGENCY"));
       setProfiles(response.profiles);
       setActivitiesCompanyId(activeCompanyId);
       syncSelectedActivity(response.items);
@@ -153,6 +155,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
 
   const setSelectedActivityCode = useCallback(
     (activityCode: BusinessActivityCode | null) => {
+      if (activityCode && !isSelectableBusinessActivityCode(activityCode)) return;
       if (restrictedActivityCode && activityCode !== restrictedActivityCode) return;
       if (!isCurrentCompany || (activityCode && !activities.some((item) => item.code === activityCode && item.isEnabled))) return;
       setSelectedActivityCodeState(activityCode);
@@ -166,6 +169,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   const applyActivityUpdate = useCallback(
     (updatedActivity: CompanyActivityItem) => {
       if (!isCurrentCompany || currentCompanyRef.current !== activeCompanyId) return;
+      if (!isSelectableBusinessActivityCode(updatedActivity.code)) return;
       const nextActivities = activities.some((item) => item.code === updatedActivity.code)
         ? activities.map((item) =>
             item.code === updatedActivity.code ? updatedActivity : item
@@ -195,7 +199,7 @@ export function BusinessActivityProvider({ children }: { children: ReactNode }):
   );
 
   const enabledActivities = useMemo(
-    () => activities.filter((item) => item.isEnabled),
+    () => activities.filter((item) => item.isEnabled && item.code !== "REAL_ESTATE_AGENCY"),
     [activities]
   );
 

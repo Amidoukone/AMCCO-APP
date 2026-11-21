@@ -2,8 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   assertTaskInputMatchesActivityProfile,
   assertTransactionInputMatchesActivityProfile,
-  getBusinessActivityProfile
+  getBusinessActivityProfile,
+  listBusinessActivityProfiles
 } from "./business-activity-profiles.js";
+
+describe("active sector catalogue", () => {
+  it("keeps rental active and the retired agency profile available only by explicit lookup", () => {
+    const codes = listBusinessActivityProfiles().map((profile) => profile.activityCode);
+    expect(codes).toContain("RENTAL");
+    expect(codes).not.toContain("REAL_ESTATE_AGENCY");
+    expect(getBusinessActivityProfile("REAL_ESTATE_AGENCY").activityCode).toBe("REAL_ESTATE_AGENCY");
+  });
+});
 
 describe("service categories", () => {
   it("accepts existing and new categories for service transactions and tasks", () => {

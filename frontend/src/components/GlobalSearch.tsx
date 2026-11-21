@@ -24,7 +24,7 @@ const FEATURE_SEARCH_KEYWORDS: Record<NavigationItem["key"], string[]> = {
   dashboard: ["pilotage", "tableau", "indicateurs", "net", "exécution", "blocages"],
   myWork: ["priorités", "mes tâches", "urgent", "échéance", "travail"],
   alerts: ["alerte", "notification", "non lue", "criticité", "risque"],
-  reports: ["rapport", "export", "pdf", "excel", "guide", "synthèse", "exec", "rentabilité"],
+  reports: ["rapport", "export", "pdf", "guide", "synthèse", "exec", "rentabilité"],
   financeTransactions: ["transaction", "finance", "caisse", "entrée", "sortie", "preuve", "justificatif"],
   financeSalaries: ["salaire", "paie", "net", "employé", "preuve", "paiement"],
   operationsTasks: ["tâche", "opération", "responsable", "blocage", "retard", "échéance"],
@@ -58,7 +58,7 @@ function buildSearchItems(
     canUse("myWork")
       ? {
           label: "Mon travail",
-          description: "Tâches ouvertes, validations et échéances",
+          description: "Tâches ouvertes et échéances",
           to: "/my-work",
           keywords: ["mon travail", "mes tâches", "à faire", "échéances", "urgent"]
         }
@@ -92,11 +92,11 @@ function buildSearchItems(
     canUse("reports")
       ? {
           label: isReadOnlyOwner ? "Vue propriétaire" : "Rapports",
-          description: isReadOnlyOwner ? "Contrôle, synthèse et exports" : "Exports PDF et Excel",
+          description: isReadOnlyOwner ? "Contrôle, synthèse et exports" : "Rapports PDF",
           to: isReadOnlyOwner ? "/dashboard" : "/reports",
           keywords: isReadOnlyOwner
             ? ["propriétaire", "contrôle", "pilotage", "synthèse", "vue propriétaire"]
-            : ["rapport", "export", "pdf", "excel"]
+            : ["rapport", "export", "pdf"]
         }
       : null,
     canUse("financeSalaries")

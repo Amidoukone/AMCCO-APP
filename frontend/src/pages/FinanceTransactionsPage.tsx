@@ -1,41 +1,35 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { getSectorReferenceView, getActiveSectorReferenceView, hasSectorReferenceWorkspace } from "../config/sectorWorkspaces";
+import { useActionScope } from "../lib/useActionScope";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { DeferredViewBoundary } from "../components/DeferredViewBoundary";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  getSectorReferenceView,
+  getActiveSectorReferenceView,
+  hasSectorReferenceWorkspace
+} from "../config/sectorWorkspaces";
 import { SectorTransactionActions } from "../components/SectorTransactionActions";
 import { SectorTransactionSummary } from "../components/SectorTransactionSummary";
 import { BeverageStockPanel } from "../components/BeverageStockPanel";
 import { useBeverageStock } from "../lib/useBeverageStock";
-import { getSectorTransactionWorkspace, type SectorTransactionPreset } from "../config/sectorTransactionWorkspaces";
+import {
+  getSectorTransactionWorkspace,
+  type SectorTransactionPreset
+} from "../config/sectorTransactionWorkspaces";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { useFormChanges } from "../lib/useFormChanges";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
-import { PageGuide } from "../components/PageGuide";
-import { RentalTenantsPanel } from "../components/RentalTenantsPanel";
-import { GeneralStoreShopsPanel } from "../components/GeneralStoreShopsPanel";
-import { BtpProjectsPanel } from "../components/BtpProjectsPanel";
-import { HardwareArticlesPanel } from "../components/HardwareArticlesPanel";
 import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
 import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
-import {
-  formatAmountForDisplay as formatLocalizedAmountForDisplay,
-  formatAmountForInput as formatLocalizedAmountForInput,
-  formatEditableAmountForInput as formatLocalizedEditableAmountForInput,
-  normalizeAmountForApi as normalizeLocalizedAmountForApi,
-  toAmountNumber as toLocalizedAmountNumber
-} from "../lib/amountFormatting";
 import {
   resolveImageKitFileName,
   resolveImageKitFileSize,
   resolveImageKitStorageKey,
   type ImageKitUploadResult
 } from "../lib/imagekitUpload";
-import {
-  buildPersistedViewStorageKey,
-  usePersistedViewState
-} from "../lib/usePersistedViewState";
+import { buildPersistedViewStorageKey, usePersistedViewState } from "../lib/usePersistedViewState";
 import {
   addFinanceTransactionProofRequest,
   ApiError,
@@ -69,26 +63,16 @@ import {
   updateGeneralStoreShopRequest,
   updateRentalTenantRequest
 } from "../lib/api";
-import {
-  getBusinessActivityLabel,
-  type BusinessActivityCode
-} from "../config/businessActivities";
+import { getBusinessActivityLabel, type BusinessActivityCode } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { financeStatusLabel } from "../utils/dashboardDisplay";
-import type { ActivityFieldDefinition } from "../types/activities";
 import type { ActivityArticle } from "../types/articles";
 import type { RentalTenant } from "../types/tenants";
 import type { GeneralStoreShop } from "../types/shops";
 import type { BtpProject } from "../types/projects";
 import type { DailyActivityCategory } from "../types/daily-activity-categories";
-import type {
-  FinancialAccount,
-  FinancialAccountScopeType,
-  DumpTruckSummaryItem,
-  FinancialTransaction,
-  TransactionProof
-} from "../types/finance";
+import type { FinancialAccount, FinancialAccountScopeType, DumpTruckSummaryItem, FinancialTransaction, TransactionProof } from "../types/finance";
 import {
   formatAccountScopeLabel,
   getAccountGovernanceLines,
@@ -96,3205 +80,81 @@ import {
 } from "../utils/governanceDisplay";
 import { canAccessFeature, canManageSectorTransactions } from "../config/permissions";
 import { getSectorRecordContext, getSectorSearchHint } from "../utils/sectorRecordContext";
-
-const EMPTY_METADATA_FIELDS: ActivityFieldDefinition[] = [];
-const DEFAULT_ALLOWED_CURRENCIES = ["XOF"];
-const TRANSACTIONS_PAGE_SIZE = 100;
-const TRANSACTIONS_MOBILE_PAGE_SIZE = 30;
-const TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
-const DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE = 10;
-function getTransactionsFetchPageSize(): number {
-  return typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
-    ? TRANSACTIONS_MOBILE_PAGE_SIZE
-    : TRANSACTIONS_PAGE_SIZE;
-}
-
-const STORE_OPERATION_KIND_KEY = "storeOperationKind";
-type StoreOperationKind = "ACHAT" | "RECOUVREMENT";
-const STORE_OPERATION_LABELS: Record<StoreOperationKind, string> = {
-  ACHAT: "Achat boutique",
-  RECOUVREMENT: "Recouvrement"
-};
-const STORE_ACHAT_METADATA_FIELDS = new Set(["shopRef"]);
-const STORE_RECOUVREMENT_METADATA_FIELDS = new Set(["shopRef"]);
-const STORE_METADATA_FIELDS = new Set([STORE_OPERATION_KIND_KEY, "shopRef"]);
-const HARDWARE_OPERATION_KIND_KEY = "hardwareOperationKind";
-type HardwareOperationKind = "GLOBAL" | "ITEM_ENTRY" | "ITEM_EXIT" | "RECOUVREMENT";
-const HARDWARE_OPERATION_LABELS: Record<HardwareOperationKind, string> = {
-  GLOBAL: "Transaction globale",
-  ITEM_ENTRY: "Achat",
-  ITEM_EXIT: "Vente d'article",
-  RECOUVREMENT: "Vente / recouvrement"
-};
-const HARDWARE_NUMERIC_METADATA_FIELDS = new Set([
-  "quantity",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "marginAmount",
-  "paymentAmount"
-]);
-const HARDWARE_AMOUNT_METADATA_FIELDS = new Set([
-  "quantity",
-  "purchaseUnitPrice",
-  "saleUnitPrice"
-]);
-const HARDWARE_COMMON_METADATA_FIELDS = new Set([
-  "itemName",
-  "quantity"
-]);
-const HARDWARE_CASH_IN_METADATA_FIELDS = new Set([
-  ...HARDWARE_COMMON_METADATA_FIELDS,
-  "saleUnitPrice",
-  "recipientRef"
-]);
-const HARDWARE_COLLECTION_METADATA_FIELDS = new Set(["recipientRef"]);
-const HARDWARE_CASH_OUT_METADATA_FIELDS = new Set([
-  ...HARDWARE_COMMON_METADATA_FIELDS,
-  "purchaseUnitPrice",
-  "marginAmount",
-  "supplierRef",
-  "recipientRef"
-]);
-const HARDWARE_METADATA_FIELDS = new Set([
-  HARDWARE_OPERATION_KIND_KEY,
-  "itemName",
-  "quantity",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "marginAmount",
-  "paymentAmount",
-  "supplierRef",
-  "recipientRef"
-]);
-const FOOD_OPERATION_KIND_KEY = "foodOperationKind";
-type FoodOperationKind =
-  | "PRODUCT_SALE"
-  | "PRODUCT_PURCHASE"
-  | "SUPPLIER_PAYMENT"
-  | "STOCK_LOSS"
-  | "COLD_CHAIN_EXPENSE"
-  | "PACKAGING_EXPENSE"
-  | "CUSTOMER_REFUND";
-const FOOD_OPERATION_LABELS: Record<FoodOperationKind, string> = {
-  PRODUCT_SALE: "Vente produit",
-  PRODUCT_PURCHASE: "Achat stock",
-  SUPPLIER_PAYMENT: "Paiement fournisseur",
-  STOCK_LOSS: "Perte / péremption",
-  COLD_CHAIN_EXPENSE: "Chaîne du froid",
-  PACKAGING_EXPENSE: "Emballage",
-  CUSTOMER_REFUND: "Remboursement client"
-};
-const FOOD_NUMERIC_METADATA_FIELDS = new Set([
-  "quantity",
-  "lossQuantity",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "invoiceAmount"
-]);
-const FOOD_AMOUNT_METADATA_FIELDS = new Set([
-  "quantity",
-  "lossQuantity",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "invoiceAmount"
-]);
-const FOOD_COMMON_METADATA_FIELDS = new Set([
-  "productFamily",
-  "productName",
-  "batchRef",
-  "expiryDate",
-  "storageArea"
-]);
-const FOOD_PRODUCT_SALE_METADATA_FIELDS = new Set([
-  ...FOOD_COMMON_METADATA_FIELDS,
-  "quantity",
-  "unit",
-  "saleUnitPrice",
-  "buyerRef",
-  "paymentRef"
-]);
-const FOOD_PRODUCT_PURCHASE_METADATA_FIELDS = new Set([
-  ...FOOD_COMMON_METADATA_FIELDS,
-  "quantity",
-  "unit",
-  "purchaseUnitPrice",
-  "supplierRef",
-  "invoiceRef"
-]);
-const FOOD_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
-  ...FOOD_COMMON_METADATA_FIELDS,
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "paymentRef"
-]);
-const FOOD_STOCK_LOSS_METADATA_FIELDS = new Set([
-  ...FOOD_COMMON_METADATA_FIELDS,
-  "lossQuantity",
-  "unit",
-  "purchaseUnitPrice",
-  "lossReason"
-]);
-const FOOD_COLD_CHAIN_EXPENSE_METADATA_FIELDS = new Set([
-  ...FOOD_COMMON_METADATA_FIELDS,
-  "temperatureRange",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const FOOD_PACKAGING_EXPENSE_METADATA_FIELDS = new Set([
-  "productFamily",
-  "productName",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const FOOD_CUSTOMER_REFUND_METADATA_FIELDS = new Set([
-  ...FOOD_COMMON_METADATA_FIELDS,
-  "quantity",
-  "unit",
-  "saleUnitPrice",
-  "buyerRef",
-  "paymentRef"
-]);
-const FOOD_METADATA_FIELDS = new Set([
-  FOOD_OPERATION_KIND_KEY,
-  "productFamily",
-  "productName",
-  "batchRef",
-  "expiryDate",
-  "storageArea",
-  "temperatureRange",
-  "quantity",
-  "lossQuantity",
-  "unit",
-  "purchaseUnitPrice",
-  "saleUnitPrice",
-  "supplierRef",
-  "buyerRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "lossReason",
-  "paymentRef"
-]);
-const RENTAL_OPERATION_KIND_KEY = "rentalOperationKind";
-type RentalOperationKind = "LOYER" | "CAUTION" | "AUTRE";
-const RENTAL_OPERATION_LABELS: Record<RentalOperationKind, string> = {
-  LOYER: "Paiement loyer",
-  CAUTION: "Caution",
-  AUTRE: "Autre encaissement / dépense"
-};
-const RENTAL_NUMERIC_METADATA_FIELDS = new Set(["monthlyRent"]);
-const RENTAL_AMOUNT_METADATA_FIELDS = new Set(["monthlyRent"]);
-const RENTAL_LOYER_METADATA_FIELDS = new Set(["tenantRef", "unitLabel", "monthlyRent"]);
-const RENTAL_CAUTION_METADATA_FIELDS = new Set(["tenantRef", "unitLabel"]);
-const RENTAL_AUTRE_METADATA_FIELDS = new Set<string>([]);
-const RENTAL_METADATA_FIELDS = new Set([
-  RENTAL_OPERATION_KIND_KEY,
-  "tenantRef",
-  "unitLabel",
-  "monthlyRent"
-]);
-const HOTEL_OPERATION_KIND_KEY = "hotelOperationKind";
-type HotelOperationKind =
-  | "ROOM_PAYMENT"
-  | "BOOKING_DEPOSIT"
-  | "RESTAURANT_SALE"
-  | "EVENT_SERVICE"
-  | "LAUNDRY_SERVICE"
-  | "ROOM_MAINTENANCE"
-  | "SUPPLIER_PAYMENT"
-  | "COMMISSION_FEE"
-  | "TAX_PAYMENT"
-  | "GUEST_REFUND";
-const HOTEL_OPERATION_LABELS: Record<HotelOperationKind, string> = {
-  ROOM_PAYMENT: "Paiement chambre",
-  BOOKING_DEPOSIT: "Acompte réservation",
-  RESTAURANT_SALE: "Restauration",
-  EVENT_SERVICE: "Evenement / salle",
-  LAUNDRY_SERVICE: "Blanchisserie",
-  ROOM_MAINTENANCE: "Maintenance chambre",
-  SUPPLIER_PAYMENT: "Paiement fournisseur",
-  COMMISSION_FEE: "Commission",
-  TAX_PAYMENT: "Taxe séjour",
-  GUEST_REFUND: "Remboursement client"
-};
-const HOTEL_NUMERIC_METADATA_FIELDS = new Set([
-  "nightsCount",
-  "roomRate",
-  "guestCount",
-  "mealCount",
-  "mealUnitPrice",
-  "serviceQuantity",
-  "serviceUnitPrice",
-  "invoiceAmount",
-  "commissionAmount",
-  "taxAmount",
-  "refundAmount"
-]);
-const HOTEL_AMOUNT_METADATA_FIELDS = new Set([
-  "nightsCount",
-  "roomRate",
-  "mealCount",
-  "mealUnitPrice",
-  "serviceQuantity",
-  "serviceUnitPrice",
-  "invoiceAmount",
-  "commissionAmount",
-  "taxAmount",
-  "refundAmount"
-]);
-const HOTEL_COMMON_METADATA_FIELDS = new Set([
-  "bookingRef",
-  "stayRef",
-  "guestRef",
-  "roomRef",
-  "roomType",
-  "serviceLine"
-]);
-const HOTEL_ROOM_PAYMENT_METADATA_FIELDS = new Set([
-  ...HOTEL_COMMON_METADATA_FIELDS,
-  "checkInDate",
-  "checkOutDate",
-  "nightsCount",
-  "roomRate",
-  "guestCount",
-  "invoiceRef",
-  "paymentRef"
-]);
-const HOTEL_BOOKING_DEPOSIT_METADATA_FIELDS = new Set([
-  ...HOTEL_COMMON_METADATA_FIELDS,
-  "checkInDate",
-  "checkOutDate",
-  "invoiceAmount",
-  "paymentRef"
-]);
-const HOTEL_RESTAURANT_SALE_METADATA_FIELDS = new Set([
-  ...HOTEL_COMMON_METADATA_FIELDS,
-  "mealCount",
-  "mealUnitPrice",
-  "invoiceRef",
-  "paymentRef"
-]);
-const HOTEL_EVENT_SERVICE_METADATA_FIELDS = new Set([
-  ...HOTEL_COMMON_METADATA_FIELDS,
-  "eventRef",
-  "serviceQuantity",
-  "serviceUnitPrice",
-  "invoiceRef",
-  "paymentRef"
-]);
-const HOTEL_LAUNDRY_SERVICE_METADATA_FIELDS = new Set([
-  ...HOTEL_COMMON_METADATA_FIELDS,
-  "serviceQuantity",
-  "serviceUnitPrice",
-  "invoiceRef",
-  "paymentRef"
-]);
-const HOTEL_ROOM_MAINTENANCE_METADATA_FIELDS = new Set([
-  ...HOTEL_COMMON_METADATA_FIELDS,
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount"
-]);
-const HOTEL_SUPPLIER_PAYMENT_METADATA_FIELDS = new Set([
-  "bookingRef",
-  "roomRef",
-  "serviceLine",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "paymentRef"
-]);
-const HOTEL_COMMISSION_FEE_METADATA_FIELDS = new Set([
-  "bookingRef",
-  "stayRef",
-  "guestRef",
-  "supplierRef",
-  "commissionAmount",
-  "paymentRef"
-]);
-const HOTEL_TAX_PAYMENT_METADATA_FIELDS = new Set([
-  "bookingRef",
-  "stayRef",
-  "guestRef",
-  "serviceLine",
-  "taxAmount",
-  "paymentRef"
-]);
-const HOTEL_GUEST_REFUND_METADATA_FIELDS = new Set([
-  ...HOTEL_COMMON_METADATA_FIELDS,
-  "refundAmount",
-  "paymentRef"
-]);
-const HOTEL_METADATA_FIELDS = new Set([
-  HOTEL_OPERATION_KIND_KEY,
-  "bookingRef",
-  "stayRef",
-  "guestRef",
-  "roomRef",
-  "roomType",
-  "serviceLine",
-  "checkInDate",
-  "checkOutDate",
-  "nightsCount",
-  "roomRate",
-  "guestCount",
-  "mealCount",
-  "mealUnitPrice",
-  "serviceQuantity",
-  "serviceUnitPrice",
-  "eventRef",
-  "supplierRef",
-  "invoiceRef",
-  "invoiceAmount",
-  "commissionAmount",
-  "taxAmount",
-  "refundAmount",
-  "paymentRef"
-]);
-const WATER_OPERATION_KIND_KEY = "waterOperationKind";
-type WaterOperationKind =
-  | "WATER_SALE"
-  | "WATER_OTHER_INCOME"
-  | "WATER_EXPENSE_MEALS"
-  | "WATER_EXPENSE_FUEL"
-  | "WATER_EXPENSE_VEHICLE_UPKEEP"
-  | "WATER_EXPENSE_PACKAGING_LOSS"
-  | "WATER_EXPENSE_SUPPLIES"
-  | "WATER_EXPENSE_ENERGY"
-  | "WATER_EXPENSE_CLEANING"
-  | "WATER_EXPENSE_MAINTENANCE"
-  | "WATER_EXPENSE_SUPPLIER"
-  | "WATER_EXPENSE_OTHER";
-const WATER_OPERATION_LABELS: Record<WaterOperationKind, string> = {
-  WATER_SALE: "Vente de paquets d'eau",
-  WATER_OTHER_INCOME: "Autre recette",
-  WATER_EXPENSE_MEALS: "Repas",
-  WATER_EXPENSE_FUEL: "Carburant (essence / gazoil)",
-  WATER_EXPENSE_VEHICLE_UPKEEP: "Entretien moto / véhicule",
-  WATER_EXPENSE_PACKAGING_LOSS: "Emballage / paquet perdu",
-  WATER_EXPENSE_SUPPLIES: "Fournitures (lait, sucre, etc.)",
-  WATER_EXPENSE_ENERGY: "Énergie / combustible",
-  WATER_EXPENSE_CLEANING: "Nettoyage / balayage",
-  WATER_EXPENSE_MAINTENANCE: "Entretien équipement / réparation",
-  WATER_EXPENSE_SUPPLIER: "Paiement fournisseur",
-  WATER_EXPENSE_OTHER: "Autre dépense"
-};
-const WATER_INCOME_KINDS: WaterOperationKind[] = ["WATER_SALE", "WATER_OTHER_INCOME"];
-const WATER_EXPENSE_KINDS: WaterOperationKind[] = [
-  "WATER_EXPENSE_MEALS",
-  "WATER_EXPENSE_FUEL",
-  "WATER_EXPENSE_VEHICLE_UPKEEP",
-  "WATER_EXPENSE_PACKAGING_LOSS",
-  "WATER_EXPENSE_SUPPLIES",
-  "WATER_EXPENSE_ENERGY",
-  "WATER_EXPENSE_CLEANING",
-  "WATER_EXPENSE_MAINTENANCE",
-  "WATER_EXPENSE_SUPPLIER",
-  "WATER_EXPENSE_OTHER"
-];
-const WATER_NUMERIC_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
-const WATER_AMOUNT_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
-const WATER_SALE_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
-const WATER_NO_EXTRA_METADATA_FIELDS = new Set<string>();
-const WATER_METADATA_FIELDS = new Set([WATER_OPERATION_KIND_KEY, "quantity", "unitPrice"]);
-const BEVERAGE_OPERATION_KIND_KEY = "beverageOperationKind";
-type BeverageOperationKind = "VENTE" | "ACHAT_STOCK" | "DEPENSE" | "AUTRE_RECETTE";
-const BEVERAGE_OPERATION_LABELS: Record<BeverageOperationKind, string> = {
-  VENTE: "Vente de boissons",
-  ACHAT_STOCK: "Achat de stock",
-  DEPENSE: "Dépense d'exploitation",
-  AUTRE_RECETTE: "Autre recette"
-};
-const BEVERAGE_NUMERIC_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice", "saleUnitPrice"]);
-const BEVERAGE_AMOUNT_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice", "saleUnitPrice"]);
-const BEVERAGE_METADATA_FIELDS = new Set([
-  BEVERAGE_OPERATION_KIND_KEY, "productName", "quantity", "purchaseUnitPrice",
-  "saleUnitPrice", "supplierRef", "invoiceRef", "expenseCategory", "beverageProductId", "beverageUnit", "beverageStockManaged", "beverageStockCost"
-]);
-const DAILY_AGREEMENT_OPERATION_KEY = "financialOperationKind";
-type DailyAgreementOperationKind = "PARTNER_PAYMENT" | "AGREEMENT_PROFIT" | "CAPITAL_RETURN" | "AGREEMENT_EXPENSE";
-const DAILY_AGREEMENT_OPERATION_LABELS: Record<DailyAgreementOperationKind, string> = {
-  PARTNER_PAYMENT: "Versement du partenaire",
-  AGREEMENT_PROFIT: "Bénéfice reçu",
-  CAPITAL_RETURN: "Retour de capital",
-  AGREEMENT_EXPENSE: "Dépense liée à l'accord"
-};
-const DAILY_PROTOCOL_CATEGORY = "Protocole d'accord";
-
-function isDailyProtocolCategory(value: string | undefined): boolean {
-  return (value ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr") ===
-    "protocole d'accord";
-}
-
-function getDailyAgreementOperationType(kind: DailyAgreementOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "PARTNER_PAYMENT" || kind === "AGREEMENT_PROFIT" ? "CASH_IN" : "CASH_OUT";
-}
-const AGENCY_OPERATION_KIND_KEY = "agencyOperationKind";
-type AgencyOperationKind =
-  | "SALE_COMMISSION"
-  | "RENTAL_COMMISSION"
-  | "MANDATE_FEE"
-  | "VISIT_FEE"
-  | "FILE_FEE"
-  | "ADVERTISING_EXPENSE"
-  | "FIELD_VISIT_EXPENSE"
-  | "BROKER_PAYOUT"
-  | "DOCUMENT_EXPENSE"
-  | "CUSTOMER_REFUND"
-  | "OFFICE_EXPENSE";
-const AGENCY_OPERATION_LABELS: Record<AgencyOperationKind, string> = {
-  SALE_COMMISSION: "Commission vente",
-  RENTAL_COMMISSION: "Commission location",
-  MANDATE_FEE: "Frais mandat",
-  VISIT_FEE: "Frais visite",
-  FILE_FEE: "Frais dossier",
-  ADVERTISING_EXPENSE: "Publicité",
-  FIELD_VISIT_EXPENSE: "Déplacement visite",
-  BROKER_PAYOUT: "Reversement courtier",
-  DOCUMENT_EXPENSE: "Frais document",
-  CUSTOMER_REFUND: "Remboursement client",
-  OFFICE_EXPENSE: "Charge agence"
-};
-const AGENCY_NUMERIC_METADATA_FIELDS = new Set([
-  "dealAmount",
-  "commissionRate",
-  "commissionAmount",
-  "feeAmount",
-  "visitCount",
-  "unitPrice",
-  "expenseAmount",
-  "payoutAmount",
-  "refundAmount"
-]);
-const AGENCY_AMOUNT_METADATA_FIELDS = new Set([
-  "dealAmount",
-  "commissionRate",
-  "commissionAmount",
-  "feeAmount",
-  "visitCount",
-  "unitPrice",
-  "expenseAmount",
-  "payoutAmount",
-  "refundAmount"
-]);
-const AGENCY_COMMON_METADATA_FIELDS = new Set([
-  "mandateRef",
-  "propertyRef",
-  "mandateType",
-  "propertyType",
-  "locationZone",
-  "ownerRef",
-  "clientRef",
-  "prospectRef",
-  "dealRef",
-  "dealStage"
-]);
-const AGENCY_SALE_COMMISSION_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "dealAmount",
-  "commissionRate",
-  "commissionAmount",
-  "invoiceRef",
-  "paymentRef"
-]);
-const AGENCY_RENTAL_COMMISSION_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "dealAmount",
-  "commissionRate",
-  "commissionAmount",
-  "invoiceRef",
-  "paymentRef"
-]);
-const AGENCY_MANDATE_FEE_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "feeAmount",
-  "documentRef",
-  "paymentRef"
-]);
-const AGENCY_VISIT_FEE_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "visitCount",
-  "unitPrice",
-  "paymentRef"
-]);
-const AGENCY_FILE_FEE_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "feeAmount",
-  "documentRef",
-  "paymentRef"
-]);
-const AGENCY_ADVERTISING_EXPENSE_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "advertisingChannel",
-  "supplierRef",
-  "invoiceRef",
-  "expenseAmount"
-]);
-const AGENCY_FIELD_VISIT_EXPENSE_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "visitCount",
-  "unitPrice",
-  "supplierRef",
-  "invoiceRef",
-  "expenseAmount"
-]);
-const AGENCY_BROKER_PAYOUT_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "supplierRef",
-  "payoutAmount",
-  "paymentRef"
-]);
-const AGENCY_DOCUMENT_EXPENSE_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "documentRef",
-  "supplierRef",
-  "invoiceRef",
-  "expenseAmount"
-]);
-const AGENCY_CUSTOMER_REFUND_METADATA_FIELDS = new Set([
-  ...AGENCY_COMMON_METADATA_FIELDS,
-  "refundAmount",
-  "paymentRef"
-]);
-const AGENCY_OFFICE_EXPENSE_METADATA_FIELDS = new Set([
-  "mandateRef",
-  "propertyRef",
-  "locationZone",
-  "supplierRef",
-  "invoiceRef",
-  "expenseAmount",
-  "paymentRef"
-]);
-const AGENCY_METADATA_FIELDS = new Set([
-  AGENCY_OPERATION_KIND_KEY,
-  "mandateRef",
-  "propertyRef",
-  "mandateType",
-  "propertyType",
-  "locationZone",
-  "ownerRef",
-  "clientRef",
-  "prospectRef",
-  "dealRef",
-  "dealStage",
-  "dealAmount",
-  "commissionRate",
-  "commissionAmount",
-  "feeAmount",
-  "visitCount",
-  "unitPrice",
-  "advertisingChannel",
-  "documentRef",
-  "supplierRef",
-  "invoiceRef",
-  "expenseAmount",
-  "payoutAmount",
-  "refundAmount",
-  "paymentRef"
-]);
-const AGRICULTURE_OPERATION_KIND_KEY = "agricultureOperationKind";
-type AgricultureOperationKind = "INPUT_PURCHASE" | "FIELD_EXPENSE" | "HARVEST_SALE" | "SUPPORT_INCOME";
-const AGRICULTURE_OPERATION_LABELS: Record<AgricultureOperationKind, string> = {
-  INPUT_PURCHASE: "Achat intrants",
-  FIELD_EXPENSE: "Travaux champ",
-  HARVEST_SALE: "Vente récolte",
-  SUPPORT_INCOME: "Appui / subvention"
-};
-const AGRICULTURE_NUMERIC_METADATA_FIELDS = new Set([
-  "surfaceArea",
-  "quantity",
-  "unitPrice"
-]);
-const AGRICULTURE_AMOUNT_METADATA_FIELDS = new Set([
-  "quantity",
-  "unitPrice"
-]);
-const AGRICULTURE_COMMON_METADATA_FIELDS = new Set([
-  "campaignRef",
-  "parcelRef",
-  "fieldType",
-  "cropType",
-  "surfaceArea"
-]);
-const AGRICULTURE_INPUT_PURCHASE_METADATA_FIELDS = new Set([
-  ...AGRICULTURE_COMMON_METADATA_FIELDS,
-  "inputName",
-  "quantity",
-  "unit",
-  "unitPrice",
-  "supplierRef"
-]);
-const AGRICULTURE_FIELD_EXPENSE_METADATA_FIELDS = new Set([
-  ...AGRICULTURE_COMMON_METADATA_FIELDS,
-  "workType",
-  "inputName",
-  "quantity",
-  "unit",
-  "supplierRef"
-]);
-const AGRICULTURE_HARVEST_SALE_METADATA_FIELDS = new Set([
-  ...AGRICULTURE_COMMON_METADATA_FIELDS,
-  "quantity",
-  "unit",
-  "unitPrice",
-  "buyerRef"
-]);
-const AGRICULTURE_SUPPORT_INCOME_METADATA_FIELDS = new Set([
-  ...AGRICULTURE_COMMON_METADATA_FIELDS,
-  "sourceRef"
-]);
-const AGRICULTURE_METADATA_FIELDS = new Set([
-  AGRICULTURE_OPERATION_KIND_KEY,
-  "campaignRef",
-  "parcelRef",
-  "fieldType",
-  "cropType",
-  "surfaceArea",
-  "inputName",
-  "workType",
-  "quantity",
-  "unit",
-  "unitPrice",
-  "supplierRef",
-  "buyerRef",
-  "sourceRef"
-]);
-const BTP_OPERATION_KIND_KEY = "btpOperationKind";
-type BtpOperationKind =
-  | "CLIENT_PAYMENT"
-  | "MATERIAL_PURCHASE"
-  | "LABOR_PAYMENT"
-  | "EQUIPMENT_RENTAL"
-  | "SUBCONTRACTING"
-  | "SITE_EXPENSE";
-const BTP_OPERATION_LABELS: Record<BtpOperationKind, string> = {
-  CLIENT_PAYMENT: "Encaissement client",
-  MATERIAL_PURCHASE: "Achat matériaux",
-  LABOR_PAYMENT: "Main-d'oeuvre",
-  EQUIPMENT_RENTAL: "Location engin",
-  SUBCONTRACTING: "Sous-traitance",
-  SITE_EXPENSE: "Charge chantier"
-};
-const BTP_NUMERIC_METADATA_FIELDS = new Set([
-  "quantity",
-  "unitPrice",
-  "workerCount",
-  "workDays",
-  "dailyRate",
-  "equipmentHours",
-  "hourlyRate",
-  "progressPercent"
-]);
-const BTP_AMOUNT_METADATA_FIELDS = new Set([
-  "quantity",
-  "unitPrice",
-  "workerCount",
-  "workDays",
-  "dailyRate",
-  "equipmentHours",
-  "hourlyRate"
-]);
-const BTP_COMMON_METADATA_FIELDS = new Set([
-  "projectRef",
-  "progressPercent"
-]);
-const BTP_CLIENT_PAYMENT_METADATA_FIELDS = new Set([...BTP_COMMON_METADATA_FIELDS]);
-const BTP_MATERIAL_PURCHASE_METADATA_FIELDS = new Set([
-  ...BTP_COMMON_METADATA_FIELDS,
-  "materialName",
-  "quantity",
-  "unitPrice"
-]);
-const BTP_LABOR_PAYMENT_METADATA_FIELDS = new Set([
-  ...BTP_COMMON_METADATA_FIELDS,
-  "workerCount",
-  "workDays",
-  "dailyRate"
-]);
-const BTP_EQUIPMENT_RENTAL_METADATA_FIELDS = new Set([
-  ...BTP_COMMON_METADATA_FIELDS,
-  "equipmentRef",
-  "equipmentHours",
-  "hourlyRate"
-]);
-const BTP_SUBCONTRACTING_METADATA_FIELDS = new Set([
-  ...BTP_COMMON_METADATA_FIELDS,
-  "subcontractorRef"
-]);
-const BTP_SITE_EXPENSE_METADATA_FIELDS = new Set([...BTP_COMMON_METADATA_FIELDS]);
-const BTP_METADATA_FIELDS = new Set([
-  BTP_OPERATION_KIND_KEY,
-  "projectRef",
-  "progressPercent",
-  "materialName",
-  "quantity",
-  "unitPrice",
-  "workerCount",
-  "workDays",
-  "dailyRate",
-  "equipmentRef",
-  "equipmentHours",
-  "hourlyRate",
-  "subcontractorRef"
-]);
-const FISH_FARMING_OPERATION_KIND_KEY = "fishOperationKind";
-type FishFarmingOperationKind =
-  | "FINGERLING_PURCHASE"
-  | "FEED_PURCHASE"
-  | "POND_EXPENSE"
-  | "FISH_SALE"
-  | "SUPPORT_INCOME";
-const FISH_FARMING_OPERATION_LABELS: Record<FishFarmingOperationKind, string> = {
-  FINGERLING_PURCHASE: "Achat alevins",
-  FEED_PURCHASE: "Achat aliment",
-  POND_EXPENSE: "Charge bassin",
-  FISH_SALE: "Vente poisson",
-  SUPPORT_INCOME: "Appui / subvention"
-};
-const FISH_FARMING_NUMERIC_METADATA_FIELDS = new Set([
-  "quantity",
-  "unitPrice",
-  "mortalityCount"
-]);
-const FISH_FARMING_AMOUNT_METADATA_FIELDS = new Set([
-  "quantity",
-  "unitPrice"
-]);
-const FISH_FARMING_COMMON_METADATA_FIELDS = new Set([
-  "pondRef",
-  "cycleRef",
-  "species"
-]);
-const FISH_FARMING_FINGERLING_PURCHASE_METADATA_FIELDS = new Set([
-  ...FISH_FARMING_COMMON_METADATA_FIELDS,
-  "fingerlingBatchRef",
-  "quantity",
-  "unit",
-  "unitPrice",
-  "supplierRef"
-]);
-const FISH_FARMING_FEED_PURCHASE_METADATA_FIELDS = new Set([
-  ...FISH_FARMING_COMMON_METADATA_FIELDS,
-  "feedName",
-  "quantity",
-  "unit",
-  "unitPrice",
-  "supplierRef"
-]);
-const FISH_FARMING_POND_EXPENSE_METADATA_FIELDS = new Set([
-  ...FISH_FARMING_COMMON_METADATA_FIELDS,
-  "feedName",
-  "quantity",
-  "unit",
-  "supplierRef",
-  "mortalityCount",
-  "waterQuality"
-]);
-const FISH_FARMING_FISH_SALE_METADATA_FIELDS = new Set([
-  ...FISH_FARMING_COMMON_METADATA_FIELDS,
-  "quantity",
-  "unit",
-  "unitPrice",
-  "buyerRef"
-]);
-const FISH_FARMING_SUPPORT_INCOME_METADATA_FIELDS = new Set([
-  ...FISH_FARMING_COMMON_METADATA_FIELDS,
-  "sourceRef"
-]);
-const FISH_FARMING_METADATA_FIELDS = new Set([
-  FISH_FARMING_OPERATION_KIND_KEY,
-  "pondRef",
-  "cycleRef",
-  "species",
-  "fingerlingBatchRef",
-  "feedName",
-  "quantity",
-  "unit",
-  "unitPrice",
-  "supplierRef",
-  "buyerRef",
-  "sourceRef",
-  "mortalityCount",
-  "waterQuality"
-]);
-const LIVESTOCK_OPERATION_KIND_KEY = "livestockOperationKind";
-type LivestockOperationKind =
-  | "ANIMAL_PURCHASE"
-  | "FEED_PURCHASE"
-  | "VET_CARE"
-  | "FARM_EXPENSE"
-  | "ANIMAL_SALE"
-  | "PRODUCT_SALE"
-  | "SUPPORT_INCOME";
-const LIVESTOCK_OPERATION_LABELS: Record<LivestockOperationKind, string> = {
-  ANIMAL_PURCHASE: "Achat animaux",
-  FEED_PURCHASE: "Achat aliment",
-  VET_CARE: "Soins / vaccin",
-  FARM_EXPENSE: "Charge élevage",
-  ANIMAL_SALE: "Vente animaux",
-  PRODUCT_SALE: "Vente produit",
-  SUPPORT_INCOME: "Appui / subvention"
-};
-const LIVESTOCK_NUMERIC_METADATA_FIELDS = new Set([
-  "animalCount",
-  "feedQuantity",
-  "productQuantity",
-  "unitPrice",
-  "mortalityCount"
-]);
-const LIVESTOCK_AMOUNT_METADATA_FIELDS = new Set([
-  "animalCount",
-  "feedQuantity",
-  "productQuantity",
-  "unitPrice"
-]);
-const LIVESTOCK_COMMON_METADATA_FIELDS = new Set([
-  "herdRef",
-  "batchRef",
-  "species",
-  "animalCategory"
-]);
-const LIVESTOCK_ANIMAL_PURCHASE_METADATA_FIELDS = new Set([
-  ...LIVESTOCK_COMMON_METADATA_FIELDS,
-  "animalCount",
-  "unit",
-  "unitPrice",
-  "supplierRef"
-]);
-const LIVESTOCK_FEED_PURCHASE_METADATA_FIELDS = new Set([
-  ...LIVESTOCK_COMMON_METADATA_FIELDS,
-  "feedName",
-  "feedQuantity",
-  "unit",
-  "unitPrice",
-  "supplierRef"
-]);
-const LIVESTOCK_VET_CARE_METADATA_FIELDS = new Set([
-  ...LIVESTOCK_COMMON_METADATA_FIELDS,
-  "treatmentName",
-  "animalCount",
-  "unit",
-  "supplierRef",
-  "healthStatus"
-]);
-const LIVESTOCK_FARM_EXPENSE_METADATA_FIELDS = new Set([
-  ...LIVESTOCK_COMMON_METADATA_FIELDS,
-  "feedName",
-  "feedQuantity",
-  "unit",
-  "supplierRef",
-  "mortalityCount",
-  "healthStatus"
-]);
-const LIVESTOCK_ANIMAL_SALE_METADATA_FIELDS = new Set([
-  ...LIVESTOCK_COMMON_METADATA_FIELDS,
-  "animalCount",
-  "unit",
-  "unitPrice",
-  "buyerRef"
-]);
-const LIVESTOCK_PRODUCT_SALE_METADATA_FIELDS = new Set([
-  ...LIVESTOCK_COMMON_METADATA_FIELDS,
-  "productName",
-  "productQuantity",
-  "unit",
-  "unitPrice",
-  "buyerRef"
-]);
-const LIVESTOCK_SUPPORT_INCOME_METADATA_FIELDS = new Set([
-  ...LIVESTOCK_COMMON_METADATA_FIELDS,
-  "sourceRef"
-]);
-const LIVESTOCK_METADATA_FIELDS = new Set([
-  LIVESTOCK_OPERATION_KIND_KEY,
-  "herdRef",
-  "batchRef",
-  "species",
-  "animalCategory",
-  "animalCount",
-  "feedName",
-  "feedQuantity",
-  "productName",
-  "productQuantity",
-  "unit",
-  "unitPrice",
-  "treatmentName",
-  "supplierRef",
-  "buyerRef",
-  "sourceRef",
-  "mortalityCount",
-  "healthStatus"
-]);
-const GENERAL_EXPENSE_KIND_KEY = "generalExpenseKind";
-type GeneralExpenseOwner = "PDG" | "EMPLOYE";
-type GeneralExpenseKind =
-  | "PDG_SUPPLIES"
-  | "PDG_TRANSPORT"
-  | "PDG_SUPPLIER_PAYMENT"
-  | "PDG_TRANSFER_ADVANCE"
-  | "PDG_INVESTMENT"
-  | "PDG_LOAN"
-  | "PDG_OVERHEAD"
-  | "EMPLOYEE_MEALS"
-  | "EMPLOYEE_FUEL"
-  | "EMPLOYEE_VEHICLE_UPKEEP"
-  | "EMPLOYEE_SUPPLIES"
-  | "EMPLOYEE_OTHER";
-const GENERAL_EXPENSE_KIND_LABELS: Record<GeneralExpenseKind, string> = {
-  PDG_SUPPLIES: "Achat matériel / fournitures",
-  PDG_TRANSPORT: "Carburant / transport",
-  PDG_SUPPLIER_PAYMENT: "Paiement fournisseur / prestataire",
-  PDG_TRANSFER_ADVANCE: "Virement / avance / transfert",
-  PDG_INVESTMENT: "Investissement",
-  PDG_LOAN: "Prêt",
-  PDG_OVERHEAD: "Frais généraux / divers",
-  EMPLOYEE_MEALS: "Repas",
-  EMPLOYEE_FUEL: "Carburant",
-  EMPLOYEE_VEHICLE_UPKEEP: "Entretien véhicule",
-  EMPLOYEE_SUPPLIES: "Fournitures / consommables",
-  EMPLOYEE_OTHER: "Autre dépense"
-};
-const GENERAL_EXPENSE_PDG_KINDS: GeneralExpenseKind[] = [
-  "PDG_SUPPLIES",
-  "PDG_TRANSPORT",
-  "PDG_SUPPLIER_PAYMENT",
-  "PDG_TRANSFER_ADVANCE",
-  "PDG_INVESTMENT",
-  "PDG_LOAN",
-  "PDG_OVERHEAD"
-];
-const GENERAL_EXPENSE_EMPLOYEE_KINDS: GeneralExpenseKind[] = [
-  "EMPLOYEE_MEALS",
-  "EMPLOYEE_FUEL",
-  "EMPLOYEE_VEHICLE_UPKEEP",
-  "EMPLOYEE_SUPPLIES",
-  "EMPLOYEE_OTHER"
-];
-const GENERAL_EXPENSES_NUMERIC_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
-const GENERAL_EXPENSES_AMOUNT_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
-const GENERAL_EXPENSES_VISIBLE_METADATA_FIELDS = new Set(["quantity", "unitPrice"]);
-const GENERAL_EXPENSES_METADATA_FIELDS = new Set([
+import {
+  BEVERAGE_OPERATION_KIND_KEY,
+  DAILY_AGREEMENT_OPERATION_KEY,
+  DAILY_AGREEMENT_OPERATION_LABELS,
+  DAILY_PROTOCOL_CATEGORY,
+  DEFAULT_ALLOWED_CURRENCIES,
+  DEFAULT_TRANSACTION_VISIBLE_PAGE_SIZE,
+  DUMP_TRUCK_OPERATION_KEY,
+  type DailyAgreementOperationKind,
+  EMPTY_METADATA_FIELDS,
   GENERAL_EXPENSE_KIND_KEY,
-  "quantity",
-  "unitPrice"
-]);
-const DUMP_TRUCK_OPERATION_KEY = "dumpTruckOperationKind";
-const DUMP_TRUCK_OPERATION_LABELS: Record<string, string> = {
-  TRAVAUX: "Travaux",
-  LOCATION: "Location",
-  VERSEMENT_AMCCO: "Versement AMCCO",
-  DEPENSE: "Dépense",
-  ENTRETIEN: "Entretien",
-  CARBURANT: "Carburant",
-  AUTRE: "Autre"
-};
-const TRANSPORT_NUMERIC_METADATA_FIELDS = new Set(["quantity"]);
-const TRANSPORT_AMOUNT_METADATA_FIELDS = new Set(["quantity", "purchaseUnitPrice"]);
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message;
-  }
-  return "Opération impossible. Vérifiez la connexion backend.";
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} o`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} Ko`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-}
-
-function toAmountNumber(input: string): number {
-  return toLocalizedAmountNumber(input);
-}
-
-function normalizeAmountForApi(input: string): string {
-  return normalizeLocalizedAmountForApi(input);
-}
-
-function formatAmountForDisplay(input: string | number): string {
-  return formatLocalizedAmountForDisplay(input);
-}
-
-function formatAmountForInput(input: string): string {
-  return formatLocalizedAmountForInput(input);
-}
-
-function formatEditableAmountForInput(input: string): string {
-  return formatLocalizedEditableAmountForInput(input);
-}
-
-function isMoneyMetadataField(key: string): boolean {
-  return (
-    key === "purchaseUnitPrice" ||
-    key === "saleUnitPrice" ||
-    key === "dailyPayment" ||
-    key === "marginAmount" ||
-    key === "paymentAmount" ||
-    key === "unitPrice" ||
-    key === "dailyRate" ||
-    key === "hourlyRate" ||
-    key === "monthlyRent" ||
-    key === "serviceCharge" ||
-    key === "depositAmount" ||
-    key === "invoiceAmount" ||
-    key === "payoutAmount" ||
-    key === "amccoAmount" ||
-    key === "discountAmount" ||
-    key === "returnAmount" ||
-    key === "roomRate" ||
-    key === "mealUnitPrice" ||
-    key === "serviceUnitPrice" ||
-    key === "commissionAmount" ||
-    key === "taxAmount" ||
-    key === "refundAmount" ||
-    key === "connectionFee" ||
-    key === "dealAmount" ||
-    key === "feeAmount" ||
-    key === "expenseAmount" ||
-    key === "payoutAmount"
-  );
-}
-
-function deriveHardwareAmount(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): string | null {
-  const quantity = toAmountNumber(metadata.quantity ?? "");
-  const unitPrice = type === "CASH_IN"
-    ? toAmountNumber(metadata.saleUnitPrice ?? "")
-    : toAmountNumber(metadata.purchaseUnitPrice ?? "");
-  if (quantity <= 0 || unitPrice <= 0) {
-    return null;
-  }
-  return (quantity * unitPrice).toFixed(2);
-}
-
-function deriveHardwareArticleUnitPricePatch(
-  operationKind: HardwareOperationKind,
-  article: ActivityArticle | undefined
-): Partial<Record<"purchaseUnitPrice" | "saleUnitPrice", string>> {
-  if (!article) {
-    return {};
-  }
-  const purchasePrice = article.defaultPurchaseUnitPrice
-    ? toAmountNumber(article.defaultPurchaseUnitPrice)
-    : 0;
-  if (operationKind === "ITEM_ENTRY") {
-    return purchasePrice > 0 ? { purchaseUnitPrice: purchasePrice.toFixed(2) } : {};
-  }
-  if (operationKind === "ITEM_EXIT") {
-    const margin = article.defaultMargin ? toAmountNumber(article.defaultMargin) : 0;
-    const salePrice = purchasePrice + margin;
-    return salePrice > 0 ? { saleUnitPrice: salePrice.toFixed(2) } : {};
-  }
-  return {};
-}
-
-function deriveHardwareMarginAmount(
-  operationKind: HardwareOperationKind,
-  metadata: Record<string, string>,
-  articles: ActivityArticle[]
-): string | null {
-  if (operationKind !== "ITEM_ENTRY") {
-    return null;
-  }
-  const quantity = toAmountNumber(metadata.quantity ?? "");
-  const article = articles.find((item) => item.name === (metadata.itemName ?? ""));
-  const defaultMargin = article?.defaultMargin ? toAmountNumber(article.defaultMargin) : 0;
-  if (quantity <= 0 || defaultMargin <= 0) {
-    return null;
-  }
-  return (quantity * defaultMargin).toFixed(2);
-}
-
-function deriveAgricultureAmount(
-  operationKind: AgricultureOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind !== "INPUT_PURCHASE" && operationKind !== "HARVEST_SALE") {
-    return null;
-  }
-  const quantity = toAmountNumber(metadata.quantity ?? "");
-  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-  if (quantity <= 0 || unitPrice <= 0) {
-    return null;
-  }
-  return (quantity * unitPrice).toFixed(2);
-}
-
-function deriveFoodAmount(
-  operationKind: FoodOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind === "PRODUCT_SALE" || operationKind === "CUSTOMER_REFUND") {
-    const quantity = toAmountNumber(metadata.quantity ?? "");
-    const saleUnitPrice = toAmountNumber(metadata.saleUnitPrice ?? "");
-    if (quantity <= 0 || saleUnitPrice <= 0) {
-      return null;
-    }
-    return (quantity * saleUnitPrice).toFixed(2);
-  }
-
-  if (operationKind === "PRODUCT_PURCHASE") {
-    const quantity = toAmountNumber(metadata.quantity ?? "");
-    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
-    if (quantity <= 0 || purchaseUnitPrice <= 0) {
-      return null;
-    }
-    return (quantity * purchaseUnitPrice).toFixed(2);
-  }
-
-  if (operationKind === "STOCK_LOSS") {
-    const lossQuantity = toAmountNumber(metadata.lossQuantity ?? "");
-    const purchaseUnitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
-    if (lossQuantity <= 0 || purchaseUnitPrice <= 0) {
-      return null;
-    }
-    return (lossQuantity * purchaseUnitPrice).toFixed(2);
-  }
-
-  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
-  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
-}
-
-function deriveBtpAmount(
-  operationKind: BtpOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind === "MATERIAL_PURCHASE") {
-    const quantity = toAmountNumber(metadata.quantity ?? "");
-    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-    if (quantity <= 0 || unitPrice <= 0) {
-      return null;
-    }
-    return (quantity * unitPrice).toFixed(2);
-  }
-
-  if (operationKind === "LABOR_PAYMENT") {
-    const workerCount = toAmountNumber(metadata.workerCount ?? "");
-    const workDays = toAmountNumber(metadata.workDays ?? "");
-    const dailyRate = toAmountNumber(metadata.dailyRate ?? "");
-    if (workerCount <= 0 || workDays <= 0 || dailyRate <= 0) {
-      return null;
-    }
-    return (workerCount * workDays * dailyRate).toFixed(2);
-  }
-
-  if (operationKind === "EQUIPMENT_RENTAL") {
-    const equipmentHours = toAmountNumber(metadata.equipmentHours ?? "");
-    const hourlyRate = toAmountNumber(metadata.hourlyRate ?? "");
-    if (equipmentHours <= 0 || hourlyRate <= 0) {
-      return null;
-    }
-    return (equipmentHours * hourlyRate).toFixed(2);
-  }
-
-  return null;
-}
-
-function deriveRentalAmount(
-  operationKind: RentalOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind !== "LOYER") {
-    return null;
-  }
-  const monthlyRent = toAmountNumber(metadata.monthlyRent ?? "");
-  return monthlyRent > 0 ? monthlyRent.toFixed(2) : null;
-}
-
-function deriveHotelAmount(
-  operationKind: HotelOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind === "ROOM_PAYMENT") {
-    const nightsCount = toAmountNumber(metadata.nightsCount ?? "");
-    const roomRate = toAmountNumber(metadata.roomRate ?? "");
-    if (nightsCount <= 0 || roomRate <= 0) {
-      return null;
-    }
-    return (nightsCount * roomRate).toFixed(2);
-  }
-
-  if (operationKind === "RESTAURANT_SALE") {
-    const mealCount = toAmountNumber(metadata.mealCount ?? "");
-    const mealUnitPrice = toAmountNumber(metadata.mealUnitPrice ?? "");
-    if (mealCount <= 0 || mealUnitPrice <= 0) {
-      return null;
-    }
-    return (mealCount * mealUnitPrice).toFixed(2);
-  }
-
-  if (operationKind === "EVENT_SERVICE" || operationKind === "LAUNDRY_SERVICE") {
-    const serviceQuantity = toAmountNumber(metadata.serviceQuantity ?? "");
-    const serviceUnitPrice = toAmountNumber(metadata.serviceUnitPrice ?? "");
-    if (serviceQuantity <= 0 || serviceUnitPrice <= 0) {
-      return null;
-    }
-    return (serviceQuantity * serviceUnitPrice).toFixed(2);
-  }
-
-  if (operationKind === "COMMISSION_FEE") {
-    const commissionAmount = toAmountNumber(metadata.commissionAmount ?? "");
-    return commissionAmount > 0 ? commissionAmount.toFixed(2) : null;
-  }
-
-  if (operationKind === "TAX_PAYMENT") {
-    const taxAmount = toAmountNumber(metadata.taxAmount ?? "");
-    return taxAmount > 0 ? taxAmount.toFixed(2) : null;
-  }
-
-  if (operationKind === "GUEST_REFUND") {
-    const refundAmount = toAmountNumber(metadata.refundAmount ?? "");
-    return refundAmount > 0 ? refundAmount.toFixed(2) : null;
-  }
-
-  const invoiceAmount = toAmountNumber(metadata.invoiceAmount ?? "");
-  return invoiceAmount > 0 ? invoiceAmount.toFixed(2) : null;
-}
-
-function deriveWaterAmount(
-  operationKind: WaterOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind !== "WATER_SALE") {
-    return null;
-  }
-  const quantity = toAmountNumber(metadata.quantity ?? "");
-  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-  if (quantity <= 0 || unitPrice <= 0) {
-    return null;
-  }
-  return (quantity * unitPrice).toFixed(2);
-}
-
-function getBeverageOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): BeverageOperationKind {
-  const value = metadata[BEVERAGE_OPERATION_KIND_KEY];
-  if (value === "VENTE" || value === "ACHAT_STOCK" || value === "DEPENSE" || value === "AUTRE_RECETTE") {
-    return value;
-  }
-  return type === "CASH_IN" ? "VENTE" : "ACHAT_STOCK";
-}
-
-function deriveBeverageAmount(
-  operationKind: BeverageOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind !== "VENTE" && operationKind !== "ACHAT_STOCK") return null;
-  const quantity = toAmountNumber(metadata.quantity ?? "");
-  const unitPrice = toAmountNumber(
-    operationKind === "VENTE" ? metadata.saleUnitPrice ?? "" : metadata.purchaseUnitPrice ?? ""
-  );
-  return quantity > 0 && unitPrice > 0 ? (quantity * unitPrice).toFixed(2) : null;
-}
-
-function deriveAgencyAmount(
-  operationKind: AgencyOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (operationKind === "SALE_COMMISSION" || operationKind === "RENTAL_COMMISSION") {
-    const commissionAmount = toAmountNumber(metadata.commissionAmount ?? "");
-    if (commissionAmount > 0) {
-      return commissionAmount.toFixed(2);
-    }
-    const dealAmount = toAmountNumber(metadata.dealAmount ?? "");
-    const commissionRate = toAmountNumber(metadata.commissionRate ?? "");
-    if (dealAmount > 0 && commissionRate > 0) {
-      return ((dealAmount * commissionRate) / 100).toFixed(2);
-    }
-    return null;
-  }
-
-  if (operationKind === "MANDATE_FEE" || operationKind === "FILE_FEE") {
-    const feeAmount = toAmountNumber(metadata.feeAmount ?? "");
-    return feeAmount > 0 ? feeAmount.toFixed(2) : null;
-  }
-
-  if (operationKind === "VISIT_FEE" || operationKind === "FIELD_VISIT_EXPENSE") {
-    const visitCount = toAmountNumber(metadata.visitCount ?? "");
-    const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-    if (visitCount > 0 && unitPrice > 0) {
-      return (visitCount * unitPrice).toFixed(2);
-    }
-  }
-
-  if (operationKind === "BROKER_PAYOUT") {
-    const payoutAmount = toAmountNumber(metadata.payoutAmount ?? "");
-    return payoutAmount > 0 ? payoutAmount.toFixed(2) : null;
-  }
-
-  if (operationKind === "CUSTOMER_REFUND") {
-    const refundAmount = toAmountNumber(metadata.refundAmount ?? "");
-    return refundAmount > 0 ? refundAmount.toFixed(2) : null;
-  }
-
-  const expenseAmount = toAmountNumber(metadata.expenseAmount ?? "");
-  return expenseAmount > 0 ? expenseAmount.toFixed(2) : null;
-}
-
-function deriveFishFarmingAmount(
-  operationKind: FishFarmingOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (
-    operationKind !== "FINGERLING_PURCHASE" &&
-    operationKind !== "FEED_PURCHASE" &&
-    operationKind !== "FISH_SALE"
-  ) {
-    return null;
-  }
-  const quantity = toAmountNumber(metadata.quantity ?? "");
-  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-  if (quantity <= 0 || unitPrice <= 0) {
-    return null;
-  }
-  return (quantity * unitPrice).toFixed(2);
-}
-
-function deriveLivestockAmount(
-  operationKind: LivestockOperationKind,
-  metadata: Record<string, string>
-): string | null {
-  if (
-    operationKind !== "ANIMAL_PURCHASE" &&
-    operationKind !== "FEED_PURCHASE" &&
-    operationKind !== "ANIMAL_SALE" &&
-    operationKind !== "PRODUCT_SALE"
-  ) {
-    return null;
-  }
-  const quantity = operationKind === "FEED_PURCHASE"
-    ? toAmountNumber(metadata.feedQuantity ?? "")
-    : operationKind === "PRODUCT_SALE"
-      ? toAmountNumber(metadata.productQuantity ?? "")
-      : toAmountNumber(metadata.animalCount ?? "");
-  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-  if (quantity <= 0 || unitPrice <= 0) {
-    return null;
-  }
-  return (quantity * unitPrice).toFixed(2);
-}
-
-function isGeneralExpenseKind(value: string | undefined): value is GeneralExpenseKind {
-  return Boolean(value) && Object.prototype.hasOwnProperty.call(GENERAL_EXPENSE_KIND_LABELS, value as string);
-}
-
-function getGeneralExpenseOwner(kind: GeneralExpenseKind): GeneralExpenseOwner {
-  return kind.startsWith("PDG_") ? "PDG" : "EMPLOYE";
-}
-
-// Maps categories used before salaries moved to the dedicated Salaires
-// module, so editing an older expense shows a sensible category (and keeps
-// the right owner) instead of silently falling back to "Autre dépense".
-const GENERAL_EXPENSE_LEGACY_KIND_MAP: Partial<Record<string, GeneralExpenseKind>> = {
-  PDG_PAYROLL: "PDG_OVERHEAD",
-  EMPLOYEE_PAYROLL: "EMPLOYEE_OTHER"
-};
-
-function getGeneralExpenseKind(metadata: Record<string, string>): GeneralExpenseKind {
-  const configuredKind = metadata[GENERAL_EXPENSE_KIND_KEY]?.trim();
-  if (isGeneralExpenseKind(configuredKind)) {
-    return configuredKind;
-  }
-  const legacyKind = configuredKind ? GENERAL_EXPENSE_LEGACY_KIND_MAP[configuredKind] : undefined;
-  if (legacyKind) {
-    return legacyKind;
-  }
-  return "EMPLOYEE_OTHER";
-}
-
-function deriveGeneralExpensesAmount(metadata: Record<string, string>): string | null {
-  const quantity = toAmountNumber(metadata.quantity ?? "");
-  const unitPrice = toAmountNumber(metadata.unitPrice ?? "");
-  if (quantity <= 0 || unitPrice <= 0) {
-    return null;
-  }
-  return (quantity * unitPrice).toFixed(2);
-}
-
-function getGeneralExpensesFormModeLabel(owner: GeneralExpenseOwner): string {
-  return owner === "PDG"
-    ? "Dépense du PDG: choisissez la catégorie, puis le montant ou la quantité et le prix unitaire."
-    : "Dépense employé: choisissez la catégorie, puis le montant ou la quantité et le prix unitaire.";
-}
-
-function getMetadataInputMode(fieldKey: string): "decimal" | "text" {
-  return HARDWARE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    FOOD_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    RENTAL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    HOTEL_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    WATER_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    BEVERAGE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    AGENCY_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    AGRICULTURE_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    BTP_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    FISH_FARMING_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    LIVESTOCK_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    GENERAL_EXPENSES_NUMERIC_METADATA_FIELDS.has(fieldKey) ||
-    TRANSPORT_NUMERIC_METADATA_FIELDS.has(fieldKey)
-    ? "decimal"
-    : "text";
-}
-
-function shouldDeriveHardwareAmount(fieldKey: string): boolean {
-  return HARDWARE_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveFoodAmount(fieldKey: string): boolean {
-  return FOOD_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveRentalAmount(fieldKey: string): boolean {
-  return RENTAL_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveHotelAmount(fieldKey: string): boolean {
-  return HOTEL_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveWaterAmount(fieldKey: string): boolean {
-  return WATER_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveBeverageAmount(fieldKey: string): boolean {
-  return BEVERAGE_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveAgencyAmount(fieldKey: string): boolean {
-  return AGENCY_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveAgricultureAmount(fieldKey: string): boolean {
-  return AGRICULTURE_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveBtpAmount(fieldKey: string): boolean {
-  return BTP_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveFishFarmingAmount(fieldKey: string): boolean {
-  return FISH_FARMING_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveLivestockAmount(fieldKey: string): boolean {
-  return LIVESTOCK_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveGeneralExpensesAmount(fieldKey: string): boolean {
-  return GENERAL_EXPENSES_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function shouldDeriveTransportAmount(fieldKey: string): boolean {
-  return TRANSPORT_AMOUNT_METADATA_FIELDS.has(fieldKey);
-}
-
-function getDefaultTransactionType(
-  activityCode: BusinessActivityCode | null
-): "CASH_IN" | "CASH_OUT" {
-  return activityCode === "FOOD" ||
-    activityCode === "RENTAL" ||
-    activityCode === "HOTEL_LODGING" ||
-    activityCode === "WATER" ||
-    activityCode === "BEVERAGE_DEPOT" ||
-    activityCode === "REAL_ESTATE_AGENCY" ||
-    activityCode === "DAILY_ACTIVITIES"
-    ? "CASH_IN"
-    : "CASH_OUT";
-}
-
-function isHardwareOperationKind(value: string | undefined): value is HardwareOperationKind {
-  return value === "GLOBAL" || value === "ITEM_ENTRY" || value === "ITEM_EXIT" || value === "RECOUVREMENT";
-}
-
-function hasHardwareItemMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "itemName",
-    "quantity",
-    "purchaseUnitPrice",
-    "saleUnitPrice",
-    "dailyPayment",
-    "supplierRef"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getHardwareOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): HardwareOperationKind {
-  const configuredKind = metadata[HARDWARE_OPERATION_KIND_KEY]?.trim();
-  if (isHardwareOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasHardwareItemMetadata(metadata)) {
-    return "GLOBAL";
-  }
-  return type === "CASH_OUT" ? "ITEM_ENTRY" : "ITEM_EXIT";
-}
-
-function getHardwareOperationType(kind: HardwareOperationKind): "CASH_IN" | "CASH_OUT" | null {
-  if (kind === "ITEM_ENTRY") {
-    return "CASH_OUT";
-  }
-  if (kind === "ITEM_EXIT" || kind === "RECOUVREMENT") {
-    return "CASH_IN";
-  }
-  return null;
-}
-
-function isStoreOperationKind(value: string | undefined): value is StoreOperationKind {
-  return value === "ACHAT" || value === "RECOUVREMENT";
-}
-
-function getStoreOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): StoreOperationKind {
-  const configuredKind = metadata[STORE_OPERATION_KIND_KEY]?.trim();
-  if (isStoreOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  return type === "CASH_IN" ? "RECOUVREMENT" : "ACHAT";
-}
-
-function getStoreOperationType(kind: StoreOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "RECOUVREMENT" ? "CASH_IN" : "CASH_OUT";
-}
-
-function getStoreVisibleKeys(kind: StoreOperationKind): Set<string> {
-  return kind === "RECOUVREMENT" ? STORE_RECOUVREMENT_METADATA_FIELDS : STORE_ACHAT_METADATA_FIELDS;
-}
-
-function isFoodOperationKind(value: string | undefined): value is FoodOperationKind {
-  return (
-    value === "PRODUCT_SALE" ||
-    value === "PRODUCT_PURCHASE" ||
-    value === "SUPPLIER_PAYMENT" ||
-    value === "STOCK_LOSS" ||
-    value === "COLD_CHAIN_EXPENSE" ||
-    value === "PACKAGING_EXPENSE" ||
-    value === "CUSTOMER_REFUND"
-  );
-}
-
-function hasFoodMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "productFamily",
-    "productName",
-    "batchRef",
-    "expiryDate",
-    "storageArea",
-    "temperatureRange",
-    "quantity",
-    "lossQuantity",
-    "purchaseUnitPrice",
-    "saleUnitPrice",
-    "supplierRef",
-    "buyerRef",
-    "invoiceRef",
-    "invoiceAmount",
-    "lossReason",
-    "paymentRef"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getFoodOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): FoodOperationKind {
-  const configuredKind = metadata[FOOD_OPERATION_KIND_KEY]?.trim();
-  if (isFoodOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasFoodMetadata(metadata)) {
-    return type === "CASH_IN" ? "PRODUCT_SALE" : "PRODUCT_PURCHASE";
-  }
-  return type === "CASH_IN" ? "PRODUCT_SALE" : "SUPPLIER_PAYMENT";
-}
-
-function getFoodOperationType(kind: FoodOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "PRODUCT_SALE" ? "CASH_IN" : "CASH_OUT";
-}
-
-function getFoodVisibleKeys(kind: FoodOperationKind): Set<string> {
-  if (kind === "PRODUCT_SALE") {
-    return FOOD_PRODUCT_SALE_METADATA_FIELDS;
-  }
-  if (kind === "PRODUCT_PURCHASE") {
-    return FOOD_PRODUCT_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "SUPPLIER_PAYMENT") {
-    return FOOD_SUPPLIER_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "STOCK_LOSS") {
-    return FOOD_STOCK_LOSS_METADATA_FIELDS;
-  }
-  if (kind === "COLD_CHAIN_EXPENSE") {
-    return FOOD_COLD_CHAIN_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "PACKAGING_EXPENSE") {
-    return FOOD_PACKAGING_EXPENSE_METADATA_FIELDS;
-  }
-  return FOOD_CUSTOMER_REFUND_METADATA_FIELDS;
-}
-
-function isRentalOperationKind(value: string | undefined): value is RentalOperationKind {
-  return value === "LOYER" || value === "CAUTION" || value === "AUTRE";
-}
-
-function hasRentalMetadata(metadata: Record<string, string>): boolean {
-  return ["tenantRef", "unitLabel", "monthlyRent"].some((key) => metadata[key]?.trim());
-}
-
-function getRentalOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): RentalOperationKind {
-  const configuredKind = metadata[RENTAL_OPERATION_KIND_KEY]?.trim();
-  if (isRentalOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (type === "CASH_IN" || hasRentalMetadata(metadata)) {
-    return "LOYER";
-  }
-  return "AUTRE";
-}
-
-function getRentalOperationType(kind: RentalOperationKind): "CASH_IN" | "CASH_OUT" | null {
-  return kind === "LOYER" || kind === "CAUTION" ? "CASH_IN" : null;
-}
-
-function getRentalVisibleKeys(kind: RentalOperationKind): Set<string> {
-  if (kind === "LOYER") {
-    return RENTAL_LOYER_METADATA_FIELDS;
-  }
-  if (kind === "CAUTION") {
-    return RENTAL_CAUTION_METADATA_FIELDS;
-  }
-  return RENTAL_AUTRE_METADATA_FIELDS;
-}
-
-function isHotelOperationKind(value: string | undefined): value is HotelOperationKind {
-  return (
-    value === "ROOM_PAYMENT" ||
-    value === "BOOKING_DEPOSIT" ||
-    value === "RESTAURANT_SALE" ||
-    value === "EVENT_SERVICE" ||
-    value === "LAUNDRY_SERVICE" ||
-    value === "ROOM_MAINTENANCE" ||
-    value === "SUPPLIER_PAYMENT" ||
-    value === "COMMISSION_FEE" ||
-    value === "TAX_PAYMENT" ||
-    value === "GUEST_REFUND"
-  );
-}
-
-function hasHotelMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "bookingRef",
-    "stayRef",
-    "guestRef",
-    "roomRef",
-    "roomType",
-    "serviceLine",
-    "checkInDate",
-    "checkOutDate",
-    "nightsCount",
-    "roomRate",
-    "guestCount",
-    "mealCount",
-    "mealUnitPrice",
-    "serviceQuantity",
-    "serviceUnitPrice",
-    "eventRef",
-    "supplierRef",
-    "invoiceRef",
-    "invoiceAmount",
-    "commissionAmount",
-    "taxAmount",
-    "refundAmount",
-    "paymentRef"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getHotelOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): HotelOperationKind {
-  const configuredKind = metadata[HOTEL_OPERATION_KIND_KEY]?.trim();
-  if (isHotelOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasHotelMetadata(metadata)) {
-    return type === "CASH_IN" ? "ROOM_PAYMENT" : "ROOM_MAINTENANCE";
-  }
-  return type === "CASH_IN" ? "ROOM_PAYMENT" : "SUPPLIER_PAYMENT";
-}
-
-function getHotelOperationType(kind: HotelOperationKind): "CASH_IN" | "CASH_OUT" {
-  return (
-    kind === "ROOM_PAYMENT" ||
-    kind === "BOOKING_DEPOSIT" ||
-    kind === "RESTAURANT_SALE" ||
-    kind === "EVENT_SERVICE" ||
-    kind === "LAUNDRY_SERVICE"
-  )
-    ? "CASH_IN"
-    : "CASH_OUT";
-}
-
-function getHotelVisibleKeys(kind: HotelOperationKind): Set<string> {
-  if (kind === "ROOM_PAYMENT") {
-    return HOTEL_ROOM_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "BOOKING_DEPOSIT") {
-    return HOTEL_BOOKING_DEPOSIT_METADATA_FIELDS;
-  }
-  if (kind === "RESTAURANT_SALE") {
-    return HOTEL_RESTAURANT_SALE_METADATA_FIELDS;
-  }
-  if (kind === "EVENT_SERVICE") {
-    return HOTEL_EVENT_SERVICE_METADATA_FIELDS;
-  }
-  if (kind === "LAUNDRY_SERVICE") {
-    return HOTEL_LAUNDRY_SERVICE_METADATA_FIELDS;
-  }
-  if (kind === "ROOM_MAINTENANCE") {
-    return HOTEL_ROOM_MAINTENANCE_METADATA_FIELDS;
-  }
-  if (kind === "SUPPLIER_PAYMENT") {
-    return HOTEL_SUPPLIER_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "COMMISSION_FEE") {
-    return HOTEL_COMMISSION_FEE_METADATA_FIELDS;
-  }
-  if (kind === "TAX_PAYMENT") {
-    return HOTEL_TAX_PAYMENT_METADATA_FIELDS;
-  }
-  return HOTEL_GUEST_REFUND_METADATA_FIELDS;
-}
-
-function isWaterOperationKind(value: string | undefined): value is WaterOperationKind {
-  return Boolean(value) && Object.prototype.hasOwnProperty.call(WATER_OPERATION_LABELS, value as string);
-}
-
-// Maps categories used before the sector was simplified to their closest
-// modern equivalent, so editing an older transaction shows the right
-// category instead of silently falling back to "Autre".
-const WATER_LEGACY_KIND_MAP: Partial<Record<string, WaterOperationKind>> = {
-  WATER_BILLING: "WATER_SALE",
-  BULK_WATER_SALE: "WATER_SALE",
-  CONNECTION_FEE: "WATER_OTHER_INCOME",
-  SUBSIDY_INCOME: "WATER_OTHER_INCOME",
-  CHEMICAL_PURCHASE: "WATER_EXPENSE_MAINTENANCE",
-  ENERGY_PAYMENT: "WATER_EXPENSE_ENERGY",
-  MAINTENANCE_EXPENSE: "WATER_EXPENSE_MAINTENANCE",
-  QUALITY_TEST_EXPENSE: "WATER_EXPENSE_MAINTENANCE",
-  NETWORK_REPAIR: "WATER_EXPENSE_MAINTENANCE",
-  SUPPLIER_PAYMENT: "WATER_EXPENSE_SUPPLIER"
-};
-
-function getWaterOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): WaterOperationKind {
-  const configuredKind = metadata[WATER_OPERATION_KIND_KEY]?.trim();
-  if (isWaterOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  const legacyKind = configuredKind ? WATER_LEGACY_KIND_MAP[configuredKind] : undefined;
-  if (legacyKind) {
-    return legacyKind;
-  }
-  return type === "CASH_IN" ? "WATER_SALE" : "WATER_EXPENSE_OTHER";
-}
-
-function getWaterOperationType(kind: WaterOperationKind): "CASH_IN" | "CASH_OUT" {
-  return WATER_INCOME_KINDS.includes(kind) ? "CASH_IN" : "CASH_OUT";
-}
-
-function getWaterVisibleKeys(kind: WaterOperationKind): Set<string> {
-  return kind === "WATER_SALE" ? WATER_SALE_METADATA_FIELDS : WATER_NO_EXTRA_METADATA_FIELDS;
-}
-
-function isAgencyOperationKind(value: string | undefined): value is AgencyOperationKind {
-  return (
-    value === "SALE_COMMISSION" ||
-    value === "RENTAL_COMMISSION" ||
-    value === "MANDATE_FEE" ||
-    value === "VISIT_FEE" ||
-    value === "FILE_FEE" ||
-    value === "ADVERTISING_EXPENSE" ||
-    value === "FIELD_VISIT_EXPENSE" ||
-    value === "BROKER_PAYOUT" ||
-    value === "DOCUMENT_EXPENSE" ||
-    value === "CUSTOMER_REFUND" ||
-    value === "OFFICE_EXPENSE"
-  );
-}
-
-function hasAgencyMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "mandateRef",
-    "propertyRef",
-    "mandateType",
-    "propertyType",
-    "locationZone",
-    "ownerRef",
-    "clientRef",
-    "prospectRef",
-    "dealRef",
-    "dealStage",
-    "dealAmount",
-    "commissionRate",
-    "commissionAmount",
-    "feeAmount",
-    "visitCount",
-    "unitPrice",
-    "advertisingChannel",
-    "documentRef",
-    "supplierRef",
-    "invoiceRef",
-    "expenseAmount",
-    "payoutAmount",
-    "refundAmount",
-    "paymentRef"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getAgencyOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): AgencyOperationKind {
-  const configuredKind = metadata[AGENCY_OPERATION_KIND_KEY]?.trim();
-  if (isAgencyOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasAgencyMetadata(metadata)) {
-    return type === "CASH_IN" ? "SALE_COMMISSION" : "ADVERTISING_EXPENSE";
-  }
-  return type === "CASH_IN" ? "SALE_COMMISSION" : "OFFICE_EXPENSE";
-}
-
-function getAgencyOperationType(kind: AgencyOperationKind): "CASH_IN" | "CASH_OUT" {
-  return (
-    kind === "SALE_COMMISSION" ||
-    kind === "RENTAL_COMMISSION" ||
-    kind === "MANDATE_FEE" ||
-    kind === "VISIT_FEE" ||
-    kind === "FILE_FEE"
-  )
-    ? "CASH_IN"
-    : "CASH_OUT";
-}
-
-function getAgencyVisibleKeys(kind: AgencyOperationKind): Set<string> {
-  if (kind === "SALE_COMMISSION") {
-    return AGENCY_SALE_COMMISSION_METADATA_FIELDS;
-  }
-  if (kind === "RENTAL_COMMISSION") {
-    return AGENCY_RENTAL_COMMISSION_METADATA_FIELDS;
-  }
-  if (kind === "MANDATE_FEE") {
-    return AGENCY_MANDATE_FEE_METADATA_FIELDS;
-  }
-  if (kind === "VISIT_FEE") {
-    return AGENCY_VISIT_FEE_METADATA_FIELDS;
-  }
-  if (kind === "FILE_FEE") {
-    return AGENCY_FILE_FEE_METADATA_FIELDS;
-  }
-  if (kind === "ADVERTISING_EXPENSE") {
-    return AGENCY_ADVERTISING_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "FIELD_VISIT_EXPENSE") {
-    return AGENCY_FIELD_VISIT_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "BROKER_PAYOUT") {
-    return AGENCY_BROKER_PAYOUT_METADATA_FIELDS;
-  }
-  if (kind === "DOCUMENT_EXPENSE") {
-    return AGENCY_DOCUMENT_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "CUSTOMER_REFUND") {
-    return AGENCY_CUSTOMER_REFUND_METADATA_FIELDS;
-  }
-  return AGENCY_OFFICE_EXPENSE_METADATA_FIELDS;
-}
-
-function isAgricultureOperationKind(value: string | undefined): value is AgricultureOperationKind {
-  return (
-    value === "INPUT_PURCHASE" ||
-    value === "FIELD_EXPENSE" ||
-    value === "HARVEST_SALE" ||
-    value === "SUPPORT_INCOME"
-  );
-}
-
-function hasAgricultureMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "campaignRef",
-    "parcelRef",
-    "fieldType",
-    "cropType",
-    "surfaceArea",
-    "inputName",
-    "workType",
-    "quantity",
-    "unitPrice",
-    "supplierRef",
-    "buyerRef",
-    "sourceRef"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getAgricultureOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): AgricultureOperationKind {
-  const configuredKind = metadata[AGRICULTURE_OPERATION_KIND_KEY]?.trim();
-  if (isAgricultureOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasAgricultureMetadata(metadata)) {
-    return "INPUT_PURCHASE";
-  }
-  return type === "CASH_IN" ? "HARVEST_SALE" : "FIELD_EXPENSE";
-}
-
-function getAgricultureOperationType(kind: AgricultureOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "HARVEST_SALE" || kind === "SUPPORT_INCOME" ? "CASH_IN" : "CASH_OUT";
-}
-
-function getAgricultureVisibleKeys(kind: AgricultureOperationKind): Set<string> {
-  if (kind === "INPUT_PURCHASE") {
-    return AGRICULTURE_INPUT_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "FIELD_EXPENSE") {
-    return AGRICULTURE_FIELD_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "HARVEST_SALE") {
-    return AGRICULTURE_HARVEST_SALE_METADATA_FIELDS;
-  }
-  return AGRICULTURE_SUPPORT_INCOME_METADATA_FIELDS;
-}
-
-function isBtpOperationKind(value: string | undefined): value is BtpOperationKind {
-  return (
-    value === "CLIENT_PAYMENT" ||
-    value === "MATERIAL_PURCHASE" ||
-    value === "LABOR_PAYMENT" ||
-    value === "EQUIPMENT_RENTAL" ||
-    value === "SUBCONTRACTING" ||
-    value === "SITE_EXPENSE"
-  );
-}
-
-function hasBtpMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "projectRef",
-    "materialName",
-    "quantity",
-    "unitPrice",
-    "workerCount",
-    "workDays",
-    "dailyRate",
-    "equipmentRef",
-    "equipmentHours",
-    "hourlyRate",
-    "subcontractorRef",
-    "progressPercent"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getBtpOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): BtpOperationKind {
-  const configuredKind = metadata[BTP_OPERATION_KIND_KEY]?.trim();
-  if (isBtpOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasBtpMetadata(metadata)) {
-    return type === "CASH_IN" ? "CLIENT_PAYMENT" : "MATERIAL_PURCHASE";
-  }
-  return type === "CASH_IN" ? "CLIENT_PAYMENT" : "SITE_EXPENSE";
-}
-
-function getBtpOperationType(kind: BtpOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "CLIENT_PAYMENT" ? "CASH_IN" : "CASH_OUT";
-}
-
-function getBtpVisibleKeys(kind: BtpOperationKind): Set<string> {
-  if (kind === "CLIENT_PAYMENT") {
-    return BTP_CLIENT_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "MATERIAL_PURCHASE") {
-    return BTP_MATERIAL_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "LABOR_PAYMENT") {
-    return BTP_LABOR_PAYMENT_METADATA_FIELDS;
-  }
-  if (kind === "EQUIPMENT_RENTAL") {
-    return BTP_EQUIPMENT_RENTAL_METADATA_FIELDS;
-  }
-  if (kind === "SUBCONTRACTING") {
-    return BTP_SUBCONTRACTING_METADATA_FIELDS;
-  }
-  return BTP_SITE_EXPENSE_METADATA_FIELDS;
-}
-
-function isFishFarmingOperationKind(value: string | undefined): value is FishFarmingOperationKind {
-  return (
-    value === "FINGERLING_PURCHASE" ||
-    value === "FEED_PURCHASE" ||
-    value === "POND_EXPENSE" ||
-    value === "FISH_SALE" ||
-    value === "SUPPORT_INCOME"
-  );
-}
-
-function hasFishFarmingMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "pondRef",
-    "cycleRef",
-    "species",
-    "fingerlingBatchRef",
-    "feedName",
-    "quantity",
-    "unitPrice",
-    "supplierRef",
-    "buyerRef",
-    "sourceRef",
-    "mortalityCount",
-    "waterQuality"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getFishFarmingOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): FishFarmingOperationKind {
-  const configuredKind = metadata[FISH_FARMING_OPERATION_KIND_KEY]?.trim();
-  if (isFishFarmingOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasFishFarmingMetadata(metadata)) {
-    return "FINGERLING_PURCHASE";
-  }
-  return type === "CASH_IN" ? "FISH_SALE" : "POND_EXPENSE";
-}
-
-function getFishFarmingOperationType(kind: FishFarmingOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "FISH_SALE" || kind === "SUPPORT_INCOME" ? "CASH_IN" : "CASH_OUT";
-}
-
-function getFishFarmingVisibleKeys(kind: FishFarmingOperationKind): Set<string> {
-  if (kind === "FINGERLING_PURCHASE") {
-    return FISH_FARMING_FINGERLING_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "FEED_PURCHASE") {
-    return FISH_FARMING_FEED_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "POND_EXPENSE") {
-    return FISH_FARMING_POND_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "FISH_SALE") {
-    return FISH_FARMING_FISH_SALE_METADATA_FIELDS;
-  }
-  return FISH_FARMING_SUPPORT_INCOME_METADATA_FIELDS;
-}
-
-function isLivestockOperationKind(value: string | undefined): value is LivestockOperationKind {
-  return (
-    value === "ANIMAL_PURCHASE" ||
-    value === "FEED_PURCHASE" ||
-    value === "VET_CARE" ||
-    value === "FARM_EXPENSE" ||
-    value === "ANIMAL_SALE" ||
-    value === "PRODUCT_SALE" ||
-    value === "SUPPORT_INCOME"
-  );
-}
-
-function hasLivestockMetadata(metadata: Record<string, string>): boolean {
-  return [
-    "herdRef",
-    "batchRef",
-    "species",
-    "animalCategory",
-    "animalCount",
-    "feedName",
-    "feedQuantity",
-    "productName",
-    "productQuantity",
-    "unitPrice",
-    "treatmentName",
-    "supplierRef",
-    "buyerRef",
-    "sourceRef",
-    "mortalityCount",
-    "healthStatus"
-  ].some((key) => metadata[key]?.trim());
-}
-
-function getLivestockOperationKind(
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): LivestockOperationKind {
-  const configuredKind = metadata[LIVESTOCK_OPERATION_KIND_KEY]?.trim();
-  if (isLivestockOperationKind(configuredKind)) {
-    return configuredKind;
-  }
-  if (!hasLivestockMetadata(metadata)) {
-    return "ANIMAL_PURCHASE";
-  }
-  return type === "CASH_IN" ? "ANIMAL_SALE" : "FARM_EXPENSE";
-}
-
-function getLivestockOperationType(kind: LivestockOperationKind): "CASH_IN" | "CASH_OUT" {
-  return kind === "ANIMAL_SALE" || kind === "PRODUCT_SALE" || kind === "SUPPORT_INCOME"
-    ? "CASH_IN"
-    : "CASH_OUT";
-}
-
-function getLivestockVisibleKeys(kind: LivestockOperationKind): Set<string> {
-  if (kind === "ANIMAL_PURCHASE") {
-    return LIVESTOCK_ANIMAL_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "FEED_PURCHASE") {
-    return LIVESTOCK_FEED_PURCHASE_METADATA_FIELDS;
-  }
-  if (kind === "VET_CARE") {
-    return LIVESTOCK_VET_CARE_METADATA_FIELDS;
-  }
-  if (kind === "FARM_EXPENSE") {
-    return LIVESTOCK_FARM_EXPENSE_METADATA_FIELDS;
-  }
-  if (kind === "ANIMAL_SALE") {
-    return LIVESTOCK_ANIMAL_SALE_METADATA_FIELDS;
-  }
-  if (kind === "PRODUCT_SALE") {
-    return LIVESTOCK_PRODUCT_SALE_METADATA_FIELDS;
-  }
-  return LIVESTOCK_SUPPORT_INCOME_METADATA_FIELDS;
-}
-
-function getVisibleFinanceMetadataFields(
-  activityCode: BusinessActivityCode | null,
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>,
-  fields: ActivityFieldDefinition[]
-): ActivityFieldDefinition[] {
-  if (activityCode === "HYDROCARBON") {
-    const category = metadata.hydrocarbonCategory;
-    const visibleKeys = new Set([
-      "hydrocarbonCategory",
-      ...(category === "Citerne"
-        ? ["hydrocarbonAssetRef"]
-        : category
-          ? ["quantity", "unit", "counterpartyRef"]
-          : [])
-    ]);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "LIVESTOCK") {
-    const operationKind = getLivestockOperationKind(type, metadata);
-    const visibleKeys = getLivestockVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "FISH_FARMING") {
-    const operationKind = getFishFarmingOperationKind(type, metadata);
-    const visibleKeys = getFishFarmingVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "BTP") {
-    const operationKind = getBtpOperationKind(type, metadata);
-    const visibleKeys = getBtpVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "GENERAL_STORE") {
-    const operationKind = getStoreOperationKind(type, metadata);
-    const visibleKeys = getStoreVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "FOOD") {
-    const operationKind = getFoodOperationKind(type, metadata);
-    const visibleKeys = getFoodVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "RENTAL") {
-    const operationKind = getRentalOperationKind(type, metadata);
-    const visibleKeys = getRentalVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "HOTEL_LODGING") {
-    const operationKind = getHotelOperationKind(type, metadata);
-    const visibleKeys = getHotelVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "WATER") {
-    const operationKind = getWaterOperationKind(type, metadata);
-    const visibleKeys = getWaterVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "BEVERAGE_DEPOT") {
-    const kind = getBeverageOperationKind(type, metadata);
-    const visibleKeys = new Set<string>([
-      "invoiceRef",
-      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice", "beverageProductId", "beverageUnit"] : []),
-      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef", "beverageProductId", "beverageUnit"] : []),
-      ...(kind === "DEPENSE" ? ["expenseCategory", "supplierRef"] : [])
-    ]);
-    return fields.filter((field) => field.key !== BEVERAGE_OPERATION_KIND_KEY && field.key !== "beverageUnit" && visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "DAILY_ACTIVITIES") {
-    return fields.filter((field) =>
-      !["dailyActivityKind", DAILY_AGREEMENT_OPERATION_KEY].includes(field.key) &&
-      ["agreementRef", "partnerName", "paymentReference"].includes(field.key)
-    );
-  }
-
-  if (activityCode === "REAL_ESTATE_AGENCY") {
-    const operationKind = getAgencyOperationKind(type, metadata);
-    const visibleKeys = getAgencyVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "AGRICULTURE") {
-    const operationKind = getAgricultureOperationKind(type, metadata);
-    const visibleKeys = getAgricultureVisibleKeys(operationKind);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode === "GENERAL_EXPENSES") {
-    return fields.filter((field) => GENERAL_EXPENSES_VISIBLE_METADATA_FIELDS.has(field.key));
-  }
-
-  if (activityCode === "TRANSPORT") {
-    if (metadata.transportCategory !== "Camion benne") {
-      const visibleKeys = new Set([
-        "transportCategory",
-        "vehicleRef",
-        "routeRef",
-        "counterpartyRef",
-        ...(type === "CASH_OUT" ? ["expenseCategory"] : [])
-      ]);
-      return fields.filter((field) => visibleKeys.has(field.key));
-    }
-    const operationKind = metadata[DUMP_TRUCK_OPERATION_KEY] ?? "TRAVAUX";
-    const visibleKeys = new Set([
-      "transportCategory",
-      "vehicleRef",
-      "routeRef",
-      DUMP_TRUCK_OPERATION_KEY,
-      "counterpartyRef",
-      ...(operationKind === "TRAVAUX" || operationKind === "LOCATION"
-        ? ["quantity", "purchaseUnitPrice", "amccoAmount"]
-        : []),
-      ...(operationKind === "DEPENSE" || operationKind === "ENTRETIEN" || operationKind === "CARBURANT"
-        ? ["expenseCategory"]
-        : [])
-    ]);
-    return fields.filter((field) => visibleKeys.has(field.key));
-  }
-
-  if (activityCode !== "HARDWARE") {
-    return fields;
-  }
-
-  const operationKind = getHardwareOperationKind(type, metadata);
-  const visibleKeys =
-    operationKind === "RECOUVREMENT"
-      ? HARDWARE_COLLECTION_METADATA_FIELDS
-      : operationKind === "ITEM_EXIT"
-      ? HARDWARE_CASH_IN_METADATA_FIELDS
-      : operationKind === "ITEM_ENTRY"
-        ? HARDWARE_CASH_OUT_METADATA_FIELDS
-        : new Set<string>();
-  return fields.filter((field) => visibleKeys.has(field.key));
-}
-
-function cleanSectorFinanceMetadata(
-  activityCode: BusinessActivityCode | null,
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): Record<string, string> {
-  if (activityCode === "LIVESTOCK") {
-    const operationKind = getLivestockOperationKind(type, metadata);
-    const visibleKeys = getLivestockVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [LIVESTOCK_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        LIVESTOCK_METADATA_FIELDS.has(key) &&
-        key !== LIVESTOCK_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "FISH_FARMING") {
-    const operationKind = getFishFarmingOperationKind(type, metadata);
-    const visibleKeys = getFishFarmingVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [FISH_FARMING_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        FISH_FARMING_METADATA_FIELDS.has(key) &&
-        key !== FISH_FARMING_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "BTP") {
-    const operationKind = getBtpOperationKind(type, metadata);
-    const visibleKeys = getBtpVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [BTP_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        BTP_METADATA_FIELDS.has(key) &&
-        key !== BTP_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "GENERAL_STORE") {
-    const operationKind = getStoreOperationKind(type, metadata);
-    const visibleKeys = getStoreVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [STORE_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        STORE_METADATA_FIELDS.has(key) &&
-        key !== STORE_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "FOOD") {
-    const operationKind = getFoodOperationKind(type, metadata);
-    const visibleKeys = getFoodVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [FOOD_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        FOOD_METADATA_FIELDS.has(key) &&
-        key !== FOOD_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "RENTAL") {
-    const operationKind = getRentalOperationKind(type, metadata);
-    const visibleKeys = getRentalVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [RENTAL_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        RENTAL_METADATA_FIELDS.has(key) &&
-        key !== RENTAL_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "HOTEL_LODGING") {
-    const operationKind = getHotelOperationKind(type, metadata);
-    const visibleKeys = getHotelVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [HOTEL_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        HOTEL_METADATA_FIELDS.has(key) &&
-        key !== HOTEL_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "WATER") {
-    const operationKind = getWaterOperationKind(type, metadata);
-    const visibleKeys = getWaterVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [WATER_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        WATER_METADATA_FIELDS.has(key) &&
-        key !== WATER_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "BEVERAGE_DEPOT") {
-    const kind = getBeverageOperationKind(type, metadata);
-    const visibleKeys = new Set<string>([
-      "invoiceRef",
-      ...(kind === "VENTE" ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice", "beverageProductId", "beverageUnit"] : []),
-      ...(kind === "ACHAT_STOCK" ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef", "beverageProductId", "beverageUnit"] : []),
-      ...(kind === "DEPENSE" ? ["expenseCategory", "supplierRef"] : [])
-    ]);
-    // Persist the same operation shown by the select, including a fresh form after saving.
-    return Object.fromEntries(Object.entries({ ...metadata, [BEVERAGE_OPERATION_KIND_KEY]: kind }).map(([key, value]) => [
-      key,
-      BEVERAGE_METADATA_FIELDS.has(key) && key !== BEVERAGE_OPERATION_KIND_KEY && !visibleKeys.has(key) ? "" : value
-    ]));
-  }
-
-  if (activityCode === "REAL_ESTATE_AGENCY") {
-    const operationKind = getAgencyOperationKind(type, metadata);
-    const visibleKeys = getAgencyVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [AGENCY_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        AGENCY_METADATA_FIELDS.has(key) &&
-        key !== AGENCY_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "AGRICULTURE") {
-    const operationKind = getAgricultureOperationKind(type, metadata);
-    const visibleKeys = getAgricultureVisibleKeys(operationKind);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [AGRICULTURE_OPERATION_KIND_KEY]: operationKind
-      }).map(([key, value]) => [
-        key,
-        AGRICULTURE_METADATA_FIELDS.has(key) &&
-        key !== AGRICULTURE_OPERATION_KIND_KEY &&
-        !visibleKeys.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode === "GENERAL_EXPENSES") {
-    const kind = getGeneralExpenseKind(metadata);
-    return Object.fromEntries(
-      Object.entries({
-        ...metadata,
-        [GENERAL_EXPENSE_KIND_KEY]: kind
-      }).map(([key, value]) => [
-        key,
-        GENERAL_EXPENSES_METADATA_FIELDS.has(key) &&
-        key !== GENERAL_EXPENSE_KIND_KEY &&
-        !GENERAL_EXPENSES_VISIBLE_METADATA_FIELDS.has(key)
-          ? ""
-          : value
-      ])
-    );
-  }
-
-  if (activityCode !== "HARDWARE") {
-    return metadata;
-  }
-
-  const operationKind = getHardwareOperationKind(type, metadata);
-  const visibleKeys =
-    operationKind === "RECOUVREMENT"
-      ? HARDWARE_COLLECTION_METADATA_FIELDS
-      : operationKind === "ITEM_EXIT"
-      ? HARDWARE_CASH_IN_METADATA_FIELDS
-      : operationKind === "ITEM_ENTRY"
-        ? HARDWARE_CASH_OUT_METADATA_FIELDS
-        : new Set<string>();
-
-  return Object.fromEntries(
-    Object.entries({
-      ...metadata,
-      [HARDWARE_OPERATION_KIND_KEY]: operationKind
-    }).map(([key, value]) => [
-      key,
-      HARDWARE_METADATA_FIELDS.has(key) &&
-      key !== HARDWARE_OPERATION_KIND_KEY &&
-      !visibleKeys.has(key)
-        ? ""
-        : value
-    ])
-  );
-}
-
-function deriveSectorAmount(
-  activityCode: BusinessActivityCode | null,
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): string | null {
-  if (activityCode === "HARDWARE") {
-    return deriveHardwareAmount(type, metadata);
-  }
-  if (activityCode === "AGRICULTURE") {
-    return deriveAgricultureAmount(getAgricultureOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "BTP") {
-    return deriveBtpAmount(getBtpOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "FOOD") {
-    return deriveFoodAmount(getFoodOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "RENTAL") {
-    return deriveRentalAmount(getRentalOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "HOTEL_LODGING") {
-    return deriveHotelAmount(getHotelOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "WATER") {
-    return deriveWaterAmount(getWaterOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "BEVERAGE_DEPOT") {
-    return deriveBeverageAmount(getBeverageOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "REAL_ESTATE_AGENCY") {
-    return deriveAgencyAmount(getAgencyOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "FISH_FARMING") {
-    return deriveFishFarmingAmount(getFishFarmingOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "LIVESTOCK") {
-    return deriveLivestockAmount(getLivestockOperationKind(type, metadata), metadata);
-  }
-  if (activityCode === "GENERAL_EXPENSES") {
-    return deriveGeneralExpensesAmount(metadata);
-  }
-  if (activityCode === "TRANSPORT") {
-    const operationKind = metadata[DUMP_TRUCK_OPERATION_KEY];
-    if (operationKind !== "TRAVAUX" && operationKind !== "LOCATION") {
-      return null;
-    }
-    const quantity = toAmountNumber(metadata.quantity ?? "");
-    const unitPrice = toAmountNumber(metadata.purchaseUnitPrice ?? "");
-    return quantity > 0 && unitPrice > 0 ? (quantity * unitPrice).toFixed(2) : null;
-  }
-  return null;
-}
-
-// Secteurs pour lesquels la saisie propose un remplissage rapide (suggestions
-// cliquables + autocomplétion de la description) à partir des opérations déjà
-// enregistrées pour la même catégorie.
-const QUICK_FILL_SECTOR_ACTIVITIES = new Set<BusinessActivityCode>([
-  "HARDWARE",
-  "GENERAL_STORE",
-  "BTP",
-  "RENTAL",
-  "WATER"
-]);
-
-function isQuickFillSectorActivity(
-  activityCode: BusinessActivityCode | null
-): activityCode is "HARDWARE" | "GENERAL_STORE" | "BTP" | "RENTAL" | "WATER" {
-  return Boolean(activityCode) && QUICK_FILL_SECTOR_ACTIVITIES.has(activityCode as BusinessActivityCode);
-}
-
-function getSectorOperationKindValue(
-  activityCode: BusinessActivityCode | null,
-  type: "CASH_IN" | "CASH_OUT",
-  metadata: Record<string, string>
-): string {
-  if (activityCode === "HARDWARE") {
-    return getHardwareOperationKind(type, metadata);
-  }
-  if (activityCode === "GENERAL_STORE") {
-    return getStoreOperationKind(type, metadata);
-  }
-  if (activityCode === "BTP") {
-    return getBtpOperationKind(type, metadata);
-  }
-  if (activityCode === "RENTAL") {
-    return getRentalOperationKind(type, metadata);
-  }
-  if (activityCode === "WATER") {
-    return getWaterOperationKind(type, metadata);
-  }
-  return "";
-}
-
-function getSectorOperationLabel(
-  activityCode: BusinessActivityCode | null,
-  kind: string
-): string {
-  if (activityCode === "HARDWARE") {
-    return HARDWARE_OPERATION_LABELS[kind as HardwareOperationKind] ?? "";
-  }
-  if (activityCode === "GENERAL_STORE") {
-    return STORE_OPERATION_LABELS[kind as StoreOperationKind] ?? "";
-  }
-  if (activityCode === "BTP") {
-    return BTP_OPERATION_LABELS[kind as BtpOperationKind] ?? "";
-  }
-  if (activityCode === "RENTAL") {
-    return RENTAL_OPERATION_LABELS[kind as RentalOperationKind] ?? "";
-  }
-  if (activityCode === "WATER") {
-    return WATER_OPERATION_LABELS[kind as WaterOperationKind] ?? "";
-  }
-  return "";
-}
-
-function getSectorSuggestionDetail(
-  activityCode: BusinessActivityCode | null,
-  kind: string,
-  metadata: Record<string, string>,
-  currency: string
-): string | null {
-  if (activityCode === "HARDWARE" && (kind === "ITEM_ENTRY" || kind === "ITEM_EXIT")) {
-    const quantity = metadata.quantity;
-    const unitPrice = kind === "ITEM_EXIT" ? metadata.saleUnitPrice : metadata.purchaseUnitPrice;
-    return quantity && unitPrice
-      ? `${quantity} × ${formatAmountForDisplay(unitPrice)} ${currency}`
-      : null;
-  }
-  if (activityCode === "WATER" && kind === "WATER_SALE" && metadata.quantity && metadata.unitPrice) {
-    return `${metadata.quantity} paquets × ${formatAmountForDisplay(metadata.unitPrice)} ${currency}`;
-  }
-  if (activityCode === "BTP") {
-    if (kind === "MATERIAL_PURCHASE" && metadata.quantity && metadata.unitPrice) {
-      return `${metadata.quantity} × ${formatAmountForDisplay(metadata.unitPrice)} ${currency}`;
-    }
-    if (kind === "LABOR_PAYMENT" && metadata.workerCount && metadata.workDays && metadata.dailyRate) {
-      return `${metadata.workerCount} ouvrier(s) × ${metadata.workDays} j × ${formatAmountForDisplay(metadata.dailyRate)} ${currency}`;
-    }
-    if (kind === "EQUIPMENT_RENTAL" && metadata.equipmentHours && metadata.hourlyRate) {
-      return `${metadata.equipmentHours} h × ${formatAmountForDisplay(metadata.hourlyRate)} ${currency}`;
-    }
-  }
-  return null;
-}
-
-function getHardwareFormModeLabel(kind: HardwareOperationKind): string {
-  if (kind === "RECOUVREMENT") {
-    return "Vente / recouvrement: indiquez la quincaillerie ou la personne qui a reçu les articles, puis le montant encaissé. Le recouvrement peut être partiel.";
-  }
-  return kind === "ITEM_EXIT"
-    ? "Vente: renseignez la quantité, le prix de vente et le versement."
-    : kind === "ITEM_ENTRY"
-      ? "Achat: choisissez l'article, la quantité, le prix d'achat et à qui il est remis."
-      : "Transaction globale: renseignez seulement le montant et la description utile.";
-}
-
-function getStoreFormModeLabel(kind: StoreOperationKind): string {
-  return kind === "RECOUVREMENT"
-    ? "Recouvrement: choisissez la boutique et indiquez le montant encaissé."
-    : "Achat: choisissez la boutique, indiquez le montant de la facture et joignez la photo du reçu si possible.";
-}
-
-function getFoodFormModeLabel(kind: FoodOperationKind): string {
-  if (kind === "PRODUCT_SALE") {
-    return "Vente produit: famille, produit, lot, DLC, quantité, prix de vente, client et référence paiement.";
-  }
-  if (kind === "PRODUCT_PURCHASE") {
-    return "Achat stock: famille, produit, lot, DLC, quantité, prix d'achat, fournisseur et facture.";
-  }
-  if (kind === "SUPPLIER_PAYMENT") {
-    return "Paiement fournisseur: fournisseur, facture, montant et référence de paiement.";
-  }
-  if (kind === "STOCK_LOSS") {
-    return "Perte / péremption: lot, DLC, quantité perdue, coût unitaire et motif de retrait.";
-  }
-  if (kind === "COLD_CHAIN_EXPENSE") {
-    return "Chaîne du froid: zone de stockage, température, prestataire, facture et montant.";
-  }
-  if (kind === "PACKAGING_EXPENSE") {
-    return "Emballage: famille, produit, fournisseur, facture et montant.";
-  }
-  return "Remboursement client: produit, lot, quantité, prix de vente, client et référence paiement.";
-}
-
-function getAgricultureFormModeLabel(kind: AgricultureOperationKind): string {
-  if (kind === "INPUT_PURCHASE") {
-    return "Achat intrants: campagne, parcelle, type de champ, intrant, quantité et prix unitaire.";
-  }
-  if (kind === "FIELD_EXPENSE") {
-    return "Travaux champ: campagne, parcelle, surface et nature des travaux agricoles.";
-  }
-  if (kind === "HARVEST_SALE") {
-    return "Vente récolte: culture, quantité vendue, prix unitaire et acheteur.";
-  }
-  return "Appui / subvention: campagne, parcelle et source de financement.";
-}
-
-function getBtpFormModeLabel(kind: BtpOperationKind): string {
-  if (kind === "CLIENT_PAYMENT") {
-    return "Encaissement client: choisissez le chantier et indiquez le montant reçu.";
-  }
-  if (kind === "MATERIAL_PURCHASE") {
-    return "Achat matériaux: chantier, matériau, quantité et prix unitaire.";
-  }
-  if (kind === "LABOR_PAYMENT") {
-    return "Main-d'oeuvre: chantier, nombre d'ouvriers, jours travailles et taux journalier.";
-  }
-  if (kind === "EQUIPMENT_RENTAL") {
-    return "Location engin: chantier, engin, heures et taux horaire.";
-  }
-  if (kind === "SUBCONTRACTING") {
-    return "Sous-traitance: chantier, sous-traitant et montant payé.";
-  }
-  return "Charge chantier: choisissez le chantier et indiquez le montant dépensé.";
-}
-
-function getRentalFormModeLabel(kind: RentalOperationKind): string {
-  if (kind === "LOYER") {
-    return "Paiement loyer: choisissez le locataire et le montant versé (plusieurs mois d'avance possibles).";
-  }
-  if (kind === "CAUTION") {
-    return "Caution: choisissez le locataire et le montant de la caution versée.";
-  }
-  return "Autre opération: encaissement ou dépense locative ne correspondant pas à un loyer.";
-}
-
-function getHotelFormModeLabel(kind: HotelOperationKind): string {
-  if (kind === "ROOM_PAYMENT") {
-    return "Paiement chambre: réservation, séjour, client, chambre, dates, nuitées et tarif par nuit.";
-  }
-  if (kind === "BOOKING_DEPOSIT") {
-    return "Acompte réservation: réservation, client, chambre, dates et montant de l'acompte.";
-  }
-  if (kind === "RESTAURANT_SALE") {
-    return "Restauration: réservation ou client, nombre de repas, prix unitaire et référence de paiement.";
-  }
-  if (kind === "EVENT_SERVICE") {
-    return "Evenement / salle: evenement, quantité de service, prix unitaire et facture.";
-  }
-  if (kind === "LAUNDRY_SERVICE") {
-    return "Blanchisserie: quantité de service, prix unitaire, chambre ou séjour rattaché.";
-  }
-  if (kind === "ROOM_MAINTENANCE") {
-    return "Maintenance chambre: chambre, service, fournisseur, facture et montant de charge.";
-  }
-  if (kind === "SUPPLIER_PAYMENT") {
-    return "Paiement fournisseur: service, fournisseur, facture, montant et référence de paiement.";
-  }
-  if (kind === "COMMISSION_FEE") {
-    return "Commission: réservation, agence ou plateforme, montant commission et paiement.";
-  }
-  if (kind === "TAX_PAYMENT") {
-    return "Taxe séjour: réservation, client, service, montant taxe et référence de paiement.";
-  }
-  return "Remboursement client: réservation, séjour, client, chambre, montant et référence de paiement.";
-}
-
-function getWaterFormModeLabel(kind: WaterOperationKind): string {
-  if (kind === "WATER_SALE") {
-    return "Vente d'eau: indiquez le nombre de paquets vendus et le prix unitaire, ou saisissez le montant directement.";
-  }
-  if (kind === "WATER_OTHER_INCOME") {
-    return "Autre recette: précisez l'origine dans la description et saisissez le montant.";
-  }
-  return "Dépense courante: choisissez la catégorie, précisez si besoin, puis saisissez le montant.";
-}
-
-function getAgencyFormModeLabel(kind: AgencyOperationKind): string {
-  if (kind === "SALE_COMMISSION") {
-    return "Commission vente: mandat, bien, vendeur, acquéreur, prix de vente, taux et référence paiement.";
-  }
-  if (kind === "RENTAL_COMMISSION") {
-    return "Commission location: mandat, bien, bailleur, locataire, valeur du bail ou loyer, taux et paiement.";
-  }
-  if (kind === "MANDATE_FEE") {
-    return "Frais mandat: mandat, bien, propriétaire, document rattaché, montant frais et paiement.";
-  }
-  if (kind === "VISIT_FEE") {
-    return "Frais visite: mandat, bien, prospect, nombre de visites, prix unitaire et référence paiement.";
-  }
-  if (kind === "FILE_FEE") {
-    return "Frais dossier: mandat, client, document ou affaire, montant et paiement.";
-  }
-  if (kind === "ADVERTISING_EXPENSE") {
-    return "Publicité: mandat, bien, canal publicitaire, prestataire, facture et montant de dépense.";
-  }
-  if (kind === "FIELD_VISIT_EXPENSE") {
-    return "Déplacement visite: mandat, bien, nombre de sorties, coût unitaire, prestataire et facture.";
-  }
-  if (kind === "BROKER_PAYOUT") {
-    return "Reversement courtier: mandat, affaire, courtier ou apporteur, montant reverse et paiement.";
-  }
-  if (kind === "DOCUMENT_EXPENSE") {
-    return "Frais document: mandat, bien, document administratif, prestataire, facture et montant.";
-  }
-  if (kind === "CUSTOMER_REFUND") {
-    return "Remboursement client: mandat, client, affaire, montant rembourse et référence paiement.";
-  }
-  return "Charge agence: mandat ou bien rattaché, fournisseur, facture, montant et paiement.";
-}
-
-function getFishFarmingFormModeLabel(kind: FishFarmingOperationKind): string {
-  if (kind === "FINGERLING_PURCHASE") {
-    return "Achat alevins: bassin, cycle, lot, quantité et prix unitaire.";
-  }
-  if (kind === "FEED_PURCHASE") {
-    return "Achat aliment: bassin, cycle, aliment, quantité, unité et fournisseur.";
-  }
-  if (kind === "POND_EXPENSE") {
-    return "Charge bassin: intervention, intrant, mortalité ou qualité d'eau si applicable.";
-  }
-  if (kind === "FISH_SALE") {
-    return "Vente poisson: bassin, cycle, quantité vendue, prix unitaire et acheteur.";
-  }
-  return "Appui / subvention: bassin, cycle et source de financement.";
-}
-
-function getLivestockFormModeLabel(kind: LivestockOperationKind): string {
-  if (kind === "ANIMAL_PURCHASE") {
-    return "Achat animaux: troupeau, lot, espèce, nombre d'animaux et prix unitaire.";
-  }
-  if (kind === "FEED_PURCHASE") {
-    return "Achat aliment: troupeau, lot, aliment, quantité, unité et fournisseur.";
-  }
-  if (kind === "VET_CARE") {
-    return "Soins / vaccin: troupeau, lot, soin, animaux concernés et état sanitaire.";
-  }
-  if (kind === "FARM_EXPENSE") {
-    return "Charge élevage: alimentation, intrant, mortalité ou observation sanitaire si applicable.";
-  }
-  if (kind === "ANIMAL_SALE") {
-    return "Vente animaux: troupeau, lot, nombre vendu, prix unitaire et acheteur.";
-  }
-  if (kind === "PRODUCT_SALE") {
-    return "Vente produit: produit d'élevage, quantité vendue, prix unitaire et acheteur.";
-  }
-  return "Appui / subvention: troupeau, lot et source de financement.";
-}
-
-function toDateTimeLocalInput(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString().slice(0, 16);
-  }
-
-  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return localDate.toISOString().slice(0, 16);
-}
-
-function syncMetadataState(
-  previous: Record<string, string>,
-  fields: ActivityFieldDefinition[]
-): Record<string, string> {
-  return { ...previous, ...Object.fromEntries(fields.map((field) => {
-    const value = previous[field.key] ?? "";
-    return [field.key, isMoneyMetadataField(field.key) ? formatAmountForInput(value) : value];
-  })) };
-}
-
-function sameStringRecord(
-  left: Record<string, string>,
-  right: Record<string, string>
-): boolean {
-  const leftEntries = Object.entries(left);
-  const rightEntries = Object.entries(right);
-
-  if (leftEntries.length !== rightEntries.length) {
-    return false;
-  }
-
-  return leftEntries.every(([key, value]) => right[key] === value);
-}
-
-function sameActivityCodeArray(
-  left: BusinessActivityCode[],
-  right: BusinessActivityCode[]
-): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-function sameAccountForm(
-  left: ReturnType<typeof buildDefaultAccountForm>,
-  right: ReturnType<typeof buildDefaultAccountForm>
-): boolean {
-  return (
-    left.name === right.name &&
-    left.accountRef === right.accountRef &&
-    left.openingBalance === right.openingBalance &&
-    left.scopeType === right.scopeType &&
-    left.primaryActivityCode === right.primaryActivityCode &&
-    sameActivityCodeArray(left.allowedActivityCodes, right.allowedActivityCodes)
-  );
-}
-
-function getLockedAccountMessage(account: FinancialAccount): string | null {
-  if (account.transactionsCount > 0) {
-    return "Ce compte financier est déjà utilisé par des transactions et ne peut pas être supprimé.";
-  }
-
-  return null;
-}
-
-function getSectorTransactionLabel(transaction: FinancialTransaction): string | null {
-  if (transaction.activityCode === "AGRICULTURE") return AGRICULTURE_OPERATION_LABELS[getAgricultureOperationKind(transaction.type, transaction.metadata)];
-  if (transaction.activityCode === "FISH_FARMING") return FISH_FARMING_OPERATION_LABELS[getFishFarmingOperationKind(transaction.type, transaction.metadata)];
-  if (transaction.activityCode === "DAILY_ACTIVITIES") return DAILY_AGREEMENT_OPERATION_LABELS[transaction.metadata.financialOperationKind as DailyAgreementOperationKind] ?? null;
-  if (transaction.activityCode === "WATER") return WATER_OPERATION_LABELS[getWaterOperationKind(transaction.type, transaction.metadata)];
-  if (transaction.activityCode === "BEVERAGE_DEPOT") return BEVERAGE_OPERATION_LABELS[getBeverageOperationKind(transaction.type, transaction.metadata)];
-  if (transaction.activityCode === "GENERAL_EXPENSES") {
-    const kind = getGeneralExpenseKind(transaction.metadata);
-    return `${getGeneralExpenseOwner(kind) === "PDG" ? "PDG" : "Employé"} : ${GENERAL_EXPENSE_KIND_LABELS[kind]}`;
-  }
-  if (transaction.activityCode === "HYDROCARBON") return transaction.metadata.hydrocarbonCategory || null;
-  if (transaction.activityCode === "SERVICES") return transaction.metadata.serviceCategory || transaction.metadata.serviceType || null;
-  return null;
-}
-
-function formatMetadataSummary(
-  metadata: Record<string, string>,
-  fields: ActivityFieldDefinition[]
-): string {
-  const items = fields
-    .map((field) => {
-      const value = metadata[field.key]?.trim();
-      const label = field.key === "beverageStockCost" && metadata.beverageOperationKind === "ACHAT_STOCK"
-        ? "Coût du stock acheté"
-        : field.label;
-      return value ? `${label}: ${formatMetadataValue(field.key, value)}` : null;
-    })
-    .filter((value): value is string => value !== null);
-
-  if (items.length > 0) {
-    return items.join(" | ");
-  }
-
-  const fallbackItems = Object.entries(metadata)
-    .filter(([, value]) => value.trim().length > 0)
-    .map(([key, value]) => `${key}: ${formatMetadataValue(key, value)}`);
-  return fallbackItems.length > 0 ? fallbackItems.join(" | ") : "-";
-}
-
-function formatMetadataValue(key: string, value: string): string {
-  if (key === "beverageStockCost") {
-    return `${formatAmountForDisplay(value)} XOF`;
-  }
-  if (key === DUMP_TRUCK_OPERATION_KEY) {
-    return DUMP_TRUCK_OPERATION_LABELS[value] ?? value;
-  }
-  if (key === HARDWARE_OPERATION_KIND_KEY && isHardwareOperationKind(value)) {
-    return HARDWARE_OPERATION_LABELS[value];
-  }
-  if (key === STORE_OPERATION_KIND_KEY && isStoreOperationKind(value)) {
-    return STORE_OPERATION_LABELS[value];
-  }
-  if (key === FOOD_OPERATION_KIND_KEY && isFoodOperationKind(value)) {
-    return FOOD_OPERATION_LABELS[value];
-  }
-  if (key === AGRICULTURE_OPERATION_KIND_KEY && isAgricultureOperationKind(value)) {
-    return AGRICULTURE_OPERATION_LABELS[value];
-  }
-  if (key === BTP_OPERATION_KIND_KEY && isBtpOperationKind(value)) {
-    return BTP_OPERATION_LABELS[value];
-  }
-  if (key === RENTAL_OPERATION_KIND_KEY && isRentalOperationKind(value)) {
-    return RENTAL_OPERATION_LABELS[value];
-  }
-  if (key === HOTEL_OPERATION_KIND_KEY && isHotelOperationKind(value)) {
-    return HOTEL_OPERATION_LABELS[value];
-  }
-  if (key === WATER_OPERATION_KIND_KEY && isWaterOperationKind(value)) {
-    return WATER_OPERATION_LABELS[value];
-  }
-  if (key === AGENCY_OPERATION_KIND_KEY && isAgencyOperationKind(value)) {
-    return AGENCY_OPERATION_LABELS[value];
-  }
-  if (key === FISH_FARMING_OPERATION_KIND_KEY && isFishFarmingOperationKind(value)) {
-    return FISH_FARMING_OPERATION_LABELS[value];
-  }
-  if (key === LIVESTOCK_OPERATION_KIND_KEY && isLivestockOperationKind(value)) {
-    return LIVESTOCK_OPERATION_LABELS[value];
-  }
-  if (isMoneyMetadataField(key)) {
-    return formatAmountForDisplay(value);
-  }
-  return value;
-}
-
-function buildDefaultAccountForm(
-  selectedActivityCode: BusinessActivityCode | null,
-  canManageGlobalAccounts: boolean
-): {
-  name: string;
-  accountRef: string;
-  openingBalance: string;
-  scopeType: FinancialAccountScopeType;
-  primaryActivityCode: BusinessActivityCode | "";
-  allowedActivityCodes: BusinessActivityCode[];
-} {
-  const scopeType: FinancialAccountScopeType = canManageGlobalAccounts
-    ? "GLOBAL"
-    : selectedActivityCode
-      ? "DEDICATED"
-      : "RESTRICTED";
-
-  return {
-    name: "",
-    accountRef: "",
-    openingBalance: "0.00",
-    scopeType,
-    primaryActivityCode: selectedActivityCode ?? "",
-    allowedActivityCodes: selectedActivityCode ? [selectedActivityCode] : []
-  };
-}
-
-function buildDefaultArticleForm(): {
-  name: string;
-  defaultMargin: string;
-  defaultPurchaseUnitPrice: string;
-} {
-  return {
-    name: "",
-    defaultMargin: "",
-    defaultPurchaseUnitPrice: ""
-  };
-}
-
-function currentMonthInputValue(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function buildDefaultTenantForm(): {
-  name: string;
-  unitLabel: string;
-  monthlyRent: string;
-  phone: string;
-  tenancyStart: string;
-} {
-  return {
-    name: "",
-    unitLabel: "",
-    monthlyRent: "",
-    phone: "",
-    tenancyStart: currentMonthInputValue()
-  };
-}
-
-function buildDefaultShopForm(): {
-  name: string;
-  location: string;
-  phone: string;
-} {
-  return {
-    name: "",
-    location: "",
-    phone: ""
-  };
-}
-
-function buildDefaultProjectForm(): {
-  name: string;
-  clientRef: string;
-  contractRef: string;
-  location: string;
-} {
-  return {
-    name: "",
-    clientRef: "",
-    contractRef: "",
-    location: ""
-  };
-}
-
-function normalizeAccountFormForActivities(
-  previous: ReturnType<typeof buildDefaultAccountForm>,
-  enabledActivityCodes: BusinessActivityCode[],
-  selectedActivityCode: BusinessActivityCode | null
-) {
-  const nextPrimaryActivityCode =
-    previous.primaryActivityCode && enabledActivityCodes.includes(previous.primaryActivityCode)
-      ? previous.primaryActivityCode
-      : (selectedActivityCode ?? enabledActivityCodes[0] ?? "");
-  const nextAllowedActivityCodes = previous.allowedActivityCodes.filter((activityCode) =>
-    enabledActivityCodes.includes(activityCode)
-  );
-
-  return {
-    ...previous,
-    primaryActivityCode: nextPrimaryActivityCode,
-    allowedActivityCodes:
-      nextAllowedActivityCodes.length > 0
-        ? nextAllowedActivityCodes
-        : selectedActivityCode
-          ? [selectedActivityCode]
-          : nextAllowedActivityCodes
-  };
-}
-
-function isAccountVisibleForSelectedActivity(
-  account: FinancialAccount,
-  activityCode: BusinessActivityCode | null
-): boolean {
-  if (!activityCode) {
-    return true;
-  }
-
-  return (
-    account.scopeType === "GLOBAL" ||
-    account.primaryActivityCode === activityCode ||
-    account.allowedActivityCodes.includes(activityCode)
-  );
-}
+  HARDWARE_OPERATION_KIND_KEY,
+  TRANSACTIONS_MOBILE_PAGE_SIZE,
+  TRANSACTION_SUGGESTION_HISTORY_SIZE,
+  TRANSACTION_VISIBLE_PAGE_SIZE_OPTIONS,
+  buildDefaultAccountForm,
+  buildDefaultArticleForm,
+  buildDefaultProjectForm,
+  buildDefaultShopForm,
+  buildDefaultTenantForm,
+  cleanSectorFinanceMetadata,
+  currentMonthInputValue,
+  deriveGeneralExpensesAmount,
+  deriveSectorAmount,
+  formatAmountForDisplay,
+  formatAmountForInput,
+  formatEditableAmountForInput,
+  formatFileSize,
+  formatMetadataSummary,
+  getAgencyOperationKind,
+  getAgricultureOperationKind,
+  getBeverageOperationKind,
+  getBtpOperationKind,
+  getDailyAgreementOperationType,
+  getDefaultTransactionType,
+  getFishFarmingOperationKind,
+  getFoodOperationKind,
+  getGeneralExpenseKind,
+  getGeneralExpenseOwner,
+  getHardwareOperationKind,
+  getHotelOperationKind,
+  getLivestockOperationKind,
+  getLockedAccountMessage,
+  getRentalOperationKind,
+  getSectorOperationKindValue,
+  getSectorTransactionLabel,
+  getStoreOperationKind,
+  getTransactionsFetchPageSize,
+  getVisibleFinanceMetadataFields,
+  getWaterOperationKind,
+  isAccountVisibleForSelectedActivity,
+  isMoneyMetadataField,
+  isQuickFillSectorActivity,
+  needsTransactionSuggestionHistory,
+  normalizeAccountFormForActivities,
+  normalizeAmountForApi,
+  sameAccountForm,
+  sameStringRecord,
+  syncMetadataState,
+  toAmountNumber,
+  toDateTimeLocalInput,
+  toErrorMessage
+} from "../utils/financeTransactions";
+
+const FinanceTransactionForm = lazy(() => import("../components/FinanceTransactionForm").then(({ FinanceTransactionForm }) => ({ default: FinanceTransactionForm })));
+const HardwareArticlesPanel = lazy(() => import("../components/HardwareArticlesPanel").then(({ HardwareArticlesPanel }) => ({ default: HardwareArticlesPanel })));
+const RentalTenantsPanel = lazy(() => import("../components/RentalTenantsPanel").then(({ RentalTenantsPanel }) => ({ default: RentalTenantsPanel })));
+const GeneralStoreShopsPanel = lazy(() => import("../components/GeneralStoreShopsPanel").then(({ GeneralStoreShopsPanel }) => ({ default: GeneralStoreShopsPanel })));
+const BtpProjectsPanel = lazy(() => import("../components/BtpProjectsPanel").then(({ BtpProjectsPanel }) => ({ default: BtpProjectsPanel })));
 
 export function FinanceTransactionsPage(): JSX.Element {
   const [transactionsFetchPageSize] = useState(getTransactionsFetchPageSize);
+  const [suggestionHistoryPageSize] = useState(() =>
+    window.matchMedia("(max-width: 640px)").matches ? TRANSACTIONS_MOBILE_PAGE_SIZE : TRANSACTION_SUGGESTION_HISTORY_SIZE
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -3482,6 +342,29 @@ export function FinanceTransactionsPage(): JSX.Element {
   const [isShopManagementExpanded, setIsShopManagementExpanded] = useState(false);
   const [isProjectManagementExpanded, setIsProjectManagementExpanded] = useState(false);
   const formScope = `${activeCompany?.id ?? ""}:${selectedActivityCode ?? ""}`;
+  const actionScopeKey = JSON.stringify([formScope, user?.id, user?.role]);
+  const captureActionScope = useActionScope(actionScopeKey);
+  useEffect(() => {
+    setIsSavingTransaction(false);
+    setIsSavingAccount(false);
+    setIsSavingArticle(false);
+    setIsSavingTenant(false);
+    setIsSavingShop(false);
+    setIsSavingProject(false);
+    setBusyTransactionId(null);
+    setBusyAccountId(null);
+    setBusyArticleId(null);
+    setBusyTenantId(null);
+    setBusyShopId(null);
+    setBusyProjectId(null);
+    setLoadingProofsByTransaction({});
+  }, [actionScopeKey]);
+  const [mountedTransactionFormScope, setMountedTransactionFormScope] = useState<string | null>(null);
+  const isTransactionFormOpen = isTransactionFormExpanded || Boolean(editingTransactionId);
+  const shouldRenderTransactionForm = isTransactionFormOpen || mountedTransactionFormScope === formScope;
+  useEffect(() => {
+    if (isTransactionFormOpen) setMountedTransactionFormScope(formScope);
+  }, [formScope, isTransactionFormOpen]);
   const accountChanges = useFormChanges(accountForm, `${formScope}:account:${editingAccountId ?? "new"}`);
   const articleChanges = useFormChanges(articleForm, `${formScope}:article:${editingArticleId ?? "new"}`);
   const tenantChanges = useFormChanges(tenantForm, `${formScope}:tenant:${editingTenantId ?? "new"}`);
@@ -3506,6 +389,11 @@ export function FinanceTransactionsPage(): JSX.Element {
   );
 
   const financeMetadataFields = selectedProfile?.finance.metadataFields ?? EMPTY_METADATA_FIELDS;
+  const suggestionTransactions = useMemo(() => {
+    const records = new Map(sectorSuggestionHistory.map((item) => [item.id, item]));
+    for (const item of transactions) records.set(item.id, item);
+    return [...records.values()].filter((item) => item.companyId === activeCompany?.id && item.activityCode === selectedActivityCode);
+  }, [activeCompany?.id, sectorSuggestionHistory, selectedActivityCode, transactions]);
   const visibleFinanceMetadataFields = useMemo(
     () =>
       getVisibleFinanceMetadataFields(
@@ -3520,11 +408,11 @@ export function FinanceTransactionsPage(): JSX.Element {
     ? getHardwareOperationKind(transactionForm.type, transactionForm.metadata)
     : "GLOBAL";
   const hardwareRecipients = useMemo(() => Array.from(new Set(
-    transactions
+    suggestionTransactions
       .filter((item) => item.activityCode === "HARDWARE")
       .map((item) => item.metadata.recipientRef?.trim())
       .filter((value): value is string => Boolean(value))
-  )).sort((left, right) => left.localeCompare(right, "fr")), [transactions]);
+  )).sort((left, right) => left.localeCompare(right, "fr")), [suggestionTransactions]);
   const storeOperationKind = selectedActivityCode === "GENERAL_STORE"
     ? getStoreOperationKind(transactionForm.type, transactionForm.metadata)
     : "ACHAT";
@@ -3577,7 +465,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       return [];
     }
     const seen = new Set<string>();
-    return [...transactions]
+    return [...suggestionTransactions]
       .filter((item) =>
         item.companyId === activeCompany?.id &&
         item.activityCode === "GENERAL_EXPENSES" &&
@@ -3596,14 +484,14 @@ export function FinanceTransactionsPage(): JSX.Element {
         return true;
       })
       .slice(0, 5);
-  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, generalExpenseKind, selectedActivityCode, transactionForm.description, transactions]);
+  }, [activeCompany?.id, allowedCurrencies, editingTransactionId, generalExpenseKind, selectedActivityCode, transactionForm.description, suggestionTransactions]);
   const generalExpenseDescriptionSuggestions = useMemo(() => {
     if (selectedActivityCode !== "GENERAL_EXPENSES") {
       return [];
     }
     const seen = new Set<string>();
     const values: string[] = [];
-    for (const item of [...transactions].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))) {
+    for (const item of [...suggestionTransactions].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))) {
       if (item.activityCode !== "GENERAL_EXPENSES" || getGeneralExpenseKind(item.metadata) !== generalExpenseKind) {
         continue;
       }
@@ -3622,7 +510,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
     }
     return values;
-  }, [generalExpenseKind, selectedActivityCode, transactions]);
+  }, [generalExpenseKind, selectedActivityCode, suggestionTransactions]);
   const currentSectorOperationKind = isQuickFillSectorActivity(selectedActivityCode)
     ? getSectorOperationKindValue(selectedActivityCode, transactionForm.type, transactionForm.metadata)
     : "";
@@ -3631,7 +519,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       return [];
     }
     const seen = new Set<string>();
-    return [...sectorSuggestionHistory]
+    return [...suggestionTransactions]
       .filter((item) =>
         item.companyId === activeCompany?.id &&
         item.activityCode === selectedActivityCode &&
@@ -3656,14 +544,14 @@ export function FinanceTransactionsPage(): JSX.Element {
         return true;
       })
       .slice(0, 5);
-  }, [activeCompany?.id, allowedCurrencies, currentSectorOperationKind, editingTransactionId, selectedActivityCode, sectorSuggestionHistory, transactionForm.description]);
+  }, [activeCompany?.id, allowedCurrencies, currentSectorOperationKind, editingTransactionId, selectedActivityCode, suggestionTransactions, transactionForm.description]);
   const sectorDescriptionSuggestions = useMemo(() => {
     if (!isQuickFillSectorActivity(selectedActivityCode)) {
       return [];
     }
     const seen = new Set<string>();
     const values: string[] = [];
-    for (const item of [...sectorSuggestionHistory].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))) {
+    for (const item of [...suggestionTransactions].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))) {
       if (
         item.activityCode !== selectedActivityCode ||
         getSectorOperationKindValue(selectedActivityCode, item.type, item.metadata) !== currentSectorOperationKind
@@ -3685,7 +573,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
     }
     return values;
-  }, [currentSectorOperationKind, selectedActivityCode, sectorSuggestionHistory]);
+  }, [currentSectorOperationKind, selectedActivityCode, suggestionTransactions]);
   const hasRequiredFinanceDetails = Boolean(
     selectedProfile?.finance.requiresDescription ||
       visibleFinanceMetadataFields.some((field) => field.required) ||
@@ -3735,13 +623,13 @@ export function FinanceTransactionsPage(): JSX.Element {
   const serviceCategorySuggestions = useMemo(() => {
     if (selectedActivityCode !== "SERVICES") return [];
     const values = new Set(["Morgue"]);
-    for (const item of sectorTransactions) {
+    for (const item of suggestionTransactions) {
       if (item.activityCode === "SERVICES" && item.metadata.serviceCategory?.trim()) {
         values.add(item.metadata.serviceCategory.trim());
       }
     }
     return [...values].sort((left, right) => left.localeCompare(right, "fr"));
-  }, [selectedActivityCode, sectorTransactions]);
+  }, [selectedActivityCode, suggestionTransactions]);
   const displayTransactions = sectorTransactions;
   const totalVisibleTransactionPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTransactions.length / visibleTransactionsPageSize));
@@ -3919,7 +807,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       {
         title: `Recettes camion benne · ${summary.currency}`,
         value: formatAmountForDisplay(summary.incomeTotal),
-        note: `${summary.operationsCount} opération(s) soumise(s) ou approuvée(s)`
+        note: `${summary.operationsCount} opération(s) comptabilisée(s)`
       },
       {
         title: `Part AMCCO · ${summary.currency}`,
@@ -4173,14 +1061,6 @@ export function FinanceTransactionsPage(): JSX.Element {
       });
       if (requestId !== transactionsLoadRequestRef.current) return;
       setHasMoreTransactions(payload.transactions.length === pageSize);
-      if (
-        !append &&
-        selectedActivityCode &&
-        isQuickFillSectorActivity(selectedActivityCode) &&
-        filters.type === "ALL" && !debouncedSearch
-      ) {
-        setSectorSuggestionHistory(payload.transactions);
-      }
       setTransactions((prev) => {
         if (!append) {
           return payload.transactions;
@@ -4229,10 +1109,9 @@ export function FinanceTransactionsPage(): JSX.Element {
       isLoadingActivities ||
       !isTransactionFormExpanded ||
       !selectedActivityCode ||
-      !isQuickFillSectorActivity(selectedActivityCode) ||
-      (filters.type === "ALL" && !debouncedSearch)
+      !needsTransactionSuggestionHistory(selectedActivityCode)
     ) {
-      if (!isQuickFillSectorActivity(selectedActivityCode)) {
+      if (!needsTransactionSuggestionHistory(selectedActivityCode)) {
         setSectorSuggestionHistory([]);
       }
       return;
@@ -4242,8 +1121,13 @@ export function FinanceTransactionsPage(): JSX.Element {
     try {
       const response = await withAuthorizedToken((accessToken) =>
         listFinanceTransactionsRequest(accessToken, {
-          limit: transactionsFetchPageSize,
-          activityCode: selectedActivityCode
+          limit: suggestionHistoryPageSize,
+          offset: 0,
+          activityCode: selectedActivityCode,
+          ...(!isQuickFillSectorActivity(selectedActivityCode) ? {
+            type: filters.type === "ALL" ? undefined : filters.type,
+            search: debouncedSearch || undefined
+          } : {})
         })
       );
       if (requestId === sectorSuggestionLoadRequestRef.current) {
@@ -4261,7 +1145,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     isLoadingActivities,
     isTransactionFormExpanded,
     selectedActivityCode,
-    transactionsFetchPageSize,
+    suggestionHistoryPageSize,
     withAuthorizedToken
   ]);
 
@@ -4598,6 +1482,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }, [canManageGlobalAccounts, selectedActivityCode]);
 
   async function handleSaveAccount(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -4622,6 +1507,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateFinanceAccountRequest(accessToken, editingAccountId, payload)
           : createFinanceAccountRequest(accessToken, payload);
       });
+      if (!isCurrentAction()) return;
       accountsLoadRequestRef.current += 1;
       setSuccessMessage(
         editingAccountId ? "Compte financier modifié." : "Compte financier créé."
@@ -4638,9 +1524,10 @@ export function FinanceTransactionsPage(): JSX.Element {
         accountId: response.item.id
       }));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingAccount(false);
+      if (isCurrentAction()) setIsSavingAccount(false);
     }
   }
 
@@ -4700,6 +1587,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteAccount(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!accountPendingDelete) {
       return;
     }
@@ -4710,6 +1598,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteFinanceAccountRequest(accessToken, account.id));
+      if (!isCurrentAction()) return;
       accountsLoadRequestRef.current += 1;
       if (editingAccountId === account.id) {
         resetAccountForm();
@@ -4723,13 +1612,15 @@ export function FinanceTransactionsPage(): JSX.Element {
           : prev
       );
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyAccountId(null);
+      if (isCurrentAction()) setBusyAccountId(null);
     }
   }
 
   async function handleSaveArticle(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -4751,6 +1642,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateActivityArticleRequest(accessToken, "HARDWARE", editingArticleId, payload)
           : createActivityArticleRequest(accessToken, "HARDWARE", payload)
       );
+      if (!isCurrentAction()) return;
       setArticles((prev) => {
         const exists = prev.some((item) => item.id === response.item.id);
         return exists
@@ -4760,9 +1652,10 @@ export function FinanceTransactionsPage(): JSX.Element {
       setSuccessMessage(editingArticleId ? "Article modifié." : "Article créé.");
       resetArticleForm();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingArticle(false);
+      if (isCurrentAction()) setIsSavingArticle(false);
     }
   }
 
@@ -4796,6 +1689,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteArticle(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!articlePendingDelete) {
       return;
     }
@@ -4808,6 +1702,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         deleteActivityArticleRequest(accessToken, "HARDWARE", article.id)
       );
+      if (!isCurrentAction()) return;
       if (editingArticleId === article.id) {
         resetArticleForm();
       }
@@ -4815,13 +1710,15 @@ export function FinanceTransactionsPage(): JSX.Element {
       setArticlePendingDelete(null);
       setArticles((prev) => prev.filter((item) => item.id !== article.id));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyArticleId(null);
+      if (isCurrentAction()) setBusyArticleId(null);
     }
   }
 
   async function handleSaveTenant(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -4841,6 +1738,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateRentalTenantRequest(accessToken, editingTenantId, payload)
           : createRentalTenantRequest(accessToken, payload)
       );
+      if (!isCurrentAction()) return;
       setTenants((prev) => {
         const exists = prev.some((item) => item.id === response.item.id);
         return exists
@@ -4850,9 +1748,10 @@ export function FinanceTransactionsPage(): JSX.Element {
       setSuccessMessage(editingTenantId ? "Locataire modifié." : "Locataire ajouté.");
       resetTenantForm();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingTenant(false);
+      if (isCurrentAction()) setIsSavingTenant(false);
     }
   }
 
@@ -4886,6 +1785,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteTenant(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!tenantPendingDelete) {
       return;
     }
@@ -4896,6 +1796,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteRentalTenantRequest(accessToken, tenant.id));
+      if (!isCurrentAction()) return;
       if (editingTenantId === tenant.id) {
         resetTenantForm();
       }
@@ -4903,13 +1804,15 @@ export function FinanceTransactionsPage(): JSX.Element {
       setTenantPendingDelete(null);
       setTenants((prev) => prev.filter((item) => item.id !== tenant.id));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTenantId(null);
+      if (isCurrentAction()) setBusyTenantId(null);
     }
   }
 
   async function handleSaveShop(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -4927,6 +1830,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateGeneralStoreShopRequest(accessToken, editingShopId, payload)
           : createGeneralStoreShopRequest(accessToken, payload)
       );
+      if (!isCurrentAction()) return;
       setShops((prev) => {
         const exists = prev.some((item) => item.id === response.item.id);
         return exists
@@ -4936,9 +1840,10 @@ export function FinanceTransactionsPage(): JSX.Element {
       setSuccessMessage(editingShopId ? "Boutique modifiée." : "Boutique ajoutée.");
       resetShopForm();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingShop(false);
+      if (isCurrentAction()) setIsSavingShop(false);
     }
   }
 
@@ -4970,6 +1875,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteShop(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!shopPendingDelete) {
       return;
     }
@@ -4980,6 +1886,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteGeneralStoreShopRequest(accessToken, shop.id));
+      if (!isCurrentAction()) return;
       if (editingShopId === shop.id) {
         resetShopForm();
       }
@@ -4987,13 +1894,15 @@ export function FinanceTransactionsPage(): JSX.Element {
       setShopPendingDelete(null);
       setShops((prev) => prev.filter((item) => item.id !== shop.id));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyShopId(null);
+      if (isCurrentAction()) setBusyShopId(null);
     }
   }
 
   async function handleSaveProject(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -5012,6 +1921,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateBtpProjectRequest(accessToken, editingProjectId, payload)
           : createBtpProjectRequest(accessToken, payload)
       );
+      if (!isCurrentAction()) return;
       setProjects((prev) => {
         const exists = prev.some((item) => item.id === response.item.id);
         return exists
@@ -5021,9 +1931,10 @@ export function FinanceTransactionsPage(): JSX.Element {
       setSuccessMessage(editingProjectId ? "Chantier modifié." : "Chantier ajouté.");
       resetProjectForm();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingProject(false);
+      if (isCurrentAction()) setIsSavingProject(false);
     }
   }
 
@@ -5056,6 +1967,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteProject(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!projectPendingDelete) {
       return;
     }
@@ -5066,6 +1978,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteBtpProjectRequest(accessToken, project.id));
+      if (!isCurrentAction()) return;
       if (editingProjectId === project.id) {
         resetProjectForm();
       }
@@ -5073,13 +1986,15 @@ export function FinanceTransactionsPage(): JSX.Element {
       setProjectPendingDelete(null);
       setProjects((prev) => prev.filter((item) => item.id !== project.id));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyProjectId(null);
+      if (isCurrentAction()) setBusyProjectId(null);
     }
   }
 
   async function handleSaveTransaction(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     if (!selectedActivityCode) {
       return;
@@ -5139,7 +2054,9 @@ export function FinanceTransactionsPage(): JSX.Element {
           ? updateFinanceTransactionRequest(accessToken, editingTransactionId, payload)
           : createFinanceTransactionRequest(accessToken, payload);
       });
+      if (!isCurrentAction()) return;
       transactionsLoadRequestRef.current += 1;
+      sectorSuggestionLoadRequestRef.current += 1;
       setIsLoadingMoreTransactions(false);
       const transactionMatchesCurrentList =
         response.item.activityCode === selectedActivityCode &&
@@ -5155,7 +2072,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           : next;
       });
       setLinkedTransaction((prev) => prev?.id === response.item.id ? response.item : prev);
-      if (isQuickFillSectorActivity(selectedActivityCode)) {
+      if (needsTransactionSuggestionHistory(selectedActivityCode)) {
         setSectorSuggestionHistory((prev) => [
           response.item,
           ...prev.filter((item) => item.id !== response.item.id)
@@ -5178,6 +2095,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       if (proofFileToUpload) {
         void uploadTransactionProof(response.item.id, proofFileToUpload)
           .then((proofItems) => {
+            if (!isCurrentAction()) return;
             setProofsByTransaction((prev) => ({
               ...prev,
               [response.item.id]: proofItems
@@ -5189,6 +2107,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             setSuccessMessage(`${transactionSavedLabel} et preuve ajoutée.`);
           })
           .catch((error) => {
+            if (!isCurrentAction()) return;
             setErrorMessage(
               `${transactionSavedLabel}, mais la preuve n'a pas pu être ajoutée. ${toErrorMessage(error)}`
             );
@@ -5196,10 +2115,11 @@ export function FinanceTransactionsPage(): JSX.Element {
           });
       }
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
       if (selectedActivityCode === "BEVERAGE_DEPOT" && error instanceof ApiError && error.statusCode === 409) void beverageStock.refresh();
     } finally {
-      setIsSavingTransaction(false);
+      if (isCurrentAction()) setIsSavingTransaction(false);
     }
   }
 
@@ -5301,37 +2221,11 @@ export function FinanceTransactionsPage(): JSX.Element {
       setErrorMessage("Vous pouvez supprimer uniquement les transactions que vous avez créées.");
       return;
     }
-
     setTransactionPendingDelete(transaction);
-    return;
-
-    setBusyTransactionId(transaction.id);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      await withAuthorizedToken((accessToken) =>
-        deleteFinanceTransactionRequest(accessToken, transaction.id)
-      );
-      transactionsLoadRequestRef.current += 1;
-      setIsLoadingMoreTransactions(false);
-      if (selectedTransactionId === transaction.id) {
-        handleCloseTransactionDetails();
-      }
-      if (editingTransactionId === transaction.id) {
-        resetTransactionForm();
-      }
-      setSuccessMessage("Transaction supprimée.");
-      setTransactions((prev) => prev.filter((item) => item.id !== transaction.id));
-      setLinkedTransaction((prev) => prev?.id === transaction.id ? null : prev);
-      void loadData({ silent: true });
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusyTransactionId(null);
-    }
   }
 
   async function handleConfirmDeleteTransaction(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!transactionPendingDelete) {
       return;
     }
@@ -5344,6 +2238,8 @@ export function FinanceTransactionsPage(): JSX.Element {
       await withAuthorizedToken((accessToken) =>
         deleteFinanceTransactionRequest(accessToken, transaction.id)
       );
+      if (!isCurrentAction()) return;
+      sectorSuggestionLoadRequestRef.current += 1;
       if (selectedTransactionId === transaction.id) {
         handleCloseTransactionDetails();
       }
@@ -5371,9 +2267,10 @@ export function FinanceTransactionsPage(): JSX.Element {
         void loadData({ offset: Math.max(0, transactions.length - 1), append: true });
       }
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTransactionId(null);
+      if (isCurrentAction()) setBusyTransactionId(null);
     }
   }
 
@@ -5427,6 +2324,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   }
 
   async function handleAddProof(transactionId: string): Promise<void> {
+    const isCurrentAction = captureActionScope();
     const selectedFile = proofFiles[transactionId];
     if (!selectedFile) {
       setErrorMessage("Sélectionne un fichier de preuve.");
@@ -5478,6 +2376,7 @@ export function FinanceTransactionsPage(): JSX.Element {
           fileSize: resolveImageKitFileSize(uploaded, selectedFile.size)
         });
       });
+      if (!isCurrentAction()) return;
 
       setSuccessMessage("Preuve ajoutée.");
       setProofFiles((prev) => ({ ...prev, [transactionId]: null }));
@@ -5490,13 +2389,15 @@ export function FinanceTransactionsPage(): JSX.Element {
         [transactionId]: true
       }));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTransactionId(null);
+      if (isCurrentAction()) setBusyTransactionId(null);
     }
   }
 
   async function handleToggleProofs(transactionId: string): Promise<void> {
+    const isCurrentAction = captureActionScope();
     const isOpen = openProofs[transactionId] === true;
     if (isOpen) {
       setOpenProofs((prev) => ({
@@ -5524,6 +2425,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         listFinanceTransactionProofsRequest(accessToken, transactionId)
       );
+      if (!isCurrentAction()) return;
       setProofsByTransaction((prev) => ({
         ...prev,
         [transactionId]: response.items
@@ -5533,9 +2435,10 @@ export function FinanceTransactionsPage(): JSX.Element {
         [transactionId]: true
       }));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setLoadingProofsByTransaction((prev) => ({
+      if (isCurrentAction()) setLoadingProofsByTransaction((prev) => ({
         ...prev,
         [transactionId]: false
       }));
@@ -5929,47 +2832,6 @@ export function FinanceTransactionsPage(): JSX.Element {
         </p>
       ) : null}
 
-      {!activeReferenceView ? <PageGuide
-        title={
-          selectedActivity
-            ? `Guide des transactions · ${selectedActivity.label}`
-            : "Guide des transactions"
-        }
-        description={
-          selectedActivityCode === "BEVERAGE_DEPOT"
-            ? "Les achats alimentent le stock des produits et les ventes le diminuent. Le bénéfice brut utilise le coût du stock enregistré."
-            : selectedProfile?.operationsModel ??
-          `Les écritures affichées sont filtrées par secteur: ${selectedActivity?.label ?? "aucun secteur actif"}.`
-        }
-        items={selectedActivityCode === "BEVERAGE_DEPOT" ? [
-          { term: "Stock", description: "Ajoutez chaque produit avec son unité et le stock de départ compté. Utilisez ensuite Approvisionner pour les achats et Vendre pour les ventes." },
-          { term: "Vente", description: "Choisissez le produit, la quantité et le prix de vente. Le coût d'achat vient du stock ; une vente au-delà du disponible est bloquée." },
-          { term: "Enregistrer", description: "Vérifiez le montant et la date, puis enregistrez. La précision et le justificatif sont facultatifs." }
-        ] : selectedProfile?.finance.workflow.length
-          ? selectedProfile.finance.workflow.map((step) => ({
-              term: step.label,
-              description: step.description
-            }))
-          : [
-              {
-                term: "Compte",
-                description: "Support financier utilisé pour enregistrer l'entrée ou la sortie."
-              },
-              {
-                term: "Comptabilisé",
-                description: "Une transaction enregistrée est prise en compte dans les rapports du secteur."
-              },
-              {
-                term: "Justificatif",
-                description: "Document lié à l'opération: reçu, facture, bordereau ou preuve terrain."
-              },
-              {
-                term: "Détail secteur",
-                description: "Les champs métier alimentent les rapports sectoriels et les exports."
-              }
-            ]}
-      /> : null}
-
       <SectorWorkspaceNav actions={activeReferenceView ? [{ label: activeReferenceView.createLabel, onClick: openReferenceForm }] : [
         { label: "Voir les transactions", onClick: () => scrollToFinanceSection("transactions-list") },
         ...(canManageTransactions && !transactionWorkspace ? [{
@@ -5979,13 +2841,6 @@ export function FinanceTransactionsPage(): JSX.Element {
             scrollToFinanceSection("transaction-create");
           }
         }] : []),
-        {
-          label: "Voir les comptes",
-          onClick: () => {
-            setIsAccountListExpanded(true);
-            scrollToFinanceSection("accounts-list");
-          }
-        },
         ...(referenceView ? [{
           label: `Gérer les ${referenceView.label.toLocaleLowerCase("fr")}`,
           onClick: () => navigate(`/finance/transactions?activityCode=${selectedActivityCode}&view=${referenceView.view}`)
@@ -6244,7 +3099,7 @@ export function FinanceTransactionsPage(): JSX.Element {
       {isHardwareArticlesView ? (
         <>
           <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
-          <HardwareArticlesPanel
+          <DeferredViewBoundary key={formScope} hasUnsavedChanges={articleChanges.isDirty}><Suspense fallback={<p role="status">Chargement des articles…</p>}><HardwareArticlesPanel
             articles={articles} articleForm={articleForm} setArticleForm={setArticleForm}
             editingArticleId={editingArticleId} busyArticleId={busyArticleId}
             isSavingArticle={isSavingArticle} articleChanges={articleChanges}
@@ -6254,49 +3109,49 @@ export function FinanceTransactionsPage(): JSX.Element {
             onReload={() => void loadArticles()} handleSaveArticle={handleSaveArticle}
             handleCancelEditArticle={handleCancelEditArticle}
             handleStartEditArticle={handleStartEditArticle} handleDeleteArticle={handleDeleteArticle}
-          />
+          /></Suspense></DeferredViewBoundary>
         </>
       ) : null}
 
       {activeReferenceView?.view === "tenants" ? (
         <>
           <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
-          <RentalTenantsPanel
+          <DeferredViewBoundary key={formScope} hasUnsavedChanges={tenantChanges.isDirty}><Suspense fallback={<p role="status">Chargement des locataires…</p>}><RentalTenantsPanel
             key={formScope} tenants={tenants.filter((record) => record.companyId === activeCompany?.id)} tenantForm={tenantForm} setTenantForm={setTenantForm}
             editingTenantId={editingTenantId} busyTenantId={busyTenantId} isSavingTenant={isSavingTenant}
             isTenantManagementExpanded={isTenantManagementExpanded} setIsTenantManagementExpanded={setIsTenantManagementExpanded}
             tenantChanges={tenantChanges} isLoading={isLoadingTenants} hasLoaded={hasLoadedTenants}
             onReload={() => void loadTenants()} handleSaveTenant={handleSaveTenant}
             handleCancelEditTenant={handleCancelEditTenant} handleStartEditTenant={handleStartEditTenant} handleDeleteTenant={handleDeleteTenant}
-          />
+          /></Suspense></DeferredViewBoundary>
         </>
       ) : null}
 
       {activeReferenceView?.view === "shops" ? (
         <>
           <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
-          <GeneralStoreShopsPanel
+          <DeferredViewBoundary key={formScope} hasUnsavedChanges={shopChanges.isDirty}><Suspense fallback={<p role="status">Chargement des boutiques…</p>}><GeneralStoreShopsPanel
             key={formScope} shops={shops.filter((record) => record.companyId === activeCompany?.id)} shopForm={shopForm} setShopForm={setShopForm}
             editingShopId={editingShopId} busyShopId={busyShopId} isSavingShop={isSavingShop}
             isShopManagementExpanded={isShopManagementExpanded} setIsShopManagementExpanded={setIsShopManagementExpanded}
             shopChanges={shopChanges} isLoading={isLoadingShops} hasLoaded={hasLoadedShops}
             onReload={() => void loadShops()} handleSaveShop={handleSaveShop}
             handleCancelEditShop={handleCancelEditShop} handleStartEditShop={handleStartEditShop} handleDeleteShop={handleDeleteShop}
-          />
+          /></Suspense></DeferredViewBoundary>
         </>
       ) : null}
 
       {activeReferenceView?.view === "projects" ? (
         <>
           <FeedbackBanner errorMessage={errorMessage} successMessage={successMessage} />
-          <BtpProjectsPanel
+          <DeferredViewBoundary key={formScope} hasUnsavedChanges={projectChanges.isDirty}><Suspense fallback={<p role="status">Chargement des chantiers…</p>}><BtpProjectsPanel
             key={formScope} projects={projects.filter((record) => record.companyId === activeCompany?.id)} projectForm={projectForm} setProjectForm={setProjectForm}
             editingProjectId={editingProjectId} busyProjectId={busyProjectId} isSavingProject={isSavingProject}
             isProjectManagementExpanded={isProjectManagementExpanded} setIsProjectManagementExpanded={setIsProjectManagementExpanded}
             projectChanges={projectChanges} isLoading={isLoadingProjects} hasLoaded={hasLoadedProjects}
             onReload={() => void loadProjects()} handleSaveProject={handleSaveProject}
             handleCancelEditProject={handleCancelEditProject} handleStartEditProject={handleStartEditProject} handleDeleteProject={handleDeleteProject}
-          />
+          /></Suspense></DeferredViewBoundary>
         </>
       ) : null}
 
@@ -6391,1594 +3246,62 @@ export function FinanceTransactionsPage(): JSX.Element {
               propriétaire, l'admin système ou le comptable.
             </p>
           ) : null}
-          <form
-            className={`finance-transaction-form${selectedActivityCode === "BEVERAGE_DEPOT" ? " finance-transaction-form-beverage" : ""}`}
-            onSubmit={handleSaveTransaction}
-            onChangeCapture={transactionChanges.onChangeCapture}
-            data-unsaved-sector-form={transactionChanges.isDirty || isSavingTransaction ? "true" : undefined}
-          >
-          <fieldset className="finance-transaction-form-section">
-            <legend>Informations principales</legend>
-          <div className="finance-transaction-form-quick">
-            <label className="operations-inline-group">
-              <span>Compte</span>
-              <select
-                value={transactionForm.accountId}
-                onChange={(event) =>
-                  setTransactionForm((prev) => ({
-                    ...prev,
-                    accountId: event.target.value
-                  }))
-                }
-                required
-              >
-                <option value="" disabled>
-                  Choisir un compte
-                </option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name} ({formatAmountForDisplay(account.balance)} {transactionForm.currency}) | {formatAccountScopeLabel(account)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {selectedActivityCode === "GENERAL_STORE" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération magasin</span>
-                  <select
-                    value={storeOperationKind}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      const nextKind = nextValue as StoreOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getStoreOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [STORE_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        return {
-                          ...prev,
-                          type: nextType,
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="ACHAT">{STORE_OPERATION_LABELS.ACHAT}</option>
-                    <option value="RECOUVREMENT">{STORE_OPERATION_LABELS.RECOUVREMENT}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette magasin" : "Dépense magasin"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "DAILY_ACTIVITIES" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Categorie</span>
-                  <select
-                    value={transactionForm.metadata.dailyActivityKind ?? DAILY_PROTOCOL_CATEGORY}
-                    onChange={(event) => setTransactionForm((previous) => ({
-                      ...previous,
-                      metadata: { ...previous.metadata, dailyActivityKind: event.target.value }
-                    }))}
-                  >
-                    {dailyActivityCategories.filter((category) => isDailyProtocolCategory(category.name)).map((category) => (
-                      <option key={category.id} value={category.name}>{category.name}</option>
-                    ))}
-                    {dailyActivityCategories.length === 0 ? <option value={DAILY_PROTOCOL_CATEGORY}>{DAILY_PROTOCOL_CATEGORY}</option> : null}
-                  </select>
-                </label>
-                <label className="operations-inline-group">
-                  <span>Nature du mouvement</span>
-                  <select
-                    value={dailyAgreementOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as DailyAgreementOperationKind;
-                      setTransactionForm((previous) => ({
-                        ...previous,
-                        type: getDailyAgreementOperationType(nextKind),
-                        metadata: { ...previous.metadata, [DAILY_AGREEMENT_OPERATION_KEY]: nextKind }
-                      }));
-                    }}
-                  >
-                    {Object.entries(DAILY_AGREEMENT_OPERATION_LABELS).map(([kind, label]) => (
-                      <option key={kind} value={kind}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>{transactionForm.type === "CASH_IN" ? "Entree de fonds" : "Sortie de fonds"}</strong>
-                </div>
-                <p className="helper-text">Creez d’abord la fiche du protocole dans Taches. Reprenez sa reference et le meme partenaire; seul le montant reellement verse se saisit ici.</p>
-              </>
-            ) : selectedActivityCode === "HARDWARE" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Nature quincaillerie</span>
-                  <select
-                    value={hardwareOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as HardwareOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getHardwareOperationType(nextKind) ?? prev.type;
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [HARDWARE_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = nextKind === "GLOBAL" || nextKind === "RECOUVREMENT"
-                          ? null
-                          : deriveSectorAmount(selectedActivityCode, nextType, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: nextKind === "GLOBAL" || nextKind === "RECOUVREMENT"
-                            ? ""
-                            : formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="GLOBAL">{HARDWARE_OPERATION_LABELS.GLOBAL}</option>
-                    <option value="ITEM_ENTRY">{HARDWARE_OPERATION_LABELS.ITEM_ENTRY}</option>
-                    <option value="RECOUVREMENT">{HARDWARE_OPERATION_LABELS.RECOUVREMENT}</option>
-                    {hardwareOperationKind === "ITEM_EXIT" ? (
-                      <option value="ITEM_EXIT">{HARDWARE_OPERATION_LABELS.ITEM_EXIT}</option>
-                    ) : null}
-                  </select>
-                </label>
-
-                {hardwareOperationKind === "GLOBAL" ? (
-                  <label className="operations-inline-group">
-                    <span>Flux financier</span>
-                    <select
-                      value={transactionForm.type}
-                      onChange={(event) => {
-                        const nextType = event.target.value as "CASH_IN" | "CASH_OUT";
-                        setTransactionForm((prev) => ({
-                          ...prev,
-                          type: nextType,
-                          metadata: cleanSectorFinanceMetadata(
-                            selectedActivityCode,
-                            nextType,
-                            {
-                              ...prev.metadata,
-                              [HARDWARE_OPERATION_KIND_KEY]: "GLOBAL"
-                            }
-                          )
-                        }));
-                      }}
-                    >
-                      <option value="CASH_IN">Encaissement</option>
-                      <option value="CASH_OUT">Decaissement</option>
-                    </select>
-                  </label>
-                ) : (
-                  <div className="operations-inline-group">
-                    <span>Flux financier</span>
-                    <strong>
-                      {transactionForm.type === "CASH_IN"
-                        ? HARDWARE_OPERATION_LABELS[hardwareOperationKind]
-                        : "Achat"}
-                    </strong>
-                  </div>
-                )}
-              </>
-            ) : selectedActivityCode === "FOOD" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération alimentaire</span>
-                  <select
-                    value={foodOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as FoodOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getFoodOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [FOOD_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveFoodAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="PRODUCT_SALE">{FOOD_OPERATION_LABELS.PRODUCT_SALE}</option>
-                    <option value="PRODUCT_PURCHASE">{FOOD_OPERATION_LABELS.PRODUCT_PURCHASE}</option>
-                    <option value="SUPPLIER_PAYMENT">{FOOD_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
-                    <option value="STOCK_LOSS">{FOOD_OPERATION_LABELS.STOCK_LOSS}</option>
-                    <option value="COLD_CHAIN_EXPENSE">{FOOD_OPERATION_LABELS.COLD_CHAIN_EXPENSE}</option>
-                    <option value="PACKAGING_EXPENSE">{FOOD_OPERATION_LABELS.PACKAGING_EXPENSE}</option>
-                    <option value="CUSTOMER_REFUND">{FOOD_OPERATION_LABELS.CUSTOMER_REFUND}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette alimentaire" : "Dépense alimentaire"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "AGRICULTURE" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération agricole</span>
-                  <select
-                    value={agricultureOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as AgricultureOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getAgricultureOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [AGRICULTURE_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveAgricultureAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="INPUT_PURCHASE">{AGRICULTURE_OPERATION_LABELS.INPUT_PURCHASE}</option>
-                    <option value="FIELD_EXPENSE">{AGRICULTURE_OPERATION_LABELS.FIELD_EXPENSE}</option>
-                    <option value="HARVEST_SALE">{AGRICULTURE_OPERATION_LABELS.HARVEST_SALE}</option>
-                    <option value="SUPPORT_INCOME">{AGRICULTURE_OPERATION_LABELS.SUPPORT_INCOME}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette agricole" : "Dépense agricole"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "BTP" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération BTP</span>
-                  <select
-                    value={btpOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as BtpOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getBtpOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [BTP_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveBtpAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="CLIENT_PAYMENT">{BTP_OPERATION_LABELS.CLIENT_PAYMENT}</option>
-                    <option value="MATERIAL_PURCHASE">{BTP_OPERATION_LABELS.MATERIAL_PURCHASE}</option>
-                    <option value="LABOR_PAYMENT">{BTP_OPERATION_LABELS.LABOR_PAYMENT}</option>
-                    <option value="EQUIPMENT_RENTAL">{BTP_OPERATION_LABELS.EQUIPMENT_RENTAL}</option>
-                    <option value="SUBCONTRACTING">{BTP_OPERATION_LABELS.SUBCONTRACTING}</option>
-                    <option value="SITE_EXPENSE">{BTP_OPERATION_LABELS.SITE_EXPENSE}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette chantier" : "Dépense chantier"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "RENTAL" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération</span>
-                  <select
-                    value={rentalOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as RentalOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getRentalOperationType(nextKind) ?? prev.type;
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [RENTAL_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveRentalAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="LOYER">{RENTAL_OPERATION_LABELS.LOYER}</option>
-                    <option value="CAUTION">{RENTAL_OPERATION_LABELS.CAUTION}</option>
-                    <option value="AUTRE">{RENTAL_OPERATION_LABELS.AUTRE}</option>
-                  </select>
-                </label>
-
-                {rentalOperationKind === "LOYER" || rentalOperationKind === "CAUTION" ? (
-                  <div className="operations-inline-group">
-                    <span>Flux financier</span>
-                    <strong>Recette locative</strong>
-                  </div>
-                ) : (
-                  <label className="operations-inline-group">
-                    <span>Flux financier</span>
-                    <select
-                      value={transactionForm.type}
-                      onChange={(event) => {
-                        const nextType = event.target.value as "CASH_IN" | "CASH_OUT";
-                        setTransactionForm((prev) => ({
-                          ...prev,
-                          type: nextType,
-                          metadata: cleanSectorFinanceMetadata(
-                            selectedActivityCode,
-                            nextType,
-                            {
-                              ...prev.metadata,
-                              [RENTAL_OPERATION_KIND_KEY]: "AUTRE"
-                            }
-                          )
-                        }));
-                      }}
-                    >
-                      <option value="CASH_IN">Encaissement</option>
-                      <option value="CASH_OUT">Decaissement</option>
-                    </select>
-                  </label>
-                )}
-              </>
-            ) : selectedActivityCode === "HOTEL_LODGING" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération hôtelière</span>
-                  <select
-                    value={hotelOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as HotelOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getHotelOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [HOTEL_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveHotelAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="ROOM_PAYMENT">{HOTEL_OPERATION_LABELS.ROOM_PAYMENT}</option>
-                    <option value="BOOKING_DEPOSIT">{HOTEL_OPERATION_LABELS.BOOKING_DEPOSIT}</option>
-                    <option value="RESTAURANT_SALE">{HOTEL_OPERATION_LABELS.RESTAURANT_SALE}</option>
-                    <option value="EVENT_SERVICE">{HOTEL_OPERATION_LABELS.EVENT_SERVICE}</option>
-                    <option value="LAUNDRY_SERVICE">{HOTEL_OPERATION_LABELS.LAUNDRY_SERVICE}</option>
-                    <option value="ROOM_MAINTENANCE">{HOTEL_OPERATION_LABELS.ROOM_MAINTENANCE}</option>
-                    <option value="SUPPLIER_PAYMENT">{HOTEL_OPERATION_LABELS.SUPPLIER_PAYMENT}</option>
-                    <option value="COMMISSION_FEE">{HOTEL_OPERATION_LABELS.COMMISSION_FEE}</option>
-                    <option value="TAX_PAYMENT">{HOTEL_OPERATION_LABELS.TAX_PAYMENT}</option>
-                    <option value="GUEST_REFUND">{HOTEL_OPERATION_LABELS.GUEST_REFUND}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette hôtelière" : "Dépense hôtelière"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "BEVERAGE_DEPOT" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération</span>
-                  <select
-                    value={beverageOperationKind}
-                    disabled={isLegacyBeverageEdit}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as BeverageOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = nextKind === "VENTE" || nextKind === "AUTRE_RECETTE" ? "CASH_IN" : "CASH_OUT";
-                        const nextMetadata = cleanSectorFinanceMetadata(selectedActivityCode, nextType, {
-                          ...prev.metadata,
-                          ...(nextKind === "ACHAT_STOCK" && getBeverageOperationKind(prev.type, prev.metadata) !== "ACHAT_STOCK" ? { purchaseUnitPrice: "" } : {}),
-                          [BEVERAGE_OPERATION_KIND_KEY]: nextKind
-                        });
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(deriveBeverageAmount(nextKind, nextMetadata) ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    {Object.entries(BEVERAGE_OPERATION_LABELS).map(([kind, label]) => (
-                      <option key={kind} value={kind}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-                <div className="operations-inline-group">
-                  <span>Mouvement de caisse</span>
-                  <strong>{transactionForm.type === "CASH_IN" ? "Entrée d'argent" : "Sortie d'argent"}</strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "WATER" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Catégorie</span>
-                  <select
-                    value={waterOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as WaterOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getWaterOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [WATER_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveWaterAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <optgroup label="Ventes">
-                      {WATER_INCOME_KINDS.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {WATER_OPERATION_LABELS[kind]}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Dépenses">
-                      {WATER_EXPENSE_KINDS.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {WATER_OPERATION_LABELS[kind]}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette eau" : "Dépense eau"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération agence immobilière</span>
-                  <select
-                    value={agencyOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as AgencyOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getAgencyOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [AGENCY_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveAgencyAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="SALE_COMMISSION">{AGENCY_OPERATION_LABELS.SALE_COMMISSION}</option>
-                    <option value="RENTAL_COMMISSION">{AGENCY_OPERATION_LABELS.RENTAL_COMMISSION}</option>
-                    <option value="MANDATE_FEE">{AGENCY_OPERATION_LABELS.MANDATE_FEE}</option>
-                    <option value="VISIT_FEE">{AGENCY_OPERATION_LABELS.VISIT_FEE}</option>
-                    <option value="FILE_FEE">{AGENCY_OPERATION_LABELS.FILE_FEE}</option>
-                    <option value="ADVERTISING_EXPENSE">{AGENCY_OPERATION_LABELS.ADVERTISING_EXPENSE}</option>
-                    <option value="FIELD_VISIT_EXPENSE">{AGENCY_OPERATION_LABELS.FIELD_VISIT_EXPENSE}</option>
-                    <option value="BROKER_PAYOUT">{AGENCY_OPERATION_LABELS.BROKER_PAYOUT}</option>
-                    <option value="DOCUMENT_EXPENSE">{AGENCY_OPERATION_LABELS.DOCUMENT_EXPENSE}</option>
-                    <option value="CUSTOMER_REFUND">{AGENCY_OPERATION_LABELS.CUSTOMER_REFUND}</option>
-                    <option value="OFFICE_EXPENSE">{AGENCY_OPERATION_LABELS.OFFICE_EXPENSE}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette agence" : "Dépense agence"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "FISH_FARMING" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération piscicole</span>
-                  <select
-                    value={fishFarmingOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as FishFarmingOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getFishFarmingOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [FISH_FARMING_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveFishFarmingAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="FINGERLING_PURCHASE">{FISH_FARMING_OPERATION_LABELS.FINGERLING_PURCHASE}</option>
-                    <option value="FEED_PURCHASE">{FISH_FARMING_OPERATION_LABELS.FEED_PURCHASE}</option>
-                    <option value="POND_EXPENSE">{FISH_FARMING_OPERATION_LABELS.POND_EXPENSE}</option>
-                    <option value="FISH_SALE">{FISH_FARMING_OPERATION_LABELS.FISH_SALE}</option>
-                    <option value="SUPPORT_INCOME">{FISH_FARMING_OPERATION_LABELS.SUPPORT_INCOME}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette piscicole" : "Dépense piscicole"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "LIVESTOCK" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Opération élevage</span>
-                  <select
-                    value={livestockOperationKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as LivestockOperationKind;
-                      setTransactionForm((prev) => {
-                        const nextType = getLivestockOperationType(nextKind);
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          nextType,
-                          {
-                            ...prev.metadata,
-                            [LIVESTOCK_OPERATION_KIND_KEY]: nextKind
-                          }
-                        );
-                        const derivedAmount = deriveLivestockAmount(nextKind, nextMetadata);
-                        return {
-                          ...prev,
-                          type: nextType,
-                          amount: formatAmountForInput(derivedAmount ?? ""),
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <option value="ANIMAL_PURCHASE">{LIVESTOCK_OPERATION_LABELS.ANIMAL_PURCHASE}</option>
-                    <option value="FEED_PURCHASE">{LIVESTOCK_OPERATION_LABELS.FEED_PURCHASE}</option>
-                    <option value="VET_CARE">{LIVESTOCK_OPERATION_LABELS.VET_CARE}</option>
-                    <option value="FARM_EXPENSE">{LIVESTOCK_OPERATION_LABELS.FARM_EXPENSE}</option>
-                    <option value="ANIMAL_SALE">{LIVESTOCK_OPERATION_LABELS.ANIMAL_SALE}</option>
-                    <option value="PRODUCT_SALE">{LIVESTOCK_OPERATION_LABELS.PRODUCT_SALE}</option>
-                    <option value="SUPPORT_INCOME">{LIVESTOCK_OPERATION_LABELS.SUPPORT_INCOME}</option>
-                  </select>
-                </label>
-
-                <div className="operations-inline-group">
-                  <span>Flux financier</span>
-                  <strong>
-                    {transactionForm.type === "CASH_IN" ? "Recette élevage" : "Dépense élevage"}
-                  </strong>
-                </div>
-              </>
-            ) : selectedActivityCode === "GENERAL_EXPENSES" ? (
-              <>
-                <label className="operations-inline-group">
-                  <span>Catégorie de dépense</span>
-                  <select
-                    value={generalExpenseKind}
-                    onChange={(event) => {
-                      const nextKind = event.target.value as GeneralExpenseKind;
-                      setTransactionForm((prev) => {
-                        const nextMetadata = cleanSectorFinanceMetadata(
-                          selectedActivityCode,
-                          "CASH_OUT",
-                          {
-                            ...prev.metadata,
-                            [GENERAL_EXPENSE_KIND_KEY]: nextKind
-                          }
-                        );
-                        return {
-                          ...prev,
-                          type: "CASH_OUT",
-                          metadata: nextMetadata
-                        };
-                      });
-                    }}
-                  >
-                    <optgroup label="PDG">
-                      {GENERAL_EXPENSE_PDG_KINDS.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {GENERAL_EXPENSE_KIND_LABELS[kind]}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Employé">
-                      {GENERAL_EXPENSE_EMPLOYEE_KINDS.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {GENERAL_EXPENSE_KIND_LABELS[kind]}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </label>
-              </>
-            ) : selectedActivityCode === "TRANSPORT" &&
-              transactionForm.metadata.transportCategory === "Camion benne" ? (
-              <div className="operations-inline-group">
-                <span>Flux de l'opération</span>
-                <strong>{transactionForm.type === "CASH_IN" ? "Entrée" : "Sortie"}</strong>
-                <small className="hint">
-                  {DUMP_TRUCK_OPERATION_LABELS[transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] ?? ""] ?? "Choisissez l'opération camion benne dans les détails."}
-                </small>
-              </div>
-            ) : (
-              <label className="operations-inline-group">
-                <span>Type</span>
-                <select
-                  value={transactionForm.type}
-                  onChange={(event) => {
-                    const nextType = event.target.value as "CASH_IN" | "CASH_OUT";
-                    setTransactionForm((prev) => ({
-                      ...prev,
-                      type: nextType
-                    }));
-                  }}
-                >
-                  <option value="CASH_IN">Entrée</option>
-                  <option value="CASH_OUT">Sortie</option>
-                </select>
-              </label>
-            )}
-
-            <label className="operations-inline-group">
-              <span>Montant</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="Montant"
-                value={transactionForm.amount}
-                readOnly={selectedActivityCode === "BEVERAGE_DEPOT" && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK")}
-                onChange={(event) =>
-                  setTransactionForm((prev) => ({
-                    ...prev,
-                    amount: formatEditableAmountForInput(event.target.value)
-                  }))
-                }
-                onBlur={() =>
-                  setTransactionForm((prev) => ({
-                    ...prev,
-                    amount: formatAmountForInput(prev.amount)
-                  }))
-                }
-                required
-              />
-              {selectedActivityCode === "BEVERAGE_DEPOT" && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK") ? (
-                <span className="hint">Total calculé automatiquement : quantité × prix {beverageOperationKind === "VENTE" ? "de vente" : "d'achat"} unitaire.</span>
-              ) : null}
-            </label>
-
-            <label className="operations-inline-group">
-              <span>Devise</span>
-              <select
-                value={transactionForm.currency}
-                onChange={(event) =>
-                  setTransactionForm((prev) => ({
-                    ...prev,
-                    currency: event.target.value
-                  }))
-                }
-              >
-                {allowedCurrencies.map((currency) => (
-                  <option key={currency} value={currency}>
-                    {currency}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          </fieldset>
-
-          <div className="scope-field finance-transaction-form-context">
-            <span className="scope-field-label">Contexte de saisie</span>
-            <strong>{selectedActivity?.label ?? "Aucun secteur actif"}</strong>
-            <span className="hint">
-              Compte et devise sont présélectionnés selon le contexte actif.
-            </span>
-          </div>
-
-          {!transactionWorkspace ? renderTransactionProof() : null}
-
-          <details className="finance-transaction-form-options" open={hasRequiredFinanceDetails || Boolean(transactionWorkspace)}>
-            <summary>{selectedActivityCode === "TRANSPORT" ? "Détails Transport" : selectedActivityCode === "HYDROCARBON" ? "Détails Hydrocarbure" : "Détails de l'opération"}</summary>
-            <div className="finance-transaction-form-options-body">
-              {selectedActivityCode === "BEVERAGE_DEPOT" ? (
-                <p className="hint finance-form-mode-hint">
-                  {beverageOperationKind === "VENTE"
-                    ? isLegacyBeverageEdit ? "Historique antérieur au suivi de stock : les produits, quantités et prix sont conservés. Les références et précisions restent modifiables. Le stock actuel n'est pas modifié." : "Choisissez le produit en stock, puis la quantité et le prix de vente dans son unité. Le coût d'achat provient automatiquement du stock."
-                    : beverageOperationKind === "ACHAT_STOCK"
-                      ? isLegacyBeverageEdit ? "Achat historique : les produits, quantités et prix sont conservés. Cette modification ne crée pas une nouvelle entrée de stock." : "Choisissez le produit, puis le fournisseur, la quantité reçue et le prix d'achat dans l'unité du produit. Le stock augmente à l'enregistrement."
-                      : beverageOperationKind === "DEPENSE"
-                        ? "Choisissez la nature de la dépense et saisissez le montant payé."
-                        : "Saisissez le montant reçu pour une recette qui n'est pas une vente de boissons."}
-                  {" Les champs marqués * sont obligatoires."}
-                </p>
-              ) : null}
-              {selectedActivityCode === "HYDROCARBON" ? (
-                <p className="hint finance-form-mode-hint">Choisissez d'abord le produit ou l'équipement. La quantité et le partenaire sont utiles pour les produits ; la référence est demandée pour une citerne.</p>
-              ) : null}
-              {selectedActivityCode === "TRANSPORT" ? (
-                <p className="hint finance-form-mode-hint">
-                  Choisissez le type de véhicule. Pour un camion benne, sélectionnez ensuite l'opération ; le sens du flux et les détails utiles s'adaptent automatiquement.
-                </p>
-              ) : null}
-              {selectedActivityCode === "HARDWARE" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getHardwareFormModeLabel(hardwareOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "GENERAL_STORE" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getStoreFormModeLabel(storeOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "FOOD" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getFoodFormModeLabel(foodOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "AGRICULTURE" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getAgricultureFormModeLabel(agricultureOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "BTP" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getBtpFormModeLabel(btpOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "RENTAL" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getRentalFormModeLabel(rentalOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "HOTEL_LODGING" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getHotelFormModeLabel(hotelOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "WATER" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getWaterFormModeLabel(waterOperationKind)}
-                </p>
-              ) : null}
-              {isQuickFillSectorActivity(selectedActivityCode) && sectorTransactionSuggestions.length > 0 ? (
-                <div className="finance-transaction-suggestions">
-                  <strong>Remplissage rapide</strong>
-                  <span className="hint">Cliquez sur une opération déjà enregistrée pour remplir les mêmes champs, puis vérifiez avant d'enregistrer.</span>
-                  <div className="finance-transaction-suggestions-list">
-                    {sectorTransactionSuggestions.map((suggestion) => {
-                      const suggestionKind = getSectorOperationKindValue(
-                        selectedActivityCode,
-                        suggestion.type,
-                        suggestion.metadata
-                      );
-                      const detail = getSectorSuggestionDetail(
-                        selectedActivityCode,
-                        suggestionKind,
-                        suggestion.metadata,
-                        suggestion.currency
-                      );
-                      return (
-                        <button
-                          key={suggestion.id}
-                          type="button"
-                          className="finance-transaction-suggestion"
-                          onClick={() => applySectorTransactionSuggestion(suggestion)}
-                        >
-                          <span className="finance-transaction-suggestion-head">
-                            <span className="finance-transaction-suggestion-title">
-                              {suggestion.description?.trim() || getSectorOperationLabel(selectedActivityCode, suggestionKind)}
-                            </span>
-                            <span className="finance-transaction-suggestion-amount">
-                              {formatAmountForDisplay(suggestion.amount)} {suggestion.currency}
-                            </span>
-                          </span>
-                          {detail ? <small>{detail}</small> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-              {selectedActivityCode === "GENERAL_EXPENSES" && generalExpenseSuggestions.length > 0 ? (
-                <div className="finance-transaction-suggestions">
-                  <strong>Remplissage rapide</strong>
-                  <span className="hint">Cliquez sur une dépense déjà enregistrée pour remplir les mêmes champs, puis vérifiez avant d'enregistrer.</span>
-                  <div className="finance-transaction-suggestions-list">
-                    {generalExpenseSuggestions.map((suggestion) => (
-                      <button
-                        key={suggestion.id}
-                        type="button"
-                        className="finance-transaction-suggestion"
-                        onClick={() => applyGeneralExpenseSuggestion(suggestion)}
-                      >
-                        <span className="finance-transaction-suggestion-head">
-                          <span className="finance-transaction-suggestion-title">
-                            {suggestion.description?.trim() || GENERAL_EXPENSE_KIND_LABELS[generalExpenseKind]}
-                          </span>
-                          <span className="finance-transaction-suggestion-amount">
-                            {formatAmountForDisplay(suggestion.amount)} {suggestion.currency}
-                          </span>
-                        </span>
-                        {suggestion.metadata.quantity && suggestion.metadata.unitPrice ? (
-                          <small>{suggestion.metadata.quantity} × {formatAmountForDisplay(suggestion.metadata.unitPrice)} {suggestion.currency}</small>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {selectedActivityCode === "REAL_ESTATE_AGENCY" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getAgencyFormModeLabel(agencyOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "FISH_FARMING" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getFishFarmingFormModeLabel(fishFarmingOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "LIVESTOCK" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getLivestockFormModeLabel(livestockOperationKind)}
-                </p>
-              ) : null}
-              {selectedActivityCode === "GENERAL_EXPENSES" ? (
-                <p className="hint finance-form-mode-hint">
-                  {getGeneralExpensesFormModeLabel(generalExpenseOwner)}
-                </p>
-              ) : null}
-
-              <label className="operations-inline-group">
-                <span>Date et heure de l'opération</span>
-                <input
-                  type="datetime-local"
-                  value={transactionForm.occurredAt}
-                  onChange={(event) =>
-                    setTransactionForm((prev) => ({
-                      ...prev,
-                      occurredAt: event.target.value
-                    }))
-                  }
-                />
-              </label>
-
-              <label className="operations-inline-group">
-                <span>{selectedActivityCode === "BEVERAGE_DEPOT" ? "Précision (facultative)" : transactionWorkspace ? selectedProfile?.finance.fields.find((field) => field.key === "description")?.label ?? "Description" : "Description"}</span>
-                <input
-                  type="text"
-                  placeholder={
-                    selectedProfile?.finance.requiresDescription ? "Requise" : "Optionnelle"
-                  }
-                  value={transactionForm.description}
-                  onChange={(event) =>
-                    setTransactionForm((prev) => ({
-                      ...prev,
-                      description: event.target.value
-                    }))
-                  }
-                  required={selectedProfile?.finance.requiresDescription ?? false}
-                  list={
-                    selectedActivityCode === "GENERAL_EXPENSES"
-                      ? "general-expense-description-options"
-                      : isQuickFillSectorActivity(selectedActivityCode)
-                        ? "sector-transaction-description-options"
-                        : undefined
-                  }
-                />
-                {selectedActivityCode === "BEVERAGE_DEPOT" ? <span className="hint">Vous pouvez laisser ce champ vide. Ajoutez un client ou une remarque si nécessaire.</span> : null}
-                {selectedActivityCode === "GENERAL_EXPENSES" ? (
-                  <datalist id="general-expense-description-options">
-                    {generalExpenseDescriptionSuggestions.map((value) => (
-                      <option key={value} value={value} />
-                    ))}
-                  </datalist>
-                ) : null}
-                {isQuickFillSectorActivity(selectedActivityCode) ? (
-                  <datalist id="sector-transaction-description-options">
-                    {sectorDescriptionSuggestions.map((value) => (
-                      <option key={value} value={value} />
-                    ))}
-                  </datalist>
-                ) : null}
-                {(selectedActivityCode === "GENERAL_EXPENSES" && generalExpenseDescriptionSuggestions.length > 0) ||
-                (isQuickFillSectorActivity(selectedActivityCode) && sectorDescriptionSuggestions.length > 0) ? (
-                  <span className="hint">Les libellés déjà utilisés pour cette catégorie s'affichent pendant la saisie.</span>
-                ) : null}
-              </label>
-
-              {selectedActivityCode === "GENERAL_EXPENSES" ? (
-                <button
-                  type="button"
-                  className="secondary-btn general-expense-calculator-toggle"
-                  onClick={() => setShowGeneralExpenseCalculator((prev) => !prev)}
-                >
-                  {showGeneralExpenseCalculator
-                    ? "Saisir le montant directement"
-                    : "Calculer le montant (quantité × prix unitaire)"}
-                </button>
-              ) : null}
-
-              {visibleFinanceMetadataFields.map((field) => {
-                if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && beverageOperationKind === "VENTE" && field.key === "purchaseUnitPrice") return null;
-                if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && field.key === "productName") return (
-                  <label key={field.key} className="operations-inline-group"><span>Produit en stock *</span>
-                    <select required disabled={beverageStock.loading || Boolean(beverageStock.error)} value={transactionForm.metadata.beverageProductId ?? ""} onChange={(event) => {
-                      const product = beverageStock.items.find((item) => item.id === event.target.value);
-                      setTransactionForm((previous) => ({ ...previous, metadata: { ...previous.metadata,
-                        beverageProductId: product?.id ?? "", productName: product?.name ?? "", beverageUnit: product?.unit ?? "",
-                        purchaseUnitPrice: beverageOperationKind === "VENTE" ? product?.averageUnitCost ?? "" : "" } }));
-                    }}><option value="">Choisir un produit</option>{beverageStock.items.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.quantity} {product.unit} disponible(s)</option>)}</select>
-                    {selectedBeverageProduct ? <span className="hint">Unité : {selectedBeverageProduct.unit}. Disponible : {selectedBeverageProduct.quantity}. {beverageOperationKind === "VENTE" ? `Coût moyen d'achat : ${formatLocalizedAmountForDisplay(selectedBeverageProduct.averageUnitCost)} XOF par ${selectedBeverageProduct.unit}.` : ""}</span> : <span className="hint">Produit absent ? Ajoutez-le dans Stock disponible avant de saisir l'opération.</span>}
-                  </label>
-                );
-                const beverageRequiredFields = beverageOperationKind === "VENTE"
-                  ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"]
-                  : beverageOperationKind === "ACHAT_STOCK"
-                    ? ["productName", "quantity", "purchaseUnitPrice", "supplierRef"]
-                    : beverageOperationKind === "DEPENSE"
-                      ? ["expenseCategory"]
-                      : [];
-                const isFieldRequired = field.required || (
-                  selectedActivityCode === "BEVERAGE_DEPOT" && beverageRequiredFields.includes(field.key)
-                ) || (
-                  selectedActivityCode === "HYDROCARBON" &&
-                  transactionForm.metadata.hydrocarbonCategory === "Citerne" &&
-                  field.key === "hydrocarbonAssetRef"
-                ) || (
-                  selectedActivityCode === "TRANSPORT" &&
-                  transactionForm.metadata.transportCategory === "Camion benne" &&
-                  (field.key === DUMP_TRUCK_OPERATION_KEY ||
-                    field.key === "vehicleRef" ||
-                    (transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] === "VERSEMENT_AMCCO" &&
-                      field.key === "counterpartyRef") ||
-                    ((transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] === "TRAVAUX" ||
-                      transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] === "LOCATION") &&
-                      ["quantity", "purchaseUnitPrice", "routeRef"].includes(field.key)) ||
-                    (["DEPENSE", "ENTRETIEN", "CARBURANT"].includes(
-                      transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] ?? ""
-                    ) && field.key === "expenseCategory"))
-                );
-                const fieldLabel = selectedActivityCode === "BEVERAGE_DEPOT"
-                  ? `${field.label}${isFieldRequired ? " *" : " (facultatif)"}`
-                  : field.label;
-                if (
-                  selectedActivityCode === "GENERAL_EXPENSES" &&
-                  !showGeneralExpenseCalculator &&
-                  (field.key === "quantity" || field.key === "unitPrice")
-                ) {
-                  return null;
-                }
-
-                if (selectedActivityCode === "RENTAL" && field.key === "tenantRef") {
-                  const tenantNameValue = transactionForm.metadata.tenantRef ?? "";
-                  const selectedTenantId =
-                    tenants.find((tenant) => tenant.name === tenantNameValue)?.id ?? "";
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <select
-                        value={selectedTenantId}
-                        onChange={(event) => {
-                          const nextTenantId = event.target.value;
-                          const selectedTenant = tenants.find((tenant) => tenant.id === nextTenantId);
-                          setTransactionForm((prev) => {
-                            const nextMetadata = {
-                              ...prev.metadata,
-                              tenantRef: selectedTenant?.name ?? "",
-                              unitLabel: selectedTenant?.unitLabel ?? "",
-                              monthlyRent: selectedTenant
-                                ? formatAmountForInput(selectedTenant.monthlyRent)
-                                : ""
-                            };
-                            const derivedAmount = deriveRentalAmount(rentalOperationKind, nextMetadata);
-                            const descriptionPrefix = rentalOperationKind === "CAUTION" ? "Caution" : "Loyer";
-                            return {
-                              ...prev,
-                              amount: formatAmountForInput(derivedAmount ?? prev.amount),
-                              description: selectedTenant
-                                ? `${descriptionPrefix} ${selectedTenant.name}`
-                                : prev.description,
-                              metadata: nextMetadata
-                            };
-                          });
-                        }}
-                        required={field.required}
-                      >
-                        <option value="">-- Choisir un locataire --</option>
-                        {tenants.map((tenant) => (
-                          <option key={tenant.id} value={tenant.id}>
-                            {tenant.name} — {tenant.unitLabel}
-                          </option>
-                        ))}
-                      </select>
-                      {tenants.length === 0 ? (
-                        <small className="hint">
-                          Aucun locataire enregistré. {referenceView?.view === "tenants"
-                            ? <Link to="/finance/transactions?activityCode=RENTAL&view=tenants">Ouvrir les locataires</Link>
-                            : "Demandez à un responsable d'ajouter le locataire."}
-                        </small>
-                      ) : null}
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "GENERAL_STORE" && field.key === "shopRef") {
-                  const shopNameValue = transactionForm.metadata.shopRef ?? "";
-                  const selectedShopId = shops.find((shop) => shop.name === shopNameValue)?.id ?? "";
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <select
-                        value={selectedShopId}
-                        onChange={(event) => {
-                          const nextShopId = event.target.value;
-                          const selectedShop = shops.find((shop) => shop.id === nextShopId);
-                          setTransactionForm((prev) => ({
-                            ...prev,
-                            metadata: {
-                              ...prev.metadata,
-                              shopRef: selectedShop?.name ?? ""
-                            }
-                          }));
-                        }}
-                        required={field.required}
-                      >
-                        <option value="">-- Choisir une boutique --</option>
-                        {shops.map((shop) => (
-                          <option key={shop.id} value={shop.id}>
-                            {shop.name}
-                            {shop.location ? ` — ${shop.location}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                      {shops.length === 0 ? (
-                        <small className="hint">
-                          Aucune boutique enregistrée. {referenceView?.view === "shops"
-                            ? <Link to="/finance/transactions?activityCode=GENERAL_STORE&view=shops">Ouvrir les boutiques</Link>
-                            : "Demandez à un responsable d'ajouter la boutique."}
-                        </small>
-                      ) : null}
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "BTP" && field.key === "projectRef") {
-                  const projectNameValue = transactionForm.metadata.projectRef ?? "";
-                  const selectedProjectId =
-                    projects.find((project) => project.name === projectNameValue)?.id ?? "";
-                  const selectedProject = projects.find((project) => project.name === projectNameValue);
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <select
-                        value={selectedProjectId}
-                        onChange={(event) => {
-                          const nextProjectId = event.target.value;
-                          const selectedProjectOption = projects.find(
-                            (project) => project.id === nextProjectId
-                          );
-                          setTransactionForm((prev) => ({
-                            ...prev,
-                            metadata: {
-                              ...prev.metadata,
-                              projectRef: selectedProjectOption?.name ?? ""
-                            }
-                          }));
-                        }}
-                        required={field.required}
-                      >
-                        <option value="">-- Choisir un chantier --</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                      {projects.length === 0 ? (
-                        <small className="hint">
-                          Aucun chantier enregistré. {referenceView?.view === "projects"
-                            ? <Link to="/finance/transactions?activityCode=BTP&view=projects">Ouvrir les chantiers</Link>
-                            : "Demandez à un responsable d'ajouter le chantier."}
-                        </small>
-                      ) : selectedProject ? (
-                        <small className="hint">
-                          {selectedProject.clientRef ? `Client: ${selectedProject.clientRef}` : ""}
-                          {selectedProject.contractRef ? ` | Marché: ${selectedProject.contractRef}` : ""}
-                          {selectedProject.location ? ` | Lieu: ${selectedProject.location}` : ""}
-                        </small>
-                      ) : null}
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "RENTAL" && field.key === "unitLabel") {
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <input
-                        type="text"
-                        value={transactionForm.metadata.unitLabel ?? ""}
-                        readOnly
-                        disabled
-                      />
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "HARDWARE" && field.key === "recipientRef") {
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>Remis à / quincaillerie</span>
-                      <input
-                        type="text"
-                        list="hardware-recipients"
-                        placeholder="Nom de la personne ou de la quincaillerie"
-                        value={transactionForm.metadata.recipientRef ?? ""}
-                        onChange={(event) => setTransactionForm((prev) => ({
-                          ...prev,
-                          metadata: { ...prev.metadata, recipientRef: event.target.value }
-                        }))}
-                        required={hardwareOperationKind === "ITEM_ENTRY" || hardwareOperationKind === "RECOUVREMENT"}
-                      />
-                      <datalist id="hardware-recipients">
-                        {hardwareRecipients.map((recipient) => <option key={recipient} value={recipient} />)}
-                      </datalist>
-                      <small className="hint">Utilisez le même nom pour les achats remis et les recouvrements.</small>
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "HARDWARE" && field.key === "itemName") {
-                  const itemNameValue = transactionForm.metadata.itemName ?? "";
-                  const matchesCatalogArticle = articles.some(
-                    (article) => article.name === itemNameValue
-                  );
-                  const showOtherArticleInput =
-                    hardwareCustomArticleMode || (itemNameValue !== "" && !matchesCatalogArticle);
-                  const selectValue = showOtherArticleInput
-                    ? "__OTHER__"
-                    : matchesCatalogArticle
-                      ? itemNameValue
-                      : "";
-
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <select
-                        value={selectValue}
-                        onChange={(event) => {
-                          const nextValue = event.target.value;
-                          if (nextValue === "__OTHER__") {
-                            setHardwareCustomArticleMode(true);
-                            return;
-                          }
-                          setHardwareCustomArticleMode(false);
-                          setTransactionForm((prev) => {
-                            const selectedArticle = articles.find(
-                              (article) => article.name === nextValue
-                            );
-                            const unitPricePatch = deriveHardwareArticleUnitPricePatch(
-                              hardwareOperationKind,
-                              selectedArticle
-                            );
-                            const nextMetadata = {
-                              ...prev.metadata,
-                              itemName: nextValue,
-                              ...(unitPricePatch.purchaseUnitPrice
-                                ? { purchaseUnitPrice: formatAmountForInput(unitPricePatch.purchaseUnitPrice) }
-                                : {}),
-                              ...(unitPricePatch.saleUnitPrice
-                                ? { saleUnitPrice: formatAmountForInput(unitPricePatch.saleUnitPrice) }
-                                : {})
-                            };
-                            const derivedMargin = deriveHardwareMarginAmount(
-                              hardwareOperationKind,
-                              nextMetadata,
-                              articles
-                            );
-                            const metadataWithMargin = derivedMargin
-                              ? { ...nextMetadata, marginAmount: formatAmountForInput(derivedMargin) }
-                              : nextMetadata;
-                            const derivedAmount = deriveSectorAmount(
-                              "HARDWARE",
-                              prev.type,
-                              metadataWithMargin
-                            );
-                            return {
-                              ...prev,
-                              amount: derivedAmount ? formatAmountForInput(derivedAmount) : prev.amount,
-                              metadata: metadataWithMargin
-                            };
-                          });
-                        }}
-                        required={field.required}
-                      >
-                        <option value="">-- Choisir un article --</option>
-                        {articles.map((article) => (
-                          <option key={article.id} value={article.name}>
-                            {article.name}
-                          </option>
-                        ))}
-                        <option value="__OTHER__">Autre (préciser)</option>
-                      </select>
-                      {showOtherArticleInput ? (
-                        <input
-                          type="text"
-                          placeholder="Nom de l'article"
-                          value={itemNameValue}
-                          onChange={(event) => {
-                            const nextValue = event.target.value;
-                            setTransactionForm((prev) => ({
-                              ...prev,
-                              metadata: {
-                                ...prev.metadata,
-                                itemName: nextValue
-                              }
-                            }));
-                          }}
-                          required={field.required}
-                        />
-                      ) : null}
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "TRANSPORT" && field.key === "transportCategory") {
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <select
-                        value={transactionForm.metadata.transportCategory ?? ""}
-                        onChange={(event) => {
-                          const category = event.target.value;
-                          setTransactionForm((prev) => {
-                            const operationKind = category === "Camion benne"
-                              ? prev.metadata[DUMP_TRUCK_OPERATION_KEY] || (prev.type === "CASH_OUT" ? "DEPENSE" : "TRAVAUX")
-                              : "";
-                            const nextMetadata = {
-                              ...prev.metadata,
-                              transportCategory: category,
-                              assetType: category,
-                              ...(category === "Camion benne"
-                                ? { [DUMP_TRUCK_OPERATION_KEY]: operationKind }
-                                : {
-                                    [DUMP_TRUCK_OPERATION_KEY]: "",
-                                    counterpartyRef: "",
-                                    quantity: "",
-                                    purchaseUnitPrice: "",
-                                    amccoAmount: "",
-                                    expenseCategory: ""
-                                  })
-                            };
-                            const nextType = operationKind === "VERSEMENT_AMCCO" ||
-                              operationKind === "DEPENSE" ||
-                              operationKind === "ENTRETIEN" ||
-                              operationKind === "CARBURANT"
-                              ? "CASH_OUT"
-                              : category === "Camion benne" ? "CASH_IN" : prev.type;
-                            const derivedAmount = category === "Camion benne"
-                              ? deriveSectorAmount("TRANSPORT", nextType, nextMetadata)
-                              : null;
-                            return {
-                              ...prev,
-                              type: nextType,
-                              amount: derivedAmount
-                                ? formatAmountForInput(derivedAmount)
-                                : category === "Camion benne" ? "" : nextType !== prev.type ? "" : prev.amount,
-                              metadata: nextMetadata
-                            };
-                          });
-                        }}
-                        title={field.helpText}
-                        required={isFieldRequired}
-                      >
-                        <option value="">Choisir une catégorie</option>
-                        {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
-                        {editingTransactionId && transactionForm.metadata.transportCategory === "Citerne" ? (
-                          <option value="Citerne">Citerne (ancien enregistrement)</option>
-                        ) : null}
-                      </select>
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "TRANSPORT" && field.key === DUMP_TRUCK_OPERATION_KEY) {
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{field.label}</span>
-                      <select
-                        value={transactionForm.metadata[DUMP_TRUCK_OPERATION_KEY] ?? ""}
-                        onChange={(event) => {
-                          const operationKind = event.target.value;
-                          const incoming = ["TRAVAUX", "LOCATION"].includes(operationKind);
-                          const outgoing = ["VERSEMENT_AMCCO", "DEPENSE", "ENTRETIEN", "CARBURANT"].includes(operationKind);
-                          const workOrRental = operationKind === "TRAVAUX" || operationKind === "LOCATION";
-                          const expense = ["DEPENSE", "ENTRETIEN", "CARBURANT"].includes(operationKind);
-                          setTransactionForm((prev) => {
-                            const nextType = incoming ? "CASH_IN" : outgoing ? "CASH_OUT" : prev.type;
-                            const nextMetadata = {
-                              ...prev.metadata,
-                              [DUMP_TRUCK_OPERATION_KEY]: operationKind,
-                              ...(operationKind !== "VERSEMENT_AMCCO" ? { counterpartyRef: "" } : {}),
-                              ...(!workOrRental
-                                ? { quantity: "", purchaseUnitPrice: "", amccoAmount: "" }
-                                : {}),
-                              ...(!expense ? { expenseCategory: "" } : {})
-                            };
-                            const derivedAmount = incoming
-                              ? deriveSectorAmount("TRANSPORT", nextType, nextMetadata)
-                              : null;
-                            return {
-                              ...prev,
-                              type: nextType,
-                              amount: derivedAmount
-                                ? formatAmountForInput(derivedAmount)
-                                : operationKind === prev.metadata[DUMP_TRUCK_OPERATION_KEY]
-                                  ? prev.amount
-                                  : "",
-                              metadata: nextMetadata
-                            };
-                          });
-                        }}
-                        title={field.helpText}
-                        required={isFieldRequired}
-                      >
-                        <option value="">Choisir une opération</option>
-                        {field.options?.map((option) => (
-                          <option key={option} value={option}>
-                            {DUMP_TRUCK_OPERATION_LABELS[option] ?? option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  );
-                }
-
-                if (selectedActivityCode === "HYDROCARBON" && field.key === "counterpartyRef") {
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{transactionForm.type === "CASH_OUT" ? "Fournisseur" : "Client"}</span>
-                      <input
-                        type="text"
-                        placeholder={transactionForm.type === "CASH_OUT" ? "Nom du fournisseur" : "Nom du client"}
-                        value={transactionForm.metadata[field.key] ?? ""}
-                        onChange={(event) => setTransactionForm((prev) => ({
-                          ...prev,
-                          metadata: { ...prev.metadata, [field.key]: event.target.value }
-                        }))}
-                        title={field.helpText}
-                      />
-                    </label>
-                  );
-                }
-
-                if (field.options?.length) {
-                  return (
-                    <label key={field.key} className="operations-inline-group">
-                      <span>{fieldLabel}</span>
-                      <select value={transactionForm.metadata[field.key] ?? ""} onChange={(event) => setTransactionForm((prev) => ({ ...prev, metadata: { ...prev.metadata, [field.key]: event.target.value } }))} title={field.helpText} required={isFieldRequired}>
-                        <option value="">Choisir une catégorie</option>
-                        {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </label>
-                  );
-                }
-
-                return (
-                <label key={field.key} className="operations-inline-group">
-                  <span>{fieldLabel}</span>
-                  <input
-                    type="text"
-                    list={selectedActivityCode === "SERVICES" && field.key === "serviceCategory" ? "finance-service-categories" : undefined}
-                    inputMode={isMoneyMetadataField(field.key) ? "numeric" : getMetadataInputMode(field.key)}
-                    placeholder={field.helpText || field.label}
-                    value={transactionForm.metadata[field.key] ?? ""}
-                    readOnly={isLegacyBeverageEdit && ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"].includes(field.key)}
-                    onChange={(event) => {
-                      const nextValue = isMoneyMetadataField(field.key)
-                        ? formatEditableAmountForInput(event.target.value)
-                        : event.target.value;
-                      setTransactionForm((prev) => {
-                        const nextMetadata = {
-                          ...prev.metadata,
-                          [field.key]: nextValue
-                        };
-                        const shouldDeriveAmount =
-                          (selectedActivityCode === "HARDWARE" && shouldDeriveHardwareAmount(field.key)) ||
-                          (selectedActivityCode === "FOOD" && shouldDeriveFoodAmount(field.key)) ||
-                          (selectedActivityCode === "AGRICULTURE" && shouldDeriveAgricultureAmount(field.key)) ||
-                          (selectedActivityCode === "BTP" && shouldDeriveBtpAmount(field.key)) ||
-                          (selectedActivityCode === "RENTAL" && shouldDeriveRentalAmount(field.key)) ||
-                          (selectedActivityCode === "HOTEL_LODGING" && shouldDeriveHotelAmount(field.key)) ||
-                          (selectedActivityCode === "WATER" && shouldDeriveWaterAmount(field.key)) ||
-                          (selectedActivityCode === "BEVERAGE_DEPOT" && shouldDeriveBeverageAmount(field.key)) ||
-                          (selectedActivityCode === "REAL_ESTATE_AGENCY" && shouldDeriveAgencyAmount(field.key)) ||
-                          (selectedActivityCode === "FISH_FARMING" && shouldDeriveFishFarmingAmount(field.key)) ||
-                          (selectedActivityCode === "LIVESTOCK" && shouldDeriveLivestockAmount(field.key)) ||
-                          (selectedActivityCode === "TRANSPORT" &&
-                            transactionForm.metadata.transportCategory === "Camion benne" &&
-                            shouldDeriveTransportAmount(field.key)) ||
-                          (selectedActivityCode === "GENERAL_EXPENSES" && shouldDeriveGeneralExpensesAmount(field.key));
-                        const derivedAmount = shouldDeriveAmount
-                          ? deriveSectorAmount(selectedActivityCode, prev.type, nextMetadata)
-                          : null;
-                        const derivedMargin =
-                          selectedActivityCode === "HARDWARE" && field.key === "quantity"
-                            ? deriveHardwareMarginAmount(hardwareOperationKind, nextMetadata, articles)
-                            : null;
-                        const finalMetadata = derivedMargin
-                          ? { ...nextMetadata, marginAmount: formatAmountForInput(derivedMargin) }
-                          : nextMetadata;
-                        return {
-                          ...prev,
-                          amount: derivedAmount ? formatAmountForInput(derivedAmount) : prev.amount,
-                          metadata: finalMetadata
-                        };
-                      });
-                    }}
-                    onBlur={() => {
-                      if (!isMoneyMetadataField(field.key)) {
-                        return;
-                      }
-                      setTransactionForm((prev) => ({
-                        ...prev,
-                        metadata: {
-                          ...prev.metadata,
-                          [field.key]: formatAmountForInput(prev.metadata[field.key] ?? "")
-                        }
-                      }));
-                    }}
-                    title={field.helpText}
-                    required={isFieldRequired}
-                  />
-                </label>
-                );
-              })}
-            </div>
-            {selectedActivityCode === "SERVICES" ? (
-              <datalist id="finance-service-categories">
-                {serviceCategorySuggestions.map((value) => <option key={value} value={value} />)}
-              </datalist>
-            ) : null}
-          </details>
-
-          {transactionWorkspace ? renderTransactionProof() : null}
-
-          <div className="mobile-sticky-form-actions">
-            <button
-              type="submit"
-              disabled={
-                accounts.length === 0 ||
-                !selectedActivityCode ||
-                isLoadingActivities ||
-                isSavingTransaction
-              }
-            >
-              {isSavingTransaction ? (
-                <>
-                  <ButtonSpinner />
-                  {transactionProofFile
-                    ? "Enregistrement et envoi de la preuve..."
-                    : "Enregistrement..."}
-                </>
-              ) : editingTransactionId ? (
-                "Enregistrer les modifications"
-              ) : (
-                "Enregistrer la transaction"
-              )}
-            </button>
-            {editingTransactionId ? (
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={handleCancelEditTransaction}
-                disabled={isSavingTransaction}
-              >
-                Annuler la modification
-              </button>
-            ) : null}
-          </div>
-          </form>
+          {shouldRenderTransactionForm ? <DeferredViewBoundary key={formScope} hasUnsavedChanges={transactionChanges.isDirty}><Suspense fallback={<p role="status">Chargement du formulaire…</p>}><FinanceTransactionForm key={formScope}
+            selectedActivityCode={selectedActivityCode}
+            handleSaveTransaction={handleSaveTransaction}
+            transactionChanges={transactionChanges}
+            isSavingTransaction={isSavingTransaction}
+            transactionForm={transactionForm}
+            setTransactionForm={setTransactionForm}
+            accounts={accounts}
+            storeOperationKind={storeOperationKind}
+            dailyActivityCategories={dailyActivityCategories}
+            dailyAgreementOperationKind={dailyAgreementOperationKind}
+            hardwareOperationKind={hardwareOperationKind}
+            foodOperationKind={foodOperationKind}
+            agricultureOperationKind={agricultureOperationKind}
+            btpOperationKind={btpOperationKind}
+            rentalOperationKind={rentalOperationKind}
+            hotelOperationKind={hotelOperationKind}
+            beverageOperationKind={beverageOperationKind}
+            isLegacyBeverageEdit={isLegacyBeverageEdit}
+            waterOperationKind={waterOperationKind}
+            agencyOperationKind={agencyOperationKind}
+            fishFarmingOperationKind={fishFarmingOperationKind}
+            livestockOperationKind={livestockOperationKind}
+            generalExpenseKind={generalExpenseKind}
+            allowedCurrencies={allowedCurrencies}
+            selectedActivity={selectedActivity}
+            transactionWorkspace={transactionWorkspace}
+            renderTransactionProof={renderTransactionProof}
+            hasRequiredFinanceDetails={hasRequiredFinanceDetails}
+            sectorTransactionSuggestions={sectorTransactionSuggestions}
+            applySectorTransactionSuggestion={applySectorTransactionSuggestion}
+            generalExpenseSuggestions={generalExpenseSuggestions}
+            applyGeneralExpenseSuggestion={applyGeneralExpenseSuggestion}
+            generalExpenseOwner={generalExpenseOwner}
+            selectedProfile={selectedProfile}
+            generalExpenseDescriptionSuggestions={generalExpenseDescriptionSuggestions}
+            sectorDescriptionSuggestions={sectorDescriptionSuggestions}
+            setShowGeneralExpenseCalculator={setShowGeneralExpenseCalculator}
+            showGeneralExpenseCalculator={showGeneralExpenseCalculator}
+            visibleFinanceMetadataFields={visibleFinanceMetadataFields}
+            beverageStock={beverageStock}
+            selectedBeverageProduct={selectedBeverageProduct}
+            tenants={tenants}
+            referenceView={referenceView}
+            shops={shops}
+            projects={projects}
+            hardwareRecipients={hardwareRecipients}
+            articles={articles}
+            hardwareCustomArticleMode={hardwareCustomArticleMode}
+            setHardwareCustomArticleMode={setHardwareCustomArticleMode}
+            editingTransactionId={editingTransactionId}
+            serviceCategorySuggestions={serviceCategorySuggestions}
+            isLoadingActivities={isLoadingActivities}
+            transactionProofFile={transactionProofFile}
+            handleCancelEditTransaction={handleCancelEditTransaction}
+          /></Suspense></DeferredViewBoundary> : null}
         </details>
       </section>
 

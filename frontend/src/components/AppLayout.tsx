@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { Breadcrumbs } from "./Breadcrumbs";
 import { GlobalSearch } from "./GlobalSearch";
 import { QuickActions } from "./QuickActions";
-import { isBusinessActivityCode } from "../config/businessActivities";
+import { isSelectableBusinessActivityCode } from "../config/businessActivities";
 import { ApiError, getAlertsSummaryRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getNavigationForRole, ROLE_LABELS, type FeatureKey } from "../config/permissions";
@@ -203,7 +203,7 @@ export function AppLayout(): JSX.Element {
   useEffect(() => {
     if (isLoadingActivities || !["/dashboard", "/finance/transactions", "/operations/tasks", "/reports"].includes(location.pathname)) return;
     const requestedCode = new URLSearchParams(location.search).get("activityCode");
-    if (!requestedCode || !isBusinessActivityCode(requestedCode)) return;
+    if (!requestedCode || !isSelectableBusinessActivityCode(requestedCode)) return;
     if (restrictedActivityCode && requestedCode !== restrictedActivityCode) return;
     if (!enabledActivities.some((activity) => activity.code === requestedCode)) return;
     if (requestedCode !== selectedActivityCode) setSelectedActivityCode(requestedCode);
@@ -216,6 +216,7 @@ export function AppLayout(): JSX.Element {
     }
 
     let isMounted = true;
+    setUnreadAlertsCount(0);
 
     const loadSummary = async (): Promise<void> => {
       const requestId = ++unreadSummaryRequestRef.current;
@@ -236,7 +237,8 @@ export function AppLayout(): JSX.Element {
     void loadSummary();
 
     const onAlertsChanged = (event: Event): void => {
-      const detail = (event as CustomEvent<{ delta?: number; unreadCount?: number }>).detail;
+      const detail = (event as CustomEvent<{ delta?: number; unreadCount?: number; companyId?: string; userId?: string }>).detail;
+      if (detail?.companyId !== activeCompany?.id || detail?.userId !== user?.id) return;
       if (typeof detail?.unreadCount === "number") {
         unreadSummaryRequestRef.current += 1;
         setUnreadAlertsCount(detail.unreadCount);
@@ -258,7 +260,7 @@ export function AppLayout(): JSX.Element {
       unreadSummaryRequestRef.current += 1;
       window.removeEventListener("amcco-alerts-changed", onAlertsChanged);
     };
-  }, [activeCompany?.id, isBootstrapMode, withAuthorizedToken]);
+  }, [activeCompany?.id, user?.id, isBootstrapMode, withAuthorizedToken]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -444,7 +446,7 @@ export function AppLayout(): JSX.Element {
   }
 
   function handleActivityChange(nextValue: string): void {
-    const nextActivityCode = isBusinessActivityCode(nextValue) ? nextValue : null;
+    const nextActivityCode = isSelectableBusinessActivityCode(nextValue) ? nextValue : null;
     if (nextActivityCode && !selectableActivities.some((activity) => activity.code === nextActivityCode)) return;
     if (
       nextActivityCode !== selectedActivityCode &&

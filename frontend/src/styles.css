@@ -13839,6 +13839,10 @@ textarea {
     gap: 10px;
   }
 
+  .reports-details-disclosure[hidden] {
+    display: none !important;
+  }
+
   .reports-details-disclosure > summary {
     min-height: 48px;
     display: flex;

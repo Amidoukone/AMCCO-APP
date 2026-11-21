@@ -1,10 +1,12 @@
-﻿import { useState, type FormEvent } from "react";
+﻿import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { ButtonSpinner } from "../components/ButtonSpinner";
 import { ApiError, changeOwnPasswordRequest } from "../lib/api";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
+import { useActionScope } from "../lib/useActionScope";
+import { hasUnsavedForms } from "../lib/useUnsavedChangesGuard";
 
 const SECURITY_PAGE_TITLE = "Sécurité et accès";
 const SECURITY_PANEL_TITLE = "Sécurité personnelle";
@@ -20,7 +22,9 @@ const LOGOUT_LABEL = "Se déconnecter";
 
 export function SecuritySettingsPage(): JSX.Element {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout, user, activeCompany } = useAuth();
+  const actionScopeKey = JSON.stringify([activeCompany?.id, user?.id, user?.role]);
+  const captureActionScope = useActionScope(actionScopeKey);
   const isReadOnlyOwner = user?.role === "OWNER";
   const withAuthorizedToken = useAuthorizedRequest();
   const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
@@ -31,9 +35,19 @@ export function SecuritySettingsPage(): JSX.Element {
     newPassword: "",
     confirmPassword: ""
   });
+  const hasPasswordChanges = Boolean(passwordForm.currentPassword || passwordForm.newPassword || passwordForm.confirmPassword);
+
+  useEffect(() => {
+    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    setIsChangingPassword(false);
+    setPasswordErrorMessage(null);
+    setPasswordSuccessMessage(null);
+  }, [actionScopeKey]);
 
   async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (isChangingPassword) return;
+    const isCurrentAction = captureActionScope();
     setPasswordErrorMessage(null);
     setPasswordSuccessMessage(null);
 
@@ -55,6 +69,7 @@ export function SecuritySettingsPage(): JSX.Element {
           newPassword: passwordForm.newPassword
         })
       );
+      if (!isCurrentAction()) return;
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
@@ -62,15 +77,17 @@ export function SecuritySettingsPage(): JSX.Element {
       });
       setPasswordSuccessMessage(PASSWORD_UPDATE_SUCCESS);
     } catch (error) {
+      if (!isCurrentAction()) return;
       setPasswordErrorMessage(
         error instanceof ApiError ? error.message : PASSWORD_UPDATE_FAILURE
       );
     } finally {
-      setIsChangingPassword(false);
+      if (isCurrentAction()) setIsChangingPassword(false);
     }
   }
 
   async function handleLogout(): Promise<void> {
+    if (hasUnsavedForms() && !window.confirm("Des modifications ne sont pas enregistrées. Se déconnecter abandonnera la saisie. Continuer ?")) return;
     await logout();
     navigate("/login", { replace: true });
   }
@@ -89,11 +106,12 @@ export function SecuritySettingsPage(): JSX.Element {
           successMessage={passwordSuccessMessage}
           isLoading={isChangingPassword}
         />
-        <form className="admin-form security-password-form" onSubmit={handlePasswordSubmit}>
+        <form className="admin-form security-password-form" onSubmit={handlePasswordSubmit} data-unsaved-sector-form={hasPasswordChanges ? "true" : undefined}>
           <input
             type="password"
             placeholder="Mot de passe actuel"
             value={passwordForm.currentPassword}
+            disabled={isChangingPassword}
             onChange={(event) =>
               setPasswordForm((prev) => ({
                 ...prev,
@@ -107,6 +125,7 @@ export function SecuritySettingsPage(): JSX.Element {
             type="password"
             placeholder="Nouveau mot de passe"
             value={passwordForm.newPassword}
+            disabled={isChangingPassword}
             onChange={(event) =>
               setPasswordForm((prev) => ({
                 ...prev,
@@ -121,6 +140,7 @@ export function SecuritySettingsPage(): JSX.Element {
             type="password"
             placeholder="Confirmer le mot de passe"
             value={passwordForm.confirmPassword}
+            disabled={isChangingPassword}
             onChange={(event) =>
               setPasswordForm((prev) => ({
                 ...prev,

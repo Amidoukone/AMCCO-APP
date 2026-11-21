@@ -24,7 +24,7 @@ const errors = [];
 
 async function fixture(definition, viewport, { role = "ACCOUNTANT", empty = false, failRead = false, foreignRecord = false } = {}) {
   const context = await browser.newContext({ viewport });
-  const calls = [];
+  const calls = [], directoryModules = [];
   const original = { ...definition.values, id: `${definition.view}-existing`, companyId: company.id, isActive: true };
   let records = empty ? [] : [{ ...original }];
   let rejectNextRead = failRead;
@@ -72,10 +72,14 @@ async function fixture(definition, viewport, { role = "ACCOUNTANT", empty = fals
     return route.fulfill({ status: 200, json: data });
   });
   const page = await context.newPage();
+  page.on("request", (request) => {
+    const match = new URL(request.url()).pathname.match(/\/(HardwareArticlesPanel|RentalTenantsPanel|GeneralStoreShopsPanel|BtpProjectsPanel)/);
+    if (match) directoryModules.push(match[1]);
+  });
   page.setDefaultTimeout(10000);
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("dialog", (dialog) => dialog.dismiss());
-  return { context, page, calls, original, records: () => records, failNextWrite: () => { rejectNextWrite = true; } };
+  return { context, page, calls, directoryModules, original, records: () => records, failNextWrite: () => { rejectNextWrite = true; } };
 }
 
 async function waitFor(predicate, message) {
@@ -89,13 +93,17 @@ async function waitFor(predicate, message) {
 try {
   for (const definition of definitions) {
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
-      const { context, page, calls, original, records, failNextWrite } = await fixture(definition, viewport);
+      const { context, page, calls, directoryModules, original, records, failNextWrite } = await fixture(definition, viewport);
       const url = `${baseURL}/finance/transactions?activityCode=${definition.code}`;
       await page.goto(url);
+      await page.locator("#transactions-list").waitFor();
+      assert.deepEqual(directoryModules, [], "Directory interfaces must not load with the transaction list");
       const nav = page.getByRole("navigation", { name: "Pages du secteur", exact: true });
       await nav.getByRole("link", { name: definition.label, exact: true }).click();
       const directory = page.getByRole("region", { name: definition.label, exact: true });
       await directory.getByRole("heading", { name: original.name, exact: true }).waitFor();
+      const expectedModule = { GENERAL_STORE: "GeneralStoreShopsPanel", RENTAL: "RentalTenantsPanel", BTP: "BtpProjectsPanel" }[definition.code];
+      assert.deepEqual([...new Set(directoryModules)], [expectedModule], "Only the selected directory interface should load");
       assert.equal(await page.locator("#transaction-create").count(), 0);
       assert.equal(await page.locator(`#${definition.anchor}`).getAttribute("open"), null, "Creation form starts collapsed");
       await page.getByLabel(definition.search, { exact: true }).fill("sans résultat");

@@ -85,7 +85,7 @@ import type {
 } from "../types/tasks";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.toString() ?? "http://localhost:4000/api/v1";
+  import.meta.env?.VITE_API_BASE_URL?.toString() ?? "http://localhost:4000/api/v1";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
@@ -96,13 +96,51 @@ type RequestOptions = {
 };
 
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
-const completedGetResponses = new Map<string, { value: unknown; expiresAt: number }>();
+type CacheScope = "alerts" | "dashboard" | "reports" | "finance" | "operations" | "references" | "other";
+const completedGetResponses = new Map<string, { value: unknown; expiresAt: number; scope: CacheScope }>();
 const MAX_COMPLETED_GET_RESPONSES = 60;
 let inFlightGetEpoch = 0;
+const cacheScopeEpochs: Record<CacheScope, number> = {
+  alerts: 0, dashboard: 0, reports: 0, finance: 0, operations: 0, references: 0, other: 0
+};
+
+function getCacheScope(path: string): CacheScope {
+  const resource = path.split("?")[0].split("/")[1];
+  switch (resource) {
+    case "alerts": case "dashboard": case "reports": case "finance": case "operations":
+      return resource;
+    case "activities": case "rental": case "general-store": case "btp": case "daily-activities":
+      return "references";
+    default:
+      return "other";
+  }
+}
+
+function invalidateMutationResponses(path: string): void {
+  const scope = getCacheScope(path);
+  let affected: CacheScope[];
+  if (scope === "alerts") {
+    affected = ["alerts", "dashboard", "other"];
+  } else if (scope === "finance" || scope === "operations") {
+    // These writes update their own records, report totals, audit and alerts.
+    // They do not modify sector catalogues or the other module's records.
+    affected = [scope, "reports", "dashboard", "alerts", "other"];
+  } else {
+    // Administration, authentication and catalogue changes can affect many
+    // views. Unknown writes remain conservative and invalidate everything.
+    clearCachedGetResponses();
+    return;
+  }
+  for (const affectedScope of affected) cacheScopeEpochs[affectedScope] += 1;
+  for (const [key, cached] of completedGetResponses) {
+    if (affected.includes(cached.scope)) completedGetResponses.delete(key);
+  }
+}
 
 export function clearCachedGetResponses(): void {
   inFlightGetEpoch += 1;
   completedGetResponses.clear();
+  inFlightGetRequests.clear();
 }
 
 export class ApiError extends Error {
@@ -130,10 +168,13 @@ async function parseErrorMessage(response: Response): Promise<string> {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   if (method !== "GET") {
-    clearCachedGetResponses();
+    invalidateMutationResponses(path);
   }
+  const scope = getCacheScope(path);
+  const epoch = inFlightGetEpoch;
+  const scopeEpoch = cacheScopeEpochs[scope];
   const inFlightKey = method === "GET"
-    ? `${inFlightGetEpoch}:${options.accessToken ?? ""}:${path}`
+    ? `${scope}:${epoch}:${scopeEpoch}:${options.accessToken ?? ""}:${path}`
     : null;
   const cacheTtlMs = method === "GET" ? Math.max(0, options.cacheTtlMs ?? 0) : 0;
 
@@ -170,8 +211,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     }
 
     const data = (await response.json()) as T;
-    if (inFlightKey && cacheTtlMs > 0) {
-      completedGetResponses.set(inFlightKey, { value: data, expiresAt: Date.now() + cacheTtlMs });
+    if (inFlightKey && cacheTtlMs > 0 && epoch === inFlightGetEpoch && scopeEpoch === cacheScopeEpochs[scope]) {
+      completedGetResponses.set(inFlightKey, { value: data, expiresAt: Date.now() + cacheTtlMs, scope });
       while (completedGetResponses.size > MAX_COMPLETED_GET_RESPONSES) {
         const oldestKey = completedGetResponses.keys().next().value as string | undefined;
         if (!oldestKey) break;
@@ -192,7 +233,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       inFlightGetRequests.delete(inFlightKey);
     }
     if (method !== "GET") {
-      clearCachedGetResponses();
+      invalidateMutationResponses(path);
     }
   }
 }
@@ -369,11 +410,15 @@ export function getDashboardSummaryRequest(
   accessToken: string,
   query: {
     activityCode?: BusinessActivityCode;
+    includeDetails?: boolean;
   } = {}
 ): Promise<DashboardSummaryResponse> {
   const params = new URLSearchParams();
   if (query.activityCode) {
     params.set("activityCode", query.activityCode);
+  }
+  if (typeof query.includeDetails === "boolean") {
+    params.set("details", String(query.includeDetails));
   }
   const suffix = params.toString();
   const path = suffix ? `/dashboard/summary?${suffix}` : "/dashboard/summary";
@@ -467,13 +512,11 @@ export function getGeneralStoreLedgerRowsRequest(
 
 export function downloadReportExportRequest(
   accessToken: string,
-  kind: "transactions" | "tasks" | "overview",
-  format: "csv" | "xlsx" | "pdf",
   query: {
     dateFrom?: string;
     dateTo?: string;
     activityCode?: BusinessActivityCode;
-  } = {}
+  } = {},
 ): Promise<Blob> {
   const params = new URLSearchParams();
   if (query.dateFrom) {
@@ -487,8 +530,8 @@ export function downloadReportExportRequest(
   }
   const suffix = params.toString();
   const path = suffix
-    ? `/reports/exports/${kind}.${format}?${suffix}`
-    : `/reports/exports/${kind}.${format}`;
+    ? `/reports/exports/overview.pdf?${suffix}`
+    : "/reports/exports/overview.pdf";
 
   return download(path, accessToken);
 }
@@ -1237,25 +1280,6 @@ export function getFinanceSalarySummaryRequest(
   });
 }
 
-export function downloadFinanceSalaryExportRequest(
-  accessToken: string,
-  format: "csv" | "xlsx",
-  query: {
-    payPeriod: string;
-    employeeUserId?: string;
-  }
-): Promise<Blob> {
-  const params = new URLSearchParams();
-  params.set("payPeriod", query.payPeriod);
-  if (query.employeeUserId) {
-    params.set("employeeUserId", query.employeeUserId);
-  }
-  return download(
-    `/finance/salaries/exports/monthly.${format}?${params.toString()}`,
-    accessToken
-  );
-}
-
 export function listFinanceTransactionProofsRequest(
   accessToken: string,
   transactionId: string
@@ -1294,28 +1318,6 @@ export function getFinanceProofUploadAuthRequest(
       accessToken
     }
   );
-}
-
-export function submitFinanceTransactionRequest(
-  accessToken: string,
-  transactionId: string
-): Promise<{ status: string }> {
-  return request<{ status: string }>(`/finance/transactions/${transactionId}/submit`, {
-    method: "PATCH",
-    accessToken
-  });
-}
-
-export function reviewFinanceTransactionRequest(
-  accessToken: string,
-  transactionId: string,
-  decision: "APPROVED" | "REJECTED"
-): Promise<{ status: string }> {
-  return request<{ status: string }>(`/finance/transactions/${transactionId}/review`, {
-    method: "PATCH",
-    body: { decision },
-    accessToken
-  });
 }
 
 export function deleteFinanceTransactionRequest(

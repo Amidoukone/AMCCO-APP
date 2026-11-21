@@ -196,7 +196,13 @@ export async function createCompanyTask(
     throw new HttpError(403, "Permissions insuffisantes pour créer une tâche.");
   }
 
-  await ensureCompanyActivityEnabledOrThrow(actor.companyId, input.activityCode);
+  const activityCheckPromise = ensureCompanyActivityEnabledOrThrow(
+    actor.companyId,
+    input.activityCode
+  )
+    .then(() => ({ ok: true as const }))
+    .catch((error: unknown) => ({ ok: false as const, error }));
+
   const metadata = normalizeActivityMetadata(input.metadata);
   const requestedAssignedToId = canManageTasks(actor.role) ? input.assignedToId : actor.actorId;
   try {
@@ -220,6 +226,11 @@ export async function createCompanyTask(
       throw new HttpError(400, "Utilisateur assigné invalide ou inactif.");
     }
     assignedToId = assignee.userId;
+  }
+
+  const activityCheck = await activityCheckPromise;
+  if (!activityCheck.ok) {
+    throw activityCheck.error;
   }
 
   const taskId = randomUUID();
@@ -476,19 +487,28 @@ export async function assignCompanyTasksBulk(
     }
   }
 
-  const items = [];
+  const items: OperationTask[] = [];
   const tasksById = new Map(tasks.map((task) => [task.id, task]));
-  for (const taskId of uniqueTaskIds) {
-    const task = tasksById.get(taskId)!;
-    const updated = await assignCompanyTask(actor, {
-      taskId,
-      assignedToId: input.assignedToId,
-      note: input.note
-    }, {
-      task,
-      assigneeId: validatedAssigneeId
-    });
-    items.push(updated);
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < uniqueTaskIds.length; i += BATCH_SIZE) {
+    const chunk = uniqueTaskIds.slice(i, i + BATCH_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map((taskId) =>
+        assignCompanyTask(
+          actor,
+          {
+            taskId,
+            assignedToId: input.assignedToId,
+            note: input.note
+          },
+          {
+            task: tasksById.get(taskId)!,
+            assigneeId: validatedAssigneeId
+          }
+        )
+      )
+    );
+    items.push(...chunkResults);
   }
   return items;
 }
@@ -596,28 +616,29 @@ export async function deleteCompanyTask(
     throw new HttpError(403, "Permissions insuffisantes pour supprimer cette tâche.");
   }
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "TASK_DELETED",
-    entityType: "TASK",
-    entityId: existing.id,
-    metadataJson: JSON.stringify({
-      title: existing.title,
-      description: existing.description,
-      status: existing.status,
-      activityCode: existing.activityCode,
-      assignedToId: existing.assignedToId,
-      dueDate: existing.dueDate,
-      metadata: existing.metadata
+  await Promise.all([
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: "TASK_DELETED",
+      entityType: "TASK",
+      entityId: existing.id,
+      metadataJson: JSON.stringify({
+        title: existing.title,
+        description: existing.description,
+        status: existing.status,
+        activityCode: existing.activityCode,
+        assignedToId: existing.assignedToId,
+        dueDate: existing.dueDate,
+        metadata: existing.metadata
+      })
+    }),
+    deleteOperationTask({
+      companyId: actor.companyId,
+      taskId: existing.id
     })
-  });
-
-  await deleteOperationTask({
-    companyId: actor.companyId,
-    taskId: existing.id
-  });
+  ]);
 }
 
 export async function updateCompanyTaskStatus(
@@ -686,7 +707,7 @@ export async function updateCompanyTaskStatus(
     throw new HttpError(500, "Impossible de recharger la tâche après changement de statut.");
   }
 
-  if (input.status === "BLOCKED") {
+  if (task.status !== input.status && input.status === "BLOCKED") {
     await createRoleTargetedAlerts({
       companyId: actor.companyId,
       recipientRoles: ["OWNER", "SYS_ADMIN", "SUPERVISOR"],
@@ -703,7 +724,7 @@ export async function updateCompanyTaskStatus(
     });
   }
 
-  if (input.status === "DONE" && updated.createdById !== actor.actorId) {
+  if (task.status !== input.status && input.status === "DONE" && updated.createdById !== actor.actorId) {
     await createUserTargetedAlerts({
       companyId: actor.companyId,
       recipientUserIds: [updated.createdById],
@@ -810,20 +831,21 @@ export async function addCompanyTaskComment(
     body
   });
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "TASK_COMMENT_ADDED",
-    entityType: "TASK_COMMENT",
-    entityId: commentId,
-    metadataJson: JSON.stringify({
-      taskId: task.id,
-      bodyPreview: body.slice(0, 200)
-    })
-  });
-
-  const created = await findTaskCommentById(actor.companyId, commentId);
+  const [_, created] = await Promise.all([
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: "TASK_COMMENT_ADDED",
+      entityType: "TASK_COMMENT",
+      entityId: commentId,
+      metadataJson: JSON.stringify({
+        taskId: task.id,
+        bodyPreview: body.slice(0, 200)
+      })
+    }),
+    findTaskCommentById(actor.companyId, commentId)
+  ]);
   if (!created) {
     throw new HttpError(500, "Impossible de recharger le commentaire créé.");
   }
@@ -883,23 +905,25 @@ export async function addAttachmentToCompanyTask(
     uploadedById: actor.actorId
   });
 
-  await createAuditLogRecord({
-    auditId: randomUUID(),
-    companyId: actor.companyId,
-    actorId: actor.actorId,
-    action: "TASK_ATTACHMENT_ADDED",
-    entityType: "TASK",
-    entityId: task.id,
-    metadataJson: JSON.stringify({
-      taskId: task.id,
-      attachmentId,
-      fileName: input.fileName.trim(),
-      mimeType: input.mimeType.trim(),
-      fileSize: input.fileSize
-    })
-  });
+  const [_, attachments] = await Promise.all([
+    createAuditLogRecord({
+      auditId: randomUUID(),
+      companyId: actor.companyId,
+      actorId: actor.actorId,
+      action: "TASK_ATTACHMENT_ADDED",
+      entityType: "TASK",
+      entityId: task.id,
+      metadataJson: JSON.stringify({
+        taskId: task.id,
+        attachmentId,
+        fileName: input.fileName.trim(),
+        mimeType: input.mimeType.trim(),
+        fileSize: input.fileSize
+      })
+    }),
+    listTaskAttachments(task.id)
+  ]);
 
-  const attachments = await listTaskAttachments(task.id);
   return toTaskAttachmentItems(attachments);
 }
 

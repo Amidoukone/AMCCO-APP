@@ -129,6 +129,10 @@ export function isBusinessActivityCode(value: string): value is BusinessActivity
   return BUSINESS_ACTIVITY_CODES.includes(value as BusinessActivityCode);
 }
 
+export function isSelectableBusinessActivityCode(value: string): value is BusinessActivityCode {
+  return isBusinessActivityCode(value) && value !== "REAL_ESTATE_AGENCY";
+}
+
 export function getBusinessActivityLabel(activityCode: BusinessActivityCode | null): string {
   if (!activityCode) {
     return "Non renseignée";

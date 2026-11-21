@@ -4,7 +4,7 @@ Systeme de gestion centralisee multi-activites.
 
 ## Objectif
 
-Ce repo contient une base professionnelle pour construire:
+Ce depot contient l'application de gestion AMCCO:
 
 - un frontend React + TypeScript
 - un backend Node.js + Express + TypeScript
@@ -28,6 +28,27 @@ Squarespace est detaillee dans `docs/18_production_deployment_runbook.md`.
 - MySQL local (Laragon) pour dev local
 
 ## Demarrage local
+
+### Verifier MySQL avant de lancer le backend
+
+Laragon doit avoir son serveur **MySQL demarre**, pas seulement sa fenetre ouverte.
+Depuis la racine ou le dossier `backend`, lancer :
+
+```powershell
+npm run db:check
+```
+
+Ce diagnostic verifie uniquement la connexion locale, sans modifier le schema ni
+les donnees. `ECONNREFUSED 127.0.0.1:3306` signifie que la connexion TCP a ete
+refusee : verifier **Laragon > MySQL > Start** et le port de `DATABASE_URL`
+dans `backend/.env`. Ne pas reinitialiser la base pour cette erreur.
+
+Pour tester les changements metier sur la copie de recette isolee, utiliser
+`npm run dev:recette` (racine ou `backend`) au lieu du demarrage sur la base
+locale d'origine. La preparation initiale et les identifiants sont documentes
+dans [scripts/README.md](scripts/README.md#tester-manuellement-avec-une-vraie-api-locale).
+
+### Installation initiale
 
 1. Installer les dependances:
 
@@ -134,18 +155,31 @@ IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/...
 
 ## Activites metier AMCCO
 
-Le referentiel metier v1 expose maintenant les activites du projet:
+Le catalogue propose 20 activites, selon leur activation dans chaque entreprise:
 
 - Quincaillerie
 - Magasins (commerce general)
 - Alimentation
 - Location immobiliere
 - Activites agricoles
+- BTP
 - Pisciculture
 - Elevage
+- Transport
+- Transit
+- Hydrocarbure
+- Hadj
+- Transaction (transferts d'argent)
+- Hotellerie / Auberge
 - Services divers
 - Exploitation miniere
 - Production d'eau potable
+- Depot de boissons
+- Depenses generales
+- Activites quotidiennes
+
+Le code historique `REAL_ESTATE_AGENCY` reste reconnu pour la lecture des anciennes
+donnees ; il n'est plus propose pour une nouvelle saisie.
 
 Les nouvelles transactions et nouvelles taches sont rattachees a une activite. Le dashboard, les rapports et les exports remontent aussi cette ventilation.
 
@@ -177,8 +211,12 @@ npm --workspace backend run test
 
 Couverture actuelle:
 
-- routes `auth`, `me`, `alerts`
-- services critiques `finance` et `tasks`
+- authentification, roles, alertes et contrats des routes
+- services critiques `finance`, `tasks` et `reporting`
+- profils sectoriels, stockage et initialisation des schemas
+
+Les recettes navigateur de coherence, de chargement et de concurrence locale
+sont documentees dans [scripts/README.md](scripts/README.md).
 
 Le pipeline CI GitHub execute aussi ces tests backend avant `typecheck` et `build`.
 
@@ -188,6 +226,7 @@ Le pipeline CI GitHub execute aussi ces tests backend avant `typecheck` et `buil
 - `GET /api/v1/ready` : readiness (connexion MySQL)
 - `POST /api/v1/auth/login` : authentification
 - `POST /api/v1/auth/refresh` : rotation access/refresh token
+- `POST /api/v1/auth/switch-company` : changement d'entreprise pour la session
 - `POST /api/v1/auth/logout` : invalidation de session refresh
 - `GET /api/v1/me` : profil courant (token requis)
 - `GET /api/v1/alerts` : liste des alertes ciblees de l'utilisateur
@@ -205,30 +244,30 @@ Le pipeline CI GitHub execute aussi ces tests backend avant `typecheck` et `buil
 - `PATCH /api/v1/admin/activities/:activityCode` : activation/desactivation d'une activite
 - `POST /api/v1/admin/activities/reclassify-legacy` : reclassement des anciennes donnees sans activite
 - `GET /api/v1/admin/audit-logs` : journal d'audit (OWNER/SYS_ADMIN)
-- `GET /api/v1/dashboard/summary` : synthese dashboard entreprise
+- `GET /api/v1/dashboard/summary` : synthese entreprise/secteur (`details=false` evite les historiques operationnels non affiches)
 - `GET /api/v1/finance/accounts` : liste comptes financiers (`activityCode` optionnel pour compatibilite sectorielle)
 - `POST /api/v1/finance/accounts` : creation compte financier hybride (`GLOBAL`, `DEDICATED`, `RESTRICTED`)
 - `GET /api/v1/finance/transactions` : liste transactions (`status`, `type`, `activityCode`)
-- `POST /api/v1/finance/transactions` : creation transaction DRAFT (avec `activityCode`)
+- `POST /api/v1/finance/transactions` : enregistrement direct d'une transaction (avec `activityCode`)
+- `PATCH /api/v1/finance/transactions/:transactionId` : modification d'une transaction autorisee
+- `DELETE /api/v1/finance/transactions/:transactionId` : suppression d'une transaction autorisee
 - `GET /api/v1/finance/transactions/:transactionId/proofs` : liste des preuves de la transaction
 - `GET /api/v1/finance/transactions/:transactionId/proofs/upload-auth` : auth upload ImageKit
 - `POST /api/v1/finance/transactions/:transactionId/proofs` : ajout preuve
-- `PATCH /api/v1/finance/transactions/:transactionId/submit` : soumission transaction
-- `PATCH /api/v1/finance/transactions/:transactionId/review` : validation/rejet comptable
 - `GET /api/v1/operations/tasks` : liste des taches (avec filtres `status`, `scope`, `unassignedOnly`, `activityCode`)
 - `GET /api/v1/operations/tasks/:taskId` : detail d'une tache
 - `GET /api/v1/operations/tasks/:taskId/timeline` : timeline des actions de la tache
 - `GET /api/v1/operations/tasks/:taskId/comments` : commentaires de suivi de la tache
-- `POST /api/v1/operations/tasks` : creation tache (OWNER/SYS_ADMIN/SUPERVISOR, avec `activityCode`)
+- `POST /api/v1/operations/tasks` : creation tache (SYS_ADMIN/ACCOUNTANT/SUPERVISOR/EMPLOYEE, avec `activityCode`)
 - `POST /api/v1/operations/tasks/:taskId/comments` : ajout commentaire (acteur autorise sur la tache)
 - `GET /api/v1/operations/members` : membres assignables (OWNER/SYS_ADMIN/SUPERVISOR)
-- `PATCH /api/v1/operations/tasks/:taskId/assign` : assignation/desassignation (OWNER/SYS_ADMIN/SUPERVISOR)
-- `PATCH /api/v1/operations/tasks/assign-bulk` : assignation en lot (OWNER/SYS_ADMIN/SUPERVISOR)
+- `PATCH /api/v1/operations/tasks/:taskId/assign` : assignation/desassignation (SYS_ADMIN/SUPERVISOR)
+- `PATCH /api/v1/operations/tasks/assign-bulk` : assignation en lot (SYS_ADMIN/SUPERVISOR)
 - `PATCH /api/v1/operations/tasks/:taskId/status` : changement statut tache (manager ou employe assigne)
-- `GET /api/v1/reports/overview` : consolidation reporting finance + operations + gouvernance comptes (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
+- `GET /api/v1/reports/overview` : synthese finance + operations + comptes (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels, `details=true` pour les tableaux complets)
 - `GET /api/v1/reports/exports/overview.pdf` : export PDF du rapport consolide (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
-- `GET /api/v1/reports/exports/transactions.csv` : export CSV des transactions (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
-- `GET /api/v1/reports/exports/transactions.xlsx` : export Excel des transactions (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
-- les exports transactions incluent la gouvernance compte: portee, secteur principal, secteurs autorises, compatibilite
-- `GET /api/v1/reports/exports/tasks.csv` : export CSV des taches (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
-- `GET /api/v1/reports/exports/tasks.xlsx` : export Excel des taches (`activityCode` obligatoire, `dateFrom`/`dateTo` optionnels)
+
+Les anciennes routes publiques de soumission/approbation et les exports CSV/Excel
+des rapports sont retires. Les statuts historiques restent lisibles.
+Le cycle transactionnel et sa migration sont decrits dans
+[docs/31_simplification_performance_production.md](docs/31_simplification_performance_production.md).

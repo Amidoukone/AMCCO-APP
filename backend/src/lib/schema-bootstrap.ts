@@ -138,6 +138,13 @@ async function ensureActivityColumnOnTasks(): Promise<void> {
       `ALTER TABLE tasks ADD KEY idx_task_company_activity_status (company_id, activity_code, status)`
     );
   }
+
+  const hasListingIndex = await indexExists("tasks", "idx_task_company_activity_created");
+  if (!hasListingIndex) {
+    await getDbPool().execute(
+      `ALTER TABLE tasks ADD KEY idx_task_company_activity_created (company_id, activity_code, created_at, updated_at)`
+    );
+  }
 }
 
 async function ensureMetadataColumnOnTasks(): Promise<void> {

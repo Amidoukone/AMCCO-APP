@@ -113,7 +113,9 @@ CREATE TABLE IF NOT EXISTS transactions (
   activity_code VARCHAR(32) NULL,
   description TEXT NULL,
   metadata_json JSON NULL,
-  status ENUM('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'DRAFT',
+  -- The legacy enum is retained to read existing production rows; new records
+  -- are final as soon as they are created.
+  status ENUM('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'APPROVED',
   requires_proof TINYINT(1) NOT NULL DEFAULT 1,
   salary_confirmation_status ENUM('NOT_REQUIRED', 'PENDING', 'CONFIRMED') NOT NULL DEFAULT 'NOT_REQUIRED',
   salary_confirmed_by_id VARCHAR(36) NULL,

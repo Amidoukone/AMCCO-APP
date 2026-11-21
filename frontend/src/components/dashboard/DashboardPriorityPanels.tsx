@@ -1,12 +1,7 @@
 import { EmptyState } from "../EmptyState";
 import { getBusinessActivityLabel } from "../../config/businessActivities";
 import type { DashboardSummary } from "../../types/reporting";
-import {
-  financeStatusLabel,
-  formatAmount,
-  formatDateTime,
-  taskStatusLabel
-} from "../../utils/dashboardDisplay";
+import { formatAmount, formatDateTime, taskStatusLabel } from "../../utils/dashboardDisplay";
 
 type DashboardPriorityPanelsProps = {
   summary: DashboardSummary;
@@ -74,9 +69,7 @@ export function DashboardPriorityPanels({
                 </div>
                 <div className="dashboard-priority-side">
                   <strong>{formatAmount(item.amount, item.currency)}</strong>
-                  <span>
-                    {financeStatusLabel(item.status)} | {formatDateTime(item.occurredAt)}
-                  </span>
+                  <span>{formatDateTime(item.occurredAt)}</span>
                 </div>
               </button>
             ))}

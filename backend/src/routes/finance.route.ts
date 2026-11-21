@@ -15,8 +15,6 @@ import {
   deleteCompanySalaryTransaction,
   deleteCompanyAccount,
   deleteCompanyTransaction,
-  exportCompanySalaryCsv,
-  exportCompanySalaryExcel,
   getTransactionProofUploadAuth,
   getCompanyTransaction,
   getCompanySalarySummary,
@@ -26,11 +24,9 @@ import {
   listCompanySalaryTransactions,
   listCompanyTransactionProofs,
   listCompanyTransactions,
-  reviewCompanyTransaction,
-  submitCompanyTransaction,
   updateCompanyAccount,
   updateCompanySalaryTransaction,
-  updateCompanyTransaction
+  updateCompanyTransaction,
 } from "../services/finance.service.js";
 
 const listTransactionsQuerySchema = z.object({
@@ -51,14 +47,23 @@ const listAccountsQuerySchema = z.object({
 });
 
 const accountScopeTypeSchema = z.enum(["GLOBAL", "DEDICATED", "RESTRICTED"]);
+const selectableActivityCodeSchema = z
+  .enum(BUSINESS_ACTIVITY_CODES)
+  .refine((code) => code !== "REAL_ESTATE_AGENCY", "Secteur désactivé.");
 
 const createAccountSchema = z.object({
   name: z.string().trim().min(2).max(120),
   accountRef: z.string().trim().max(255).optional(),
-  openingBalance: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+  openingBalance: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/)
+    .optional(),
   scopeType: accountScopeTypeSchema.default("GLOBAL"),
-  primaryActivityCode: z.enum(BUSINESS_ACTIVITY_CODES).optional(),
-  allowedActivityCodes: z.array(z.enum(BUSINESS_ACTIVITY_CODES)).max(BUSINESS_ACTIVITY_CODES.length).optional()
+  primaryActivityCode: selectableActivityCodeSchema.optional(),
+  allowedActivityCodes: z
+    .array(selectableActivityCodeSchema)
+    .max(BUSINESS_ACTIVITY_CODES.length)
+    .optional(),
 });
 
 const createTransactionSchema = z.object({
@@ -66,10 +71,12 @@ const createTransactionSchema = z.object({
   type: z.enum(["CASH_IN", "CASH_OUT"]),
   amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
   currency: z.string().trim().min(3).max(8).default("XOF"),
-  activityCode: z.enum(BUSINESS_ACTIVITY_CODES),
+  activityCode: selectableActivityCodeSchema,
   description: z.string().trim().max(2000).optional(),
-  metadata: z.record(z.string().trim().min(1).max(64), z.string().trim().max(500)).optional(),
-  occurredAt: z.string().datetime().optional()
+  metadata: z
+    .record(z.string().trim().min(1).max(64), z.string().trim().max(500))
+    .optional(),
+  occurredAt: z.string().datetime().optional(),
 });
 
 const salaryPaymentMethodSchema = z.enum(["BANK_TRANSFER", "CASH", "MOBILE_MONEY", "CHEQUE"]);
@@ -115,39 +122,82 @@ const addProofSchema = z.object({
   fileSize: z.number().int().min(1)
 });
 
-const reviewSchema = z.object({
-  decision: z.enum(["APPROVED", "REJECTED"])
-});
-
 export const financeRouter = Router();
 
 financeRouter.use(authenticateAccessToken);
 
-financeRouter.get("/finance/beverage-products", asyncHandler(async (req, res) => {
-  if (!req.auth) throw new HttpError(401, "Authentification requise.");
-  const items = await getCompanyBeverageStock({ companyId: req.auth.companyId, actorId: req.auth.userId, role: req.auth.role });
-  res.json({ items });
-}));
+financeRouter.get(
+  "/finance/beverage-products",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    const items = await getCompanyBeverageStock({
+      companyId: req.auth.companyId,
+      actorId: req.auth.userId,
+      role: req.auth.role,
+    });
+    res.json({ items });
+  }),
+);
 
-financeRouter.post("/finance/beverage-products/:productId/count", authorizeRoles("SYS_ADMIN", "ACCOUNTANT"), asyncHandler(async (req, res) => {
-  if (!req.auth) throw new HttpError(401, "Authentification requise.");
-  const quantity = z.string().regex(/^\d{1,9}(\.\d{1,3})?$/);
-  const body = z.object({ expectedQuantity: quantity, countedQuantity: quantity,
-    unitCost: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/).default("0"), reason: z.string().trim().min(5).max(500) }).parse(req.body);
-  await countCompanyBeverageStock({ companyId: req.auth.companyId, actorId: req.auth.userId, role: req.auth.role }, { ...body, productId: z.string().uuid().parse(req.params.productId) });
-  res.json({ status: "ok" });
-}));
+financeRouter.post(
+  "/finance/beverage-products/:productId/count",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    const quantity = z.string().regex(/^\d{1,9}(\.\d{1,3})?$/);
+    const body = z
+      .object({
+        expectedQuantity: quantity,
+        countedQuantity: quantity,
+        unitCost: z
+          .string()
+          .regex(/^\d{1,9}(\.\d{1,6})?$/)
+          .default("0"),
+        reason: z.string().trim().min(5).max(500),
+      })
+      .parse(req.body);
+    await countCompanyBeverageStock(
+      {
+        companyId: req.auth.companyId,
+        actorId: req.auth.userId,
+        role: req.auth.role,
+      },
+      { ...body, productId: z.string().uuid().parse(req.params.productId) },
+    );
+    res.json({ status: "ok" });
+  }),
+);
 
-financeRouter.post("/finance/beverage-products", authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"), asyncHandler(async (req, res) => {
-  if (!req.auth) throw new HttpError(401, "Authentification requise.");
-  const body = z.object({
-    name: z.string().trim().min(2).max(120), unit: z.string().trim().min(1).max(40),
-    openingQuantity: z.string().regex(/^\d{1,9}(\.\d{1,3})?$/).default("0"),
-    openingUnitCost: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/).default("0")
-  }).parse(req.body);
-  const item = await addCompanyBeverageProduct({ companyId: req.auth.companyId, actorId: req.auth.userId, role: req.auth.role }, body);
-  res.status(201).json({ item });
-}));
+financeRouter.post(
+  "/finance/beverage-products",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    const body = z
+      .object({
+        name: z.string().trim().min(2).max(120),
+        unit: z.string().trim().min(1).max(40),
+        openingQuantity: z
+          .string()
+          .regex(/^\d{1,9}(\.\d{1,3})?$/)
+          .default("0"),
+        openingUnitCost: z
+          .string()
+          .regex(/^\d{1,9}(\.\d{1,6})?$/)
+          .default("0"),
+      })
+      .parse(req.body);
+    const item = await addCompanyBeverageProduct(
+      {
+        companyId: req.auth.companyId,
+        actorId: req.auth.userId,
+        role: req.auth.role,
+      },
+      body,
+    );
+    res.status(201).json({ item });
+  }),
+);
 
 financeRouter.get(
   "/finance/accounts",
@@ -159,10 +209,10 @@ financeRouter.get(
     const items = await listCompanyAccounts({
       companyId: req.auth.companyId,
       activityCode: getRoleActivityCode(req.auth.role) ?? query.activityCode,
-      role: req.auth.role
+      role: req.auth.role,
     });
     res.status(200).json({ items });
-  })
+  }),
 );
 
 financeRouter.post(
@@ -177,7 +227,7 @@ financeRouter.post(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         name: body.name,
@@ -185,11 +235,11 @@ financeRouter.post(
         openingBalance: body.openingBalance,
         scopeType: body.scopeType,
         primaryActivityCode: body.primaryActivityCode,
-        allowedActivityCodes: body.allowedActivityCodes
-      }
+        allowedActivityCodes: body.allowedActivityCodes,
+      },
     );
     res.status(201).json({ item });
-  })
+  }),
 );
 
 financeRouter.patch(
@@ -205,7 +255,7 @@ financeRouter.patch(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         accountId: params.accountId,
@@ -214,11 +264,11 @@ financeRouter.patch(
         openingBalance: body.openingBalance,
         scopeType: body.scopeType,
         primaryActivityCode: body.primaryActivityCode,
-        allowedActivityCodes: body.allowedActivityCodes
-      }
+        allowedActivityCodes: body.allowedActivityCodes,
+      },
     );
     res.status(200).json({ item });
-  })
+  }),
 );
 
 financeRouter.delete(
@@ -233,14 +283,14 @@ financeRouter.delete(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
-        accountId: params.accountId
-      }
+        accountId: params.accountId,
+      },
     );
     res.status(200).json({ status: "deleted" });
-  })
+  }),
 );
 
 financeRouter.get(
@@ -259,10 +309,10 @@ financeRouter.get(
       type: query.type,
       search: query.search,
       activityCode: getRoleActivityCode(req.auth.role) ?? query.activityCode,
-      role: req.auth.role
+      role: req.auth.role,
     });
     res.status(200).json({ items });
-  })
+  }),
 );
 
 financeRouter.get(
@@ -270,13 +320,16 @@ financeRouter.get(
   asyncHandler(async (req, res) => {
     if (!req.auth) throw new HttpError(401, "Authentification requise.");
     const params = txIdParamSchema.parse(req.params);
-    const item = await getCompanyTransaction({
-      actorId: req.auth.userId,
-      companyId: req.auth.companyId,
-      role: req.auth.role
-    }, params.transactionId);
+    const item = await getCompanyTransaction(
+      {
+        actorId: req.auth.userId,
+        companyId: req.auth.companyId,
+        role: req.auth.role,
+      },
+      params.transactionId,
+    );
     res.status(200).json({ item });
-  })
+  }),
 );
 
 financeRouter.get(
@@ -289,10 +342,10 @@ financeRouter.get(
     const query = dumpTruckSummaryQuerySchema.parse(req.query);
     const items = await getCompanyDumpTruckSummary({
       companyId: req.auth.companyId,
-      period: query.period
+      period: query.period,
     });
     res.status(200).json({ items });
-  })
+  }),
 );
 
 financeRouter.get(
@@ -304,7 +357,7 @@ financeRouter.get(
     }
     const items = await listCompanySalaryMembers(req.auth.companyId);
     res.status(200).json({ items });
-  })
+  }),
 );
 
 financeRouter.get(
@@ -322,10 +375,10 @@ financeRouter.get(
       offset: query.offset,
       status: query.status,
       employeeUserId: query.employeeUserId,
-      payPeriod: query.payPeriod
+      payPeriod: query.payPeriod,
     });
     res.status(200).json({ items });
-  })
+  }),
 );
 
 financeRouter.post(
@@ -340,7 +393,7 @@ financeRouter.post(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         accountId: body.accountId,
@@ -352,11 +405,11 @@ financeRouter.post(
         currency: body.currency,
         paymentMethod: body.paymentMethod,
         note: body.note,
-        occurredAt: body.occurredAt
-      }
+        occurredAt: body.occurredAt,
+      },
     );
     res.status(201).json({ item });
-  })
+  }),
 );
 
 financeRouter.patch(
@@ -372,7 +425,7 @@ financeRouter.patch(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         transactionId: params.transactionId,
@@ -385,11 +438,11 @@ financeRouter.patch(
         currency: body.currency,
         paymentMethod: body.paymentMethod,
         note: body.note,
-        occurredAt: body.occurredAt
-      }
+        occurredAt: body.occurredAt,
+      },
     );
     res.status(200).json({ item });
-  })
+  }),
 );
 
 financeRouter.delete(
@@ -404,14 +457,14 @@ financeRouter.delete(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
-        transactionId: params.transactionId
-      }
+        transactionId: params.transactionId,
+      },
     );
     res.status(200).json({ status: "deleted" });
-  })
+  }),
 );
 
 financeRouter.patch(
@@ -425,14 +478,14 @@ financeRouter.patch(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
-        transactionId: params.transactionId
-      }
+        transactionId: params.transactionId,
+      },
     );
     res.status(200).json({ status: "confirmed" });
-  })
+  }),
 );
 
 financeRouter.get(
@@ -448,64 +501,23 @@ financeRouter.get(
       role: req.auth.role,
       payPeriod: query.payPeriod,
       employeeUserId: query.employeeUserId,
-      includeItems: false
+      includeItems: false,
     });
     res.status(200).json({ item });
-  })
-);
-
-financeRouter.get(
-  "/finance/salaries/exports/monthly.csv",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const query = salarySummaryQuerySchema.parse(req.query);
-    const csv = await exportCompanySalaryCsv({
-      companyId: req.auth.companyId,
-      role: req.auth.role,
-      payPeriod: query.payPeriod,
-      employeeUserId: query.employeeUserId
-    });
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="amcco-salaires-${query.payPeriod}.csv"`
-    );
-    res.status(200).send(`\uFEFF${csv}`);
-  })
-);
-
-financeRouter.get(
-  "/finance/salaries/exports/monthly.xlsx",
-  authorizeRoles("OWNER", "SYS_ADMIN", "ACCOUNTANT"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const query = salarySummaryQuerySchema.parse(req.query);
-    const workbook = await exportCompanySalaryExcel({
-      companyId: req.auth.companyId,
-      role: req.auth.role,
-      payPeriod: query.payPeriod,
-      employeeUserId: query.employeeUserId
-    });
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="amcco-salaires-${query.payPeriod}.xlsx"`
-    );
-    res.status(200).send(workbook);
-  })
+  }),
 );
 
 financeRouter.post(
   "/finance/transactions",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
+  authorizeRoles(
+    "SYS_ADMIN",
+    "ACCOUNTANT",
+    "SUPERVISOR",
+    "EMPLOYEE",
+    "HARDWARE_OPERATOR",
+    "HYDROCARBON_OPERATOR",
+    "BEVERAGE_DEPOT_OPERATOR",
+  ),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -515,7 +527,7 @@ financeRouter.post(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         accountId: body.accountId,
@@ -525,16 +537,23 @@ financeRouter.post(
         activityCode: body.activityCode,
         description: body.description,
         metadata: body.metadata,
-        occurredAt: body.occurredAt
-      }
+        occurredAt: body.occurredAt,
+      },
     );
     res.status(201).json({ item });
-  })
+  }),
 );
 
 financeRouter.patch(
   "/finance/transactions/:transactionId",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
+  authorizeRoles(
+    "SYS_ADMIN",
+    "ACCOUNTANT",
+    "EMPLOYEE",
+    "HARDWARE_OPERATOR",
+    "HYDROCARBON_OPERATOR",
+    "BEVERAGE_DEPOT_OPERATOR",
+  ),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -545,7 +564,7 @@ financeRouter.patch(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         transactionId: params.transactionId,
@@ -556,11 +575,11 @@ financeRouter.patch(
         activityCode: body.activityCode,
         description: body.description,
         metadata: body.metadata,
-        occurredAt: body.occurredAt
-      }
+        occurredAt: body.occurredAt,
+      },
     );
     res.status(200).json({ item });
-  })
+  }),
 );
 
 financeRouter.get(
@@ -574,19 +593,27 @@ financeRouter.get(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
-        transactionId: params.transactionId
-      }
+        transactionId: params.transactionId,
+      },
     );
     res.status(200).json({ items });
-  })
+  }),
 );
 
 financeRouter.get(
   "/finance/transactions/:transactionId/proofs/upload-auth",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
+  authorizeRoles(
+    "SYS_ADMIN",
+    "ACCOUNTANT",
+    "SUPERVISOR",
+    "EMPLOYEE",
+    "HARDWARE_OPERATOR",
+    "HYDROCARBON_OPERATOR",
+    "BEVERAGE_DEPOT_OPERATOR",
+  ),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -596,19 +623,27 @@ financeRouter.get(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
-        transactionId: params.transactionId
-      }
+        transactionId: params.transactionId,
+      },
     );
     res.status(200).json({ item });
-  })
+  }),
 );
 
 financeRouter.post(
   "/finance/transactions/:transactionId/proofs",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
+  authorizeRoles(
+    "SYS_ADMIN",
+    "ACCOUNTANT",
+    "SUPERVISOR",
+    "EMPLOYEE",
+    "HARDWARE_OPERATOR",
+    "HYDROCARBON_OPERATOR",
+    "BEVERAGE_DEPOT_OPERATOR",
+  ),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -619,73 +654,30 @@ financeRouter.post(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
         transactionId: params.transactionId,
         storageKey: body.storageKey,
         fileName: body.fileName,
         mimeType: body.mimeType,
-        fileSize: body.fileSize
-      }
+        fileSize: body.fileSize,
+      },
     );
     res.status(201).json({ items });
-  })
-);
-
-financeRouter.patch(
-  "/finance/transactions/:transactionId/submit",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const params = txIdParamSchema.parse(req.params);
-    await submitCompanyTransaction(
-      {
-        actorId: req.auth.userId,
-        companyId: req.auth.companyId,
-        role: req.auth.role,
-        email: req.auth.email,
-        fullName: req.auth.fullName
-      },
-      {
-        transactionId: params.transactionId
-      }
-    );
-    res.status(200).json({ status: "submitted" });
-  })
-);
-
-financeRouter.patch(
-  "/finance/transactions/:transactionId/review",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT"),
-  asyncHandler(async (req, res) => {
-    if (!req.auth) {
-      throw new HttpError(401, "Authentification requise.");
-    }
-    const params = txIdParamSchema.parse(req.params);
-    const body = reviewSchema.parse(req.body);
-    await reviewCompanyTransaction(
-      {
-        actorId: req.auth.userId,
-        companyId: req.auth.companyId,
-        role: req.auth.role,
-        email: req.auth.email,
-        fullName: req.auth.fullName
-      },
-      {
-        transactionId: params.transactionId,
-        decision: body.decision
-      }
-    );
-    res.status(200).json({ status: "reviewed" });
-  })
+  }),
 );
 
 financeRouter.delete(
   "/finance/transactions/:transactionId",
-  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR", "BEVERAGE_DEPOT_OPERATOR"),
+  authorizeRoles(
+    "SYS_ADMIN",
+    "ACCOUNTANT",
+    "EMPLOYEE",
+    "HARDWARE_OPERATOR",
+    "HYDROCARBON_OPERATOR",
+    "BEVERAGE_DEPOT_OPERATOR",
+  ),
   asyncHandler(async (req, res) => {
     if (!req.auth) {
       throw new HttpError(401, "Authentification requise.");
@@ -695,12 +687,12 @@ financeRouter.delete(
       {
         actorId: req.auth.userId,
         companyId: req.auth.companyId,
-        role: req.auth.role
+        role: req.auth.role,
       },
       {
-        transactionId: params.transactionId
-      }
+        transactionId: params.transactionId,
+      },
     );
     res.status(200).json({ status: "deleted" });
-  })
+  }),
 );

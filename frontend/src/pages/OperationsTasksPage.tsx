@@ -1,3 +1,4 @@
+import { useActionScope } from "../lib/useActionScope";
 import {
   useCallback,
   useEffect,
@@ -14,7 +15,6 @@ import { useFormChanges } from "../lib/useFormChanges";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
 import { EmptyState } from "../components/EmptyState";
-import { PageGuide } from "../components/PageGuide";
 import { SectorWorkspaceNav } from "../components/SectorWorkspaceNav";
 import { SectorDirectoryPanel } from "../components/SectorDirectoryPanel";
 import { getActiveSectorReferenceView } from "../config/sectorWorkspaces";
@@ -70,503 +70,59 @@ import type { DailyActivityCategory } from "../types/daily-activity-categories";
 import type { GeneralStoreOperationsReportRow } from "../types/reporting";
 import { getSectorRecordContext, getSectorSearchHint } from "../utils/sectorRecordContext";
 
-const TASKS_PAGE_SIZE = 200;
-const TASKS_MOBILE_PAGE_SIZE = 40;
-const TASKS_VISIBLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
-const DEFAULT_TASKS_VISIBLE_PAGE_SIZE = 10;
-function getTasksFetchPageSize(): number {
-  return typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches
-    ? TASKS_MOBILE_PAGE_SIZE
-    : TASKS_PAGE_SIZE;
-}
-
-const AGRICULTURE_TASK_KIND_KEY = "agricultureTaskKind";
-type AgricultureTaskKind =
-  | "PREPARATION"
-  | "SOWING"
-  | "MAINTENANCE"
-  | "TREATMENT"
-  | "HARVEST"
-  | "STORAGE"
-  | "FOLLOW_UP";
-const AGRICULTURE_TASK_LABELS: Record<AgricultureTaskKind, string> = {
-  PREPARATION: "Préparation",
-  SOWING: "Semis",
-  MAINTENANCE: "Entretien",
-  TREATMENT: "Traitement",
-  HARVEST: "Récolte",
-  STORAGE: "Stockage",
-  FOLLOW_UP: "Suivi terrain"
-};
-const BTP_TASK_KIND_KEY = "btpTaskKind";
-type BtpTaskKind =
-  | "SITE_PREPARATION"
-  | "EARTHWORKS"
-  | "FOUNDATION"
-  | "STRUCTURAL_WORK"
-  | "MASONRY"
-  | "MEP"
-  | "FINISHING"
-  | "PROCUREMENT"
-  | "QUALITY_CONTROL"
-  | "RESERVE"
-  | "HANDOVER"
-  | "FOLLOW_UP";
-const BTP_TASK_LABELS: Record<BtpTaskKind, string> = {
-  SITE_PREPARATION: "Préparation chantier",
-  EARTHWORKS: "Terrassement",
-  FOUNDATION: "Fondation",
-  STRUCTURAL_WORK: "Structure",
-  MASONRY: "Maconnerie",
-  MEP: "Electricite / plomberie",
-  FINISHING: "Finition",
-  PROCUREMENT: "Approvisionnement",
-  QUALITY_CONTROL: "Contrôle qualité",
-  RESERVE: "Réserve / reprise",
-  HANDOVER: "Réception",
-  FOLLOW_UP: "Suivi chantier"
-};
-const FOOD_TASK_KIND_KEY = "foodTaskKind";
-type FoodTaskKind =
-  | "RECEPTION"
-  | "STOCK_CONTROL"
-  | "EXPIRY_CHECK"
-  | "COLD_CHAIN_CHECK"
-  | "SHELF_ROTATION"
-  | "SUPPLIER_FOLLOW_UP"
-  | "PRODUCT_WITHDRAWAL"
-  | "CLEANING"
-  | "INVENTORY"
-  | "QUALITY_CONTROL"
-  | "DELIVERY"
-  | "FOLLOW_UP";
-const FOOD_TASK_LABELS: Record<FoodTaskKind, string> = {
-  RECEPTION: "Réception stock",
-  STOCK_CONTROL: "Contrôle stock",
-  EXPIRY_CHECK: "Contrôle DLC",
-  COLD_CHAIN_CHECK: "Contrôle froid",
-  SHELF_ROTATION: "Rotation rayon",
-  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
-  PRODUCT_WITHDRAWAL: "Retrait produit",
-  CLEANING: "Nettoyage",
-  INVENTORY: "Inventaire",
-  QUALITY_CONTROL: "Contrôle qualité",
-  DELIVERY: "Livraison",
-  FOLLOW_UP: "Suivi alimentaire"
-};
-const RENTAL_TASK_KIND_KEY = "rentalTaskKind";
-type RentalTaskKind = "RELANCE" | "VISIT" | "MOVE_IN" | "MOVE_OUT" | "MAINTENANCE" | "FOLLOW_UP";
-const RENTAL_TASK_LABELS: Record<RentalTaskKind, string> = {
-  RELANCE: "Relance loyer",
-  VISIT: "Visite",
-  MOVE_IN: "Entree locataire",
-  MOVE_OUT: "Sortie locataire",
-  MAINTENANCE: "Maintenance",
-  FOLLOW_UP: "Autre"
-};
-const HOTEL_TASK_KIND_KEY = "hotelTaskKind";
-type HotelTaskKind =
-  | "CHECK_IN"
-  | "CHECK_OUT"
-  | "ROOM_PREPARATION"
-  | "HOUSEKEEPING"
-  | "MAINTENANCE"
-  | "RESTAURANT_SERVICE"
-  | "LAUNDRY"
-  | "EVENT_SETUP"
-  | "GUEST_FOLLOW_UP"
-  | "SUPPLIER_FOLLOW_UP"
-  | "NIGHT_AUDIT"
-  | "FOLLOW_UP";
-const HOTEL_TASK_LABELS: Record<HotelTaskKind, string> = {
-  CHECK_IN: "Check-in",
-  CHECK_OUT: "Check-out",
-  ROOM_PREPARATION: "Préparation chambre",
-  HOUSEKEEPING: "Menage",
-  MAINTENANCE: "Maintenance",
-  RESTAURANT_SERVICE: "Service restauration",
-  LAUNDRY: "Blanchisserie",
-  EVENT_SETUP: "Préparation événement",
-  GUEST_FOLLOW_UP: "Suivi client",
-  SUPPLIER_FOLLOW_UP: "Suivi fournisseur",
-  NIGHT_AUDIT: "Audit nuit",
-  FOLLOW_UP: "Suivi hotelier"
-};
-const AGENCY_TASK_KIND_KEY = "agencyTaskKind";
-type AgencyTaskKind =
-  | "MANDATE_INTAKE"
-  | "PROPERTY_VALUATION"
-  | "LISTING_PUBLICATION"
-  | "CLIENT_PROSPECTING"
-  | "VISIT_SCHEDULE"
-  | "OFFER_FOLLOW_UP"
-  | "DOCUMENT_COLLECTION"
-  | "NOTARY_FOLLOW_UP"
-  | "CONTRACT_SIGNING"
-  | "OWNER_REPORTING"
-  | "COMMISSION_COLLECTION"
-  | "FOLLOW_UP";
-const AGENCY_TASK_LABELS: Record<AgencyTaskKind, string> = {
-  MANDATE_INTAKE: "Prise mandat",
-  PROPERTY_VALUATION: "Estimation bien",
-  LISTING_PUBLICATION: "Publication annonce",
-  CLIENT_PROSPECTING: "Prospection client",
-  VISIT_SCHEDULE: "Visite",
-  OFFER_FOLLOW_UP: "Suivi offre",
-  DOCUMENT_COLLECTION: "Collecte documents",
-  NOTARY_FOLLOW_UP: "Suivi notaire",
-  CONTRACT_SIGNING: "Signature contrat",
-  OWNER_REPORTING: "Reporting propriétaire",
-  COMMISSION_COLLECTION: "Recouvrement commission",
-  FOLLOW_UP: "Suivi dossier"
-};
-const FISH_FARMING_TASK_KIND_KEY = "fishTaskKind";
-type FishFarmingTaskKind =
-  | "FEEDING"
-  | "WATER_CONTROL"
-  | "TREATMENT"
-  | "SORTING"
-  | "HARVEST"
-  | "STOCKING"
-  | "FOLLOW_UP";
-const FISH_FARMING_TASK_LABELS: Record<FishFarmingTaskKind, string> = {
-  FEEDING: "Nourrissage",
-  WATER_CONTROL: "Contrôle eau",
-  TREATMENT: "Traitement sanitaire",
-  SORTING: "Tri / calibrage",
-  HARVEST: "Récolte",
-  STOCKING: "Mise en charge",
-  FOLLOW_UP: "Suivi bassin"
-};
-const LIVESTOCK_TASK_KIND_KEY = "livestockTaskKind";
-type LivestockTaskKind =
-  | "FEEDING"
-  | "HEALTH_CHECK"
-  | "VACCINATION"
-  | "TREATMENT"
-  | "CLEANING"
-  | "BREEDING"
-  | "SALE_PREP"
-  | "FOLLOW_UP";
-const LIVESTOCK_TASK_LABELS: Record<LivestockTaskKind, string> = {
-  FEEDING: "Nourrissage",
-  HEALTH_CHECK: "Contrôle sanitaire",
-  VACCINATION: "Vaccination",
-  TREATMENT: "Traitement",
-  CLEANING: "Nettoyage enclos",
-  BREEDING: "Reproduction",
-  SALE_PREP: "Préparation vente",
-  FOLLOW_UP: "Suivi élevage"
-};
-const GENERAL_EXPENSE_KIND_KEY = "generalExpenseKind";
-type GeneralExpenseKind =
-  | "PDG_SUPPLIES"
-  | "PDG_TRANSPORT"
-  | "PDG_SUPPLIER_PAYMENT"
-  | "PDG_TRANSFER_ADVANCE"
-  | "PDG_INVESTMENT"
-  | "PDG_LOAN"
-  | "PDG_OVERHEAD"
-  | "EMPLOYEE_MEALS"
-  | "EMPLOYEE_FUEL"
-  | "EMPLOYEE_VEHICLE_UPKEEP"
-  | "EMPLOYEE_SUPPLIES"
-  | "EMPLOYEE_OTHER";
-const GENERAL_EXPENSE_KIND_LABELS: Record<GeneralExpenseKind, string> = {
-  PDG_SUPPLIES: "PDG - Achat matériel / fournitures",
-  PDG_TRANSPORT: "PDG - Carburant / transport",
-  PDG_SUPPLIER_PAYMENT: "PDG - Paiement fournisseur / prestataire",
-  PDG_TRANSFER_ADVANCE: "PDG - Virement / avance / transfert",
-  PDG_INVESTMENT: "PDG - Investissement",
-  PDG_LOAN: "PDG - Prêt",
-  PDG_OVERHEAD: "PDG - Frais généraux / divers",
-  EMPLOYEE_MEALS: "Employé - Repas",
-  EMPLOYEE_FUEL: "Employé - Carburant",
-  EMPLOYEE_VEHICLE_UPKEEP: "Employé - Entretien véhicule",
-  EMPLOYEE_SUPPLIES: "Employé - Fournitures / consommables",
-  EMPLOYEE_OTHER: "Employé - Autre dépense"
-};
-
-function isGeneralExpenseKind(value: string | undefined): value is GeneralExpenseKind {
-  return Boolean(value) && Object.prototype.hasOwnProperty.call(GENERAL_EXPENSE_KIND_LABELS, value as string);
-}
-
-const DAILY_ACTIVITY_KIND_KEY = "dailyActivityKind";
-const DAILY_ACTIVITY_AMOUNT_KEY = "amount";
-const DAILY_PROTOCOL_CATEGORY = "Protocole d'accord";
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message;
-  }
-  return "Opération impossible. Vérifiez la connexion backend.";
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} o`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} Ko`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-}
-
-function statusLabel(status: TaskStatus): string {
-  if (status === "TODO") {
-    return "À faire";
-  }
-  if (status === "IN_PROGRESS") {
-    return "En cours";
-  }
-  if (status === "DONE") {
-    return "Terminée";
-  }
-  return "Bloquée";
-}
-
-function statusToneClass(status: TaskStatus): string {
-  if (status === "TODO") {
-    return "todo";
-  }
-  if (status === "IN_PROGRESS") {
-    return "in-progress";
-  }
-  if (status === "DONE") {
-    return "done";
-  }
-  return "blocked";
-}
-
-function statusShortMetric(status: TaskStatus): string {
-  if (status === "TODO") {
-    return "À lancer";
-  }
-  if (status === "IN_PROGRESS") {
-    return "En exécution";
-  }
-  if (status === "DONE") {
-    return "Clôturées";
-  }
-  return "À débloquer";
-}
-
-function memberLabel(member: OperationTaskMember): string {
-  return `${member.fullName} (${member.role})`;
-}
-
-function formatDate(value: string | null): string {
-  if (!value) {
-    return "-";
-  }
-  return new Date(value).toLocaleString("fr-FR");
-}
-
-function syncMetadataState(
-  previous: Record<string, string>,
-  fields: ActivityFieldDefinition[]
-): Record<string, string> {
-  return { ...previous, ...Object.fromEntries(fields.map((field) => [field.key, previous[field.key] ?? ""])) };
-}
-
-function isAgricultureTaskKind(value: string | undefined): value is AgricultureTaskKind {
-  return (
-    value === "PREPARATION" ||
-    value === "SOWING" ||
-    value === "MAINTENANCE" ||
-    value === "TREATMENT" ||
-    value === "HARVEST" ||
-    value === "STORAGE" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isBtpTaskKind(value: string | undefined): value is BtpTaskKind {
-  return (
-    value === "SITE_PREPARATION" ||
-    value === "EARTHWORKS" ||
-    value === "FOUNDATION" ||
-    value === "STRUCTURAL_WORK" ||
-    value === "MASONRY" ||
-    value === "MEP" ||
-    value === "FINISHING" ||
-    value === "PROCUREMENT" ||
-    value === "QUALITY_CONTROL" ||
-    value === "RESERVE" ||
-    value === "HANDOVER" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isFoodTaskKind(value: string | undefined): value is FoodTaskKind {
-  return (
-    value === "RECEPTION" ||
-    value === "STOCK_CONTROL" ||
-    value === "EXPIRY_CHECK" ||
-    value === "COLD_CHAIN_CHECK" ||
-    value === "SHELF_ROTATION" ||
-    value === "SUPPLIER_FOLLOW_UP" ||
-    value === "PRODUCT_WITHDRAWAL" ||
-    value === "CLEANING" ||
-    value === "INVENTORY" ||
-    value === "QUALITY_CONTROL" ||
-    value === "DELIVERY" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isRentalTaskKind(value: string | undefined): value is RentalTaskKind {
-  return (
-    value === "RELANCE" ||
-    value === "VISIT" ||
-    value === "MOVE_IN" ||
-    value === "MOVE_OUT" ||
-    value === "MAINTENANCE" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isHotelTaskKind(value: string | undefined): value is HotelTaskKind {
-  return (
-    value === "CHECK_IN" ||
-    value === "CHECK_OUT" ||
-    value === "ROOM_PREPARATION" ||
-    value === "HOUSEKEEPING" ||
-    value === "MAINTENANCE" ||
-    value === "RESTAURANT_SERVICE" ||
-    value === "LAUNDRY" ||
-    value === "EVENT_SETUP" ||
-    value === "GUEST_FOLLOW_UP" ||
-    value === "SUPPLIER_FOLLOW_UP" ||
-    value === "NIGHT_AUDIT" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isAgencyTaskKind(value: string | undefined): value is AgencyTaskKind {
-  return (
-    value === "MANDATE_INTAKE" ||
-    value === "PROPERTY_VALUATION" ||
-    value === "LISTING_PUBLICATION" ||
-    value === "CLIENT_PROSPECTING" ||
-    value === "VISIT_SCHEDULE" ||
-    value === "OFFER_FOLLOW_UP" ||
-    value === "DOCUMENT_COLLECTION" ||
-    value === "NOTARY_FOLLOW_UP" ||
-    value === "CONTRACT_SIGNING" ||
-    value === "OWNER_REPORTING" ||
-    value === "COMMISSION_COLLECTION" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isFishFarmingTaskKind(value: string | undefined): value is FishFarmingTaskKind {
-  return (
-    value === "FEEDING" ||
-    value === "WATER_CONTROL" ||
-    value === "TREATMENT" ||
-    value === "SORTING" ||
-    value === "HARVEST" ||
-    value === "STOCKING" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function isLivestockTaskKind(value: string | undefined): value is LivestockTaskKind {
-  return (
-    value === "FEEDING" ||
-    value === "HEALTH_CHECK" ||
-    value === "VACCINATION" ||
-    value === "TREATMENT" ||
-    value === "CLEANING" ||
-    value === "BREEDING" ||
-    value === "SALE_PREP" ||
-    value === "FOLLOW_UP"
-  );
-}
-
-function formatMetadataValue(key: string, value: string): string {
-  if (key === AGRICULTURE_TASK_KIND_KEY && isAgricultureTaskKind(value)) {
-    return AGRICULTURE_TASK_LABELS[value];
-  }
-  if (key === BTP_TASK_KIND_KEY && isBtpTaskKind(value)) {
-    return BTP_TASK_LABELS[value];
-  }
-  if (key === FOOD_TASK_KIND_KEY && isFoodTaskKind(value)) {
-    return FOOD_TASK_LABELS[value];
-  }
-  if (key === RENTAL_TASK_KIND_KEY && isRentalTaskKind(value)) {
-    return RENTAL_TASK_LABELS[value];
-  }
-  if (key === HOTEL_TASK_KIND_KEY && isHotelTaskKind(value)) {
-    return HOTEL_TASK_LABELS[value];
-  }
-  if (key === AGENCY_TASK_KIND_KEY && isAgencyTaskKind(value)) {
-    return AGENCY_TASK_LABELS[value];
-  }
-  if (key === FISH_FARMING_TASK_KIND_KEY && isFishFarmingTaskKind(value)) {
-    return FISH_FARMING_TASK_LABELS[value];
-  }
-  if (key === LIVESTOCK_TASK_KIND_KEY && isLivestockTaskKind(value)) {
-    return LIVESTOCK_TASK_LABELS[value];
-  }
-  if (key === GENERAL_EXPENSE_KIND_KEY && isGeneralExpenseKind(value)) {
-    return GENERAL_EXPENSE_KIND_LABELS[value];
-  }
-  if (key === DAILY_ACTIVITY_AMOUNT_KEY) {
-    return `${formatAmountForDisplay(value)} XOF`;
-  }
-  if (key === "agreementCapitalAmount" || key === "agreementProfitAmount") {
-    return `${formatAmountForDisplay(value)} XOF`;
-  }
-  return value;
-}
-
-function formatMetadataSummary(
-  metadata: Record<string, string>,
-  fields: ActivityFieldDefinition[]
-): string {
-  const items = fields
-    .map((field) => {
-      const value = metadata[field.key]?.trim();
-      return value ? `${field.label}: ${formatMetadataValue(field.key, value)}` : null;
-    })
-    .filter((value): value is string => value !== null);
-
-  if (items.length > 0) {
-    return items.join(" | ");
-  }
-
-  const fallbackItems = Object.entries(metadata)
-    .filter(([, value]) => value.trim().length > 0)
-    .map(([key, value]) => `${key}: ${formatMetadataValue(key, value)}`);
-  return fallbackItems.length > 0 ? fallbackItems.join(" | ") : "-";
-}
-
-function isRequiredDailyAgreementField(fieldKey: string, metadata: Record<string, string>): boolean {
-  if (metadata[DAILY_ACTIVITY_KIND_KEY] !== DAILY_PROTOCOL_CATEGORY) return false;
-  if (["agreementRef", "partnerName", "agreementType"].includes(fieldKey)) return true;
-  return fieldKey === "agreementCapitalAmount" && metadata.agreementType === "Financier";
-}
-
-function createDefaultTaskForm(): {
-  title: string;
-  description: string;
-  dueDate: string;
-  assignedToId: string;
-  metadata: Record<string, string>;
-} {
-  return {
-    title: "",
-    description: "",
-    dueDate: "",
-    assignedToId: "",
-    metadata: {}
-  };
-}
+import {
+  TASKS_PAGE_SIZE,
+  TASKS_SERVICE_SUGGESTION_HISTORY_SIZE,
+  TASKS_MOBILE_PAGE_SIZE,
+  TASKS_VISIBLE_PAGE_SIZE_OPTIONS,
+  DEFAULT_TASKS_VISIBLE_PAGE_SIZE,
+  getTasksFetchPageSize,
+  AGRICULTURE_TASK_KIND_KEY,
+  AGRICULTURE_TASK_LABELS,
+  BTP_TASK_KIND_KEY,
+  BTP_TASK_LABELS,
+  FOOD_TASK_KIND_KEY,
+  FOOD_TASK_LABELS,
+  RENTAL_TASK_KIND_KEY,
+  RENTAL_TASK_LABELS,
+  HOTEL_TASK_KIND_KEY,
+  HOTEL_TASK_LABELS,
+  AGENCY_TASK_KIND_KEY,
+  AGENCY_TASK_LABELS,
+  FISH_FARMING_TASK_KIND_KEY,
+  FISH_FARMING_TASK_LABELS,
+  LIVESTOCK_TASK_KIND_KEY,
+  LIVESTOCK_TASK_LABELS,
+  GENERAL_EXPENSE_KIND_KEY,
+  GENERAL_EXPENSE_KIND_LABELS,
+  isGeneralExpenseKind,
+  DAILY_ACTIVITY_KIND_KEY,
+  DAILY_ACTIVITY_AMOUNT_KEY,
+  DAILY_PROTOCOL_CATEGORY,
+  toErrorMessage,
+  formatFileSize,
+  statusLabel,
+  statusToneClass,
+  statusShortMetric,
+  memberLabel,
+  formatDate,
+  syncMetadataState,
+  isAgricultureTaskKind,
+  isBtpTaskKind,
+  isFoodTaskKind,
+  isRentalTaskKind,
+  isHotelTaskKind,
+  isAgencyTaskKind,
+  isFishFarmingTaskKind,
+  isLivestockTaskKind,
+  formatMetadataValue,
+  formatMetadataSummary,
+  isRequiredDailyAgreementField,
+  createDefaultTaskForm
+} from "../utils/operationsTasks";
 
 export function OperationsTasksPage(): JSX.Element {
-  const [tasksFetchPageSize] = useState(getTasksFetchPageSize);
+  const [tasksListPageSize] = useState(getTasksFetchPageSize);
   const navigate = useNavigate();
   const location = useLocation();
   const requestedEditTaskId = new URLSearchParams(location.search).get("editTaskId");
@@ -578,6 +134,10 @@ export function OperationsTasksPage(): JSX.Element {
     selectedActivityCode,
     selectedProfile
   } = useBusinessActivity();
+  // Service category suggestions still use the loaded history. Retain its
+  // previous depth until those suggestions have a dedicated source.
+  const tasksFetchPageSize = selectedActivityCode === "SERVICES" && tasksListPageSize === TASKS_PAGE_SIZE
+    ? TASKS_SERVICE_SUGGESTION_HISTORY_SIZE : tasksListPageSize;
   const fieldWorkspace = getSectorFieldWorkspace(selectedActivityCode);
   const isCategoriesView = getActiveSectorReferenceView(location.pathname, location.search, selectedActivityCode, user?.role)?.view === "categories";
   const [tasks, setTasks] = useState<OperationTask[]>([]);
@@ -623,6 +183,22 @@ export function OperationsTasksPage(): JSX.Element {
   const [isTaskAttachmentExpanded, setIsTaskAttachmentExpanded] = useState(
     () => !fieldWorkspace && (typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches)
   );
+  const actionScopeKey = JSON.stringify([activeCompany?.id, user?.id, user?.role, selectedActivityCode]);
+  const captureActionScope = useActionScope(actionScopeKey);
+  useEffect(() => {
+    setIsSavingTaskForm(false);
+    setIsSavingCategory(false);
+    setIsBulkAssigning(false);
+    setBusyTaskId(null);
+    setBusyCategoryId(null);
+  }, [actionScopeKey]);
+  const taskFormScope = `${activeCompany?.id ?? ""}:${selectedActivityCode ?? ""}`;
+  const [mountedTaskFormScope, setMountedTaskFormScope] = useState<string | null>(null);
+  const isTaskFormOpen = isTaskFormExpanded || Boolean(editingTaskId) || Boolean(requestedEditTaskId);
+  const shouldRenderTaskForm = isTaskFormOpen || mountedTaskFormScope === taskFormScope;
+  useEffect(() => {
+    if (isTaskFormOpen) setMountedTaskFormScope(taskFormScope);
+  }, [taskFormScope, isTaskFormOpen]);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia("(max-width: 640px)");
@@ -776,6 +352,7 @@ export function OperationsTasksPage(): JSX.Element {
     return [...values].sort((left, right) => left.localeCompare(right, "fr"));
   }, [selectedActivityCode, sectorTasks]);
   const displayTasks = sectorTasks;
+
   const totalVisibleTaskPages = useMemo(() => {
     return Math.max(1, Math.ceil(displayTasks.length / visibleTasksPageSize));
   }, [displayTasks.length, visibleTasksPageSize]);
@@ -1134,6 +711,7 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   async function handleSaveCategory(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -1145,6 +723,7 @@ export function OperationsTasksPage(): JSX.Element {
           ? updateDailyActivityCategoryRequest(accessToken, editingCategoryId, payload)
           : createDailyActivityCategoryRequest(accessToken, payload)
       );
+      if (!isCurrentAction()) return;
       setDailyActivityCategories((prev) => {
         const exists = prev.some((item) => item.id === response.item.id);
         return exists
@@ -1154,9 +733,10 @@ export function OperationsTasksPage(): JSX.Element {
       setSuccessMessage(editingCategoryId ? "Catégorie modifiée." : "Catégorie ajoutée.");
       resetCategoryForm();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingCategory(false);
+      if (isCurrentAction()) setIsSavingCategory(false);
     }
   }
 
@@ -1183,6 +763,7 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteCategory(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!categoryPendingDelete) {
       return;
     }
@@ -1192,6 +773,7 @@ export function OperationsTasksPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteDailyActivityCategoryRequest(accessToken, category.id));
+      if (!isCurrentAction()) return;
       if (editingCategoryId === category.id) {
         resetCategoryForm();
       }
@@ -1199,9 +781,10 @@ export function OperationsTasksPage(): JSX.Element {
       setCategoryPendingDelete(null);
       setDailyActivityCategories((prev) => prev.filter((item) => item.id !== category.id));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyCategoryId(null);
+      if (isCurrentAction()) setBusyCategoryId(null);
     }
   }
 
@@ -1336,6 +919,7 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   async function handleCreateTask(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     if (!canCreateTasks || !selectedActivityCode) {
       return;
@@ -1388,6 +972,7 @@ export function OperationsTasksPage(): JSX.Element {
                 : undefined
             })
       );
+      if (!isCurrentAction()) return;
       setEditingTaskId(null);
       editingTaskActivityRef.current = null;
       taskChanges.markClean();
@@ -1436,8 +1021,12 @@ export function OperationsTasksPage(): JSX.Element {
       }
       if (!editingTaskId && attachmentFileToUpload) {
         void uploadTaskAttachment(response.item.id, attachmentFileToUpload)
-          .then(() => setSuccessMessage("Tâche créée avec pièce jointe."))
+          .then(() => {
+            if (!isCurrentAction()) return;
+            setSuccessMessage("Tâche créée avec pièce jointe.");
+          })
           .catch((error) => {
+            if (!isCurrentAction()) return;
             setErrorMessage(
               `Tâche créée, mais la pièce jointe n'a pas pu être ajoutée. ${toErrorMessage(error)}`
             );
@@ -1445,9 +1034,10 @@ export function OperationsTasksPage(): JSX.Element {
           });
       }
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingTaskForm(false);
+      if (isCurrentAction()) setIsSavingTaskForm(false);
     }
   }
 
@@ -1581,6 +1171,7 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteTask(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!taskPendingDelete) {
       return;
     }
@@ -1591,6 +1182,7 @@ export function OperationsTasksPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteOperationsTaskRequest(accessToken, task.id));
+      if (!isCurrentAction()) return;
       if (editingTaskId === task.id) {
         handleCancelEditTask();
       }
@@ -1604,13 +1196,15 @@ export function OperationsTasksPage(): JSX.Element {
         });
       }
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTaskId(null);
+      if (isCurrentAction()) setBusyTaskId(null);
     }
   }
 
   async function handleSaveAssignment(taskId: string): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!canAssignTasks) {
       return;
     }
@@ -1636,6 +1230,7 @@ export function OperationsTasksPage(): JSX.Element {
           assignmentNotes[taskId]?.trim() || undefined
         )
       );
+      if (!isCurrentAction()) return;
       const remainsInCurrentList = taskMatchesCurrentList(response.item);
       setTasks((prev) =>
         remainsInCurrentList
@@ -1647,9 +1242,10 @@ export function OperationsTasksPage(): JSX.Element {
         void loadData({ offset: Math.max(0, tasks.length - 1), append: true });
       }
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTaskId(null);
+      if (isCurrentAction()) setBusyTaskId(null);
     }
   }
 
@@ -1658,6 +1254,7 @@ export function OperationsTasksPage(): JSX.Element {
   }
 
   async function handleChangeStatus(taskId: string, status: TaskStatus): Promise<void> {
+    const isCurrentAction = captureActionScope();
     setBusyTaskId(taskId);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -1665,6 +1262,7 @@ export function OperationsTasksPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         updateOperationsTaskStatusRequest(accessToken, taskId, status)
       );
+      if (!isCurrentAction()) return;
       const remainsInCurrentList = taskMatchesCurrentList(response.item);
       setTasks((prev) =>
         remainsInCurrentList
@@ -1676,9 +1274,10 @@ export function OperationsTasksPage(): JSX.Element {
         void loadData({ offset: Math.max(0, tasks.length - 1), append: true });
       }
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTaskId(null);
+      if (isCurrentAction()) setBusyTaskId(null);
     }
   }
 
@@ -1859,202 +1458,105 @@ export function OperationsTasksPage(): JSX.Element {
                       <strong>Échéance:</strong> {formatDate(task.dueDate)}
                     </p>
                     <p className="operations-task-meta-secondary">
-                      <strong>Mise à jour:</strong> {formatDate(task.updatedAt)}
+                      <strong>Création:</strong> {formatDate(task.createdAt)}
                     </p>
-                    {Object.keys(task.metadata).length > 0 ? (
-                      <p className="operations-task-metadata">
-                        <strong>Contexte:</strong> {formatMetadataSummary(task.metadata, taskMetadataFields)}
-                      </p>
-                    ) : null}
                   </div>
 
-                  <div
-                    className="operations-actions"
-                    onClick={preventCardNavigation}
-                    onKeyDown={preventCardKeyboardNavigation}
-                  >
-                    <div className="operations-actions-primary">
-                      <button
-                        type="button"
-                        className="secondary-btn operations-primary-action"
-                        onClick={() => openTaskDetails(task.id)}
-                      >
-                        Voir
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={() => handleStartEditTask(task)}
-                        disabled={isBusy || editingTaskId === task.id || editLockMessage !== null}
-                        title={editLockMessage ?? undefined}
-                      >
-                        Modifier
-                      </button>
+                  {canUpdate ? (
+                    <div
+                      className="operations-task-actions"
+                      onClick={preventCardNavigation}
+                      onKeyDown={preventCardKeyboardNavigation}
+                    >
+                      <div className="operations-inline-actions">
+                        <select
+                          value={task.status}
+                          onChange={(event) =>
+                            void handleChangeStatus(task.id, event.target.value as TaskStatus)
+                          }
+                          disabled={isBusy}
+                        >
+                          <option value="TODO">À faire</option>
+                          <option value="IN_PROGRESS">En cours</option>
+                          <option value="DONE">Terminée</option>
+                          <option value="BLOCKED">Bloquée</option>
+                        </select>
+                      </div>
+
+                      {canAssignTasks && !isCompleted ? (
+                        <div className="operations-inline-actions">
+                          <select
+                            value={selectedAssignee}
+                            onChange={(event) =>
+                              setAssignments((prev) => ({
+                                ...prev,
+                                [task.id]: event.target.value
+                              }))
+                            }
+                            disabled={isBusy}
+                          >
+                            <option value="">Non assignée</option>
+                            {members.map((member) => (
+                              <option key={member.userId} value={member.userId}>
+                                {memberLabel(member)}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Note d'assignation"
+                            value={assignmentNotes[task.id] ?? ""}
+                            onChange={(event) =>
+                              setAssignmentNotes((prev) => ({
+                                ...prev,
+                                [task.id]: event.target.value
+                              }))
+                            }
+                            disabled={isBusy}
+                          />
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => void handleSaveAssignment(task.id)}
+                            disabled={isBusy || !assignmentChanged}
+                          >
+                            Assigner
+                          </button>
+                        </div>
+                      ) : null}
+
+                      <div className="operations-inline-actions">
+                        {editLockMessage ? (
+                          <span className="hint">{editLockMessage}</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => handleStartEditTask(task)}
+                            disabled={isBusy}
+                          >
+                            Modifier
+                          </button>
+                        )}
+                        {deleteLockMessage ? (
+                          <span className="hint">{deleteLockMessage}</span>
+                        ) : canDelete ? (
+                          <button
+                            type="button"
+                            className="danger-btn"
+                            onClick={() => handleDeleteTask(task)}
+                            disabled={isBusy}
+                          >
+                            Supprimer
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-
-                    {isCompleted ? (
-                      <div className="operations-actions-secondary-content">
-                        <div className="operations-task-closed-note">
-                          Tâche terminée: statut et assignation verrouillés.
-                        </div>
-                        {canDelete ? (
-                          <button
-                            type="button"
-                            className="danger-btn"
-                            onClick={() => void handleDeleteTask(task)}
-                            disabled={isBusy}
-                            title={deleteLockMessage ?? undefined}
-                          >
-                            Supprimer
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : !canAssignTasks ? (
-                      <div className="operations-actions-secondary-content">
-                        {canUpdate ? (
-                          <div className="operations-inline-group">
-                            <label>Statut</label>
-                            <select
-                              value={task.status}
-                              onChange={(event) =>
-                                void handleChangeStatus(task.id, event.target.value as TaskStatus)
-                              }
-                              disabled={isBusy || isBulkAssigning}
-                            >
-                              <option value="TODO">À faire</option>
-                              <option value="IN_PROGRESS">En cours</option>
-                              <option value="DONE">Terminée</option>
-                              <option value="BLOCKED">Bloquée</option>
-                            </select>
-                          </div>
-                        ) : null}
-                        {canDelete ? (
-                          <button
-                            type="button"
-                            className="danger-btn"
-                            onClick={() => void handleDeleteTask(task)}
-                            disabled={isBusy}
-                            title={deleteLockMessage ?? undefined}
-                          >
-                            Supprimer
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <details
-                        className="operations-actions-secondary"
-                        onToggle={(event) => {
-                          if (event.currentTarget.open) void loadMembers();
-                        }}
-                      >
-                        <summary>Statut et assignation</summary>
-                        <div className="operations-actions-secondary-content">
-                        {canUpdate ? (
-                          <div className="operations-inline-group">
-                            <label>Statut</label>
-                            <select
-                              value={task.status}
-                              onChange={(event) =>
-                                void handleChangeStatus(task.id, event.target.value as TaskStatus)
-                              }
-                              disabled={isBusy || isBulkAssigning}
-                            >
-                              <option value="TODO">À faire</option>
-                              <option value="IN_PROGRESS">En cours</option>
-                              <option value="DONE">Terminée</option>
-                              <option value="BLOCKED">Bloquée</option>
-                            </select>
-                          </div>
-                        ) : null}
-
-                        {canAssignTasks ? (
-                          <div className="operations-assign-card">
-                            <div className="operations-inline-group">
-                              <label>Assigner à</label>
-                              <select
-                                value={selectedAssignee}
-                                onChange={(event) =>
-                                  setAssignments((prev) => ({
-                                    ...prev,
-                                    [task.id]: event.target.value
-                                  }))
-                                }
-                                disabled={isBusy || isBulkAssigning}
-                              >
-                                <option value="">Non assignée</option>
-                                {isLoadingMembers ? (
-                                  <option value="" disabled>Chargement des membres…</option>
-                                ) : null}
-                                {members.map((member) => (
-                                  <option key={member.userId} value={member.userId}>
-                                    {memberLabel(member)}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="operations-inline-group">
-                              <label>Note (optionnel)</label>
-                              <input
-                                type="text"
-                                placeholder="Motif d'assignation"
-                                value={assignmentNotes[task.id] ?? ""}
-                                onChange={(event) =>
-                                  setAssignmentNotes((prev) => ({
-                                    ...prev,
-                                    [task.id]: event.target.value
-                                  }))
-                                }
-                                disabled={isBusy || isBulkAssigning}
-                              />
-                            </div>
-
-                            <button
-                              type="button"
-                              className="secondary-btn"
-                              onClick={() => void handleSaveAssignment(task.id)}
-                              disabled={!assignmentChanged || isBusy || isBulkAssigning}
-                            >
-                              Enregistrer assignation
-                            </button>
-                          </div>
-                        ) : null}
-                          {canDelete ? (
-                            <button
-                              type="button"
-                              className="danger-btn"
-                              onClick={() => void handleDeleteTask(task)}
-                              disabled={isBusy}
-                              title={deleteLockMessage ?? undefined}
-                            >
-                              Supprimer
-                            </button>
-                          ) : null}
-                        </div>
-                      </details>
-                    )}
-                  </div>
+                  ) : null}
                 </article>
               );
             })}
           </div>
-          {hasMoreTasks ? (
-            <div className="list-pagination">
-              <p className="hint list-pagination-meta">
-                {displayTasks.length} tâche(s) affichée(s)
-                {displayTasks.length !== tasks.length ? ` sur ${tasks.length} chargée(s)` : ""}
-                {" sur plusieurs pages."}
-              </p>
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => void handleLoadMoreTasks()}
-                disabled={isLoading || isLoadingMoreTasks || searchQuery.trim() !== debouncedSearch}
-              >
-                {isLoadingMoreTasks ? "Chargement..." : "Charger plus"}
-              </button>
-            </div>
-          ) : null}
           {renderVisibleTasksPagination("bottom")}
           </>
         ) : null}
@@ -2074,39 +1576,6 @@ export function OperationsTasksPage(): JSX.Element {
           l'administration.
         </p>
       ) : null}
-
-      <PageGuide
-        title={
-          selectedProfile ? `Guide des tâches · ${selectedProfile.label}` : "Guide des tâches"
-        }
-        description={
-          selectedProfile?.operationsModel ??
-          "Les tâches structurent le suivi terrain par secteur, responsable, statut et échéance."
-        }
-        items={selectedProfile?.tasks.workflow.length
-          ? selectedProfile.tasks.workflow.map((step) => ({
-              term: step.label,
-              description: step.description
-            }))
-          : [
-              {
-                term: "À faire",
-                description: "Travail créé mais pas encore démarré."
-              },
-              {
-                term: "En cours",
-                description: "Travail actif, suivi par le responsable ou le superviseur."
-              },
-              {
-                term: "Bloquée",
-                description: "Tâche arrêtée par un problème qui demande une décision ou un appui."
-              },
-              {
-                term: "Retard",
-                description: "Tâche ouverte dont l'échéance est dépassée."
-              }
-            ]}
-      />
 
       <SectorWorkspaceNav actions={isCategoriesView ? [{
         label: "Ajouter une catégorie",
@@ -2294,11 +1763,11 @@ export function OperationsTasksPage(): JSX.Element {
         <details
           id="task-create"
           className="panel mobile-form-anchor mobile-create-disclosure"
-          open={isTaskFormExpanded || Boolean(editingTaskId) || Boolean(requestedEditTaskId)}
+          open={isTaskFormOpen}
           onToggle={(event) => setIsTaskFormExpanded(event.currentTarget.open)}
         >
           <summary>{editingTaskId ? (selectedActivityCode === "DAILY_ACTIVITIES" ? "Modifier une activité" : "Modifier une tâche") : requestedEditTaskId ? "Ouverture de la tâche..." : selectedActivityCode === "DAILY_ACTIVITIES" ? "Nouvelle activité" : "Nouvelle tâche"}</summary>
-          {requestedEditTaskId && !editingTaskId ? <p className="hint" role="status">Chargement de la tâche à modifier...</p> : (
+          {requestedEditTaskId && !editingTaskId ? <p className="hint" role="status">Chargement de la tâche à modifier...</p> : shouldRenderTaskForm ? (
           <form
             className="operations-task-form"
             onSubmit={handleCreateTask}
@@ -2867,7 +2336,7 @@ export function OperationsTasksPage(): JSX.Element {
                               ...prev,
                               metadata: {
                                 ...prev.metadata,
-                              [field.key]: formatEditableAmountForInput(event.target.value)
+                                [field.key]: formatEditableAmountForInput(event.target.value)
                               }
                             }))
                           }
@@ -2997,7 +2466,7 @@ export function OperationsTasksPage(): JSX.Element {
               ) : null}
             </div>
           </form>
-          )}
+          ) : null}
         </details>
       ) : null}
 
@@ -3098,4 +2567,3 @@ export function OperationsTasksPage(): JSX.Element {
     </>
   );
 }
-

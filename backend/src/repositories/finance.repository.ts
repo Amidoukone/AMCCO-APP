@@ -592,14 +592,17 @@ export async function createFinancialTransaction(input: {
   createdById: string;
   occurredAt: Date;
 }): Promise<void> {
-  const persist = async (executor: Pick<PoolConnection, "execute">, metadata: Record<string, string> = input.metadata) => {
+  const persist = async (
+    executor: Pick<PoolConnection, "execute">,
+    metadata: Record<string, string> = input.metadata,
+  ) => {
     await executor.execute<ResultSetHeader>(
       `
         INSERT INTO transactions (
           id, company_id, account_id, type, amount, currency, activity_code, description, metadata_json,
           status, requires_proof, salary_confirmation_status, created_by_id, occurred_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED', ?, ?, ?, ?)
       `,
       [
         input.id,
@@ -614,16 +617,28 @@ export async function createFinancialTransaction(input: {
         input.requiresProof ? 1 : 0,
         input.salaryConfirmationStatus ?? "NOT_REQUIRED",
         input.createdById,
-        input.occurredAt
-      ]
+        input.occurredAt,
+      ],
     );
   };
   if (input.activityCode === "BEVERAGE_DEPOT") {
-    await withBeverageStockWrite({ companyId: input.companyId, transactionId: input.id, action: "create", activityCode: input.activityCode, metadata: input.metadata, occurredAt: input.occurredAt }, async (connection, metadata) => {
-      Object.keys(input.metadata).forEach((key) => { delete input.metadata[key]; });
-      Object.assign(input.metadata, metadata);
-      await persist(connection, metadata);
-    });
+    await withBeverageStockWrite(
+      {
+        companyId: input.companyId,
+        transactionId: input.id,
+        action: "create",
+        activityCode: input.activityCode,
+        metadata: input.metadata,
+        occurredAt: input.occurredAt,
+      },
+      async (connection, metadata) => {
+        Object.keys(input.metadata).forEach((key) => {
+          delete input.metadata[key];
+        });
+        Object.assign(input.metadata, metadata);
+        await persist(connection, metadata);
+      },
+    );
   } else {
     await persist(getDbPool());
   }
@@ -644,7 +659,10 @@ export async function updateFinancialTransaction(input: {
   salaryConfirmationStatus?: SalaryConfirmationStatus;
   occurredAt: Date;
 }): Promise<void> {
-  const persist = async (executor: Pick<PoolConnection, "execute">, metadata: Record<string, string> = input.metadata) => {
+  const persist = async (
+    executor: Pick<PoolConnection, "execute">,
+    metadata: Record<string, string> = input.metadata,
+  ) => {
     await executor.execute<ResultSetHeader>(
       `
         UPDATE transactions
@@ -656,7 +674,9 @@ export async function updateFinancialTransaction(input: {
             description = ?,
             metadata_json = ?,
             requires_proof = ?,
-            status = 'DRAFT',
+            -- A transaction is recorded immediately.  The status column is kept only
+            -- for compatibility with historic production rows.
+            status = 'APPROVED',
             validated_by_id = NULL,
             salary_confirmation_status = ?,
             salary_confirmed_by_id = NULL,
@@ -678,16 +698,28 @@ export async function updateFinancialTransaction(input: {
         input.salaryConfirmationStatus ?? "NOT_REQUIRED",
         input.occurredAt,
         input.companyId,
-        input.transactionId
-      ]
+        input.transactionId,
+      ],
     );
   };
   if (input.stockControlled || input.activityCode === "BEVERAGE_DEPOT") {
-    await withBeverageStockWrite({ companyId: input.companyId, transactionId: input.transactionId, action: "update", activityCode: input.activityCode, metadata: input.metadata, occurredAt: input.occurredAt }, async (connection, metadata) => {
-      Object.keys(input.metadata).forEach((key) => { delete input.metadata[key]; });
-      Object.assign(input.metadata, metadata);
-      await persist(connection, metadata);
-    });
+    await withBeverageStockWrite(
+      {
+        companyId: input.companyId,
+        transactionId: input.transactionId,
+        action: "update",
+        activityCode: input.activityCode,
+        metadata: input.metadata,
+        occurredAt: input.occurredAt,
+      },
+      async (connection, metadata) => {
+        Object.keys(input.metadata).forEach((key) => {
+          delete input.metadata[key];
+        });
+        Object.assign(input.metadata, metadata);
+        await persist(connection, metadata);
+      },
+    );
   } else {
     await persist(getDbPool());
   }

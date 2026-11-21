@@ -7,7 +7,6 @@ vi.mock("../lib/db.js", () => ({ queryRows: queryRowsMock }));
 import {
   getDashboardFinanceSummary,
   listReportOperationalTransactions,
-  listTransactionsForExport
 } from "./reporting.repository.js";
 
 describe("reporting.repository", () => {
@@ -147,47 +146,4 @@ describe("reporting.repository", () => {
     ]);
   });
 
-  it("includes dedicated operator-account transactions in transaction exports", async () => {
-    queryRowsMock.mockResolvedValue([
-      {
-        id: "beverage-export-1",
-        occurredAt: new Date("2026-10-12T09:00:00.000Z"),
-        status: "APPROVED",
-        type: "CASH_IN",
-        amount: "60000.00",
-        currency: "XOF",
-        activityCode: "BEVERAGE_DEPOT",
-        accountName: "Caisse opérateur boissons",
-        accountRef: "BEV-01",
-        accountScopeType: "DEDICATED",
-        accountPrimaryActivityCode: "BEVERAGE_DEPOT",
-        accountAllowedActivityCodes: "BEVERAGE_DEPOT",
-        createdByEmail: "operateur@example.com",
-        validatedByEmail: "operateur@example.com",
-        proofsCount: 0,
-        description: "Vente opérateur",
-        createdAt: new Date("2026-10-12T09:00:00.000Z"),
-        updatedAt: new Date("2026-10-12T09:00:00.000Z")
-      }
-    ]);
-
-    const result = await listTransactionsForExport("company-1", {
-      activityCode: "BEVERAGE_DEPOT"
-    });
-
-    const [sql, values] = queryRowsMock.mock.calls[0] as [string, string[]];
-    expect(sql).toContain("INNER JOIN financial_accounts fa");
-    expect(sql).toContain("fa.scope_type AS accountScopeType");
-    expect(sql).not.toContain("fa.scope_type =");
-    expect(values).toEqual(["company-1", "BEVERAGE_DEPOT"]);
-    expect(result).toMatchObject([
-      {
-        id: "beverage-export-1",
-        activityCode: "BEVERAGE_DEPOT",
-        accountScopeType: "DEDICATED",
-        accountPrimaryActivityCode: "BEVERAGE_DEPOT",
-        createdByEmail: "operateur@example.com"
-      }
-    ]);
-  });
 });

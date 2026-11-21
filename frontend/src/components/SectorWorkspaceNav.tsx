@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { isBusinessActivityCode } from "../config/businessActivities";
+import { isSelectableBusinessActivityCode } from "../config/businessActivities";
 import { canAccessFeature, type FeatureKey } from "../config/permissions";
 import { useAuth } from "../context/AuthContext";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
@@ -29,7 +29,7 @@ export function SectorWorkspaceNav({ actions = [] }: { actions?: SectorWorkspace
   useEffect(() => {
     if (
       requestedActivityCode &&
-      isBusinessActivityCode(requestedActivityCode) &&
+      isSelectableBusinessActivityCode(requestedActivityCode) &&
       (!restrictedActivityCode || requestedActivityCode === restrictedActivityCode) &&
       enabledActivities.some((activity) => activity.code === requestedActivityCode) &&
       selectedActivityCode !== requestedActivityCode

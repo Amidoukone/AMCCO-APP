@@ -4,7 +4,6 @@ import { listBeverageProducts, listBeverageStockAdjustments } from "../repositor
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
-import * as XLSX from "xlsx";
 import {
   buildActivityReportHighlights,
   getBusinessActivityProfile,
@@ -34,10 +33,6 @@ import {
   listReportRentalTransactions,
   listReportTaskByActivity,
   listReportTaskByStatus,
-  listTasksForExport,
-  listTransactionsForExport,
-  toTaskExportRecord,
-  toTransactionExportRecord,
   type ReportPeriodFilter,
   type AgricultureOperationsReport,
   type AgencyOperationsReport,
@@ -64,7 +59,7 @@ import {
   type ReportOperationalTask,
   type ReportOperationalTransaction,
   type ReportsOverview,
-  type TransportOperationsReport
+  type TransportOperationsReport,
 } from "../repositories/reporting.repository.js";
 import {
   getFinancialAccountsSummary,
@@ -98,6 +93,7 @@ type ReportFiltersInput = {
   dateFrom?: string;
   dateTo?: string;
   activityCode?: string;
+  includeDetails?: boolean;
 };
 
 const DASHBOARD_ROLES: RoleCode[] = ["OWNER", "SYS_ADMIN", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE"];
@@ -460,27 +456,24 @@ function ensureReportingAccess(role: RoleCode): void {
 }
 
 function ensureSectorReportFilter(
-  filters: ReportPeriodFilter
-): asserts filters is ReportPeriodFilter & { activityCode: BusinessActivityCode } {
+  filters: ReportPeriodFilter,
+): asserts filters is ReportPeriodFilter & {
+  activityCode: BusinessActivityCode;
+} {
   if (!filters.activityCode) {
-    throw new HttpError(400, "Sélectionnez un secteur pour consulter le rapport.");
+    throw new HttpError(
+      400,
+      "Sélectionnez un secteur pour consulter le rapport.",
+    );
+  }
+  if (filters.activityCode === "REAL_ESTATE_AGENCY") {
+    throw new HttpError(
+      410,
+      "Le secteur Agence immobilière a été retiré. Ses anciennes données sont conservées, sans parcours applicatif actif.",
+    );
   }
 }
 
-function escapeCsvValue(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  const normalized = String(value).replace(/\r?\n/g, " ").replace(/"/g, '""');
-  return `"${normalized}"`;
-}
-
-function buildCsv(headers: string[], rows: Array<Array<string | number | null | undefined>>): string {
-  const headerLine = headers.map((header) => escapeCsvValue(header)).join(",");
-  const lines = rows.map((row) => row.map((value) => escapeCsvValue(value)).join(","));
-  return [headerLine, ...lines].join("\n");
-}
 
 function toDisplayPeriodLabel(filters: { dateFrom?: string; dateTo?: string }): string {
   if (!filters.dateFrom && !filters.dateTo) {
@@ -540,108 +533,6 @@ function toDisplayAccountCompatibilityLabel(isCompatible: boolean): string {
   return isCompatible ? "Compatible" : "Hors secteur";
 }
 
-function resolveWorksheetColumns(
-  rows: Array<Record<string, unknown>>,
-  configuredColumns?: string[]
-): string[] {
-  if (configuredColumns && configuredColumns.length > 0) {
-    return configuredColumns;
-  }
-
-  const columns = new Set<string>();
-  for (const row of rows) {
-    for (const key of Object.keys(row)) {
-      columns.add(key);
-    }
-  }
-  return Array.from(columns);
-}
-
-function formatWorksheetForExport(
-  worksheet: XLSX.WorkSheet,
-  rows: Array<Record<string, unknown>>,
-  columns: string[]
-): void {
-  if (columns.length === 0) {
-    return;
-  }
-
-  const range = worksheet["!ref"]
-    ? XLSX.utils.decode_range(worksheet["!ref"])
-    : {
-        s: { c: 0, r: 0 },
-        e: { c: columns.length - 1, r: Math.max(rows.length, 0) }
-      };
-
-  worksheet["!autofilter"] = {
-    ref: XLSX.utils.encode_range({
-      s: { c: range.s.c, r: range.s.r },
-      e: { c: range.e.c, r: range.s.r }
-    })
-  };
-
-  worksheet["!cols"] = columns.map((column) => {
-    const maxContentLength = rows.reduce((max, row) => {
-      const value = row[column];
-      if (value === null || value === undefined) {
-        return max;
-      }
-      return Math.max(max, String(value).length);
-    }, column.length);
-
-    return {
-      wch: Math.min(Math.max(maxContentLength + 2, 12), 48)
-    };
-  });
-}
-
-function buildWorkbookBuffer(
-  sheets: Array<{
-    name: string;
-    rows: Array<Record<string, unknown>>;
-    columns?: string[];
-  }>
-): Buffer {
-  const workbook = XLSX.utils.book_new();
-
-  for (const sheet of sheets) {
-    const columns = resolveWorksheetColumns(sheet.rows, sheet.columns);
-    const worksheet =
-      sheet.rows.length > 0
-        ? XLSX.utils.json_to_sheet(sheet.rows, {
-            header: columns
-          })
-        : XLSX.utils.aoa_to_sheet([columns]);
-    formatWorksheetForExport(worksheet, sheet.rows, columns);
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
-  }
-
-  return XLSX.write(workbook, {
-    type: "buffer",
-    bookType: "xlsx"
-  }) as Buffer;
-}
-
-function buildOverviewMetadataRows(filters: ReportPeriodFilter): Array<Record<string, unknown>> {
-  return [
-    {
-      generatedAt: new Date().toISOString(),
-      period: toDisplayPeriodLabel(filters),
-      activity: toDisplayActivityLabel(filters.activityCode),
-      dateFrom: filters.dateFrom ?? "",
-      dateTo: filters.dateTo ?? ""
-    }
-  ];
-}
-
-function buildReportReadingGuideRows(): Array<Record<string, unknown>> {
-  return REPORT_READING_GUIDE_ROWS.map((item) => ({
-    term: item.term,
-    definition: item.definition,
-    formula: item.formula,
-    useCase: item.useCase
-  }));
-}
 
 type BufferedPdfPage = {
   content?: {
@@ -755,7 +646,7 @@ function limitPdfRows(rows: string[], limit = 20): string[] {
 
   return [
     ...rows.slice(0, limit),
-    `${rows.length - limit} ligne(s) supplementaire(s) disponibles dans l'export Excel.`
+    `${rows.length - limit} ligne(s) supplémentaire(s) non affichée(s) dans cette synthèse.`
   ];
 }
 
@@ -7313,744 +7204,6 @@ function renderLivestockReportsPdf(
   drawPdfReadingGuideBox(doc);
 }
 
-function buildOverviewSummaryRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  const rows: Array<Record<string, unknown>> = [
-    {
-      category: "Meta",
-      item: "generatedAt",
-      label: "Generation",
-      value: overview.generatedAt,
-      extra: ""
-    },
-    {
-      category: "Meta",
-      item: "period",
-      label: "Période",
-      value: toDisplayPeriodLabel({
-        dateFrom: overview.filters.dateFrom ?? undefined,
-        dateTo: overview.filters.dateTo ?? undefined
-      }),
-      extra: ""
-    },
-    {
-      category: "Meta",
-      item: "activity",
-      label: "Activité",
-      value: toDisplayActivityLabel(overview.filters.activityCode ?? undefined),
-      extra: ""
-    },
-    {
-      category: "Meta",
-      item: "sectorRulesVersion",
-      label: "Version regles sectorielles",
-      value: overview.sectorRulesVersion,
-      extra: ""
-    }
-  ];
-
-  if (overview.activityProfile) {
-    rows.push({
-      category: "SectorProfile",
-      item: overview.activityProfile.activityCode,
-      label: "Mode operatoire",
-      value: overview.activityProfile.label,
-      extra: overview.activityProfile.operationsModel
-    });
-    rows.push({
-      category: "SectorProfile",
-      item: `${overview.activityProfile.activityCode}-focus`,
-      label: "Focus reporting",
-      value: overview.activityProfile.reporting.focusArea,
-      extra: overview.activityProfile.reporting.exportSections.join(" | ")
-    });
-  }
-
-  for (const item of overview.activityHighlights) {
-    rows.push({
-      category: "SectorHighlight",
-      item: item.code,
-      label: item.label,
-      value: item.value,
-      extra: `${item.emphasis} | ${item.description}`
-    });
-  }
-
-  for (const item of overview.financeByStatus) {
-    rows.push({
-      category: "FinanceByStatus",
-      item: item.status,
-      label: `${item.status} ${item.currency}`,
-      value: item.count,
-      extra: `${item.totalAmount} ${item.currency}`
-    });
-  }
-
-  for (const item of overview.financeByType) {
-    rows.push({
-      category: "FinanceByType",
-      item: item.type,
-      label: `${item.type} ${item.currency}`,
-      value: item.count,
-      extra: `total ${item.totalAmount} ${item.currency} | comptabilisé ${item.approvedAmount} ${item.currency}`
-    });
-  }
-
-  for (const item of overview.financeByActivity) {
-    rows.push({
-      category: "FinanceByActivity",
-      item: item.activityCode,
-      label: BUSINESS_ACTIVITY_LABELS[item.activityCode],
-      value: item.count,
-      extra: `total ${item.totalAmount} XOF/DEV | comptabilisé ${item.approvedAmount} XOF/DEV`
-    });
-  }
-
-  rows.push({
-    category: "FinanceAccounts",
-    item: "totals",
-    label: "Comptes financiers",
-    value: overview.financeAccountsSummary.totalCount,
-    extra: `compatibles ${overview.financeAccountsSummary.compatibleCount} | incompatibles ${overview.financeAccountsSummary.incompatibleCount}`
-  });
-  rows.push({
-    category: "FinanceAccounts",
-    item: "scope-distribution",
-    label: "Portée des comptes",
-    value: overview.financeAccountsSummary.globalCount,
-    extra: `globaux ${overview.financeAccountsSummary.globalCount} | dédiés ${overview.financeAccountsSummary.dedicatedCount} | restreints ${overview.financeAccountsSummary.restrictedCount}`
-  });
-
-  for (const item of overview.financeAccounts) {
-    rows.push({
-      category: "FinanceAccountDetail",
-      item: item.id,
-      label: item.name,
-      value: toDisplayAccountScopeLabel(item),
-      extra: `${toDisplayAccountCompatibilityLabel(item.isCompatibleWithSelectedActivity)} | ref ${item.accountRef ?? "-"} | solde ${item.balance}`
-    });
-  }
-
-  for (const item of overview.operationalPerformance) {
-    rows.push({
-      category: "OperationalPerformance",
-      item: `${item.scope}-${item.activityCode}-${item.dimensionKey}-${item.itemKey}`,
-      label: `${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.dimensionLabel} | ${item.itemLabel}`,
-      value: item.netProfit,
-      extra: `entrées ${item.approvedCashIn} XOF | sorties ${item.approvedCashOut} XOF | marge ${item.marginRate}% | rentabilité coûts ${item.returnOnCostRate}% | exécution ${item.executionRate}% | ouvertes ${item.openTasksCount} | bloquées ${item.blockedTasksCount} | retards ${item.overdueTasksCount}`
-    });
-  }
-
-  if (overview.hardwareMonthlyReport) {
-    rows.push({
-      category: "HardwareMonthlyReport",
-      item: "totals",
-      label: `Quincaillerie ${overview.hardwareMonthlyReport.periodLabel}`,
-      value: overview.hardwareMonthlyReport.totals.purchaseAmount,
-      extra: `quantité ${overview.hardwareMonthlyReport.totals.quantity} | achats ${overview.hardwareMonthlyReport.totals.purchaseAmount} XOF | bénéfice ${overview.hardwareMonthlyReport.totals.grossProfit} XOF | recouvré ${overview.hardwareMonthlyReport.totals.collectedAmount} XOF | écart achats ${overview.hardwareMonthlyReport.totals.purchaseVarianceAmount} XOF | reste attendu ${overview.hardwareMonthlyReport.totals.balanceAmount} XOF | lignes ${overview.hardwareMonthlyReport.totals.transactionsCount}`
-    });
-  }
-
-  if (overview.generalExpensesReport) {
-    rows.push({
-      category: "GeneralExpensesReport",
-      item: "totals",
-      label: `Dépenses générales ${overview.generalExpensesReport.periodLabel}`,
-      value: overview.generalExpensesReport.totals.totalAmount,
-      extra: `PDG ${overview.generalExpensesReport.totals.pdgAmount} XOF | employés ${overview.generalExpensesReport.totals.employeeAmount} XOF | lignes ${overview.generalExpensesReport.totals.transactionsCount}`
-    });
-  }
-
-  if (overview.agricultureOperationsReport) {
-    rows.push({
-      category: "AgricultureOperationsReport",
-      item: "totals",
-      label: `Agriculture ${overview.agricultureOperationsReport.periodLabel}`,
-      value: overview.agricultureOperationsReport.totals.netAmount,
-      extra: `parcelles ${overview.agricultureOperationsReport.totals.parcelsCount} | surface ${overview.agricultureOperationsReport.totals.surfaceArea} | recettes ${overview.agricultureOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.agricultureOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.agricultureOperationsReport.totals.executionRate}%`
-    });
-  }
-
-  if (overview.generalStoreOperationsReport) {
-    rows.push({
-      category: "GeneralStoreOperationsReport",
-      item: "totals",
-      label: `Magasins ${overview.generalStoreOperationsReport.periodLabel}`,
-      value: overview.generalStoreOperationsReport.totals.balanceAmount,
-      extra: `boutiques ${overview.generalStoreOperationsReport.totals.shopsCount} | achats ${overview.generalStoreOperationsReport.totals.purchaseAmount} XOF | recouvré ${overview.generalStoreOperationsReport.totals.collectedAmount} XOF | solde dû ${overview.generalStoreOperationsReport.totals.balanceAmount} XOF`
-    });
-  }
-
-  if (overview.foodOperationsReport) {
-    rows.push({
-      category: "FoodOperationsReport",
-      item: "totals",
-      label: `Alimentation ${overview.foodOperationsReport.periodLabel}`,
-      value: overview.foodOperationsReport.totals.netAmount,
-      extra: `familles ${overview.foodOperationsReport.totals.productFamiliesCount} | produits ${overview.foodOperationsReport.totals.productsCount} | lots ${overview.foodOperationsReport.totals.batchesCount} | ventes ${overview.foodOperationsReport.totals.salesAmount} XOF | achats ${overview.foodOperationsReport.totals.purchaseAmount} XOF | pertes ${overview.foodOperationsReport.totals.lossAmount} XOF | marge ${overview.foodOperationsReport.totals.marginRate}% | exécution ${overview.foodOperationsReport.totals.executionRate}%`
-    });
-  }
-
-  if (overview.rentalOperationsReport) {
-    rows.push({
-      category: "RentalOperationsReport",
-      item: "totals",
-      label: `Location ${overview.rentalOperationsReport.periodLabel}`,
-      value: overview.rentalOperationsReport.totals.netAmount,
-      extra: `locataires ${overview.rentalOperationsReport.totals.tenantsCount} | a jour ${overview.rentalOperationsReport.totals.upToDateTenantsCount} | en retard ${overview.rentalOperationsReport.totals.lateTenantsCount} | arrieres ${overview.rentalOperationsReport.totals.totalArrearsAmount} XOF | encaisse ${overview.rentalOperationsReport.totals.collectedAmount} XOF | cautions ${overview.rentalOperationsReport.totals.depositAmount} XOF | exécution ${overview.rentalOperationsReport.totals.executionRate}%`
-    });
-  }
-
-  if (overview.hotelOperationsReport) {
-    rows.push({
-      category: "HotelOperationsReport",
-      item: "totals",
-      label: `Hôtellerie ${overview.hotelOperationsReport.periodLabel}`,
-      value: overview.hotelOperationsReport.totals.netAmount,
-      extra: `réservations ${overview.hotelOperationsReport.totals.bookingsCount} | chambres ${overview.hotelOperationsReport.totals.roomsCount} | nuitées ${overview.hotelOperationsReport.totals.nightsCount} | hebergement ${overview.hotelOperationsReport.totals.roomRevenue} XOF | restauration ${overview.hotelOperationsReport.totals.restaurantAmount} XOF | services ${overview.hotelOperationsReport.totals.serviceAmount} XOF | charges ${overview.hotelOperationsReport.totals.cashOutAmount} XOF | tarif moyen ${overview.hotelOperationsReport.totals.averageRoomRate} XOF | exécution ${overview.hotelOperationsReport.totals.executionRate}%`
-    });
-  }
-
-  if (overview.waterOperationsReport) {
-    rows.push({
-      category: "WaterOperationsReport",
-      item: "totals",
-      label: `Eau ${overview.waterOperationsReport.periodLabel}`,
-      value: overview.waterOperationsReport.totals.netAmount,
-      extra: `paquets vendus ${overview.waterOperationsReport.totals.packagesSold} | ventes ${overview.waterOperationsReport.totals.salesAmount} XOF | dépenses ${overview.waterOperationsReport.totals.expensesAmount} XOF | lignes ${overview.waterOperationsReport.totals.transactionsCount}`
-    });
-  }
-
-  if (overview.agencyOperationsReport) {
-    rows.push({
-      category: "AgencyOperationsReport",
-      item: "totals",
-      label: `Agence immobilière ${overview.agencyOperationsReport.periodLabel}`,
-      value: overview.agencyOperationsReport.totals.netAmount,
-      extra: `mandats ${overview.agencyOperationsReport.totals.mandatesCount} | biens ${overview.agencyOperationsReport.totals.propertiesCount} | clients ${overview.agencyOperationsReport.totals.clientsCount} | affaires ${overview.agencyOperationsReport.totals.dealAmount} XOF | commissions vente ${overview.agencyOperationsReport.totals.saleCommissionAmount} XOF | commissions location ${overview.agencyOperationsReport.totals.rentalCommissionAmount} XOF | charges ${overview.agencyOperationsReport.totals.cashOutAmount} XOF | taux commission ${overview.agencyOperationsReport.totals.commissionRate}% | exécution ${overview.agencyOperationsReport.totals.executionRate}%`
-    });
-  }
-
-  if (overview.btpOperationsReport) {
-    rows.push({
-      category: "BtpOperationsReport",
-      item: "totals",
-      label: `BTP ${overview.btpOperationsReport.periodLabel}`,
-      value: overview.btpOperationsReport.totals.netAmount,
-      extra: `chantiers ${overview.btpOperationsReport.totals.projectsCount} | encaissé ${overview.btpOperationsReport.totals.cashInAmount} XOF | dépensé ${overview.btpOperationsReport.totals.totalCostAmount} XOF | marge ${overview.btpOperationsReport.totals.netAmount} XOF`
-    });
-  }
-
-  if (overview.fishFarmingOperationsReport) {
-    rows.push({
-      category: "FishFarmingOperationsReport",
-      item: "totals",
-      label: `Pisciculture ${overview.fishFarmingOperationsReport.periodLabel}`,
-      value: overview.fishFarmingOperationsReport.totals.netAmount,
-      extra: `bassins ${overview.fishFarmingOperationsReport.totals.pondsCount} | cycles ${overview.fishFarmingOperationsReport.totals.cyclesCount} | alevins ${overview.fishFarmingOperationsReport.totals.fingerlingsQuantity} | aliment ${overview.fishFarmingOperationsReport.totals.feedQuantity} | ventes ${overview.fishFarmingOperationsReport.totals.soldQuantity} | mortalité ${overview.fishFarmingOperationsReport.totals.mortalityCount} | recettes ${overview.fishFarmingOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.fishFarmingOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.fishFarmingOperationsReport.totals.executionRate}%`
-    });
-  }
-
-  if (overview.livestockOperationsReport) {
-    rows.push({
-      category: "LivestockOperationsReport",
-      item: "totals",
-      label: `Élevage ${overview.livestockOperationsReport.periodLabel}`,
-      value: overview.livestockOperationsReport.totals.netAmount,
-      extra: `troupeaux ${overview.livestockOperationsReport.totals.herdsCount} | lots ${overview.livestockOperationsReport.totals.batchesCount} | achats ${overview.livestockOperationsReport.totals.animalPurchaseCount} | aliment ${overview.livestockOperationsReport.totals.feedQuantity} | ventes ${overview.livestockOperationsReport.totals.soldAnimalCount} | produits ${overview.livestockOperationsReport.totals.productQuantity} | mortalité ${overview.livestockOperationsReport.totals.mortalityCount} | recettes ${overview.livestockOperationsReport.totals.cashInAmount} XOF | dépenses ${overview.livestockOperationsReport.totals.cashOutAmount} XOF | exécution ${overview.livestockOperationsReport.totals.executionRate}%`
-    });
-  }
-
-  for (const item of overview.taskByStatus) {
-    rows.push({
-      category: "TaskByStatus",
-      item: item.status,
-      label: item.status,
-      value: item.count,
-      extra: ""
-    });
-  }
-
-  for (const item of overview.taskByActivity) {
-    rows.push({
-      category: "TaskByActivity",
-      item: item.activityCode,
-      label: BUSINESS_ACTIVITY_LABELS[item.activityCode],
-      value: item.totalCount,
-      extra: `ouvertes ${item.openCount} | bloquées ${item.blockedCount} | terminées ${item.doneCount}`
-    });
-  }
-
-  return rows;
-}
-
-function buildOperationalPerformanceRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return overview.operationalPerformance.map((item) => ({
-    scope: item.scope === "ACTIVITY" ? "Secteur" : "Sous-section",
-    activity: BUSINESS_ACTIVITY_LABELS[item.activityCode],
-    dimension: item.dimensionLabel,
-    item: item.itemLabel,
-    currency: item.currency,
-    transactionsCount: item.transactionsCount,
-    activeTransactionsCount: item.approvedTransactionsCount,
-    cashIn: item.approvedCashIn,
-    cashOut: item.approvedCashOut,
-    netProfit: item.netProfit,
-    marginRate: item.marginRate,
-    returnOnCostRate: item.returnOnCostRate,
-    totalTasksCount: item.totalTasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    overdueTasksCount: item.overdueTasksCount,
-    executionRate: item.executionRate,
-    blockageRate: item.blockageRate,
-    followUpPressure: item.followUpPressure
-  }));
-}
-
-function buildHardwareMonthlyReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.hardwareMonthlyReport?.rows ?? []).map((item) => ({
-    date: item.date,
-    designation: item.designation,
-    recipientRef: item.recipientRef,
-    quantity: item.quantity,
-    purchaseUnitPrice: item.purchaseUnitPrice,
-    purchaseAmount: item.purchaseAmount,
-    grossProfit: item.grossProfit,
-    transactionsCount: item.transactionsCount,
-    currency: item.currency
-  }));
-}
-
-function buildHardwareRecipientReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.hardwareMonthlyReport?.recipientRows ?? []).map((item) => ({
-    recipientRef: item.recipientRef,
-    purchaseAmount: item.purchaseAmount,
-    grossProfit: item.grossProfit,
-    expectedReturnAmount: item.expectedReturnAmount,
-    collectedAmount: item.collectedAmount,
-    purchaseVarianceAmount: item.purchaseVarianceAmount,
-    balanceAmount: item.balanceAmount,
-    transactionsCount: item.transactionsCount,
-    currency: item.currency
-  }));
-}
-
-function buildGeneralExpensesReportRows(
-  overview: ReportsOverview,
-  ownerType: "PDG" | "EMPLOYE"
-): Array<Record<string, unknown>> {
-  return (overview.generalExpensesReport?.rows ?? [])
-    .filter((item) => item.ownerType === ownerType)
-    .map((item) => ({
-      date: item.date,
-      categoryLabel: item.categoryLabel,
-      designation: item.designation,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      amount: item.amount,
-      currency: item.currency
-    }));
-}
-
-function buildGeneralExpensesBreakdownRows(
-  overview: ReportsOverview,
-  ownerType: "PDG" | "EMPLOYE"
-): Array<Record<string, unknown>> {
-  return (overview.generalExpensesReport?.breakdownRows ?? [])
-    .filter((item) => item.ownerType === ownerType)
-    .map((item) => ({
-      categoryLabel: item.categoryLabel,
-      transactionsCount: item.transactionsCount,
-      amount: item.amount,
-      currency: item.currency
-    }));
-}
-
-function buildAgricultureOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.agricultureOperationsReport?.rows ?? []).map((item) => ({
-    campaignRef: item.campaignRef,
-    parcelRef: item.parcelRef,
-    fieldType: item.fieldType,
-    cropType: item.cropType,
-    surfaceArea: item.surfaceArea,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildAgricultureOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.agricultureOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
-}
-
-function buildGeneralStoreOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.generalStoreOperationsReport?.rows ?? []).map((item) => ({
-    shopRef: item.shopRef,
-    location: item.location,
-    transactionsCount: item.transactionsCount,
-    lastOperationDate: item.lastOperationDate,
-    purchaseAmount: item.purchaseAmount,
-    collectedAmount: item.collectedAmount,
-    balanceAmount: item.balanceAmount,
-    lastInventoryDate: item.lastInventoryDate,
-    remainingStockValue: item.remainingStockValue ?? "",
-    estimatedSoldAmount: item.estimatedSoldAmount ?? "",
-    varianceAmount: item.varianceAmount ?? "",
-    currency: item.currency
-  }));
-}
-
-function buildGeneralStoreOperationDetailRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.generalStoreOperationsReport?.operationRows ?? []).map((item) => ({
-    date: item.date,
-    shopRef: item.shopRef,
-    operationKind: item.operationKind,
-    status: item.status,
-    designation: item.designation,
-    amount: item.amount,
-    currency: item.currency
-  }));
-}
-
-function buildGeneralStoreOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.generalStoreOperationsReport?.breakdownRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    amount: item.amount,
-    currency: item.currency
-  }));
-}
-
-function buildGeneralStoreReadingRows(): Array<Record<string, unknown>> {
-  return [
-    {
-      indicator: "Périmètre",
-      definition: "Achats, recouvrements et nombres d'opérations soumises ou approuvées sont cumulés depuis l'historique jusqu'à la date de situation (date de fin sélectionnée, ou date du jour)."
-    },
-    {
-      indicator: "Vendu estimé",
-      definition: "Achats reportables enregistrés jusqu'au dernier inventaire moins la valeur du stock restant à cet inventaire. L'estimation suppose un stock initial nul ou déjà intégré et n'est calculée que si les achats couvrent le stock déclaré."
-    },
-    {
-      indicator: "Écart",
-      definition: "Vendu estimé moins les recouvrements enregistrés jusqu'à la date du même inventaire. À rapprocher des ventes constatées; un écart peut aussi représenter des créances ou pertes de stock."
-    }
-  ];
-}
-
-function buildFoodOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.foodOperationsReport?.rows ?? []).map((item) => ({
-    productFamily: item.productFamily,
-    productName: item.productName,
-    batchRef: item.batchRef,
-    storageArea: item.storageArea,
-    purchaseQuantity: item.purchaseQuantity,
-    soldQuantity: item.soldQuantity,
-    lossQuantity: item.lossQuantity,
-    purchaseAmount: item.purchaseAmount,
-    salesAmount: item.salesAmount,
-    lossAmount: item.lossAmount,
-    expenseAmount: item.expenseAmount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    grossMargin: item.grossMargin,
-    marginRate: item.marginRate,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildFoodOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.foodOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
-}
-
-function buildRentalOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.rentalOperationsReport?.rows ?? []).map((item) => ({
-    tenantRef: item.tenantRef,
-    unitRef: item.unitRef,
-    monthlyRent: item.monthlyRent,
-    totalDue: item.totalDue,
-    totalPaid: item.totalPaid,
-    balanceAmount: item.balanceAmount,
-    status: item.status,
-    statusDetail: item.statusDetail,
-    currency: item.currency
-  }));
-}
-
-function buildRentalOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.rentalOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
-}
-
-function buildRentalDepositReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.rentalOperationsReport?.depositRows ?? []).map((item) => ({
-    tenantRef: item.tenantRef,
-    unitRef: item.unitRef,
-    status: item.status,
-    depositPaidAmount: item.depositPaidAmount,
-    paymentsCount: item.paymentsCount,
-    lastPaymentLabel: item.lastPaymentLabel ?? "-",
-    currency: item.currency
-  }));
-}
-
-function buildHotelOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.hotelOperationsReport?.rows ?? []).map((item) => ({
-    serviceLine: item.serviceLine,
-    roomRef: item.roomRef,
-    roomType: item.roomType,
-    bookingRef: item.bookingRef,
-    guestRef: item.guestRef,
-    nightsCount: item.nightsCount,
-    guestCount: item.guestCount,
-    roomRevenue: item.roomRevenue,
-    depositAmount: item.depositAmount,
-    restaurantAmount: item.restaurantAmount,
-    serviceAmount: item.serviceAmount,
-    maintenanceAmount: item.maintenanceAmount,
-    commissionAmount: item.commissionAmount,
-    taxAmount: item.taxAmount,
-    refundAmount: item.refundAmount,
-    expenseAmount: item.expenseAmount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    averageRoomRate: item.averageRoomRate,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildHotelOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.hotelOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
-}
-
-function buildWaterOperationsReportRows(
-  overview: ReportsOverview,
-  kind: "IN" | "OUT"
-): Array<Record<string, unknown>> {
-  return (overview.waterOperationsReport?.rows ?? [])
-    .filter((item) => item.kind === kind)
-    .map((item) => ({
-      date: item.date,
-      categoryLabel: item.categoryLabel,
-      designation: item.designation,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      amount: item.amount,
-      currency: item.currency
-    }));
-}
-
-function buildWaterOperationsBreakdownRows(
-  overview: ReportsOverview,
-  kind: "IN" | "OUT"
-): Array<Record<string, unknown>> {
-  return (overview.waterOperationsReport?.breakdownRows ?? [])
-    .filter((item) => item.kind === kind)
-    .map((item) => ({
-      categoryLabel: item.categoryLabel,
-      transactionsCount: item.transactionsCount,
-      amount: item.amount,
-      currency: item.currency
-    }));
-}
-
-function buildAgencyOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.agencyOperationsReport?.rows ?? []).map((item) => ({
-    mandateRef: item.mandateRef,
-    propertyRef: item.propertyRef,
-    mandateType: item.mandateType,
-    propertyType: item.propertyType,
-    locationZone: item.locationZone,
-    clientRef: item.clientRef,
-    dealStage: item.dealStage,
-    dealAmount: item.dealAmount,
-    saleCommissionAmount: item.saleCommissionAmount,
-    rentalCommissionAmount: item.rentalCommissionAmount,
-    mandateFeeAmount: item.mandateFeeAmount,
-    visitFeeAmount: item.visitFeeAmount,
-    fileFeeAmount: item.fileFeeAmount,
-    advertisingExpenseAmount: item.advertisingExpenseAmount,
-    fieldVisitExpenseAmount: item.fieldVisitExpenseAmount,
-    brokerPayoutAmount: item.brokerPayoutAmount,
-    documentExpenseAmount: item.documentExpenseAmount,
-    officeExpenseAmount: item.officeExpenseAmount,
-    refundAmount: item.refundAmount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    commissionRate: item.commissionRate,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildAgencyOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.agencyOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
-}
-
-function buildBtpOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.btpOperationsReport?.rows ?? []).map((item) => ({
-    projectRef: item.projectRef,
-    clientRef: item.clientRef,
-    location: item.location,
-    cashInAmount: item.cashInAmount,
-    materialAmount: item.materialAmount,
-    laborAmount: item.laborAmount,
-    equipmentAmount: item.equipmentAmount,
-    subcontractingAmount: item.subcontractingAmount,
-    siteExpenseAmount: item.siteExpenseAmount,
-    totalCostAmount: item.totalCostAmount,
-    netAmount: item.netAmount,
-    retentionAmount: item.retentionAmount,
-    lastProgressPercent: item.lastProgressPercent ?? "",
-    lastOperationDate: item.lastOperationDate,
-    transactionsCount: item.transactionsCount,
-    currency: item.currency
-  }));
-}
-
-function buildFishFarmingOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.fishFarmingOperationsReport?.rows ?? []).map((item) => ({
-    pondRef: item.pondRef,
-    cycleRef: item.cycleRef,
-    species: item.species,
-    fingerlingsQuantity: item.fingerlingsQuantity,
-    feedQuantity: item.feedQuantity,
-    soldQuantity: item.soldQuantity,
-    mortalityCount: item.mortalityCount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildFishFarmingOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.fishFarmingOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
-}
-
-function buildLivestockOperationsReportRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.livestockOperationsReport?.rows ?? []).map((item) => ({
-    herdRef: item.herdRef,
-    batchRef: item.batchRef,
-    species: item.species,
-    animalPurchaseCount: item.animalPurchaseCount,
-    feedQuantity: item.feedQuantity,
-    soldAnimalCount: item.soldAnimalCount,
-    productQuantity: item.productQuantity,
-    mortalityCount: item.mortalityCount,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    doneTasksCount: item.doneTasksCount,
-    openTasksCount: item.openTasksCount,
-    blockedTasksCount: item.blockedTasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    executionRate: item.executionRate,
-    currency: item.currency
-  }));
-}
-
-function buildLivestockOperationsBreakdownRows(overview: ReportsOverview): Array<Record<string, unknown>> {
-  return (overview.livestockOperationsReport?.operationRows ?? []).map((item) => ({
-    operationKind: item.operationKind,
-    operationLabel: item.operationLabel,
-    transactionsCount: item.transactionsCount,
-    tasksCount: item.tasksCount,
-    cashInAmount: item.cashInAmount,
-    cashOutAmount: item.cashOutAmount,
-    netAmount: item.netAmount,
-    currency: item.currency
-  }));
-}
 
 function normalizeReportFilters(input: ReportFiltersInput = {}): ReportPeriodFilter {
   const dateFrom = input.dateFrom ? new Date(input.dateFrom) : null;
@@ -12382,10 +11535,13 @@ function buildFinancialAccountGovernanceItems(
 
 export async function getCompanyDashboardSummary(
   actor: ActorContext,
-  input: ReportFiltersInput = {}
+  input: ReportFiltersInput = {},
 ): Promise<DashboardSummary> {
   ensureDashboardAccess(actor.role);
   const filters = normalizeReportFilters(input);
+  // The landing page and My Work only render totals and recent records. Keep
+  // full operational metrics available to callers that explicitly need them.
+  const includeDetails = input.includeDetails !== false;
 
   const [
     companySummary,
@@ -12398,26 +11554,38 @@ export async function getCompanyDashboardSummary(
     financeActivitySummary,
     taskActivitySummary,
     operationalTransactions,
-    operationalTasks
+    operationalTasks,
   ] = await Promise.all([
     getDashboardCompanySummary(actor.companyId, actor.actorId),
     getDashboardFinanceSummary(actor.companyId, filters),
     getDashboardOperationsSummary(actor.companyId, actor.actorId, filters),
     getFinancialAccountsSummary({
       companyId: actor.companyId,
-      activityCode: filters.activityCode
+      activityCode: filters.activityCode,
     }),
     listDashboardRecentTransactions(actor.companyId, 6, filters),
-    listDashboardRecentTasks(actor.companyId, 6, actor.role, actor.actorId, filters),
-    actor.role === "EMPLOYEE" ? Promise.resolve([]) : listDashboardWorkload(actor.companyId, 5, filters),
-    listDashboardFinanceActivitySummary(actor.companyId),
-    listDashboardTaskActivitySummary(actor.companyId),
-    listDashboardOperationalTransactions(
+    listDashboardRecentTasks(
+      actor.companyId,
+      6,
+      actor.role,
+      actor.actorId,
+      filters,
+    ),
+    // Keep the landing dashboard responsive: detailed workload and the global
+    // per-sector roll-up belong to their dedicated pages, not this request.
+    Promise.resolve([]),
+    Promise.resolve([]),
+    Promise.resolve([]),
+    includeDetails ? listDashboardOperationalTransactions(
       actor.companyId,
       filters,
-      DASHBOARD_OPERATIONAL_METADATA_KEYS
-    ),
-    listDashboardOperationalTasks(actor.companyId, filters, DASHBOARD_OPERATIONAL_METADATA_KEYS)
+      DASHBOARD_OPERATIONAL_METADATA_KEYS,
+    ) : Promise.resolve([]),
+    includeDetails ? listDashboardOperationalTasks(
+      actor.companyId,
+      filters,
+      DASHBOARD_OPERATIONAL_METADATA_KEYS,
+    ) : Promise.resolve([]),
   ]);
 
   if (!companySummary) {
@@ -12426,9 +11594,12 @@ export async function getCompanyDashboardSummary(
 
   const company = {
     ...companySummary,
-    financialAccountsCount: accountsSummary.totalCount
+    financialAccountsCount: accountsSummary.totalCount,
   };
-  const activitySummary = buildDashboardActivitySummary(financeActivitySummary, taskActivitySummary);
+  const activitySummary = buildDashboardActivitySummary(
+    financeActivitySummary,
+    taskActivitySummary,
+  );
 
   return {
     generatedAt: new Date().toISOString(),
@@ -12436,32 +11607,45 @@ export async function getCompanyDashboardSummary(
     company,
     finance: {
       ...finance,
-      accountsSummary
+      accountsSummary,
     },
     operations,
     activitySummary,
-    operationalPerformance: buildOperationalPerformance(operationalTransactions, operationalTasks),
+    operationalPerformance: buildOperationalPerformance(
+      operationalTransactions,
+      operationalTasks,
+    ),
     recentTransactions,
     recentTasks,
-    workload
+    workload,
   };
 }
 
 export async function getCompanyReportsOverview(
   actor: ActorContext,
-  input: ReportFiltersInput = {}
+  input: ReportFiltersInput = {},
 ): Promise<ReportsOverview> {
   ensureReportingAccess(actor.role);
   const filters = normalizeReportFilters(input);
   ensureSectorReportFilter(filters);
+  // Service callers retain the complete report by default. The HTTP overview
+  // explicitly opts out; PDF generation explicitly opts in.
+  const includeDetails = input.includeDetails !== false;
 
-  const shouldLoadRentalData = !filters.activityCode || filters.activityCode === "RENTAL";
-  const shouldLoadGeneralStoreData = !filters.activityCode || filters.activityCode === "GENERAL_STORE";
-  const shouldLoadHardwareData = !filters.activityCode || filters.activityCode === "HARDWARE";
-  const shouldLoadBtpData = !filters.activityCode || filters.activityCode === "BTP";
+  const shouldLoadRentalData =
+    !filters.activityCode || filters.activityCode === "RENTAL";
+  const shouldLoadGeneralStoreData =
+    !filters.activityCode || filters.activityCode === "GENERAL_STORE";
+  const shouldLoadHardwareData =
+    !filters.activityCode || filters.activityCode === "HARDWARE";
+  const shouldLoadBtpData =
+    !filters.activityCode || filters.activityCode === "BTP";
   const isTransportReport = filters.activityCode === "TRANSPORT";
   const asOfDate = filters.dateTo;
 
+  // Keep the first wave below the default MySQL pool limit (10).  The
+  // specialised data is deliberately fetched only after these shared metrics
+  // have completed, so opening a report cannot starve ordinary transactions.
   const [
     financeByStatus,
     financeByType,
@@ -12471,6 +11655,24 @@ export async function getCompanyReportsOverview(
     taskByActivity,
     operationalTransactions,
     operationalTasks,
+  ] = await Promise.all([
+    listReportFinanceByStatus(actor.companyId, filters),
+    listReportFinanceByType(actor.companyId, filters),
+    listReportFinanceByActivity(actor.companyId, filters),
+    isTransportReport
+      ? Promise.resolve([])
+      : listFinancialAccounts({ companyId: actor.companyId }),
+    isTransportReport
+      ? Promise.resolve([])
+      : listReportTaskByStatus(actor.companyId, filters),
+    isTransportReport
+      ? Promise.resolve([])
+      : listReportTaskByActivity(actor.companyId, filters),
+    includeDetails ? listReportOperationalTransactions(actor.companyId, filters) : Promise.resolve([]),
+    includeDetails && !isTransportReport ? listReportOperationalTasks(actor.companyId, filters) : Promise.resolve([]),
+  ]);
+
+  const [
     rentalTransactions,
     rentalTenants,
     generalStoreTransactions,
@@ -12480,61 +11682,62 @@ export async function getCompanyReportsOverview(
     btpTransactions,
     btpProjects,
     beverageProducts,
-    beverageAdjustments
-  ] =
-    await Promise.all([
-      listReportFinanceByStatus(actor.companyId, filters),
-      listReportFinanceByType(actor.companyId, filters),
-      listReportFinanceByActivity(actor.companyId, filters),
-      isTransportReport ? Promise.resolve([]) : listFinancialAccounts({ companyId: actor.companyId }),
-      isTransportReport ? Promise.resolve([]) : listReportTaskByStatus(actor.companyId, filters),
-      isTransportReport ? Promise.resolve([]) : listReportTaskByActivity(actor.companyId, filters),
-      listReportOperationalTransactions(actor.companyId, filters),
-      isTransportReport ? Promise.resolve([]) : listReportOperationalTasks(actor.companyId, filters),
-      shouldLoadRentalData
-        ? listReportRentalTransactions(actor.companyId, asOfDate)
-        : Promise.resolve([] as ReportOperationalTransaction[]),
-      shouldLoadRentalData
-        ? listRentalTenants({ companyId: actor.companyId, activeOnly: true })
-        : Promise.resolve([] as RentalTenant[]),
-      shouldLoadGeneralStoreData
-        ? listReportGeneralStoreTransactions(actor.companyId, asOfDate)
-        : Promise.resolve([] as ReportOperationalTransaction[]),
-      shouldLoadGeneralStoreData
-        ? listGeneralStoreShops({ companyId: actor.companyId, activeOnly: true })
-        : Promise.resolve([] as GeneralStoreShop[]),
-      shouldLoadGeneralStoreData
-        ? listReportGeneralStoreInventorySnapshots(actor.companyId, asOfDate)
-        : Promise.resolve([] as GeneralStoreInventorySnapshot[]),
-      shouldLoadHardwareData
-        ? listReportHardwareTransactions(actor.companyId, asOfDate)
-        : Promise.resolve([] as ReportOperationalTransaction[]),
-      shouldLoadBtpData
-        ? listReportBtpTransactions(actor.companyId, asOfDate)
-        : Promise.resolve([] as ReportOperationalTransaction[]),
-      shouldLoadBtpData
-        ? listBtpProjects({ companyId: actor.companyId, activeOnly: true })
-        : Promise.resolve([] as BtpProject[]),
-      filters.activityCode === "BEVERAGE_DEPOT" ? listBeverageProducts(actor.companyId) : Promise.resolve([]),
-      filters.activityCode === "BEVERAGE_DEPOT" ? listBeverageStockAdjustments(actor.companyId, filters) : Promise.resolve([])
-    ]);
+    beverageAdjustments,
+  ] = await Promise.all([
+    includeDetails && shouldLoadRentalData
+      ? listReportRentalTransactions(actor.companyId, asOfDate)
+      : Promise.resolve([] as ReportOperationalTransaction[]),
+    includeDetails && shouldLoadRentalData
+      ? listRentalTenants({ companyId: actor.companyId, activeOnly: true })
+      : Promise.resolve([] as RentalTenant[]),
+    includeDetails && shouldLoadGeneralStoreData
+      ? listReportGeneralStoreTransactions(actor.companyId, asOfDate)
+      : Promise.resolve([] as ReportOperationalTransaction[]),
+    includeDetails && shouldLoadGeneralStoreData
+      ? listGeneralStoreShops({ companyId: actor.companyId, activeOnly: true })
+      : Promise.resolve([] as GeneralStoreShop[]),
+    includeDetails && shouldLoadGeneralStoreData
+      ? listReportGeneralStoreInventorySnapshots(actor.companyId, asOfDate)
+      : Promise.resolve([] as GeneralStoreInventorySnapshot[]),
+    includeDetails && shouldLoadHardwareData
+      ? listReportHardwareTransactions(actor.companyId, asOfDate)
+      : Promise.resolve([] as ReportOperationalTransaction[]),
+    includeDetails && shouldLoadBtpData
+      ? listReportBtpTransactions(actor.companyId, asOfDate)
+      : Promise.resolve([] as ReportOperationalTransaction[]),
+    includeDetails && shouldLoadBtpData
+      ? listBtpProjects({ companyId: actor.companyId, activeOnly: true })
+      : Promise.resolve([] as BtpProject[]),
+    includeDetails && filters.activityCode === "BEVERAGE_DEPOT"
+      ? listBeverageProducts(actor.companyId)
+      : Promise.resolve([]),
+    includeDetails && filters.activityCode === "BEVERAGE_DEPOT"
+      ? listBeverageStockAdjustments(actor.companyId, filters)
+      : Promise.resolve([]),
+  ]);
 
-  const financeByActivitySummary = buildReportFinanceByActivitySummary(financeByActivity)
-    .filter((item) => item.activityCode === filters.activityCode);
-  const taskByActivitySummary = buildReportTaskByActivitySummary(taskByActivity)
-    .filter((item) => item.activityCode === filters.activityCode);
+  const financeByActivitySummary = buildReportFinanceByActivitySummary(
+    financeByActivity,
+  ).filter((item) => item.activityCode === filters.activityCode);
+  const taskByActivitySummary = buildReportTaskByActivitySummary(
+    taskByActivity,
+  ).filter((item) => item.activityCode === filters.activityCode);
   const selectedFinanceActivity = filters.activityCode
-    ? financeByActivitySummary.find((item) => item.activityCode === filters.activityCode)
+    ? financeByActivitySummary.find(
+        (item) => item.activityCode === filters.activityCode,
+      )
     : null;
   const selectedTaskActivity = filters.activityCode
-    ? taskByActivitySummary.find((item) => item.activityCode === filters.activityCode)
+    ? taskByActivitySummary.find(
+        (item) => item.activityCode === filters.activityCode,
+      )
     : null;
   const visibleFinancialAccounts = financialAccounts.filter((account) =>
-    isFinancialAccountCompatibleWithActivity(account, filters.activityCode)
+    isFinancialAccountCompatibleWithActivity(account, filters.activityCode),
   );
   const financeAccountsSummary = buildFinancialAccountsSummary(
     visibleFinancialAccounts,
-    filters.activityCode
+    filters.activityCode,
   );
 
   return {
@@ -12543,1171 +11746,155 @@ export async function getCompanyReportsOverview(
     filters: {
       dateFrom: filters.dateFrom ?? null,
       dateTo: filters.dateTo ?? null,
-      activityCode: filters.activityCode ?? null
+      activityCode: filters.activityCode ?? null,
     },
     activityProfile: getBusinessActivityProfile(filters.activityCode),
-    availableActivityProfiles: [getBusinessActivityProfile(filters.activityCode)],
+    availableActivityProfiles: [
+      getBusinessActivityProfile(filters.activityCode),
+    ],
     activityHighlights: filters.activityCode
       ? buildActivityReportHighlights(filters.activityCode, {
           transactionsCount: selectedFinanceActivity?.count ?? 0,
-          submittedTransactionsCount:
-            financeByStatus
-              .filter((item) => isReportableFinancialStatus(item.status))
-              .reduce((sum, item) => sum + item.count, 0),
+          submittedTransactionsCount: financeByStatus
+            .filter((item) => isReportableFinancialStatus(item.status))
+            .reduce((sum, item) => sum + item.count, 0),
           totalTasksCount: selectedTaskActivity?.totalCount ?? 0,
           openTasksCount: selectedTaskActivity?.openCount ?? 0,
-          blockedTasksCount: selectedTaskActivity?.blockedCount ?? 0
+          blockedTasksCount: selectedTaskActivity?.blockedCount ?? 0,
         })
       : [],
     financeByStatus,
     financeByType,
     financeByActivity: financeByActivitySummary,
     financeAccountsSummary,
-    financeAccounts: buildFinancialAccountGovernanceItems(visibleFinancialAccounts, filters.activityCode),
+    financeAccounts: buildFinancialAccountGovernanceItems(
+      visibleFinancialAccounts,
+      filters.activityCode,
+    ),
     taskByStatus,
     taskByActivity: taskByActivitySummary,
     operationalPerformance: isTransportReport
       ? []
       : buildOperationalPerformance(operationalTransactions, operationalTasks),
-    fieldOperationsReport: filters.activityCode === "SERVICES" || filters.activityCode === "MINING" ? {
-      transactions: operationalTransactions.filter((row) => row.activityCode === filters.activityCode),
-      tasks: operationalTasks.filter((row) => row.activityCode === filters.activityCode)
-    } : null,
-    hardwareMonthlyReport: buildHardwareMonthlyReport(operationalTransactions, hardwareTransactions, filters),
-    agricultureOperationsReport: buildAgricultureOperationsReport(operationalTransactions, operationalTasks, filters),
+    fieldOperationsReport:
+      filters.activityCode === "SERVICES" || filters.activityCode === "MINING"
+        ? {
+            transactions: operationalTransactions.filter(
+              (row) => row.activityCode === filters.activityCode,
+            ),
+            tasks: operationalTasks.filter(
+              (row) => row.activityCode === filters.activityCode,
+            ),
+          }
+        : null,
+    hardwareMonthlyReport: buildHardwareMonthlyReport(
+      operationalTransactions,
+      hardwareTransactions,
+      filters,
+    ),
+    agricultureOperationsReport: buildAgricultureOperationsReport(
+      operationalTransactions,
+      operationalTasks,
+      filters,
+    ),
     generalStoreOperationsReport: buildGeneralStoreOperationsReport(
       generalStoreTransactions,
       generalStoreShops,
       generalStoreInventorySnapshots,
-      filters
+      filters,
     ),
-    foodOperationsReport: buildFoodOperationsReport(operationalTransactions, operationalTasks, filters),
-    rentalOperationsReport: buildRentalOperationsReport(rentalTransactions, rentalTenants, filters),
-    btpOperationsReport: buildBtpOperationsReport(btpTransactions, btpProjects, filters),
-    fishFarmingOperationsReport: buildFishFarmingOperationsReport(operationalTransactions, operationalTasks, filters),
-    livestockOperationsReport: buildLivestockOperationsReport(operationalTransactions, operationalTasks, filters),
-    hotelOperationsReport: buildHotelOperationsReport(operationalTransactions, operationalTasks, filters),
-    waterOperationsReport: buildWaterOperationsReport(operationalTransactions, filters),
-    beverageDepotReport: filters.activityCode === "BEVERAGE_DEPOT"
-      ? (() => {
-          const report = buildBeverageDepotReport(operationalTransactions, operationalTasks, filters);
-          const adjustmentAmount = beverageAdjustments.reduce((sum, item) => sum + toNumberAmount(item.value), 0);
-          return { ...report, currentStock: { asOf: new Date().toISOString(), products: beverageProducts },
-            stockAdjustments: beverageAdjustments, stockAdjustmentAmount: toMoneyString(adjustmentAmount),
-            netOperatingResultAmount: toMoneyString(toNumberAmount(report.netOperatingResultAmount ?? "0") + adjustmentAmount) };
-        })()
-      : null,
-    hydrocarbonOperationsReport: filters.activityCode === "HYDROCARBON"
-      ? buildHydrocarbonOperationsReport(operationalTransactions, operationalTasks, filters)
-      : null,
-    agencyOperationsReport: buildAgencyOperationsReport(operationalTransactions, operationalTasks, filters),
-    generalExpensesReport: buildGeneralExpensesReport(operationalTransactions, filters),
-    transportOperationsReport: buildTransportOperationsReport(operationalTransactions, filters),
-    dailyActivitiesReport: buildDailyActivitiesReport(operationalTransactions, operationalTasks, filters),
+    foodOperationsReport: buildFoodOperationsReport(
+      operationalTransactions,
+      operationalTasks,
+      filters,
+    ),
+    rentalOperationsReport: buildRentalOperationsReport(
+      rentalTransactions,
+      rentalTenants,
+      filters,
+    ),
+    btpOperationsReport: buildBtpOperationsReport(
+      btpTransactions,
+      btpProjects,
+      filters,
+    ),
+    fishFarmingOperationsReport: buildFishFarmingOperationsReport(
+      operationalTransactions,
+      operationalTasks,
+      filters,
+    ),
+    livestockOperationsReport: buildLivestockOperationsReport(
+      operationalTransactions,
+      operationalTasks,
+      filters,
+    ),
+    hotelOperationsReport: buildHotelOperationsReport(
+      operationalTransactions,
+      operationalTasks,
+      filters,
+    ),
+    waterOperationsReport: buildWaterOperationsReport(
+      operationalTransactions,
+      filters,
+    ),
+    beverageDepotReport:
+      filters.activityCode === "BEVERAGE_DEPOT"
+        ? (() => {
+            const report = buildBeverageDepotReport(
+              operationalTransactions,
+              operationalTasks,
+              filters,
+            );
+            const adjustmentAmount = beverageAdjustments.reduce(
+              (sum, item) => sum + toNumberAmount(item.value),
+              0,
+            );
+            return {
+              ...report,
+              currentStock: {
+                asOf: new Date().toISOString(),
+                products: beverageProducts,
+              },
+              stockAdjustments: beverageAdjustments,
+              stockAdjustmentAmount: toMoneyString(adjustmentAmount),
+              netOperatingResultAmount: toMoneyString(
+                toNumberAmount(report.netOperatingResultAmount ?? "0") +
+                  adjustmentAmount,
+              ),
+            };
+          })()
+        : null,
+    hydrocarbonOperationsReport:
+      filters.activityCode === "HYDROCARBON"
+        ? buildHydrocarbonOperationsReport(
+            operationalTransactions,
+            operationalTasks,
+            filters,
+          )
+        : null,
+    agencyOperationsReport: buildAgencyOperationsReport(
+      operationalTransactions,
+      operationalTasks,
+      filters,
+    ),
+    generalExpensesReport: buildGeneralExpensesReport(
+      operationalTransactions,
+      filters,
+    ),
+    transportOperationsReport: buildTransportOperationsReport(
+      operationalTransactions,
+      filters,
+    ),
+    dailyActivitiesReport: buildDailyActivitiesReport(
+      operationalTransactions,
+      operationalTasks,
+      filters,
+    ),
     roleDistribution: [],
-    topAssignees: []
+    topAssignees: [],
   };
 }
 
-export async function exportCompanyTransactionsCsv(
-  actor: ActorContext,
-  input: ReportFiltersInput = {}
-): Promise<string> {
-  ensureReportingAccess(actor.role);
-  const filters = normalizeReportFilters(input);
-  ensureSectorReportFilter(filters);
-  const rows = await listTransactionsForExport(actor.companyId, filters);
-  const records = rows.map(toTransactionExportRecord);
-
-  return buildCsv(
-    [
-      "transaction_id",
-      "occurred_at",
-      "status",
-      "type",
-      "amount",
-      "currency",
-      "activity_code",
-      "account_name",
-      "account_ref",
-      "account_scope_type",
-      "account_primary_activity_code",
-      "account_allowed_activity_codes",
-      "account_supports_transaction_activity",
-      "created_by_email",
-      "proofs_count",
-      "description",
-      "created_at",
-      "updated_at"
-    ],
-    records.map((item) => [
-      item.id,
-      item.occurredAt,
-      item.status,
-      item.type,
-      item.amount,
-      item.currency,
-      item.activityCode,
-      item.accountName,
-      item.accountRef,
-      item.accountScopeType,
-      item.accountPrimaryActivityCode,
-      item.accountAllowedActivityCodes.join("|"),
-      item.accountSupportsTransactionActivity ? "YES" : "NO",
-      item.createdByEmail,
-      item.proofsCount,
-      item.description,
-      item.createdAt,
-      item.updatedAt
-    ])
-  );
-}
-
-export async function exportCompanyTasksCsv(
-  actor: ActorContext,
-  input: ReportFiltersInput = {}
-): Promise<string> {
-  ensureReportingAccess(actor.role);
-  const filters = normalizeReportFilters(input);
-  ensureSectorReportFilter(filters);
-  const rows = await listTasksForExport(actor.companyId, filters);
-  const records = rows.map(toTaskExportRecord);
-
-  return buildCsv(
-    [
-      "task_id",
-      "title",
-      "description",
-      "activity_code",
-      "status",
-      "created_by_full_name",
-      "created_by_email",
-      "assigned_to_full_name",
-      "assigned_to_email",
-      "due_date",
-      "created_at",
-      "updated_at"
-    ],
-    records.map((item) => [
-      item.id,
-      item.title,
-      item.description,
-      item.activityCode,
-      item.status,
-      item.createdByFullName,
-      item.createdByEmail,
-      item.assignedToFullName,
-      item.assignedToEmail,
-      item.dueDate,
-      item.createdAt,
-      item.updatedAt
-    ])
-  );
-}
-
-export async function exportCompanyTransactionsExcel(
-  actor: ActorContext,
-  input: ReportFiltersInput = {}
-): Promise<Buffer> {
-  ensureReportingAccess(actor.role);
-  const filters = normalizeReportFilters(input);
-  ensureSectorReportFilter(filters);
-  const [overview, rows] = await Promise.all([
-    getCompanyReportsOverview(actor, input),
-    listTransactionsForExport(actor.companyId, filters)
-  ]);
-  const records = rows.map(toTransactionExportRecord);
-
-  return buildWorkbookBuffer([
-    {
-      name: "Resume",
-      rows: buildOverviewMetadataRows(filters),
-      columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
-    },
-    {
-      name: "Guide",
-      rows: buildReportReadingGuideRows(),
-      columns: ["term", "definition", "formula", "useCase"]
-    },
-    {
-      name: "Synthèse",
-      rows: buildOverviewSummaryRows(overview),
-      columns: ["category", "item", "label", "value", "extra"]
-    },
-    {
-      name: "Pilotage",
-      rows: buildOperationalPerformanceRows(overview),
-      columns: [
-        "scope",
-        "activity",
-        "dimension",
-        "item",
-        "currency",
-        "transactionsCount",
-        "activeTransactionsCount",
-        "cashIn",
-        "cashOut",
-        "netProfit",
-        "marginRate",
-        "returnOnCostRate",
-        "totalTasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "overdueTasksCount",
-        "executionRate",
-        "blockageRate",
-        "followUpPressure"
-      ]
-    },
-    {
-      name: "Quincaillerie",
-      rows: buildHardwareMonthlyReportRows(overview),
-      columns: [
-        "date",
-        "designation",
-        "recipientRef",
-        "quantity",
-        "purchaseUnitPrice",
-        "purchaseAmount",
-        "grossProfit",
-        "transactionsCount",
-        "currency"
-      ]
-    },
-    {
-      name: "RecouvrementQuincaillerie",
-      rows: buildHardwareRecipientReportRows(overview),
-      columns: ["recipientRef", "purchaseAmount", "grossProfit", "expectedReturnAmount", "collectedAmount", "purchaseVarianceAmount", "balanceAmount", "transactionsCount", "currency"]
-    },
-    {
-      name: "DepensesGeneralesPDG",
-      rows: buildGeneralExpensesReportRows(overview, "PDG"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "DepensesGeneralesEmployes",
-      rows: buildGeneralExpensesReportRows(overview, "EMPLOYE"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "DepGeneralesRepartitionPDG",
-      rows: buildGeneralExpensesBreakdownRows(overview, "PDG"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "DepGeneralesRepartitionEmployes",
-      rows: buildGeneralExpensesBreakdownRows(overview, "EMPLOYE"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "Agriculture",
-      rows: buildAgricultureOperationsReportRows(overview),
-      columns: [
-        "campaignRef",
-        "parcelRef",
-        "fieldType",
-        "cropType",
-        "surfaceArea",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "AgriOperations",
-      rows: buildAgricultureOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Magasins",
-      rows: buildGeneralStoreOperationsReportRows(overview),
-      columns: [
-        "shopRef",
-        "location",
-        "transactionsCount",
-        "lastOperationDate",
-        "purchaseAmount",
-        "collectedAmount",
-        "balanceAmount",
-        "lastInventoryDate",
-        "remainingStockValue",
-        "estimatedSoldAmount",
-        "varianceAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "MagasinsMouvements",
-      rows: buildGeneralStoreOperationDetailRows(overview),
-      columns: ["date", "shopRef", "operationKind", "status", "designation", "amount", "currency"]
-    },
-    {
-      name: "MagasinsSynthese",
-      rows: buildGeneralStoreOperationsBreakdownRows(overview),
-      columns: ["operationKind", "operationLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "MagasinsLecture",
-      rows: buildGeneralStoreReadingRows(),
-      columns: ["indicator", "definition"]
-    },
-    {
-      name: "Alimentation",
-      rows: buildFoodOperationsReportRows(overview),
-      columns: [
-        "productFamily",
-        "productName",
-        "batchRef",
-        "storageArea",
-        "purchaseQuantity",
-        "soldQuantity",
-        "lossQuantity",
-        "purchaseAmount",
-        "salesAmount",
-        "lossAmount",
-        "expenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "grossMargin",
-        "marginRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "AlimOperations",
-      rows: buildFoodOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Location",
-      rows: buildRentalOperationsReportRows(overview),
-      columns: [
-        "tenantRef",
-        "unitRef",
-        "monthlyRent",
-        "totalDue",
-        "totalPaid",
-        "balanceAmount",
-        "status",
-        "statusDetail",
-        "currency"
-      ]
-    },
-    {
-      name: "LocationOps",
-      rows: buildRentalOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "LocationCautions",
-      rows: buildRentalDepositReportRows(overview),
-      columns: [
-        "tenantRef",
-        "unitRef",
-        "status",
-        "depositPaidAmount",
-        "paymentsCount",
-        "lastPaymentLabel",
-        "currency"
-      ]
-    },
-    {
-      name: "Hôtellerie",
-      rows: buildHotelOperationsReportRows(overview),
-      columns: [
-        "serviceLine",
-        "roomRef",
-        "roomType",
-        "bookingRef",
-        "guestRef",
-        "nightsCount",
-        "guestCount",
-        "roomRevenue",
-        "depositAmount",
-        "restaurantAmount",
-        "serviceAmount",
-        "maintenanceAmount",
-        "commissionAmount",
-        "taxAmount",
-        "refundAmount",
-        "expenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "averageRoomRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "HotelOps",
-      rows: buildHotelOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "EauVentes",
-      rows: buildWaterOperationsReportRows(overview, "IN"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "EauDepenses",
-      rows: buildWaterOperationsReportRows(overview, "OUT"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "EauRepartitionVentes",
-      rows: buildWaterOperationsBreakdownRows(overview, "IN"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "EauRepartitionDepenses",
-      rows: buildWaterOperationsBreakdownRows(overview, "OUT"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "AgenceImmo",
-      rows: buildAgencyOperationsReportRows(overview),
-      columns: [
-        "mandateRef",
-        "propertyRef",
-        "mandateType",
-        "propertyType",
-        "locationZone",
-        "clientRef",
-        "dealStage",
-        "dealAmount",
-        "saleCommissionAmount",
-        "rentalCommissionAmount",
-        "mandateFeeAmount",
-        "visitFeeAmount",
-        "fileFeeAmount",
-        "advertisingExpenseAmount",
-        "fieldVisitExpenseAmount",
-        "brokerPayoutAmount",
-        "documentExpenseAmount",
-        "officeExpenseAmount",
-        "refundAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "commissionRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "AgenceOps",
-      rows: buildAgencyOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "BTP",
-      rows: buildBtpOperationsReportRows(overview),
-      columns: [
-        "projectRef",
-        "clientRef",
-        "location",
-        "cashInAmount",
-        "materialAmount",
-        "laborAmount",
-        "equipmentAmount",
-        "subcontractingAmount",
-        "siteExpenseAmount",
-        "totalCostAmount",
-        "netAmount",
-        "retentionAmount",
-        "lastProgressPercent",
-        "lastOperationDate",
-        "transactionsCount",
-        "currency"
-      ]
-    },
-    {
-      name: "Pisciculture",
-      rows: buildFishFarmingOperationsReportRows(overview),
-      columns: [
-        "pondRef",
-        "cycleRef",
-        "species",
-        "fingerlingsQuantity",
-        "feedQuantity",
-        "soldQuantity",
-        "mortalityCount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "PiscOperations",
-      rows: buildFishFarmingOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Élevage",
-      rows: buildLivestockOperationsReportRows(overview),
-      columns: [
-        "herdRef",
-        "batchRef",
-        "species",
-        "animalPurchaseCount",
-        "feedQuantity",
-        "soldAnimalCount",
-        "productQuantity",
-        "mortalityCount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "ÉlevageOps",
-      rows: buildLivestockOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Transactions",
-      columns: [
-        "transactionId",
-        "occurredAt",
-        "status",
-        "type",
-        "amount",
-        "currency",
-        "activityCode",
-        "accountName",
-        "accountRef",
-        "accountScopeType",
-        "accountPrimaryActivityCode",
-        "accountAllowedActivityCodes",
-        "accountSupportsTransactionActivity",
-        "createdByEmail",
-        "proofsCount",
-        "description",
-        "createdAt",
-        "updatedAt"
-      ],
-      rows: records.map((item) => ({
-        transactionId: item.id,
-        occurredAt: item.occurredAt,
-        status: item.status,
-        type: item.type,
-        amount: item.amount,
-        currency: item.currency,
-        activityCode: item.activityCode ?? "",
-        accountName: item.accountName,
-        accountRef: item.accountRef ?? "",
-        accountScopeType: item.accountScopeType,
-        accountPrimaryActivityCode: item.accountPrimaryActivityCode ?? "",
-        accountAllowedActivityCodes: item.accountAllowedActivityCodes.join(" | "),
-        accountSupportsTransactionActivity: item.accountSupportsTransactionActivity ? "YES" : "NO",
-        createdByEmail: item.createdByEmail,
-        proofsCount: item.proofsCount,
-        description: item.description ?? "",
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt
-      }))
-    }
-  ]);
-}
-
-export async function exportCompanyTasksExcel(
-  actor: ActorContext,
-  input: ReportFiltersInput = {}
-): Promise<Buffer> {
-  ensureReportingAccess(actor.role);
-  const filters = normalizeReportFilters(input);
-  ensureSectorReportFilter(filters);
-  const [overview, rows] = await Promise.all([
-    getCompanyReportsOverview(actor, input),
-    listTasksForExport(actor.companyId, filters)
-  ]);
-  const records = rows.map(toTaskExportRecord);
-
-  return buildWorkbookBuffer([
-    {
-      name: "Resume",
-      rows: buildOverviewMetadataRows(filters),
-      columns: ["generatedAt", "period", "activity", "dateFrom", "dateTo"]
-    },
-    {
-      name: "Guide",
-      rows: buildReportReadingGuideRows(),
-      columns: ["term", "definition", "formula", "useCase"]
-    },
-    {
-      name: "Synthèse",
-      rows: buildOverviewSummaryRows(overview),
-      columns: ["category", "item", "label", "value", "extra"]
-    },
-    {
-      name: "Pilotage",
-      rows: buildOperationalPerformanceRows(overview),
-      columns: [
-        "scope",
-        "activity",
-        "dimension",
-        "item",
-        "currency",
-        "transactionsCount",
-        "activeTransactionsCount",
-        "cashIn",
-        "cashOut",
-        "netProfit",
-        "marginRate",
-        "returnOnCostRate",
-        "totalTasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "overdueTasksCount",
-        "executionRate",
-        "blockageRate",
-        "followUpPressure"
-      ]
-    },
-    {
-      name: "Quincaillerie",
-      rows: buildHardwareMonthlyReportRows(overview),
-      columns: [
-        "date",
-        "designation",
-        "recipientRef",
-        "quantity",
-        "purchaseUnitPrice",
-        "purchaseAmount",
-        "grossProfit",
-        "transactionsCount",
-        "currency"
-      ]
-    },
-    {
-      name: "RecouvrementQuincaillerie",
-      rows: buildHardwareRecipientReportRows(overview),
-      columns: ["recipientRef", "purchaseAmount", "grossProfit", "expectedReturnAmount", "collectedAmount", "purchaseVarianceAmount", "balanceAmount", "transactionsCount", "currency"]
-    },
-    {
-      name: "DepensesGeneralesPDG",
-      rows: buildGeneralExpensesReportRows(overview, "PDG"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "DepensesGeneralesEmployes",
-      rows: buildGeneralExpensesReportRows(overview, "EMPLOYE"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "DepGeneralesRepartitionPDG",
-      rows: buildGeneralExpensesBreakdownRows(overview, "PDG"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "DepGeneralesRepartitionEmployes",
-      rows: buildGeneralExpensesBreakdownRows(overview, "EMPLOYE"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "Agriculture",
-      rows: buildAgricultureOperationsReportRows(overview),
-      columns: [
-        "campaignRef",
-        "parcelRef",
-        "fieldType",
-        "cropType",
-        "surfaceArea",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "AgriOperations",
-      rows: buildAgricultureOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Magasins",
-      rows: buildGeneralStoreOperationsReportRows(overview),
-      columns: [
-        "shopRef",
-        "location",
-        "transactionsCount",
-        "lastOperationDate",
-        "purchaseAmount",
-        "collectedAmount",
-        "balanceAmount",
-        "lastInventoryDate",
-        "remainingStockValue",
-        "estimatedSoldAmount",
-        "varianceAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "MagasinsMouvements",
-      rows: buildGeneralStoreOperationDetailRows(overview),
-      columns: ["date", "shopRef", "operationKind", "status", "designation", "amount", "currency"]
-    },
-    {
-      name: "MagasinsSynthese",
-      rows: buildGeneralStoreOperationsBreakdownRows(overview),
-      columns: ["operationKind", "operationLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "MagasinsLecture",
-      rows: buildGeneralStoreReadingRows(),
-      columns: ["indicator", "definition"]
-    },
-    {
-      name: "Alimentation",
-      rows: buildFoodOperationsReportRows(overview),
-      columns: [
-        "productFamily",
-        "productName",
-        "batchRef",
-        "storageArea",
-        "purchaseQuantity",
-        "soldQuantity",
-        "lossQuantity",
-        "purchaseAmount",
-        "salesAmount",
-        "lossAmount",
-        "expenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "grossMargin",
-        "marginRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "AlimOperations",
-      rows: buildFoodOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Location",
-      rows: buildRentalOperationsReportRows(overview),
-      columns: [
-        "tenantRef",
-        "unitRef",
-        "monthlyRent",
-        "totalDue",
-        "totalPaid",
-        "balanceAmount",
-        "status",
-        "statusDetail",
-        "currency"
-      ]
-    },
-    {
-      name: "LocationOps",
-      rows: buildRentalOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "LocationCautions",
-      rows: buildRentalDepositReportRows(overview),
-      columns: [
-        "tenantRef",
-        "unitRef",
-        "status",
-        "depositPaidAmount",
-        "paymentsCount",
-        "lastPaymentLabel",
-        "currency"
-      ]
-    },
-    {
-      name: "Hôtellerie",
-      rows: buildHotelOperationsReportRows(overview),
-      columns: [
-        "serviceLine",
-        "roomRef",
-        "roomType",
-        "bookingRef",
-        "guestRef",
-        "nightsCount",
-        "guestCount",
-        "roomRevenue",
-        "depositAmount",
-        "restaurantAmount",
-        "serviceAmount",
-        "maintenanceAmount",
-        "commissionAmount",
-        "taxAmount",
-        "refundAmount",
-        "expenseAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "averageRoomRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "HotelOps",
-      rows: buildHotelOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "BTP",
-      rows: buildBtpOperationsReportRows(overview),
-      columns: [
-        "projectRef",
-        "clientRef",
-        "location",
-        "cashInAmount",
-        "materialAmount",
-        "laborAmount",
-        "equipmentAmount",
-        "subcontractingAmount",
-        "siteExpenseAmount",
-        "totalCostAmount",
-        "netAmount",
-        "retentionAmount",
-        "lastProgressPercent",
-        "lastOperationDate",
-        "transactionsCount",
-        "currency"
-      ]
-    },
-    {
-      name: "Pisciculture",
-      rows: buildFishFarmingOperationsReportRows(overview),
-      columns: [
-        "pondRef",
-        "cycleRef",
-        "species",
-        "fingerlingsQuantity",
-        "feedQuantity",
-        "soldQuantity",
-        "mortalityCount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "PiscOperations",
-      rows: buildFishFarmingOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Élevage",
-      rows: buildLivestockOperationsReportRows(overview),
-      columns: [
-        "herdRef",
-        "batchRef",
-        "species",
-        "animalPurchaseCount",
-        "feedQuantity",
-        "soldAnimalCount",
-        "productQuantity",
-        "mortalityCount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "ÉlevageOps",
-      rows: buildLivestockOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "EauVentes",
-      rows: buildWaterOperationsReportRows(overview, "IN"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "EauDepenses",
-      rows: buildWaterOperationsReportRows(overview, "OUT"),
-      columns: ["date", "categoryLabel", "designation", "quantity", "unitPrice", "amount", "currency"]
-    },
-    {
-      name: "EauRepartitionVentes",
-      rows: buildWaterOperationsBreakdownRows(overview, "IN"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "EauRepartitionDepenses",
-      rows: buildWaterOperationsBreakdownRows(overview, "OUT"),
-      columns: ["categoryLabel", "transactionsCount", "amount", "currency"]
-    },
-    {
-      name: "AgenceImmo",
-      rows: buildAgencyOperationsReportRows(overview),
-      columns: [
-        "mandateRef",
-        "propertyRef",
-        "mandateType",
-        "propertyType",
-        "locationZone",
-        "clientRef",
-        "dealStage",
-        "dealAmount",
-        "saleCommissionAmount",
-        "rentalCommissionAmount",
-        "mandateFeeAmount",
-        "visitFeeAmount",
-        "fileFeeAmount",
-        "advertisingExpenseAmount",
-        "fieldVisitExpenseAmount",
-        "brokerPayoutAmount",
-        "documentExpenseAmount",
-        "officeExpenseAmount",
-        "refundAmount",
-        "transactionsCount",
-        "tasksCount",
-        "doneTasksCount",
-        "openTasksCount",
-        "blockedTasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "commissionRate",
-        "executionRate",
-        "currency"
-      ]
-    },
-    {
-      name: "AgenceOps",
-      rows: buildAgencyOperationsBreakdownRows(overview),
-      columns: [
-        "operationKind",
-        "operationLabel",
-        "transactionsCount",
-        "tasksCount",
-        "cashInAmount",
-        "cashOutAmount",
-        "netAmount",
-        "currency"
-      ]
-    },
-    {
-      name: "Tâches",
-      columns: [
-        "taskId",
-        "title",
-        "description",
-        "activityCode",
-        "status",
-        "createdByFullName",
-        "createdByEmail",
-        "assignedToFullName",
-        "assignedToEmail",
-        "dueDate",
-        "createdAt",
-        "updatedAt"
-      ],
-      rows: records.map((item) => ({
-        taskId: item.id,
-        title: item.title,
-        description: item.description ?? "",
-        activityCode: item.activityCode ?? "",
-        status: item.status,
-        createdByFullName: item.createdByFullName,
-        createdByEmail: item.createdByEmail,
-        assignedToFullName: item.assignedToFullName ?? "",
-        assignedToEmail: item.assignedToEmail ?? "",
-        dueDate: item.dueDate ?? "",
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt
-      }))
-    }
-  ]);
-}
 
 function reportCurrencySummary(overview: ReportsOverview) {
   const currencies = new Map<string, { currency: string; cashIn: number; cashOut: number }>();
@@ -13775,396 +11962,546 @@ function renderFieldSectorReportsPdf(doc: PDFKit.PDFDocument, overview: ReportsO
 
 export async function exportCompanyReportsPdf(
   actor: ActorContext,
-  input: ReportFiltersInput = {}
+  input: ReportFiltersInput = {},
 ): Promise<Buffer> {
   ensureReportingAccess(actor.role);
   const filters = normalizeReportFilters(input);
   ensureSectorReportFilter(filters);
-  const overview = await getCompanyReportsOverview(actor, input);
+  const overview = await getCompanyReportsOverview(actor, { ...input, includeDetails: true });
   const periodLabel = toDisplayPeriodLabel(filters);
   const buildSectorPdf = (
     render: (doc: PDFKit.PDFDocument) => void,
-    decorate: (doc: PDFKit.PDFDocument, pageNumber: number, totalPages: number) => void,
-    options?: { layout?: "portrait" | "landscape" }
-  ) => buildPdfBuffer((doc) => {
-    doc.info.Title = `${toDisplayActivityLabel(filters.activityCode)} - ${periodLabel}`;
-    doc.info.Author = "AMCCO";
-    doc.info.Subject = `Rapport sectoriel | ${periodLabel}`;
-    doc.info.CreationDate = new Date(overview.generatedAt);
-    render(doc);
-    const xofFocused = ["HARDWARE", "GENERAL_STORE", "RENTAL", "AGRICULTURE", "BTP", "FISH_FARMING"];
-    if (filters.activityCode && xofFocused.includes(filters.activityCode) && overview.financeByType.some((row) => row.currency !== "XOF")) {
-      const nextPage = () => { doc.addPage(); drawSectorContinuationHeader(doc, toDisplayActivityLabel(filters.activityCode), periodLabel); };
-      nextPage();
-      doc.fillColor("#486581").font("Helvetica").fontSize(9).text("Complément financier : les tableaux métier précédents portent sur le XOF. Les autres devises sont présentées séparément ci-dessous, sans conversion.", PDF_PAGE_MARGIN, doc.y, { width: doc.page.width - PDF_PAGE_MARGIN * 2 });
-      doc.y += 18;
-      renderReportCurrencySummary(doc, overview, nextPage);
-    }
-  }, decorate, options);
+    decorate: (
+      doc: PDFKit.PDFDocument,
+      pageNumber: number,
+      totalPages: number,
+    ) => void,
+    options?: { layout?: "portrait" | "landscape" },
+  ) =>
+    buildPdfBuffer(
+      (doc) => {
+        doc.info.Title = `${toDisplayActivityLabel(filters.activityCode)} - ${periodLabel}`;
+        doc.info.Author = "AMCCO";
+        doc.info.Subject = `Rapport sectoriel | ${periodLabel}`;
+        doc.info.CreationDate = new Date(overview.generatedAt);
+        render(doc);
+        const xofFocused = [
+          "HARDWARE",
+          "GENERAL_STORE",
+          "RENTAL",
+          "AGRICULTURE",
+          "BTP",
+          "FISH_FARMING",
+        ];
+        if (
+          filters.activityCode &&
+          xofFocused.includes(filters.activityCode) &&
+          overview.financeByType.some((row) => row.currency !== "XOF")
+        ) {
+          const nextPage = () => {
+            doc.addPage();
+            drawSectorContinuationHeader(
+              doc,
+              toDisplayActivityLabel(filters.activityCode),
+              periodLabel,
+            );
+          };
+          nextPage();
+          doc
+            .fillColor("#486581")
+            .font("Helvetica")
+            .fontSize(9)
+            .text(
+              "Complément financier : les tableaux métier précédents portent sur le XOF. Les autres devises sont présentées séparément ci-dessous, sans conversion.",
+              PDF_PAGE_MARGIN,
+              doc.y,
+              { width: doc.page.width - PDF_PAGE_MARGIN * 2 },
+            );
+          doc.y += 18;
+          renderReportCurrencySummary(doc, overview, nextPage);
+        }
+      },
+      decorate,
+      options,
+    );
 
-  if (filters.activityCode === "SERVICES" || filters.activityCode === "MINING") {
-    return buildSectorPdf((doc) => renderFieldSectorReportsPdf(doc, overview, filters),
-      (doc, page, total) => drawSectorReportFooter(doc, toDisplayActivityLabel(filters.activityCode), periodLabel, page, total),
-      { layout: "landscape" });
+  if (
+    filters.activityCode === "SERVICES" ||
+    filters.activityCode === "MINING"
+  ) {
+    return buildSectorPdf(
+      (doc) => renderFieldSectorReportsPdf(doc, overview, filters),
+      (doc, page, total) =>
+        drawSectorReportFooter(
+          doc,
+          toDisplayActivityLabel(filters.activityCode),
+          periodLabel,
+          page,
+          total,
+        ),
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "HARDWARE") {
-    return buildSectorPdf((doc) => {
-      renderHardwareReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawHardwarePdfFooter(doc, pageNumber, totalPages, overview.hardwareMonthlyReport?.periodLabel ?? periodLabel);
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderHardwareReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawHardwarePdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.hardwareMonthlyReport?.periodLabel ?? periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "TRANSPORT") {
     const report = overview.transportOperationsReport ?? {
       periodLabel,
       rows: [],
-      currencySummaries: []
+      currencySummaries: [],
     };
-    return buildSectorPdf((doc) => {
-      renderTransportOperationsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawTransportPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderTransportOperationsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawTransportPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "GENERAL_EXPENSES") {
-    return buildSectorPdf((doc) => {
-      renderGeneralExpensesReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawGeneralExpensesPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.generalExpensesReport?.periodLabel ?? periodLabel
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderGeneralExpensesReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawGeneralExpensesPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.generalExpensesReport?.periodLabel ?? periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "DAILY_ACTIVITIES") {
-    return buildSectorPdf((doc) => {
-      renderDailyActivitiesReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawDailyActivitiesPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.dailyActivitiesReport?.periodLabel ?? periodLabel
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderDailyActivitiesReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawDailyActivitiesPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.dailyActivitiesReport?.periodLabel ?? periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "AGRICULTURE") {
-    return buildSectorPdf((doc) => {
-      renderAgricultureReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawAgriculturePdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.agricultureOperationsReport?.periodLabel ?? periodLabel
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderAgricultureReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawAgriculturePdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.agricultureOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "GENERAL_STORE") {
-    return buildSectorPdf((doc) => {
-      renderGeneralStoreReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawGeneralStorePdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.generalStoreOperationsReport?.periodLabel ?? periodLabel
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderGeneralStoreReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawGeneralStorePdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.generalStoreOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "FOOD") {
-    return buildSectorPdf((doc) => {
-      renderFoodReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawFoodPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.foodOperationsReport?.periodLabel ?? periodLabel
-      );
-    });
+    return buildSectorPdf(
+      (doc) => {
+        renderFoodReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawFoodPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.foodOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+    );
   }
 
   if (filters.activityCode === "RENTAL") {
-    return buildSectorPdf((doc) => {
-      renderRentalReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawRentalPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        toRentalPdfPeriodLabel(filters)
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderRentalReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawRentalPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          toRentalPdfPeriodLabel(filters),
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "HOTEL_LODGING") {
-    return buildSectorPdf((doc) => {
-      renderHotelReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawHotelPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.hotelOperationsReport?.periodLabel ?? periodLabel
-      );
-    });
+    return buildSectorPdf(
+      (doc) => {
+        renderHotelReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawHotelPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.hotelOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+    );
   }
 
   if (filters.activityCode === "WATER") {
-    return buildSectorPdf((doc) => {
-      renderWaterReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawWaterPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.waterOperationsReport?.periodLabel ?? periodLabel
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderWaterReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawWaterPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.waterOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "BEVERAGE_DEPOT") {
-    const report = overview.beverageDepotReport ?? buildEmptyBeverageDepotReport(filters);
-    return buildSectorPdf((doc) => {
-      renderBeverageDepotReportsPdf(doc, report, overview.generatedAt);
-    }, (doc, pageNumber, totalPages) => {
-      drawBeverageDepotPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
-    }, { layout: "landscape" });
+    const report =
+      overview.beverageDepotReport ?? buildEmptyBeverageDepotReport(filters);
+    return buildSectorPdf(
+      (doc) => {
+        renderBeverageDepotReportsPdf(doc, report, overview.generatedAt);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawBeverageDepotPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          report.periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "HYDROCARBON") {
-    const report = overview.hydrocarbonOperationsReport ?? buildHydrocarbonOperationsReport([], [], filters);
-    return buildSectorPdf((doc) => {
-      renderHydrocarbonReportsPdf(doc, report, overview.generatedAt);
-    }, (doc, pageNumber, totalPages) => {
-      drawHydrocarbonPdfFooter(doc, pageNumber, totalPages, report.periodLabel);
-    }, { layout: "landscape" });
+    const report =
+      overview.hydrocarbonOperationsReport ??
+      buildHydrocarbonOperationsReport([], [], filters);
+    return buildSectorPdf(
+      (doc) => {
+        renderHydrocarbonReportsPdf(doc, report, overview.generatedAt);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawHydrocarbonPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          report.periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "REAL_ESTATE_AGENCY") {
-    return buildSectorPdf((doc) => {
-      renderAgencyReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawAgencyPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.agencyOperationsReport?.periodLabel ?? periodLabel
-      );
-    });
+    return buildSectorPdf(
+      (doc) => {
+        renderAgencyReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawAgencyPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.agencyOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+    );
   }
 
   if (filters.activityCode === "BTP") {
-    return buildSectorPdf((doc) => {
-      renderBtpReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawBtpPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.btpOperationsReport?.asOfLabel ?? formatPdfDate(resolveBtpAsOfDate(filters).toISOString())
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderBtpReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawBtpPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.btpOperationsReport?.asOfLabel ??
+            formatPdfDate(resolveBtpAsOfDate(filters).toISOString()),
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "FISH_FARMING") {
-    return buildSectorPdf((doc) => {
-      renderFishFarmingReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawFishFarmingPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.fishFarmingOperationsReport?.periodLabel ?? periodLabel
-      );
-    }, { layout: "landscape" });
+    return buildSectorPdf(
+      (doc) => {
+        renderFishFarmingReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawFishFarmingPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.fishFarmingOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+      { layout: "landscape" },
+    );
   }
 
   if (filters.activityCode === "LIVESTOCK") {
-    return buildSectorPdf((doc) => {
-      renderLivestockReportsPdf(doc, overview, filters);
-    }, (doc, pageNumber, totalPages) => {
-      drawLivestockPdfFooter(
-        doc,
-        pageNumber,
-        totalPages,
-        overview.livestockOperationsReport?.periodLabel ?? periodLabel
-      );
-    });
+    return buildSectorPdf(
+      (doc) => {
+        renderLivestockReportsPdf(doc, overview, filters);
+      },
+      (doc, pageNumber, totalPages) => {
+        drawLivestockPdfFooter(
+          doc,
+          pageNumber,
+          totalPages,
+          overview.livestockOperationsReport?.periodLabel ?? periodLabel,
+        );
+      },
+    );
   }
 
-  return buildSectorPdf((doc) => {
-    doc.on("pageAdded", () => {
+  return buildSectorPdf(
+    (doc) => {
+      doc.on("pageAdded", () => {
+        doc.y = PDF_CONTENT_TOP;
+      });
       doc.y = PDF_CONTENT_TOP;
-    });
-    doc.y = PDF_CONTENT_TOP;
-    doc
-      .fillColor("#0f2544")
-      .font("Helvetica-Bold")
-      .fontSize(18)
-      .text("AMCCO - Rapport consolide");
-    doc.moveDown(0.5);
-    doc.fillColor("#334e68").font("Helvetica").fontSize(10).text(`Entreprise: ${actor.companyId}`);
-    doc.fontSize(10).text(`Genere le: ${new Date().toLocaleString("fr-FR")}`);
-    doc.fontSize(10).text(`Période appliquée: ${periodLabel}`);
-    doc.fontSize(10).text(`Activité: ${toDisplayActivityLabel(filters.activityCode)}`);
-    if (overview.activityProfile) {
-      doc.fontSize(10).text(`Mode operatoire: ${overview.activityProfile.operationsModel}`);
-    }
+      doc
+        .fillColor("#0f2544")
+        .font("Helvetica-Bold")
+        .fontSize(18)
+        .text("AMCCO - Rapport consolide");
+      doc.moveDown(0.5);
+      doc
+        .fillColor("#334e68")
+        .font("Helvetica")
+        .fontSize(10)
+        .text(`Entreprise: ${actor.companyId}`);
+      doc.fontSize(10).text(`Genere le: ${new Date().toLocaleString("fr-FR")}`);
+      doc.fontSize(10).text(`Période appliquée: ${periodLabel}`);
+      doc
+        .fontSize(10)
+        .text(`Activité: ${toDisplayActivityLabel(filters.activityCode)}`);
+      if (overview.activityProfile) {
+        doc
+          .fontSize(10)
+          .text(`Mode operatoire: ${overview.activityProfile.operationsModel}`);
+      }
 
-    drawPdfReadingGuideBox(doc);
+      drawPdfReadingGuideBox(doc);
 
-    writePdfSectionTitle(doc, "Synthèse consolidée");
-    writePdfList(
-      doc,
-      [
-        `Transactions consolidées: ${overview.financeByStatus.reduce((sum, item) => sum + item.count, 0)}`,
-        `Tâches consolidées: ${overview.taskByStatus.reduce((sum, item) => sum + item.count, 0)}`
-      ],
-      "Aucune synthese disponible."
-    );
-
-    writePdfSectionTitle(doc, "Rentabilité et exécution XOF");
-    writePdfList(
-      doc,
-      limitPdfRows(
-        overview.operationalPerformance
-          .filter((item) => item.transactionsCount > 0 || item.totalTasksCount > 0)
-          .map(
-            (item) =>
-              `${item.scope === "ACTIVITY" ? "Secteur" : "Sous-section"} | ${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.dimensionLabel}: ${item.itemLabel} | net ${item.netProfit} XOF | marge ${item.marginRate}% | exécution ${item.executionRate}% | bloquées ${item.blockedTasksCount} | retards ${item.overdueTasksCount}`
-          )
-      ),
-      "Aucune donnee de pilotage opérationnel sur cette période."
-    );
-
-    if (overview.hardwareMonthlyReport) {
-      const hardwareReport = overview.hardwareMonthlyReport;
-      writePdfSectionTitle(doc, `Rapport quincaillerie - ${hardwareReport.periodLabel}`);
+      writePdfSectionTitle(doc, "Synthèse consolidée");
       writePdfList(
         doc,
-        limitPdfRows([
-          ...hardwareReport.rows.map(
-            (item) =>
-              `${item.date} | ${item.designation} | quantité ${item.quantity} | prix d'achat ${item.purchaseUnitPrice} XOF | montant ${item.purchaseAmount} XOF | bénéfice ${item.grossProfit} XOF`
-          ),
-          `TOTAL | quantité ${hardwareReport.totals.quantity} | montant ${hardwareReport.totals.purchaseAmount} XOF | bénéfice ${hardwareReport.totals.grossProfit} XOF`
-        ]),
-        "Aucun achat quincaillerie comptabilisé sur cette période."
+        [
+          `Transactions consolidées: ${overview.financeByStatus.reduce((sum, item) => sum + item.count, 0)}`,
+          `Tâches consolidées: ${overview.taskByStatus.reduce((sum, item) => sum + item.count, 0)}`,
+        ],
+        "Aucune synthese disponible.",
       );
-      writePdfSectionTitle(doc, "Quincaillerie - écarts par destinataire");
+
+      writePdfSectionTitle(doc, "Rentabilité et exécution XOF");
       writePdfList(
         doc,
-        limitPdfRows([
-          ...hardwareReport.recipientRows.map((item) =>
-            `${item.recipientRef} | achats ${formatPdfMoney(item.purchaseAmount)} | recouvré ${formatPdfMoney(item.collectedAmount)} | écart achats ${formatPdfMoney(item.purchaseVarianceAmount)} | reste attendu ${formatPdfMoney(item.balanceAmount)}`
-          ),
-          `TOTAL | écart achats ${formatPdfMoney(hardwareReport.totals.purchaseVarianceAmount)} | reste attendu ${formatPdfMoney(hardwareReport.totals.balanceAmount)}`
-        ]),
-        "Aucun destinataire suivi."
+        limitPdfRows(
+          overview.operationalPerformance
+            .filter(
+              (item) => item.transactionsCount > 0 || item.totalTasksCount > 0,
+            )
+            .map(
+              (item) =>
+                `${item.scope === "ACTIVITY" ? "Secteur" : "Sous-section"} | ${BUSINESS_ACTIVITY_LABELS[item.activityCode]} | ${item.dimensionLabel}: ${item.itemLabel} | net ${item.netProfit} XOF | marge ${item.marginRate}% | exécution ${item.executionRate}% | bloquées ${item.blockedTasksCount} | retards ${item.overdueTasksCount}`,
+            ),
+        ),
+        "Aucune donnee de pilotage opérationnel sur cette période.",
       );
-    }
 
-    if (overview.btpOperationsReport) {
-      const btpReport = overview.btpOperationsReport;
-      writePdfSectionTitle(doc, `Rapport BTP - ${btpReport.periodLabel}`);
+      if (overview.hardwareMonthlyReport) {
+        const hardwareReport = overview.hardwareMonthlyReport;
+        writePdfSectionTitle(
+          doc,
+          `Rapport quincaillerie - ${hardwareReport.periodLabel}`,
+        );
+        writePdfList(
+          doc,
+          limitPdfRows([
+            ...hardwareReport.rows.map(
+              (item) =>
+                `${item.date} | ${item.designation} | quantité ${item.quantity} | prix d'achat ${item.purchaseUnitPrice} XOF | montant ${item.purchaseAmount} XOF | bénéfice ${item.grossProfit} XOF`,
+            ),
+            `TOTAL | quantité ${hardwareReport.totals.quantity} | montant ${hardwareReport.totals.purchaseAmount} XOF | bénéfice ${hardwareReport.totals.grossProfit} XOF`,
+          ]),
+          "Aucun achat quincaillerie comptabilisé sur cette période.",
+        );
+        writePdfSectionTitle(doc, "Quincaillerie - écarts par destinataire");
+        writePdfList(
+          doc,
+          limitPdfRows([
+            ...hardwareReport.recipientRows.map(
+              (item) =>
+                `${item.recipientRef} | achats ${formatPdfMoney(item.purchaseAmount)} | recouvré ${formatPdfMoney(item.collectedAmount)} | écart achats ${formatPdfMoney(item.purchaseVarianceAmount)} | reste attendu ${formatPdfMoney(item.balanceAmount)}`,
+            ),
+            `TOTAL | écart achats ${formatPdfMoney(hardwareReport.totals.purchaseVarianceAmount)} | reste attendu ${formatPdfMoney(hardwareReport.totals.balanceAmount)}`,
+          ]),
+          "Aucun destinataire suivi.",
+        );
+      }
+
+      if (overview.btpOperationsReport) {
+        const btpReport = overview.btpOperationsReport;
+        writePdfSectionTitle(doc, `Rapport BTP - ${btpReport.periodLabel}`);
+        writePdfList(
+          doc,
+          limitPdfRows([
+            ...btpReport.rows.map(
+              (item) =>
+                `${item.projectRef} | client ${item.clientRef} | encaissé ${item.cashInAmount} XOF | dépensé ${item.totalCostAmount} XOF (matériaux ${item.materialAmount}, main-d'oeuvre ${item.laborAmount}, engins ${item.equipmentAmount}, sous-traitance ${item.subcontractingAmount}, charges ${item.siteExpenseAmount}) | marge ${item.netAmount} XOF | avancement ${item.lastProgressPercent ?? "-"}%`,
+            ),
+            `TOTAL | chantiers ${btpReport.totals.projectsCount} | encaissé ${btpReport.totals.cashInAmount} XOF | dépensé ${btpReport.totals.totalCostAmount} XOF | marge ${btpReport.totals.netAmount} XOF`,
+          ]),
+          "Aucune opération BTP sur cette période.",
+        );
+      }
+
+      if (overview.fishFarmingOperationsReport) {
+        const fishReport = overview.fishFarmingOperationsReport;
+        writePdfSectionTitle(
+          doc,
+          `Rapport pisciculture - ${fishReport.periodLabel}`,
+        );
+        writePdfList(
+          doc,
+          limitPdfRows([
+            ...fishReport.rows.map(
+              (item) =>
+                `${item.pondRef} | ${item.cycleRef} | ${item.species} | alevins ${item.fingerlingsQuantity} | aliment ${item.feedQuantity} | ventes ${item.soldQuantity} | mortalité ${item.mortalityCount} | net ${item.netAmount} XOF | exécution ${item.executionRate}%`,
+            ),
+            `TOTAL | bassins ${fishReport.totals.pondsCount} | cycles ${fishReport.totals.cyclesCount} | alevins ${fishReport.totals.fingerlingsQuantity} | aliment ${fishReport.totals.feedQuantity} | ventes ${fishReport.totals.soldQuantity} | mortalité ${fishReport.totals.mortalityCount} | net ${fishReport.totals.netAmount} XOF`,
+          ]),
+          "Aucune opération piscicole sur cette période.",
+        );
+      }
+
+      if (overview.livestockOperationsReport) {
+        const livestockReport = overview.livestockOperationsReport;
+        writePdfSectionTitle(
+          doc,
+          `Rapport élevage - ${livestockReport.periodLabel}`,
+        );
+        writePdfList(
+          doc,
+          limitPdfRows([
+            ...livestockReport.rows.map(
+              (item) =>
+                `${item.herdRef} | ${item.batchRef} | ${item.species} | achats ${item.animalPurchaseCount} | aliment ${item.feedQuantity} | ventes ${item.soldAnimalCount} | produits ${item.productQuantity} | mortalité ${item.mortalityCount} | net ${item.netAmount} XOF | exécution ${item.executionRate}%`,
+            ),
+            `TOTAL | troupeaux ${livestockReport.totals.herdsCount} | lots ${livestockReport.totals.batchesCount} | achats ${livestockReport.totals.animalPurchaseCount} | aliment ${livestockReport.totals.feedQuantity} | ventes ${livestockReport.totals.soldAnimalCount} | produits ${livestockReport.totals.productQuantity} | mortalité ${livestockReport.totals.mortalityCount} | net ${livestockReport.totals.netAmount} XOF`,
+          ]),
+          "Aucune opération d'élevage sur cette période.",
+        );
+      }
+
+      writePdfSectionTitle(doc, "Transactions par type et devise");
       writePdfList(
         doc,
-        limitPdfRows([
-          ...btpReport.rows.map(
-            (item) =>
-              `${item.projectRef} | client ${item.clientRef} | encaissé ${item.cashInAmount} XOF | dépensé ${item.totalCostAmount} XOF (matériaux ${item.materialAmount}, main-d'oeuvre ${item.laborAmount}, engins ${item.equipmentAmount}, sous-traitance ${item.subcontractingAmount}, charges ${item.siteExpenseAmount}) | marge ${item.netAmount} XOF | avancement ${item.lastProgressPercent ?? "-"}%`
-          ),
-          `TOTAL | chantiers ${btpReport.totals.projectsCount} | encaissé ${btpReport.totals.cashInAmount} XOF | dépensé ${btpReport.totals.totalCostAmount} XOF | marge ${btpReport.totals.netAmount} XOF`
-        ]),
-        "Aucune opération BTP sur cette période."
-      );
-    }
-
-    if (overview.fishFarmingOperationsReport) {
-      const fishReport = overview.fishFarmingOperationsReport;
-      writePdfSectionTitle(doc, `Rapport pisciculture - ${fishReport.periodLabel}`);
-      writePdfList(
-        doc,
-        limitPdfRows([
-          ...fishReport.rows.map(
-            (item) =>
-              `${item.pondRef} | ${item.cycleRef} | ${item.species} | alevins ${item.fingerlingsQuantity} | aliment ${item.feedQuantity} | ventes ${item.soldQuantity} | mortalité ${item.mortalityCount} | net ${item.netAmount} XOF | exécution ${item.executionRate}%`
-          ),
-          `TOTAL | bassins ${fishReport.totals.pondsCount} | cycles ${fishReport.totals.cyclesCount} | alevins ${fishReport.totals.fingerlingsQuantity} | aliment ${fishReport.totals.feedQuantity} | ventes ${fishReport.totals.soldQuantity} | mortalité ${fishReport.totals.mortalityCount} | net ${fishReport.totals.netAmount} XOF`
-        ]),
-        "Aucune opération piscicole sur cette période."
-      );
-    }
-
-    if (overview.livestockOperationsReport) {
-      const livestockReport = overview.livestockOperationsReport;
-      writePdfSectionTitle(doc, `Rapport élevage - ${livestockReport.periodLabel}`);
-      writePdfList(
-        doc,
-        limitPdfRows([
-          ...livestockReport.rows.map(
-            (item) =>
-              `${item.herdRef} | ${item.batchRef} | ${item.species} | achats ${item.animalPurchaseCount} | aliment ${item.feedQuantity} | ventes ${item.soldAnimalCount} | produits ${item.productQuantity} | mortalité ${item.mortalityCount} | net ${item.netAmount} XOF | exécution ${item.executionRate}%`
-          ),
-          `TOTAL | troupeaux ${livestockReport.totals.herdsCount} | lots ${livestockReport.totals.batchesCount} | achats ${livestockReport.totals.animalPurchaseCount} | aliment ${livestockReport.totals.feedQuantity} | ventes ${livestockReport.totals.soldAnimalCount} | produits ${livestockReport.totals.productQuantity} | mortalité ${livestockReport.totals.mortalityCount} | net ${livestockReport.totals.netAmount} XOF`
-        ]),
-        "Aucune opération d'élevage sur cette période."
-      );
-    }
-
-    writePdfSectionTitle(doc, "Transactions par type et devise");
-    writePdfList(
-      doc,
-      overview.financeByType.map(
-        (item) =>
-          `${toDisplayTransactionTypeLabel(item.type)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | comptabilisé ${item.approvedAmount} ${item.currency}`
-      ),
-      "Aucune transaction consolidée sur cette période."
-    );
-
-    writePdfSectionTitle(doc, "Transactions par statut");
-    writePdfList(
-      doc,
-      overview.financeByStatus.map(
-        (item) =>
-          `${toDisplayTransactionStatusLabel(item.status)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency}`
-      ),
-      "Aucune transaction par statut sur cette période."
-    );
-
-    writePdfSectionTitle(doc, "Gouvernance des comptes");
-    writePdfList(
-      doc,
-      limitPdfRows(
-        overview.financeAccounts.map(
+        overview.financeByType.map(
           (item) =>
-            `${item.name} | ${toDisplayAccountScopeLabel(item)} | ${toDisplayAccountCompatibilityLabel(item.isCompatibleWithSelectedActivity)} | solde ${item.balance}`
-        )
-      ),
-      "Aucun compte financier disponible."
-    );
+            `${toDisplayTransactionTypeLabel(item.type)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency} | comptabilisé ${item.approvedAmount} ${item.currency}`,
+        ),
+        "Aucune transaction consolidée sur cette période.",
+      );
 
-    writePdfSectionTitle(doc, "Tâches par statut");
-    writePdfList(
-      doc,
-      overview.taskByStatus.map(
-        (item) => `${toDisplayTaskStatusLabel(item.status)} | ${item.count} tâche(s)`
-      ),
-      "Aucune tâche consolidée sur cette période."
-    );
+      writePdfSectionTitle(doc, "Transactions par statut");
+      writePdfList(
+        doc,
+        overview.financeByStatus.map(
+          (item) =>
+            `${toDisplayTransactionStatusLabel(item.status)} | ${item.currency} | ${item.count} transaction(s) | total ${item.totalAmount} ${item.currency}`,
+        ),
+        "Aucune transaction par statut sur cette période.",
+      );
 
-  }, (doc, pageNumber, totalPages) => {
-    drawPdfBrandingFrame(doc, pageNumber, totalPages, periodLabel);
-  });
+      writePdfSectionTitle(doc, "Gouvernance des comptes");
+      writePdfList(
+        doc,
+        limitPdfRows(
+          overview.financeAccounts.map(
+            (item) =>
+              `${item.name} | ${toDisplayAccountScopeLabel(item)} | ${toDisplayAccountCompatibilityLabel(item.isCompatibleWithSelectedActivity)} | solde ${item.balance}`,
+          ),
+        ),
+        "Aucun compte financier disponible.",
+      );
+
+      writePdfSectionTitle(doc, "Tâches par statut");
+      writePdfList(
+        doc,
+        overview.taskByStatus.map(
+          (item) =>
+            `${toDisplayTaskStatusLabel(item.status)} | ${item.count} tâche(s)`,
+        ),
+        "Aucune tâche consolidée sur cette période.",
+      );
+    },
+    (doc, pageNumber, totalPages) => {
+      drawPdfBrandingFrame(doc, pageNumber, totalPages, periodLabel);
+    },
+  );
 }

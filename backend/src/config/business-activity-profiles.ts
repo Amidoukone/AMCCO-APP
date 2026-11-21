@@ -1,5 +1,6 @@
 import {
   BUSINESS_ACTIVITY_LABELS,
+  SELECTABLE_BUSINESS_ACTIVITY_CODES,
   type BusinessActivityCode
 } from "../types/business-activity.js";
 
@@ -1829,7 +1830,7 @@ export function getBusinessActivityProfile(
 }
 
 export function listBusinessActivityProfiles(): BusinessActivityProfile[] {
-  return Object.values(BUSINESS_ACTIVITY_PROFILES);
+  return SELECTABLE_BUSINESS_ACTIVITY_CODES.map((code) => BUSINESS_ACTIVITY_PROFILES[code]);
 }
 
 function normalizeActivityCategory(value: string | undefined): string {

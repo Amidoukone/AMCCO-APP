@@ -16,7 +16,7 @@ async function fixture(entry, width, { role = "ACCOUNTANT", failRead = false, fa
   const overview = JSON.parse(await readFile(new URL(entry.overview, directory), "utf8"));
   const pdf = await readFile(new URL(entry.pdf, directory));
   const context = await browser.newContext({ viewport: { width, height: 1000 }, acceptDownloads: true });
-  const calls = [];
+  const calls = [], detailModules = [];
   await context.addInitScript(() => localStorage.setItem("amcco_session_v1", JSON.stringify({ accessToken: "local-test", refreshToken: "local-refresh" })));
   await context.route("**/*", async (route) => {
     const request = route.request(), url = new URL(request.url());
@@ -41,13 +41,14 @@ async function fixture(entry, width, { role = "ACCOUNTANT", failRead = false, fa
     await route.fulfill({ status: 200, json: data });
   });
   const page = await context.newPage();
+  page.on("request", (request) => { if (new URL(request.url()).pathname.includes("ReportsDetails")) detailModules.push(request.url()); });
   page.setDefaultTimeout(15000);
   page.on("pageerror", (error) => errors.push(error.message));
-  return { context, page, calls, overview };
+  return { context, page, calls, overview, detailModules };
 }
 try {
   for (const entry of manifest.filter((row) => process.argv.length <= 2 || process.argv.slice(2).includes(row.code))) for (const width of [1440, 390]) {
-    const { context, page, calls, overview } = await fixture(entry, width);
+    const { context, page, calls, overview, detailModules } = await fixture(entry, width);
     await page.goto(`${base}/reports?activityCode=${entry.code}`);
     const scope = page.getByRole("region", { name: "Périmètre du rapport affiché", exact: true });
     await scope.waitFor();
@@ -58,9 +59,8 @@ try {
     await page.locator("#reports-date-to").fill(to);
     await page.getByRole("button", { name: "Mettre à jour", exact: true }).click();
     await page.getByRole("button", { name: "Télécharger PDF", exact: true }).waitFor();
-    await page.getByRole("button", { name: "Voir le rapport du secteur", exact: true }).click();
-    await page.locator("#reports-sector-details[open]").waitFor();
-    assert.ok(await page.locator("#reports-sector-details table").count() > 0, `Expected ${entry.code} business tables`);
+    assert.equal(await page.locator("#reports-sector-details").isHidden(), true, "Detailed sector tables are intentionally deferred to the PDF export");
+    assert.equal(detailModules.length, 0, "Hidden report details must not load their JavaScript");
     assert.ok((await scope.innerText()).includes("sans conversion"));
     const appliedQuery = calls.findLast((call) => call.path === "/reports/overview").query;
     assert.ok(appliedQuery.dateFrom.startsWith(from));
@@ -82,8 +82,12 @@ try {
     assert.equal(await page.locator(".reports-result-scroll").evaluate((element) => getComputedStyle(element).maxHeight), "none", "Report reading uses the main page scroll");
     await page.evaluate(() => document.querySelector(".app-content")?.scrollTo(0, 0));
     await page.screenshot({ path: fileURLToPath(new URL(`${entry.code}-web-${width}.png`, directory)), fullPage: true });
+    // Exercise the preserved, deferred component without exposing a new UI flow.
+    await page.locator("#reports-sector-details").evaluate((element) => { element.hidden = false; element.open = true; });
+    await page.locator("#reports-sector-details .panel").first().waitFor();
+    assert.ok(detailModules.length > 0, "Details must load when explicitly opened");
     await context.close();
-    console.log(`PASS ${entry.code} ${width}: business tables, scope, PDF download, applied dates, no data writes`);
+    console.log(`PASS ${entry.code} ${width}: summary, scope, PDF download, applied dates, no data writes`);
   }
   for (const scenario of [{ failRead: true }, { failExport: true }, { role: "OWNER" }]) {
     const entry = manifest.find((row) => row.code === "SERVICES");

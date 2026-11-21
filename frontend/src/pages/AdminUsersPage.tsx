@@ -14,12 +14,13 @@ import { FeedbackBanner } from "../components/FeedbackBanner";
 import { PageGuide } from "../components/PageGuide";
 import { ButtonSpinner } from "../components/ButtonSpinner";
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
+import { useActionScope } from "../lib/useActionScope";
 import {
   buildPersistedViewStorageKey,
   usePersistedViewState
 } from "../lib/usePersistedViewState";
 import { buildQuickSearchText, createQuickSearchMatcher } from "../lib/quickSearch";
-import type { AdminUserItem } from "../types/admin-users";
+import type { AdminUserItem, CreateAdminUserInput } from "../types/admin-users";
 import { ROLE_CODES, type RoleCode } from "../types/role";
 import { ROLE_LABELS } from "../config/permissions";
 
@@ -30,6 +31,10 @@ type UserDraft = {
   newPassword: string;
 };
 
+function createEmptyUserForm(): CreateAdminUserInput {
+  return { fullName: "", email: "", password: "", role: "EMPLOYEE" };
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -38,25 +43,24 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function AdminUsersPage(): JSX.Element {
-  const { activeCompany, user } = useAuth();
+  const { activeCompany, user, getRequestContext } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
+  const actionScopeKey = JSON.stringify([activeCompany?.id, user?.id, user?.role]);
+  const captureActionScope = useActionScope(actionScopeKey);
 
-  const [items, setItems] = useState<AdminUserItem[]>([]);
+  const [loadedItems, setItems] = useState<AdminUserItem[]>([]);
+  const [itemsScope, setItemsScope] = useState(actionScopeKey);
+  const items = itemsScope === actionScopeKey ? loadedItems : [];
   const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [hasUsersLoadError, setHasUsersLoadError] = useState(false);
   const usersLoadRequestRef = useRef(0);
-  const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
-  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [busyUsers, setBusyUsers] = useState<Record<string, boolean>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const [createForm, setCreateForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    role: "EMPLOYEE" as RoleCode
-  });
+  const [createForm, setCreateForm] = useState(createEmptyUserForm);
   const [isCreateFormExpanded, setIsCreateFormExpanded] = useState(
     () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches
   );
@@ -104,6 +108,15 @@ export function AdminUsersPage(): JSX.Element {
   }, [items, roleFilter, searchQuery, statusFilter, userSearchTextById]);
   const activeUsersCount = useMemo(() => items.filter((item) => item.isActive).length, [items]);
   const inactiveUsersCount = items.length - activeUsersCount;
+  const hasCreateChanges = Boolean(createForm.fullName || createForm.email || createForm.password || createForm.role !== "EMPLOYEE");
+  const hasUserChanges = items.some((item) => {
+    const draft = drafts[item.userId];
+    return draft && (draft.fullName !== item.fullName || draft.isActive !== item.isActive || draft.role !== item.role || Boolean(draft.newPassword));
+  });
+
+  function setUserBusy(userId: string, busy: boolean): void {
+    setBusyUsers((prev) => ({ ...prev, [userId]: busy }));
+  }
 
   const setDraftsFromItems = useCallback((rows: AdminUserItem[]) => {
     const nextDrafts: Record<string, UserDraft> = {};
@@ -119,31 +132,40 @@ export function AdminUsersPage(): JSX.Element {
   }, []);
 
   const loadUsers = useCallback(async () => {
+    const isCurrentAction = captureActionScope();
     const requestId = ++usersLoadRequestRef.current;
     setIsLoading(true);
+    setHasUsersLoadError(false);
     setErrorMessage(null);
     try {
       const response = await withAuthorizedToken((accessToken) => listAdminUsersRequest(accessToken));
-      if (requestId !== usersLoadRequestRef.current) return;
+      if (!isCurrentAction() || requestId !== usersLoadRequestRef.current) return;
       setItems(response.items);
+      setItemsScope(actionScopeKey);
       setDraftsFromItems(response.items);
     } catch (error) {
-      if (requestId === usersLoadRequestRef.current) setErrorMessage(toErrorMessage(error));
+      if (isCurrentAction() && requestId === usersLoadRequestRef.current) {
+        setHasUsersLoadError(true);
+        setErrorMessage(toErrorMessage(error));
+      }
     } finally {
-      if (requestId === usersLoadRequestRef.current) {
+      if (isCurrentAction() && requestId === usersLoadRequestRef.current) {
         setIsLoading(false);
       }
     }
-  }, [activeCompany?.id, setDraftsFromItems, withAuthorizedToken]);
+  }, [actionScopeKey, captureActionScope, setDraftsFromItems, withAuthorizedToken]);
 
   useEffect(() => {
-    if (loadedCompanyIdRef.current === activeCompany?.id) return;
-    loadedCompanyIdRef.current = activeCompany?.id;
     setItems([]);
     setDrafts({});
+    setCreateForm(createEmptyUserForm());
+    setBusyUsers({});
+    setIsSubmittingCreate(false);
+    setHasUsersLoadError(false);
     setIsLoading(true);
     setErrorMessage(null);
-  }, [activeCompany?.id]);
+    setSuccessMessage(null);
+  }, [actionScopeKey]);
 
   useEffect(() => {
     if (!canViewUsers) {
@@ -155,6 +177,8 @@ export function AdminUsersPage(): JSX.Element {
 
   async function handleCreateUser(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (!canManageUser || isSubmittingCreate || isLoading || hasUsersLoadError) return;
+    const isCurrentAction = captureActionScope();
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsSubmittingCreate(true);
@@ -168,6 +192,7 @@ export function AdminUsersPage(): JSX.Element {
           role: createForm.role
         })
       );
+      if (!isCurrentAction()) return;
 
       setItems((prev) => [
         response.item,
@@ -183,33 +208,33 @@ export function AdminUsersPage(): JSX.Element {
         }
       }));
 
-      setCreateForm({
-        fullName: "",
-        email: "",
-        password: "",
-        role: "EMPLOYEE"
-      });
+      setCreateForm(createEmptyUserForm());
       setSuccessMessage("Utilisateur créé avec succès.");
       if (window.matchMedia("(max-width: 640px)").matches) {
         setIsCreateFormExpanded(false);
       }
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSubmittingCreate(false);
+      if (isCurrentAction()) setIsSubmittingCreate(false);
     }
   }
 
   async function handleSaveProfile(userId: string): Promise<void> {
+    if (!canManageUser || busyUsers[userId]) return;
+    const isCurrentAction = captureActionScope();
+    const requestContext = getRequestContext();
     const draft = drafts[userId];
     if (!draft) {
       return;
     }
     const currentUser = items.find((item) => item.userId === userId);
 
-    setBusyUserId(userId);
+    setUserBusy(userId, true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    let profileSaved = false;
     try {
       let response = await withAuthorizedToken((accessToken) =>
         updateAdminUserRequest(accessToken, userId, {
@@ -217,12 +242,19 @@ export function AdminUsersPage(): JSX.Element {
           isActive: draft.isActive
         })
       );
+      // The auth context changes before React renders the destination company.
+      // Do not start the second write while a company switch is in flight.
+      if (!isCurrentAction() || getRequestContext() !== requestContext) return;
+      profileSaved = true;
+      const updatedProfile = response.item;
+      setItems((prev) => prev.map((item) => item.userId === userId ? updatedProfile : item));
       if (currentUser && currentUser.role !== draft.role) {
         response = await withAuthorizedToken((accessToken) =>
           changeAdminUserRoleRequest(accessToken, userId, {
             role: draft.role
           })
         );
+        if (!isCurrentAction() || getRequestContext() !== requestContext) return;
       }
       const savedUser = response.item;
       setItems((prev) => prev.map((item) => (item.userId === savedUser.userId ? savedUser : item)));
@@ -237,18 +269,24 @@ export function AdminUsersPage(): JSX.Element {
       }));
       setSuccessMessage("Profil utilisateur mis à jour.");
     } catch (error) {
-      setErrorMessage(toErrorMessage(error));
+      if (!isCurrentAction()) return;
+      setErrorMessage(profileSaved
+        ? `Profil enregistré, mais le rôle n'a pas pu être modifié. ${toErrorMessage(error)}`
+        : toErrorMessage(error));
     } finally {
-      setBusyUserId(null);
+      if (isCurrentAction()) setUserBusy(userId, false);
     }
   }
 
   async function handleDeleteMembership(userId: string): Promise<void> {
-    setBusyUserId(userId);
+    if (!canManageUser || busyUsers[userId]) return;
+    const isCurrentAction = captureActionScope();
+    setUserBusy(userId, true);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteAdminUserRequest(accessToken, userId));
+      if (!isCurrentAction()) return;
       setItems((prev) => prev.filter((item) => item.userId !== userId));
       setDrafts((prev) => {
         const next = { ...prev };
@@ -257,13 +295,16 @@ export function AdminUsersPage(): JSX.Element {
       });
       setSuccessMessage("Membre retire de l'entreprise.");
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyUserId(null);
+      if (isCurrentAction()) setUserBusy(userId, false);
     }
   }
 
   async function handleResetPassword(userId: string): Promise<void> {
+    if (!canManageUser || busyUsers[userId]) return;
+    const isCurrentAction = captureActionScope();
     const draft = drafts[userId];
     if (!draft) {
       return;
@@ -275,7 +316,7 @@ export function AdminUsersPage(): JSX.Element {
       return;
     }
 
-    setBusyUserId(userId);
+    setUserBusy(userId, true);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
@@ -284,6 +325,7 @@ export function AdminUsersPage(): JSX.Element {
           newPassword: password
         })
       );
+      if (!isCurrentAction()) return;
       setSuccessMessage("Mot de passe reinitialise et sessions invalidees.");
       setDrafts((prev) => ({
         ...prev,
@@ -298,9 +340,10 @@ export function AdminUsersPage(): JSX.Element {
         }
       }));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyUserId(null);
+      if (isCurrentAction()) setUserBusy(userId, false);
     }
   }
 
@@ -356,11 +399,12 @@ export function AdminUsersPage(): JSX.Element {
           onToggle={(event) => setIsCreateFormExpanded(event.currentTarget.open)}
         >
         <summary>Créer un utilisateur</summary>
-        <form className="admin-form admin-users-create-form" onSubmit={handleCreateUser}>
+        <form className="admin-form admin-users-create-form" onSubmit={handleCreateUser} data-unsaved-sector-form={hasCreateChanges ? "true" : undefined}>
           <input
             type="text"
             placeholder="Nom complet"
             value={createForm.fullName}
+            disabled={isSubmittingCreate}
             onChange={(event) =>
               setCreateForm((prev) => ({
                 ...prev,
@@ -373,6 +417,7 @@ export function AdminUsersPage(): JSX.Element {
             type="email"
             placeholder="Email"
             value={createForm.email}
+            disabled={isSubmittingCreate}
             onChange={(event) =>
               setCreateForm((prev) => ({
                 ...prev,
@@ -385,6 +430,7 @@ export function AdminUsersPage(): JSX.Element {
             type="password"
             placeholder="Mot de passe"
             value={createForm.password}
+            disabled={isSubmittingCreate}
             onChange={(event) =>
               setCreateForm((prev) => ({
                 ...prev,
@@ -395,6 +441,7 @@ export function AdminUsersPage(): JSX.Element {
           />
           <select
             value={createForm.role}
+            disabled={isSubmittingCreate}
             onChange={(event) =>
               setCreateForm((prev) => ({
                 ...prev,
@@ -424,7 +471,7 @@ export function AdminUsersPage(): JSX.Element {
             </p>
           ) : null}
           <div className="mobile-sticky-form-actions">
-            <button type="submit" disabled={isSubmittingCreate}>
+            <button type="submit" disabled={isSubmittingCreate || isLoading || hasUsersLoadError}>
               {isSubmittingCreate ? (
                 <>
                   <ButtonSpinner />
@@ -445,7 +492,7 @@ export function AdminUsersPage(): JSX.Element {
         isLoading={isLoading}
       />
 
-      <section className={canManageUser ? "panel admin-users-panel" : "panel admin-users-panel admin-users-readonly"}>
+      <section className={canManageUser ? "panel admin-users-panel" : "panel admin-users-panel admin-users-readonly"} data-unsaved-sector-form={canManageUser && hasUserChanges ? "true" : undefined}>
         <div className="admin-users-management-header">
           <div>
             <h3>Utilisateurs de l'entreprise</h3>
@@ -501,12 +548,14 @@ export function AdminUsersPage(): JSX.Element {
         </div>
         {!isLoading && items.length === 0 ? (
           <EmptyState
-            title="Aucun utilisateur"
+            title={hasUsersLoadError ? "Liste indisponible" : "Aucun utilisateur"}
             description={
-              canManageUser
+              hasUsersLoadError ? "La liste des membres n'a pas pu être chargée." : canManageUser
                 ? "Ajoutez le premier membre depuis le formulaire de création."
                 : "Aucun membre n'est disponible dans cette entreprise."
             }
+            actionLabel={hasUsersLoadError ? "Actualiser" : undefined}
+            onAction={hasUsersLoadError ? () => void loadUsers() : undefined}
           />
         ) : null}
         {!isLoading && items.length > 0 && displayItems.length === 0 ? (
@@ -533,7 +582,7 @@ export function AdminUsersPage(): JSX.Element {
               <tbody>
                 {displayItems.map((item) => {
                   const draft = drafts[item.userId];
-                  const isBusy = busyUserId === item.userId;
+                  const isBusy = busyUsers[item.userId] === true;
                   return (
                     <tr key={item.userId}>
                       <td data-label="Nom">
@@ -604,7 +653,7 @@ export function AdminUsersPage(): JSX.Element {
                               }
                               }))
                             }
-                            disabled={isBusy}
+                            disabled={!canManageUser || isBusy}
                           />
                           <span>{(draft?.isActive ?? item.isActive) ? "Oui" : "Non"}</span>
                         </label>
@@ -623,7 +672,7 @@ export function AdminUsersPage(): JSX.Element {
                             type="button"
                             className="danger-btn"
                             onClick={() => void handleDeleteMembership(item.userId)}
-                            disabled={isBusy}
+                            disabled={!canManageUser || isBusy}
                           >
                             Supprimer
                           </button>

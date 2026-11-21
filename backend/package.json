@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:check": "node ../scripts/check-local-db.mjs",
+    "dev:recette": "node ../scripts/local-recipe.mjs dev",
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
@@ -19,7 +21,10 @@
     "seed:demo-presentation:preview": "tsx src/scripts/seed-demo-presentation.ts",
     "seed:dev-user": "tsx src/scripts/seed-dev-user.ts",
     "roles:repair:dry-run": "tsx src/scripts/repair-membership-roles.ts",
-    "roles:repair:apply": "tsx src/scripts/repair-membership-roles.ts --apply"
+    "roles:repair:apply": "tsx src/scripts/repair-membership-roles.ts --apply",
+    "migrate:transaction-lifecycle:dry-run": "node dist/scripts/apply-transaction-lifecycle-migration.js",
+    "migrate:transaction-lifecycle:apply": "node dist/scripts/apply-transaction-lifecycle-migration.js --apply",
+    "migrate:transaction-lifecycle:dev": "tsx src/scripts/apply-transaction-lifecycle-migration.ts"
   },
   "dependencies": {
     "@imagekit/nodejs": "^7.5.0",
@@ -35,7 +40,6 @@
     "pdfkit": "^0.18.0",
     "pino": "^9.4.0",
     "pino-http": "^10.3.0",
-    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

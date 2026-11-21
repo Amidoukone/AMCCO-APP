@@ -1,3 +1,4 @@
+import { useActionScope } from "../lib/useActionScope";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -25,6 +26,12 @@ import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { getBusinessActivityLabel, type BusinessActivityCode } from "../config/businessActivities";
 import { useBusinessActivity } from "../context/BusinessActivityContext";
 import { getTaskTraceLines } from "../utils/traceMetadata";
+import {
+  formatFileSize,
+  statusLabel,
+  statusToneClass,
+  toErrorMessage
+} from "../utils/operationsTasks";
 import type {
   OperationTask,
   OperationTaskMember,
@@ -35,49 +42,6 @@ import type {
 } from "../types/tasks";
 
 const TASK_DETAIL_PAGE_SIZE = 50;
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} o`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} Ko`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return error.message;
-  }
-  return "Opération impossible. Vérifiez la connexion backend.";
-}
-
-function statusLabel(status: TaskStatus): string {
-  if (status === "TODO") {
-    return "À faire";
-  }
-  if (status === "IN_PROGRESS") {
-    return "En cours";
-  }
-  if (status === "DONE") {
-    return "Terminée";
-  }
-  return "Bloquée";
-}
-
-function statusToneClass(status: TaskStatus): string {
-  if (status === "TODO") {
-    return "todo";
-  }
-  if (status === "IN_PROGRESS") {
-    return "in-progress";
-  }
-  if (status === "DONE") {
-    return "done";
-  }
-  return "blocked";
-}
 
 function timelineActionLabel(action: string): string {
   if (action === "TASK_CREATED") {
@@ -179,6 +143,12 @@ export function TaskDetailsPage(): JSX.Element {
   const { activeCompany, user } = useAuth();
   const withAuthorizedToken = useAuthorizedRequest();
   const { enabledActivities, profiles, setSelectedActivityCode } = useBusinessActivity();
+  const [isSaving, setIsSaving] = useState(false);
+  const actionScopeKey = JSON.stringify([activeCompany?.id, user?.id, user?.role, taskId]);
+  const captureActionScope = useActionScope(actionScopeKey);
+  useEffect(() => {
+    setIsSaving(false);
+  }, [actionScopeKey]);
   const [task, setTask] = useState<OperationTask | null>(null);
   const [timeline, setTimeline] = useState<OperationTaskTimelineEvent[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -190,7 +160,6 @@ export function TaskDetailsPage(): JSX.Element {
   const loadRequestRef = useRef(0);
   const timelineLoadRequestRef = useRef(0);
   const loadedHistoryTaskRef = useRef<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [isLoadingMoreTimeline, setIsLoadingMoreTimeline] = useState(false);
   const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [isCompactScreen] = useState(
@@ -451,6 +420,7 @@ export function TaskDetailsPage(): JSX.Element {
   }
 
   async function handleAssign(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!taskId || !task || !canManageTasks) {
       return;
     }
@@ -466,19 +436,22 @@ export function TaskDetailsPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         assignOperationsTaskRequest(accessToken, taskId, nextAssignedToId, assignmentNote.trim() || undefined)
       );
+      if (!isCurrentAction()) return;
       setTask(response.item);
       setAssignment(response.item.assignedToId ?? "");
       setAssignmentNote("");
       setSuccessMessage("Assignation mise à jour.");
       void refreshTimeline();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSaving(false);
+      if (isCurrentAction()) setIsSaving(false);
     }
   }
 
   async function handleStatusChange(status: TaskStatus): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!taskId || !task) {
       return;
     }
@@ -492,17 +465,20 @@ export function TaskDetailsPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         updateOperationsTaskStatusRequest(accessToken, taskId, status)
       );
+      if (!isCurrentAction()) return;
       setTask(response.item);
       setSuccessMessage("Statut mis à jour.");
       void refreshTimeline();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSaving(false);
+      if (isCurrentAction()) setIsSaving(false);
     }
   }
 
   async function handleAddComment(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!taskId || isReadOnlyOwner) {
       return;
     }
@@ -517,14 +493,16 @@ export function TaskDetailsPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         addTaskCommentRequest(accessToken, taskId, body)
       );
+      if (!isCurrentAction()) return;
       setComments((prev) => [response.item, ...prev.filter((item) => item.id !== response.item.id)]);
       setNewComment("");
       setSuccessMessage("Commentaire ajoute.");
       void refreshTimeline();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSaving(false);
+      if (isCurrentAction()) setIsSaving(false);
     }
   }
 
@@ -578,6 +556,7 @@ export function TaskDetailsPage(): JSX.Element {
   }
 
   async function handleAddAttachment(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!taskId || isReadOnlyOwner) {
       return;
     }
@@ -591,6 +570,7 @@ export function TaskDetailsPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       const items = await uploadTaskAttachment(taskId, attachmentFile);
+      if (!isCurrentAction()) return;
       setAttachmentFile(null);
       setAttachments(items);
       setSuccessMessage("Pièce jointe ajoutee.");
@@ -599,9 +579,10 @@ export function TaskDetailsPage(): JSX.Element {
       }
       void refreshTimeline();
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSaving(false);
+      if (isCurrentAction()) setIsSaving(false);
     }
   }
 

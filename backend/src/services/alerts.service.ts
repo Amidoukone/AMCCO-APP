@@ -15,6 +15,17 @@ import type { RoleCode } from "../types/role.js";
 
 type AlertSeverity = "INFO" | "WARNING" | "CRITICAL";
 
+// Routine records are already visible in their lists and audit trail. Do not
+// broadcast an informational copy to management on every write. Explicit user
+// notifications (assignment, payroll, completion) and elevated alerts remain.
+const ROUTINE_ROLE_ALERT_CODES = new Set([
+  "TASK_CREATED_BY_EMPLOYEE",
+  "FINANCE_TRANSACTION_SUBMITTED",
+  "FINANCE_SALARY_SUBMITTED",
+  "FINANCE_SALARY_CREATED",
+  "FINANCE_SALARY_UPDATED"
+]);
+
 type ActorContext = {
   actorId: string;
   companyId: string;
@@ -40,6 +51,8 @@ export async function createUserTargetedAlerts(input: {
     return;
   }
 
+  const metadataJson = input.metadata ? JSON.stringify(input.metadata) : null;
+
   await createAlertRecords(
     recipientUserIds.map((targetUserId) => ({
       id: randomUUID(),
@@ -50,7 +63,7 @@ export async function createUserTargetedAlerts(input: {
       severity: input.severity,
       entityType: input.entityType ?? null,
       entityId: input.entityId ?? null,
-      metadataJson: input.metadata ? JSON.stringify(input.metadata) : null
+      metadataJson
     }))
   );
 }
@@ -66,6 +79,11 @@ export async function createRoleTargetedAlerts(input: {
   entityId?: string | null;
   metadata?: Record<string, unknown> | null;
 }): Promise<void> {
+  if (input.recipientRoles.length === 0 ||
+      (input.severity === "INFO" && ROUTINE_ROLE_ALERT_CODES.has(input.code))) {
+    return;
+  }
+
   const targetUserIds = await listCompanyActiveUserIdsByRoles(input.companyId, input.recipientRoles);
   const excluded = new Set((input.excludeUserIds ?? []).map((id) => id.trim()).filter(Boolean));
 

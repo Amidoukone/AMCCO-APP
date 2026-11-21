@@ -33,7 +33,6 @@ import {
   createCompanySalaryTransaction,
   createCompanyTransaction,
   deleteCompanyTransaction,
-  exportCompanySalaryCsv,
   getCompanyTransaction,
   getCompanySalarySummary,
   listCompanyTransactions,
@@ -279,7 +278,7 @@ describe("finance.service", () => {
           netAmount: "85000.00",
           paymentMethod: "BANK_TRANSFER"
         },
-        status: "DRAFT",
+        status: "APPROVED",
         requiresProof: false,
         createdById: actor.actorId,
         createdByEmail: "actor@example.com",
@@ -344,11 +343,10 @@ describe("finance.service", () => {
         companyId: actor.companyId,
         createdById: actor.actorId,
         activityCode: null,
-        status: "DRAFT",
+        status: "APPROVED",
         requiresProof: false,
         salaryConfirmationStatus: "NOT_REQUIRED"
       });
-      let salaryReadCount = 0;
       vi.mocked(findFinancialTransactionById).mockImplementation(async () => ({
         id: "salary-1",
         companyId: actor.companyId,
@@ -377,7 +375,7 @@ describe("finance.service", () => {
           paymentMethod: "BANK_TRANSFER",
           note: "Prime de rendement"
         },
-        status: salaryReadCount++ === 0 ? "DRAFT" : "APPROVED",
+        status: "APPROVED",
         requiresProof: false,
         createdById: actor.actorId,
         createdByEmail: "actor@example.com",
@@ -427,17 +425,8 @@ describe("finance.service", () => {
           })
         })
       );
-      expect(submitTransaction).toHaveBeenCalledWith({
-        companyId: actor.companyId,
-        transactionId: "salary-1",
-        salaryConfirmationStatus: "NOT_REQUIRED"
-      });
-      expect(reviewTransaction).toHaveBeenCalledWith({
-        companyId: actor.companyId,
-        transactionId: "salary-1",
-        reviewerId: actor.actorId,
-        status: "APPROVED"
-      });
+      expect(submitTransaction).not.toHaveBeenCalled();
+      expect(reviewTransaction).not.toHaveBeenCalled();
       expect(createAuditLogRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           companyId: actor.companyId,
@@ -449,6 +438,14 @@ describe("finance.service", () => {
       expect(result.netAmount).toBe("92500.00");
       expect(result.employeeFullName).toBe("Agent Test");
       expect(result.status).toBe("APPROVED");
+      expect(createUserTargetedAlerts).toHaveBeenCalledWith(expect.objectContaining({
+        recipientUserIds: ["employee-1"],
+        code: "FINANCE_SALARY_CREATED"
+      }));
+      expect(createRoleTargetedAlerts).toHaveBeenCalledWith(expect.objectContaining({
+        recipientRoles: ["OWNER", "SYS_ADMIN", "ACCOUNTANT"],
+        code: "FINANCE_SALARY_CREATED"
+      }));
     });
   });
 
@@ -525,7 +522,7 @@ describe("finance.service", () => {
             paymentMethod: "BANK_TRANSFER",
             note: "Ajustement"
           },
-          status: "DRAFT",
+          status: "APPROVED",
           requiresProof: false,
           createdById: actor.actorId,
           createdByEmail: "actor@example.com",
@@ -651,7 +648,7 @@ describe("finance.service", () => {
         companyId: actor.companyId,
         createdById: actor.actorId,
         activityCode: null,
-        status: "DRAFT",
+        status: "APPROVED",
         requiresProof: false,
         salaryConfirmationStatus: "NOT_REQUIRED"
       });
@@ -701,19 +698,14 @@ describe("finance.service", () => {
           metadataJson: expect.stringContaining("\"previousStatus\":\"SUBMITTED\"")
         })
       );
-      expect(submitTransaction).toHaveBeenCalledWith({
-        companyId: actor.companyId,
-        transactionId: "salary-3",
-        salaryConfirmationStatus: "NOT_REQUIRED"
-      });
-      expect(reviewTransaction).toHaveBeenCalledWith({
-        companyId: actor.companyId,
-        transactionId: "salary-3",
-        reviewerId: actor.actorId,
-        status: "APPROVED"
-      });
+      expect(submitTransaction).not.toHaveBeenCalled();
+      expect(reviewTransaction).not.toHaveBeenCalled();
       expect(result.status).toBe("APPROVED");
       expect(result.salaryConfirmation.status).toBe("NOT_REQUIRED");
+      expect(createUserTargetedAlerts).toHaveBeenCalledWith(expect.objectContaining({
+        recipientUserIds: ["employee-1"],
+        code: "FINANCE_SALARY_UPDATED"
+      }));
     });
 
     it("alerts owners when sys admin updates a salary", async () => {
@@ -745,7 +737,7 @@ describe("finance.service", () => {
             netAmount: "92500.00",
             paymentMethod: "BANK_TRANSFER"
           },
-          status: "DRAFT",
+          status: "APPROVED",
           requiresProof: false,
           createdById: actor.actorId,
           createdByEmail: "actor@example.com",
@@ -787,7 +779,7 @@ describe("finance.service", () => {
             netAmount: "94000.00",
             paymentMethod: "BANK_TRANSFER"
           },
-          status: "DRAFT",
+          status: "APPROVED",
           requiresProof: false,
           createdById: actor.actorId,
           createdByEmail: "actor@example.com",
@@ -871,7 +863,7 @@ describe("finance.service", () => {
         companyId: actor.companyId,
         createdById: actor.actorId,
         activityCode: null,
-        status: "DRAFT",
+        status: "APPROVED",
         requiresProof: false,
         salaryConfirmationStatus: "NOT_REQUIRED"
       });
@@ -945,7 +937,7 @@ describe("finance.service", () => {
           netAmount: "92500.00",
           paymentMethod: "BANK_TRANSFER"
         },
-        status: "DRAFT",
+        status: "APPROVED",
         requiresProof: false,
         createdById: actor.actorId,
         createdByEmail: "actor@example.com",
@@ -1063,8 +1055,8 @@ describe("finance.service", () => {
     });
   });
 
-  describe("salary summary and export", () => {
-    it("builds a monthly salary summary and csv export", async () => {
+  describe("salary summary", () => {
+    it("builds a monthly salary summary", async () => {
       vi.mocked(listSalaryTransactions).mockResolvedValue([
         {
           id: "salary-1",
@@ -1164,17 +1156,6 @@ describe("finance.service", () => {
       expect(summary.pendingCount).toBe(0);
       expect(summary.byEmployee).toHaveLength(2);
 
-      const csv = await exportCompanySalaryCsv({
-        companyId: actor.companyId,
-        role: "ACCOUNTANT",
-        payPeriod: "2026-04"
-      });
-
-      expect(csv).toContain("salary_id");
-      expect(csv).toContain("employee_full_name");
-      expect(csv).not.toContain("validated_by_email");
-      expect(csv).toContain("\"Agent Test\"");
-      expect(csv).toContain("\"BANK_TRANSFER\"");
     });
   });
 
@@ -1842,10 +1823,7 @@ describe("finance.service", () => {
         amount: "7000.00"
       }));
       expect(result.createdById).toBe("operator-1");
-      expect(reviewTransaction).toHaveBeenCalledWith(expect.objectContaining({
-        transactionId: existing.id,
-        status: "APPROVED"
-      }));
+      expect(reviewTransaction).not.toHaveBeenCalled();
     });
 
     it("rejects an operator edit that changes the transaction to another sector", async () => {

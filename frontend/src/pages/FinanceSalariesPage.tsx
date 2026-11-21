@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useActionScope } from "../lib/useActionScope";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FeedbackBanner } from "../components/FeedbackBanner";
@@ -28,7 +29,6 @@ import {
   ApiError,
   createFinanceSalaryRequest,
   deleteFinanceSalaryRequest,
-  downloadFinanceSalaryExportRequest,
   getFinanceProofUploadAuthRequest,
   getFinanceSalarySummaryRequest,
   listFinanceAccountsRequest,
@@ -145,6 +145,13 @@ export function FinanceSalariesPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeCompany, user } = useAuth();
+  const actionScopeKey = JSON.stringify([activeCompany?.id, user?.id, user?.role]);
+  const captureActionScope = useActionScope(actionScopeKey);
+  useEffect(() => {
+    setIsSavingSalary(false);
+    setBusyTransactionId(null);
+    setLoadingProofsByTransaction({});
+  }, [actionScopeKey]);
   const withAuthorizedToken = useAuthorizedRequest();
   const [salaryAccounts, setSalaryAccounts] = useState<FinancialAccount[]>([]);
   const [salaryMembers, setSalaryMembers] = useState<SalaryMember[]>([]);
@@ -169,7 +176,6 @@ export function FinanceSalariesPage(): JSX.Element {
   const loadedSalaryMembersCompanyRef = useRef<string | null>(null);
   const loadedCompanyIdRef = useRef(activeCompany?.id);
   const [busyTransactionId, setBusyTransactionId] = useState<string | null>(null);
-  const [busySalaryExport, setBusySalaryExport] = useState<"csv" | "xlsx" | null>(null);
   const [isLoadingMoreSalaries, setIsLoadingMoreSalaries] = useState(false);
   const [hasMoreSalaries, setHasMoreSalaries] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -648,6 +654,7 @@ export function FinanceSalariesPage(): JSX.Element {
   }
 
   async function handleSaveSalary(event: FormEvent<HTMLFormElement>): Promise<void> {
+    const isCurrentAction = captureActionScope();
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -675,6 +682,7 @@ export function FinanceSalariesPage(): JSX.Element {
         );
         return result;
       });
+      if (!isCurrentAction()) return;
 
       handleOpenSalaryDetails(response.item.id);
       setSalaryItems((prev) => {
@@ -696,9 +704,10 @@ export function FinanceSalariesPage(): JSX.Element {
       void loadSalaryAccounts();
       void loadData({ silent: true });
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setIsSavingSalary(false);
+      if (isCurrentAction()) setIsSavingSalary(false);
     }
   }
 
@@ -733,6 +742,7 @@ export function FinanceSalariesPage(): JSX.Element {
   }
 
   async function handleConfirmDeleteSalary(): Promise<void> {
+    const isCurrentAction = captureActionScope();
     if (!salaryPendingDelete) {
       return;
     }
@@ -743,6 +753,7 @@ export function FinanceSalariesPage(): JSX.Element {
     setSuccessMessage(null);
     try {
       await withAuthorizedToken((accessToken) => deleteFinanceSalaryRequest(accessToken, item.id));
+      if (!isCurrentAction()) return;
       if (selectedSalaryId === item.id) {
         handleCloseSalaryDetails();
       }
@@ -756,35 +767,15 @@ export function FinanceSalariesPage(): JSX.Element {
       void loadSalaryAccounts();
       void loadData({ silent: true });
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTransactionId(null);
-    }
-  }
-
-  async function handleExportSalaries(format: "csv" | "xlsx"): Promise<void> {
-    setBusySalaryExport(format);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    try {
-      const blob = await withAuthorizedToken((accessToken) =>
-        downloadFinanceSalaryExportRequest(accessToken, format, {
-          payPeriod: salaryFilters.payPeriod,
-          employeeUserId: salaryFilters.employeeUserId || undefined
-        })
-      );
-      triggerBlobDownload(blob, `amcco-salaires-${salaryFilters.payPeriod}.${format}`);
-      setSuccessMessage(
-        format === "xlsx" ? "Export Excel des salaires généré." : "Export CSV des salaires généré."
-      );
-    } catch (error) {
-      setErrorMessage(toErrorMessage(error));
-    } finally {
-      setBusySalaryExport(null);
+      if (isCurrentAction()) setBusyTransactionId(null);
     }
   }
 
   async function handleToggleProofs(transactionId: string): Promise<void> {
+    const isCurrentAction = captureActionScope();
     const isOpen = openProofs[transactionId] === true;
     if (isOpen) {
       setOpenProofs((prev) => ({ ...prev, [transactionId]: false }));
@@ -802,19 +793,22 @@ export function FinanceSalariesPage(): JSX.Element {
       const response = await withAuthorizedToken((accessToken) =>
         listFinanceTransactionProofsRequest(accessToken, transactionId)
       );
+      if (!isCurrentAction()) return;
       setProofsByTransaction((prev) => ({
         ...prev,
         [transactionId]: response.items
       }));
       setOpenProofs((prev) => ({ ...prev, [transactionId]: true }));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setLoadingProofsByTransaction((prev) => ({ ...prev, [transactionId]: false }));
+      if (isCurrentAction()) setLoadingProofsByTransaction((prev) => ({ ...prev, [transactionId]: false }));
     }
   }
 
   async function handleAddProof(transactionId: string): Promise<void> {
+    const isCurrentAction = captureActionScope();
     const selectedFile = proofFiles[transactionId];
     if (!selectedFile) {
       setErrorMessage("Sélectionnez un fichier de preuve.");
@@ -857,6 +851,7 @@ export function FinanceSalariesPage(): JSX.Element {
           fileSize: resolveImageKitFileSize(uploaded, selectedFile.size)
         });
       });
+      if (!isCurrentAction()) return;
 
       setSuccessMessage("Preuve ajoutée.");
       setProofFiles((prev) => ({ ...prev, [transactionId]: null }));
@@ -866,9 +861,10 @@ export function FinanceSalariesPage(): JSX.Element {
       }));
       setOpenProofs((prev) => ({ ...prev, [transactionId]: true }));
     } catch (error) {
+      if (!isCurrentAction()) return;
       setErrorMessage(toErrorMessage(error));
     } finally {
-      setBusyTransactionId(null);
+      if (isCurrentAction()) setBusyTransactionId(null);
     }
   }
 
@@ -1194,24 +1190,6 @@ export function FinanceSalariesPage(): JSX.Element {
                 {formatMoneyForDisplay(salarySummary.totalBonusAmount)} | Retenues{" "}
                 {formatMoneyForDisplay(salarySummary.totalDeductionAmount)}
               </p>
-            </div>
-            <div className="topbar-actions salaries-summary-actions">
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => void handleExportSalaries("csv")}
-                disabled={busySalaryExport !== null}
-              >
-                {busySalaryExport === "csv" ? "Préparation..." : "Salaires CSV"}
-              </button>
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => void handleExportSalaries("xlsx")}
-                disabled={busySalaryExport !== null}
-              >
-                {busySalaryExport === "xlsx" ? "Préparation..." : "Salaires Excel"}
-              </button>
             </div>
           </div>
           <div className="table-wrap mobile-card-table finance-salary-summary-table-wrap">

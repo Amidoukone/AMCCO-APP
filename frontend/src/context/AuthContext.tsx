@@ -33,6 +33,7 @@ type AuthState = {
   user: LoginUser | null;
   session: SessionTokens | null;
   getSession: () => SessionTokens | null;
+  getRequestContext: () => number;
   activeCompany: CompanyProfile | null;
   memberships: CompanyMembershipSummary[];
   login: (input: LoginInput) => Promise<LoginUser>;
@@ -90,20 +91,29 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   const [activeCompany, setActiveCompany] = useState<CompanyProfile | null>(null);
   const [memberships, setMemberships] = useState<CompanyMembershipSummary[]>([]);
   const sessionRef = useRef<SessionTokens | null>(null);
-  const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
+  const requestContextRef = useRef(0);
+  const identityRef = useRef<string | null>(null);
+  const refreshInFlightRef = useRef<{ session: SessionTokens; key: symbol; promise: Promise<string | null> } | null>(null);
 
   const resetAuth = useCallback(() => {
+    requestContextRef.current += 1;
+    identityRef.current = null;
     clearCachedGetResponses();
     sessionRef.current = null;
     setUser(null);
     setSession(null);
     setActiveCompany(null);
     setMemberships([]);
+    setIsInitializing(false);
     clearSessionTokens();
   }, []);
 
   const applyAuthenticatedState = useCallback(
     (nextTokens: SessionTokens, me: Awaited<ReturnType<typeof meRequest>>) => {
+      const nextUser = toLoginUser(me);
+      const identity = JSON.stringify([nextUser.id, nextUser.companyId, nextUser.role]);
+      if (identityRef.current !== identity) requestContextRef.current += 1;
+      identityRef.current = identity;
       clearCachedGetResponses();
       const normalizedTokens: SessionTokens = {
         accessToken: nextTokens.accessToken,
@@ -114,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
       sessionRef.current = normalizedTokens;
       setSession(normalizedTokens);
-      setUser(toLoginUser(me));
+      setUser(nextUser);
       setActiveCompany(me.company ?? null);
       setMemberships(me.memberships);
       saveSessionTokens(normalizedTokens);
@@ -123,19 +133,24 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   );
 
   const getSession = useCallback((): SessionTokens | null => sessionRef.current, []);
+  const getRequestContext = useCallback(() => requestContextRef.current, []);
 
   const login = useCallback(async (input: LoginInput) => {
+    const context = ++requestContextRef.current;
     const response = await loginRequest(input);
     const baseTokens: SessionTokens = {
       accessToken: response.accessToken,
       refreshToken: response.refreshToken
     };
     const me = response.me ?? await meRequest(response.accessToken);
+    if (requestContextRef.current !== context) throw new ApiError(409, "Le contexte de connexion a changé. Relancez la connexion.");
     applyAuthenticatedState(baseTokens, me);
+    setIsInitializing(false);
     return toLoginUser(me);
   }, [applyAuthenticatedState]);
 
   const logout = useCallback(async () => {
+    const context = ++requestContextRef.current;
     const currentSession = sessionRef.current;
     if (currentSession?.refreshToken) {
       try {
@@ -144,20 +159,22 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         // no-op: local logout must still succeed
       }
     }
-    resetAuth();
+    if (requestContextRef.current === context) resetAuth();
   }, [resetAuth]);
 
   const refreshSession = useCallback(async (): Promise<string | null> => {
     const currentSession = sessionRef.current;
+    const context = requestContextRef.current;
     if (!currentSession?.refreshToken) {
       resetAuth();
       return null;
     }
 
-    if (refreshInFlightRef.current) {
-      return refreshInFlightRef.current;
+    if (refreshInFlightRef.current?.session === currentSession) {
+      return refreshInFlightRef.current.promise;
     }
 
+    const refreshAttempt = Symbol("refresh");
     const refreshPromise = (async (): Promise<string | null> => {
       try {
         const refreshed = await refreshRequest(currentSession.refreshToken);
@@ -167,17 +184,20 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         };
 
         const me = refreshed.me ?? await meRequest(nextTokens.accessToken);
+        // A failed company switch must not discard a valid token rotation for
+        // the still-active session. A replaced session can never be restored.
+        if (sessionRef.current !== currentSession) return null;
         applyAuthenticatedState(nextTokens, me);
         return nextTokens.accessToken;
       } catch {
-        resetAuth();
+        if (sessionRef.current === currentSession && requestContextRef.current === context) resetAuth();
         return null;
       } finally {
-        refreshInFlightRef.current = null;
+        if (refreshInFlightRef.current?.key === refreshAttempt) refreshInFlightRef.current = null;
       }
     })();
 
-    refreshInFlightRef.current = refreshPromise;
+    refreshInFlightRef.current = { session: currentSession, key: refreshAttempt, promise: refreshPromise };
     return refreshPromise;
   }, [applyAuthenticatedState, resetAuth]);
 
@@ -192,12 +212,15 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         return;
       }
 
+      const context = ++requestContextRef.current;
+
       const switched = await switchCompanyRequest(currentSession.refreshToken, companyId);
       const nextTokens: SessionTokens = {
         accessToken: switched.accessToken,
         refreshToken: switched.refreshToken
       };
       const me = switched.me ?? await meRequest(nextTokens.accessToken);
+      if (requestContextRef.current !== context) throw new ApiError(409, "Le contexte de connexion a changé. Relancez le changement d'entreprise.");
       applyAuthenticatedState(nextTokens, me);
     },
     [activeCompany, applyAuthenticatedState, resetAuth]
@@ -231,6 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
   const reloadProfile = useCallback(async (): Promise<void> => {
     const currentSession = sessionRef.current;
+    const context = requestContextRef.current;
     if (!currentSession?.accessToken || !currentSession.refreshToken) {
       resetAuth();
       return;
@@ -238,8 +262,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
     try {
       const me = await meRequest(currentSession.accessToken);
+      if (sessionRef.current !== currentSession || requestContextRef.current !== context) return;
       applyAuthenticatedState(currentSession, me);
     } catch (error) {
+      if (sessionRef.current !== currentSession || requestContextRef.current !== context) return;
       if (!(error instanceof ApiError) || error.statusCode !== 401) {
         throw error;
       }
@@ -253,6 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
   useEffect(() => {
     let isMounted = true;
+    const context = requestContextRef.current;
 
     const restoreSession = async (): Promise<void> => {
       const persisted = loadSessionTokens();
@@ -266,15 +293,16 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       if (!isAccessTokenExpired(persisted.accessToken)) {
         try {
           const me = await meRequest(persisted.accessToken);
-          if (!isMounted) {
+          if (!isMounted || requestContextRef.current !== context) {
             return;
           }
           applyAuthenticatedState(persisted, me);
           setIsInitializing(false);
           return;
         } catch (error) {
+          if (!isMounted || requestContextRef.current !== context) return;
           if (!(error instanceof ApiError) || error.statusCode !== 401) {
-            if (isMounted) {
+            if (isMounted && requestContextRef.current === context) {
               resetAuth();
               setIsInitializing(false);
             }
@@ -283,6 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         }
       }
 
+      if (!isMounted || requestContextRef.current !== context) return;
       try {
         const refreshed = await refreshRequest(persisted.refreshToken);
         const nextTokens: SessionTokens = {
@@ -290,12 +319,12 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
           refreshToken: refreshed.refreshToken
         };
         const me = refreshed.me ?? await meRequest(nextTokens.accessToken);
-        if (!isMounted) {
+        if (!isMounted || requestContextRef.current !== context) {
           return;
         }
         applyAuthenticatedState(nextTokens, me);
       } catch {
-        if (!isMounted) {
+        if (!isMounted || requestContextRef.current !== context) {
           return;
         }
         resetAuth();
@@ -320,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       user,
       session,
       getSession,
+      getRequestContext,
       activeCompany,
       memberships,
       login,
@@ -333,6 +363,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       activeCompany,
       applyCompanyUpdate,
       getSession,
+      getRequestContext,
       isInitializing,
       login,
       logout,

@@ -7,6 +7,7 @@ import {
   findCompanyTaskAssigneeByUserId,
   findOperationTaskById,
   findOperationTaskMinimalById,
+  findOperationTasksMinimalByIds,
   listCompanyTaskAssignees,
   listOperationsTasks,
   updateOperationTask,
@@ -17,6 +18,7 @@ import { createRoleTargetedAlerts, createUserTargetedAlerts } from "./alerts.ser
 import { ensureCompanyActivityEnabledOrThrow } from "./company-activities.service.js";
 import {
   assignCompanyTask,
+  assignCompanyTasksBulk,
   createCompanyTask,
   deleteCompanyTask,
   listCompanyTaskMembers,
@@ -383,6 +385,103 @@ describe("tasks.service", () => {
     });
   });
 
+  describe("assignCompanyTasksBulk", () => {
+    it("rejects non-management roles", async () => {
+      await expect(
+        assignCompanyTasksBulk({ actorId: "emp-1", companyId: "c-1", role: "EMPLOYEE" }, {
+          taskIds: ["task-1"],
+          assignedToId: "emp-2"
+        })
+      ).rejects.toThrow("Permissions insuffisantes");
+    });
+
+    it("rejects empty or oversized task lists", async () => {
+      await expect(
+        assignCompanyTasksBulk(actor, { taskIds: [], assignedToId: "emp-2" })
+      ).rejects.toThrow("Aucune tâche valide fournie.");
+
+      const tooMany = Array.from({ length: 101 }, (_, i) => `task-${i}`);
+      await expect(
+        assignCompanyTasksBulk(actor, { taskIds: tooMany, assignedToId: "emp-2" })
+      ).rejects.toThrow("Maximum 100 tâches");
+    });
+
+    it("assigns multiple tasks in bounded concurrent chunks and notifies assignee", async () => {
+      const taskIds = ["task-1", "task-2", "task-3"];
+      vi.mocked(findOperationTasksMinimalByIds).mockResolvedValue(
+        taskIds.map((id) => ({
+          id,
+          companyId: actor.companyId,
+          activityCode: "AGRICULTURE",
+          status: "TODO",
+          createdById: "creator-1",
+          assignedToId: null,
+          dueDate: null,
+          metadata: {}
+        }))
+      );
+      vi.mocked(findCompanyTaskAssigneeByUserId).mockResolvedValue({
+        userId: "employee-2",
+        email: "employee2@example.com",
+        fullName: "Employee Two",
+        role: "EMPLOYEE",
+        openTasksCount: 0,
+        inProgressTasksCount: 0,
+        blockedTasksCount: 0,
+        todoTasksCount: 0,
+        doneTasksCount: 0,
+        totalAssignedTasksCount: 0
+      });
+      vi.mocked(findOperationTaskById).mockImplementation(async (_companyId, taskId) => ({
+        id: taskId,
+        companyId: actor.companyId,
+        title: `Task ${taskId}`,
+        description: null,
+        activityCode: "AGRICULTURE",
+        status: "IN_PROGRESS",
+        createdById: "creator-1",
+        createdByEmail: "creator@example.com",
+        createdByFullName: "Creator",
+        assignedToId: "employee-2",
+        assignedToEmail: "employee2@example.com",
+        assignedToFullName: "Employee Two",
+        dueDate: null,
+        createdAt: "2026-04-20T08:00:00.000Z",
+        updatedAt: "2026-04-20T08:00:00.000Z",
+        metadata: {}
+      }));
+
+      const results = await assignCompanyTasksBulk(actor, {
+        taskIds,
+        assignedToId: "employee-2",
+        note: "Lot urgent"
+      });
+
+      expect(results).toHaveLength(3);
+      expect(updateOperationTaskAssignment).toHaveBeenCalledTimes(3);
+      expect(createAuditLogRecord).toHaveBeenCalledTimes(3);
+      expect(createUserTargetedAlerts).toHaveBeenCalledTimes(3);
+    });
+
+    it("rejects bulk assignment if a task is already completed", async () => {
+      vi.mocked(findOperationTasksMinimalByIds).mockResolvedValue([
+        {
+          id: "task-done",
+          companyId: actor.companyId,
+          activityCode: "AGRICULTURE",
+          status: "DONE",
+          createdById: "creator-1",
+          assignedToId: "emp-old",
+          dueDate: null,
+          metadata: {}
+        }
+      ]);
+      await expect(
+        assignCompanyTasksBulk(actor, { taskIds: ["task-done"], assignedToId: "employee-2" })
+      ).rejects.toThrow("Le lot contient une tâche terminée");
+    });
+  });
+
   describe("listCompanyTaskMembers", () => {
     it("filters assignable members by the selected activity when requested", async () => {
       vi.mocked(listCompanyTaskAssignees).mockResolvedValue([]);
@@ -585,6 +684,25 @@ describe("tasks.service", () => {
   });
 
   describe("updateCompanyTaskStatus", () => {
+    it.each(["BLOCKED", "DONE"] as const)("does not resend alerts or audit entries when status is already %s", async (status) => {
+      vi.mocked(findOperationTaskMinimalById).mockResolvedValue({
+        id: "task-repeat", companyId: actor.companyId, status,
+        activityCode: "SERVICES", createdById: "employee-2", assignedToId: actor.actorId
+      });
+      const task = {
+        id: "task-repeat", companyId: actor.companyId, title: "Suivi existant", description: null,
+        activityCode: "SERVICES" as const, metadata: {}, status,
+        createdById: "employee-2", createdByEmail: "employee@example.invalid", createdByFullName: "Employee",
+        assignedToId: actor.actorId, assignedToEmail: "manager@example.invalid", assignedToFullName: "Manager",
+        dueDate: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
+      };
+      vi.mocked(findOperationTaskById).mockResolvedValue(task);
+      await expect(updateCompanyTaskStatus(actor, { taskId: task.id, status })).resolves.toEqual(task);
+      expect(updateOperationTaskStatus).not.toHaveBeenCalled();
+      expect(createAuditLogRecord).not.toHaveBeenCalled();
+      expect(createRoleTargetedAlerts).not.toHaveBeenCalled();
+      expect(createUserTargetedAlerts).not.toHaveBeenCalled();
+    });
     it("allows an employee to change the status of an unassigned task they created", async () => {
       vi.mocked(findOperationTaskMinimalById).mockResolvedValue({
         id: "task-created-by-employee",

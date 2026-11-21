@@ -24,6 +24,9 @@ import {
 
 const taskStatusSchema = z.enum(["TODO", "IN_PROGRESS", "DONE", "BLOCKED"]);
 const taskScopeSchema = z.enum(["ALL", "ASSIGNED_TO_ME", "CREATED_BY_ME", "MINE"]);
+const selectableActivityCodeSchema = z
+  .enum(BUSINESS_ACTIVITY_CODES)
+  .refine((code) => code !== "REAL_ESTATE_AGENCY", "Secteur désactivé.");
 
 const listTasksQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
@@ -52,7 +55,7 @@ const listTaskMembersQuerySchema = z.object({
 const createTaskSchema = z.object({
   title: z.string().trim().min(2).max(255),
   description: z.string().trim().max(4000).optional(),
-  activityCode: z.enum(BUSINESS_ACTIVITY_CODES),
+  activityCode: selectableActivityCodeSchema,
   assignedToId: z.string().trim().min(8).max(64).optional(),
   metadata: z.record(z.string().trim().min(1).max(64), z.string().trim().max(500)).optional(),
   dueDate: z.string().datetime().optional()
