@@ -41,10 +41,16 @@ try {
       await pool.query(sql);
     }
     if (index === 2) {
-      const productDDL = (await readFile(new URL("../backend/sql/028_beverage_stock.sql", import.meta.url), "utf8")).split(";")[0]
+      const statements = (await readFile(new URL("../backend/sql/028_beverage_stock.sql", import.meta.url), "utf8")).split(";").map((s) => s.trim()).filter(Boolean);
+      const productDDL = statements[0]
         .replace("company_id VARCHAR(36)", `company_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE ${collation}`)
         .replace("DEFAULT CHARSET=utf8mb4", "DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
       await pool.query(productDDL);
+      const legacyMovementDDL = statements[1]
+        .replace("company_id VARCHAR(36)", `company_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE ${collation}`)
+        .replace("product_id VARCHAR(36)", "product_id VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+        .replace("'INVENTORY_OUT', 'LOSS'", "'INVENTORY_OUT'");
+      await pool.query(legacyMovementDDL);
     }
     const historicalCompany = randomUUID(), historicalUser = randomUUID(), historicalAccount = randomUUID();
     const historicalTransaction = randomUUID(), historicalTask = randomUUID();
@@ -78,7 +84,11 @@ try {
     assert.equal(column("beverage_products", "company_id"), column("companies", "id"));
     assert.equal(column("beverage_stock_movements", "company_id"), column("companies", "id"));
     assert.equal(column("beverage_stock_movements", "product_id"), column("beverage_products", "id"));
-    if (index === 2) assert.notEqual(column("companies", "id"), column("beverage_products", "id"));
+    if (index === 2) {
+      assert.notEqual(column("companies", "id"), column("beverage_products", "id"));
+      const [kindCols] = await pool.query("SHOW COLUMNS FROM beverage_stock_movements LIKE 'kind'");
+      assert.ok(String(kindCols[0]?.Type ?? "").includes("'LOSS'"), "Legacy 4-value ENUM must auto-upgrade to include LOSS");
+    }
     console.log(`PASS MySQL schema ${collation}${index === 2 ? " / existing unicode product table" : ""}`);
     if (index !== 0) { await db.closeDbPool(); continue; }
 
@@ -132,6 +142,19 @@ try {
     assert.equal(report.beverageDepotReport.totals.grossMarginAmount, "480.00");
     assert.equal(report.beverageDepotReport.netOperatingResultAmount, "270.00");
     assert.ok((await exportCompanyReportsPdf(accountant, { activityCode: "BEVERAGE_DEPOT" })).byteLength > 1000);
+    const recordedLoss = await stock.recordCompanyBeverageLoss(operator, { productId: product.id, quantity: "1", reason: "Casse — 1 casier" });
+    const afterLoss = await available();
+    assert.equal(Number(afterLoss.quantity), 6);
+    assert.equal(Number(afterLoss.soldQuantity), 8);
+    assert.equal(Number(afterLoss.lostQuantity), 1);
+    assert.equal(Number(afterLoss.lostValue), 210);
+    const reportWithLoss = await getCompanyReportsOverview(accountant, { activityCode: "BEVERAGE_DEPOT" });
+    assert.equal(reportWithLoss.beverageDepotReport.stockLossAmount, "210.00");
+    assert.equal(reportWithLoss.beverageDepotReport.netOperatingResultAmount, "60.00");
+    assert.ok((await exportCompanyReportsPdf(accountant, { activityCode: "BEVERAGE_DEPOT" })).byteLength > 1000);
+    await stock.cancelCompanyBeverageLoss(operator, recordedLoss.id);
+    assert.equal(Number((await available()).quantity), 7);
+    assert.equal(Number((await available()).lostQuantity), 0);
     const second = await stock.addCompanyBeverageProduct(operator, { name: "Review Fanta", unit: "casier", openingQuantity: "10", openingUnitCost: "100" });
     const rejected = await post(operator, "VENTE", "3", "150", second.id);
     await pool.execute("UPDATE transactions SET status = 'SUBMITTED' WHERE id = ? AND company_id = ?", [rejected.id, companyId]);

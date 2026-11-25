@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { listBeverageProducts, listBeverageStockAdjustments } from "../repositories/beverage-stock.repository.js";
-vi.mock("../repositories/beverage-stock.repository.js", () => ({ listBeverageProducts: vi.fn().mockResolvedValue([]), listBeverageStockAdjustments: vi.fn().mockResolvedValue([]) }));
+import { listBeverageProducts, listBeverageStockAdjustments, listBeverageStockLosses } from "../repositories/beverage-stock.repository.js";
+vi.mock("../repositories/beverage-stock.repository.js", () => ({ listBeverageProducts: vi.fn().mockResolvedValue([]), listBeverageStockAdjustments: vi.fn().mockResolvedValue([]), listBeverageStockLosses: vi.fn().mockResolvedValue([]) }));
 import { inflateSync } from "node:zlib";
 import { mkdir, writeFile } from "node:fs/promises";
 import {
@@ -1280,6 +1280,40 @@ describe("reporting.service", () => {
     expect(pdfText).toContain("Coca stock contrôlé / casier");
     expect(pdfText).toContain("situation actuelle");
     expect(pdfText).toContain("Bouteilles cassées");
+  });
+
+  it("includes beverage stock losses separately from sales and deducts them from operating result in report and PDF", async () => {
+    const stockProducts = [{
+      id: "coca", name: "Coca 50 cl", unit: "canette", quantity: "5.000", stockValue: "1000.00",
+      averageUnitCost: "200.000000", openingQuantity: "10.000", initializedAt: "2026-10-22T00:00:00Z",
+      soldQuantity: "3.000", lostQuantity: "2.000", lostValue: "400.00"
+    }];
+    const losses = [{
+      id: "loss-1", date: "2026-10-22T15:00:00Z", productId: "coca", productName: "Coca 50 cl",
+      unit: "canette", quantity: "2.000", value: "400.000000000", reason: "Casse - 2 canettes tombées"
+    }];
+    vi.mocked(listBeverageProducts).mockResolvedValueOnce(stockProducts);
+    vi.mocked(listBeverageStockAdjustments).mockResolvedValueOnce([]);
+    vi.mocked(listBeverageStockLosses).mockResolvedValueOnce(losses);
+    vi.mocked(listReportOperationalTransactions).mockResolvedValue([
+      { activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_IN", amount: "1500", currency: "XOF", occurredAt: "2026-10-22T12:00:00Z", metadata: { beverageOperationKind: "VENTE", quantity: "3", saleUnitPrice: "500", purchaseUnitPrice: "200", beverageStockManaged: "1", beverageStockCost: "600.000000000" } },
+      { activityCode: "BEVERAGE_DEPOT", status: "APPROVED", type: "CASH_OUT", amount: "100", currency: "XOF", occurredAt: "2026-10-22T12:00:00Z", metadata: { beverageOperationKind: "DEPENSE" } }
+    ]);
+    const filters = { activityCode: "BEVERAGE_DEPOT" as const };
+    const overview = await getCompanyReportsOverview(actor, filters);
+    expect(overview.beverageDepotReport?.totals.grossMarginAmount).toBe("900.00");
+    expect(overview.beverageDepotReport?.stockLossAmount).toBe("400.00");
+    expect(overview.beverageDepotReport?.stockLosses).toHaveLength(1);
+    expect(overview.beverageDepotReport?.netOperatingResultAmount).toBe("400.00");
+    vi.mocked(listBeverageProducts).mockResolvedValueOnce(stockProducts);
+    vi.mocked(listBeverageStockAdjustments).mockResolvedValueOnce([]);
+    vi.mocked(listBeverageStockLosses).mockResolvedValueOnce(losses);
+    const exported = await exportCompanyReportsPdf(actor, filters);
+    const pdfText = extractPdfText(exported);
+    expect(pdfText).toContain("Pertes de stock constatées sur la période");
+    expect(pdfText).toContain("Casse - 2 canettes tombées");
+    expect(pdfText).toContain("Vendu");
+    expect(pdfText).toContain("Perdu");
   });
 
   it("reports beverage sales, stock purchases, expenses and inventory tasks without treating deposits as sales", async () => {

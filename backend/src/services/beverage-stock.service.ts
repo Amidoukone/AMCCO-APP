@@ -1,6 +1,13 @@
 import { HttpError } from "../errors/http-error.js";
 import type { RoleCode } from "../types/role.js";
-import { countBeverageProduct, createBeverageProduct, listBeverageProducts } from "../repositories/beverage-stock.repository.js";
+import {
+  cancelBeverageStockLoss,
+  countBeverageProduct,
+  createBeverageProduct,
+  listBeverageProducts,
+  listBeverageStockLosses,
+  recordBeverageStockLoss
+} from "../repositories/beverage-stock.repository.js";
 import { ensureCompanyActivityEnabledOrThrow } from "./company-activities.service.js";
 
 type Actor = { companyId: string; actorId: string; role: RoleCode };
@@ -13,6 +20,22 @@ export async function getCompanyBeverageStock(actor: Actor) {
   return listBeverageProducts(actor.companyId);
 }
 
+export async function getCompanyBeverageStockOverview(actor: Actor) {
+  if (!readers.includes(actor.role)) throw new HttpError(403, "Accès au stock du dépôt non autorisé.");
+  await ensureCompanyActivityEnabledOrThrow(actor.companyId, "BEVERAGE_DEPOT");
+  const [items, losses] = await Promise.all([
+    listBeverageProducts(actor.companyId),
+    listBeverageStockLosses(actor.companyId, { limit: 50 })
+  ]);
+  return { items, losses };
+}
+
+export async function listCompanyBeverageLosses(actor: Actor, filters: { dateFrom?: string; dateTo?: string; limit?: number } = {}) {
+  if (!readers.includes(actor.role)) throw new HttpError(403, "Accès au stock du dépôt non autorisé.");
+  await ensureCompanyActivityEnabledOrThrow(actor.companyId, "BEVERAGE_DEPOT");
+  return listBeverageStockLosses(actor.companyId, filters);
+}
+
 export async function addCompanyBeverageProduct(actor: Actor, input: {
   name: string; unit: string; openingQuantity: string; openingUnitCost: string;
 }) {
@@ -20,6 +43,20 @@ export async function addCompanyBeverageProduct(actor: Actor, input: {
   await ensureCompanyActivityEnabledOrThrow(actor.companyId, "BEVERAGE_DEPOT");
   const product = await createBeverageProduct({ ...input, companyId: actor.companyId, actorId: actor.actorId });
   return product;
+}
+
+export async function recordCompanyBeverageLoss(actor: Actor, input: {
+  productId: string; quantity: string; expectedQuantity?: string; reason?: string;
+}) {
+  if (!writers.includes(actor.role)) throw new HttpError(403, "Déclaration de perte non autorisée.");
+  await ensureCompanyActivityEnabledOrThrow(actor.companyId, "BEVERAGE_DEPOT");
+  return recordBeverageStockLoss({ ...input, companyId: actor.companyId, actorId: actor.actorId });
+}
+
+export async function cancelCompanyBeverageLoss(actor: Actor, lossId: string) {
+  if (!writers.includes(actor.role)) throw new HttpError(403, "Annulation de perte non autorisée.");
+  await ensureCompanyActivityEnabledOrThrow(actor.companyId, "BEVERAGE_DEPOT");
+  await cancelBeverageStockLoss({ companyId: actor.companyId, lossId });
 }
 
 export async function countCompanyBeverageStock(actor: Actor, input: { productId: string; expectedQuantity: string; countedQuantity: string; unitCost: string; reason: string }) {

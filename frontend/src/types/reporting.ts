@@ -484,6 +484,8 @@ export type WaterOperationsReport = {
 export type BeverageDepotReport = {
   currentStock?: { asOf: string; products: import("./beverage-stock").BeverageProduct[] };
   netOperatingResultAmount?: string;
+  stockLosses?: import("./beverage-stock").BeverageStockLoss[];
+  stockLossAmount?: string;
   stockAdjustments?: Array<{ date: string; productName: string; unit: string; quantity: string; value: string; reason: string }>;
   stockAdjustmentAmount?: string;
   periodLabel: string;

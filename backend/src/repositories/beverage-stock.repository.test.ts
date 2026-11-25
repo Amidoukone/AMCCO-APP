@@ -3,9 +3,16 @@ import { stockDecimal, stockFormat, saleStockCost } from "../utils/beverage-stoc
 import { assertTransactionInputMatchesActivityProfile } from "../config/business-activity-profiles.js";
 const db = vi.hoisted(() => ({ getConnection: vi.fn(), queryRows: vi.fn() }));
 vi.mock("../lib/db.js", () => ({ getDbPool: () => db, queryRows: db.queryRows }));
-import { countBeverageProduct, listBeverageProducts, withBeverageStockWrite } from "./beverage-stock.repository.js";
+import {
+  cancelBeverageStockLoss,
+  countBeverageProduct,
+  listBeverageProducts,
+  listBeverageStockLosses,
+  recordBeverageStockLoss,
+  withBeverageStockWrite
+} from "./beverage-stock.repository.js";
 
-type Movement = { id: number; productId: string; transactionId: string; kind: string; quantity: string; costValue: string; active: number };
+type Movement = { id: number; productId: string; transactionId: string; kind: string; quantity: string; costValue: string; active: number; reason?: string | null };
 type Record = { activityCode: string; metadataJson: { [key: string]: string }; status: string; occurredAt: Date };
 let state: { movements: Movement[]; records: { [key: string]: Record }; audits: unknown[][] };
 let openingQuantity: string;
@@ -15,12 +22,20 @@ let financialWrites: number;
 const productId = "product-coca";
 function products(local = state) {
   let quantity = stockDecimal(openingQuantity, 3), value = stockDecimal(openingValue, 9);
+  let purchasedQuantity = 0n, soldQuantity = 0n, lostQuantity = 0n, lostValue = 0n;
   for (const move of local.movements.filter((item) => item.active)) {
+    const qty = stockDecimal(move.quantity, 3), cost = stockDecimal(move.costValue, 9);
     const sign = ["ACHAT_STOCK", "INVENTORY_IN"].includes(move.kind) ? 1n : -1n;
-    quantity += sign * stockDecimal(move.quantity, 3); value += sign * stockDecimal(move.costValue, 9);
+    quantity += sign * qty; value += sign * cost;
+    if (move.kind === "ACHAT_STOCK") purchasedQuantity += qty;
+    if (move.kind === "VENTE") soldQuantity += qty;
+    if (move.kind === "LOSS") { lostQuantity += qty; lostValue += cost; }
   }
   return [{ id: productId, name: "Coca 50 cl", unit: "casier", openingQuantity, openingValue,
-    quantity: stockFormat(quantity, 3), stockValue: stockFormat(value, 9), initializedAt: new Date("2026-10-22T00:00:00Z") }];
+    quantity: stockFormat(quantity, 3), stockValue: stockFormat(value, 9),
+    purchasedQuantity: stockFormat(purchasedQuantity, 3), soldQuantity: stockFormat(soldQuantity, 3),
+    lostQuantity: stockFormat(lostQuantity, 3), lostValue: stockFormat(lostValue, 9),
+    initializedAt: new Date("2026-10-22T00:00:00Z") }];
 }
 beforeEach(() => {
   state = { movements: [], records: {}, audits: [] }; openingQuantity = "10"; openingValue = "1000";
@@ -41,13 +56,18 @@ beforeEach(() => {
           return [[{ id: "company-a" }]];
         }
         if (sql.includes("FROM transactions")) return [[local.records[String(values[1])]].filter(Boolean)];
-        if (sql.includes("kind = 'VENTE' AND id >")) return [local.movements.filter((item) => item.active && item.kind === "VENTE" && item.productId === values[1] && item.id > Number(values[2]))];
+        if (sql.includes("kind IN ('VENTE', 'LOSS') AND id >")) return [local.movements.filter((item) => item.active && ["VENTE", "LOSS"].includes(item.kind) && item.productId === values[1] && item.id > Number(values[2]))];
         if (sql.includes("kind IN ('INVENTORY_IN', 'INVENTORY_OUT') AND id >")) return [local.movements.filter((item) => item.active && item.kind.startsWith("INVENTORY_") && item.productId === values[1] && item.id > Number(values[2]))];
+        if (sql.includes("AND kind = 'LOSS' FOR UPDATE")) return [local.movements.filter((item) => item.transactionId === values[1] && item.kind === "LOSS")];
         if (sql.includes("FROM beverage_stock_movements")) return [local.movements.filter((item) => item.transactionId === values[1])];
         if (sql.includes("UPDATE beverage_stock_movements")) {
-          local.movements.filter((item) => item.transactionId === values[1]).forEach((item) => { item.active = 0; }); return [{}];
+          local.movements.filter((item) => item.transactionId === values[1] && (!sql.includes("kind = 'LOSS'") || item.kind === "LOSS")).forEach((item) => { item.active = 0; }); return [{}];
         }
         if (sql.includes("INSERT INTO beverage_stock_movements")) {
+          if (sql.includes("'LOSS'")) {
+            local.movements.push({ id: local.movements.length + 1, productId: String(values[1]), transactionId: String(values[2]), kind: "LOSS", quantity: String(values[3]), costValue: String(values[4]), active: 1, reason: values[5] == null ? null : String(values[5]) });
+            return [{}];
+          }
           const old = local.movements.find((item) => item.transactionId === values[2]);
           const item = { id: old?.id ?? local.movements.length + 1, productId: String(values[1]), transactionId: String(values[2]), kind: String(values[3]), quantity: String(values[4]), costValue: String(values[5]), active: 1 };
           if (old) Object.assign(old, item); else local.movements.push(item);
@@ -130,6 +150,14 @@ describe("beverage stock integrity", () => {
     await expect(withBeverageStockWrite({ companyId: "company-a", transactionId: "buy", action: "reject" }, async () => {})).rejects.toThrow("déjà servi");
     expect(products()[0].quantity).toBe("14.000");
   });
+  it("protects the purchase cost used by a loss and rejects stale piece counts", async () => {
+    await save("buy", "ACHAT_STOCK", "5");
+    const input = { companyId: "company-a", actorId: "operator", productId, quantity: "1", expectedQuantity: "15" };
+    await recordBeverageStockLoss(input);
+    await expect(recordBeverageStockLoss(input)).rejects.toMatchObject({ statusCode: 409 });
+    await expect(withBeverageStockWrite({ companyId: "company-a", transactionId: "buy", action: "delete" }, async () => {})).rejects.toThrow("déjà servi");
+    expect(products()[0].quantity).toBe("14.000");
+  });
   it("permits reference-only purchase edits without changing its stock effect", async () => {
     await save("buy", "ACHAT_STOCK", "5"); await save("sale", "VENTE", "1");
     await save("buy", "ACHAT_STOCK", "5", { purchaseUnitPrice: "100.00", invoiceRef: "INV-NEW" }, "update");
@@ -195,5 +223,49 @@ describe("beverage stock integrity", () => {
     await countBeverageProduct({ companyId: "company-a", actorId: "accountant", productId, expectedQuantity: "9", countedQuantity: "8", unitCost: "0", reason: "Casier cassé au rangement" });
     await expect(withBeverageStockWrite({ companyId: "company-a", transactionId: "sale", action: "delete" }, async () => {})).rejects.toThrow("Un comptage");
     expect(products()[0].quantity).toBe("8.000");
+  });
+  it("records a stock loss at weighted average cost without audit log or cash transaction and separates sold vs lost quantities", async () => {
+    await save("sale-1", "VENTE", "3");
+    const loss = await recordBeverageStockLoss({ companyId: "company-a", actorId: "operator", productId, quantity: "2", reason: "" });
+    expect(loss).toMatchObject({ productId, quantity: "2.000", value: "200.000000000", reason: "" });
+    expect(products()[0]).toMatchObject({
+      quantity: "5.000",
+      stockValue: "500.000000000",
+      soldQuantity: "3.000",
+      lostQuantity: "2.000",
+      lostValue: "200.000000000"
+    });
+    expect(state.audits).toHaveLength(0);
+    expect(financialWrites).toBe(1);
+  });
+  it("rejects a loss exceeding available stock and serializes concurrent sale and loss", async () => {
+    await expect(recordBeverageStockLoss({ companyId: "company-a", actorId: "operator", productId, quantity: "11" })).rejects.toThrow("Stock insuffisant");
+    const results = await Promise.allSettled([
+      save("sale-c", "VENTE", "7"),
+      recordBeverageStockLoss({ companyId: "company-a", actorId: "operator", productId, quantity: "7", reason: "Casse" })
+    ]);
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect(products()[0].quantity).toBe("3.000");
+  });
+  it("cancels a loss easily even after a physical count without locking stock or writing an audit log", async () => {
+    const loss = await recordBeverageStockLoss({ companyId: "company-a", actorId: "operator", productId, quantity: "2", reason: "Canettes cassées" });
+    await countBeverageProduct({ companyId: "company-a", actorId: "accountant", productId, expectedQuantity: "8", countedQuantity: "7", unitCost: "0", reason: "Inventaire soir" });
+    const auditsAfterCount = state.audits.length;
+    await cancelBeverageStockLoss({ companyId: "company-a", lossId: loss.id });
+    expect(products()[0]).toMatchObject({ quantity: "9.000", stockValue: "900.000000000", lostQuantity: "0.000" });
+    expect(state.audits).toHaveLength(auditsAfterCount);
+    await expect(cancelBeverageStockLoss({ companyId: "company-a", lossId: loss.id })).rejects.toMatchObject({ statusCode: 404 });
+  });
+  it("lists only active LOSS movements with explicit company scope", async () => {
+    db.queryRows.mockResolvedValueOnce([
+      { id: "loss-1", date: new Date("2026-11-24T10:00:00Z"), productId, productName: "Coca 50 cl", unit: "casier", quantity: "0.042", value: "4.200000000", reason: "Casse" }
+    ]);
+    const rows = await listBeverageStockLosses("company-a", { limit: 25 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: "loss-1", quantity: "0.042", reason: "Casse" });
+    const [sql, values] = db.queryRows.mock.calls.at(-1)!;
+    expect(sql).toContain("m.kind = 'LOSS'");
+    expect(sql).toContain("LIMIT 25");
+    expect(values).toEqual(["company-a"]);
   });
 });

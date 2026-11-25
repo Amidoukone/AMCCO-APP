@@ -10,7 +10,9 @@ beforeEach(() => {
   db.execute.mockReset().mockResolvedValue([{}]);
   db.queryRows.mockReset().mockImplementation(async (sql: string) => sql.includes("information_schema.COLUMNS")
     ? [{ tableName: "companies", columnType: "varchar(36)", characterSet: "utf8mb4", collation: "utf8mb4_0900_ai_ci" }]
-    : sql === "SELECT id FROM companies" ? [] : [{ Field: "exists", Null: "YES", Type: "HARDWARE_OPERATOR HYDROCARBON_OPERATOR BEVERAGE_DEPOT_OPERATOR", constraintName: "exists" }]);
+    : sql.includes("SHOW COLUMNS FROM beverage_stock_movements LIKE 'kind'")
+      ? [{ Field: "kind", Type: "enum('ACHAT_STOCK','VENTE','INVENTORY_IN','INVENTORY_OUT','LOSS')" }]
+      : sql === "SELECT id FROM companies" ? [] : [{ Field: "exists", Null: "YES", Type: "HARDWARE_OPERATOR HYDROCARBON_OPERATOR BEVERAGE_DEPOT_OPERATOR", constraintName: "exists" }]);
 });
 describe("stock schema initialization", () => {
   it("uses only the two additive idempotent statements from the versioned migration", async () => {
@@ -63,5 +65,18 @@ describe("stock schema initialization", () => {
     db.queryRows.mockResolvedValueOnce([]);
     await expect(ensureBeverageStockSchemaReady()).rejects.toThrow("companies.id is missing");
     expect(db.execute).not.toHaveBeenCalled();
+  });
+  it("appends LOSS to an existing legacy beverage_stock_movements kind ENUM without altering other tables", async () => {
+    db.queryRows.mockImplementation(async (sql: string) => sql.includes("information_schema.COLUMNS")
+      ? [{ tableName: "companies", columnType: "varchar(36)", characterSet: "utf8mb4", collation: "utf8mb4_0900_ai_ci" }]
+      : sql.includes("SHOW COLUMNS FROM beverage_stock_movements LIKE 'kind'")
+        ? [{ Field: "kind", Type: "enum('ACHAT_STOCK','VENTE','INVENTORY_IN','INVENTORY_OUT')" }]
+        : []);
+    await ensureBeverageStockSchemaReady();
+    const statements = db.execute.mock.calls.map(([sql]) => String(sql));
+    expect(statements).toHaveLength(3);
+    expect(statements[2]).toBe(
+      "ALTER TABLE beverage_stock_movements MODIFY kind ENUM('ACHAT_STOCK', 'VENTE', 'INVENTORY_IN', 'INVENTORY_OUT', 'LOSS') NOT NULL"
+    );
   });
 });

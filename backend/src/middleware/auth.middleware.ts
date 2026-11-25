@@ -7,7 +7,12 @@ import type { RoleCode } from "../types/role.js";
 import { getRoleActivityCode } from "../types/role.js";
 
 function isAllowedSectorOperatorRequest(req: Request, role: RoleCode): boolean {
-  if (role === "BEVERAGE_DEPOT_OPERATOR" && req.path === "/finance/beverage-products" && (req.method === "GET" || req.method === "POST")) return true;
+  if (role === "BEVERAGE_DEPOT_OPERATOR") {
+    if (req.path === "/finance/beverage-products" && (req.method === "GET" || req.method === "POST")) return true;
+    if (req.path === "/finance/beverage-products/losses" && req.method === "GET") return true;
+    if (/^\/finance\/beverage-products\/[a-f0-9-]+\/losses$/i.test(req.path) && req.method === "POST") return true;
+    if (/^\/finance\/beverage-products\/losses\/[a-f0-9-]+$/i.test(req.path) && req.method === "DELETE") return true;
+  }
   if (req.method === "GET" && (req.path === "/me" || req.path === "/activities" || req.path === "/finance/accounts" || req.path === "/finance/transactions")) {
     return true;
   }

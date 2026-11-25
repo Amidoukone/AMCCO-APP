@@ -5,7 +5,14 @@ import { asyncHandler } from "../lib/async-handler.js";
 import { authenticateAccessToken, authorizeRoles } from "../middleware/auth.middleware.js";
 import { BUSINESS_ACTIVITY_CODES } from "../types/business-activity.js";
 import { getRoleActivityCode } from "../types/role.js";
-import { addCompanyBeverageProduct, countCompanyBeverageStock, getCompanyBeverageStock } from "../services/beverage-stock.service.js";
+import {
+  addCompanyBeverageProduct,
+  cancelCompanyBeverageLoss,
+  countCompanyBeverageStock,
+  getCompanyBeverageStockOverview,
+  listCompanyBeverageLosses,
+  recordCompanyBeverageLoss
+} from "../services/beverage-stock.service.js";
 import {
   addProofToTransaction,
   confirmCompanySalaryReceipt,
@@ -130,12 +137,74 @@ financeRouter.get(
   "/finance/beverage-products",
   asyncHandler(async (req, res) => {
     if (!req.auth) throw new HttpError(401, "Authentification requise.");
-    const items = await getCompanyBeverageStock({
+    const overview = await getCompanyBeverageStockOverview({
       companyId: req.auth.companyId,
       actorId: req.auth.userId,
       role: req.auth.role,
     });
+    res.json(overview);
+  }),
+);
+
+financeRouter.get(
+  "/finance/beverage-products/losses",
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    const query = z
+      .object({
+        limit: z.coerce.number().int().min(1).max(200).optional(),
+      })
+      .parse(req.query);
+    const items = await listCompanyBeverageLosses(
+      {
+        companyId: req.auth.companyId,
+        actorId: req.auth.userId,
+        role: req.auth.role,
+      },
+      { limit: query.limit ?? 50 },
+    );
     res.json({ items });
+  }),
+);
+
+financeRouter.post(
+  "/finance/beverage-products/:productId/losses",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    const body = z
+      .object({
+        quantity: z.string().regex(/^\d{1,9}(\.\d{1,3})?$/),
+        expectedQuantity: z.string().regex(/^\d{1,21}(\.\d{1,3})?$/).optional(),
+        reason: z.string().trim().max(500).optional().default(""),
+      })
+      .parse(req.body);
+    const item = await recordCompanyBeverageLoss(
+      {
+        companyId: req.auth.companyId,
+        actorId: req.auth.userId,
+        role: req.auth.role,
+      },
+      { ...body, productId: z.string().uuid().parse(req.params.productId) },
+    );
+    res.status(201).json({ item });
+  }),
+);
+
+financeRouter.delete(
+  "/finance/beverage-products/losses/:lossId",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    await cancelCompanyBeverageLoss(
+      {
+        companyId: req.auth.companyId,
+        actorId: req.auth.userId,
+        role: req.auth.role,
+      },
+      z.string().uuid().parse(req.params.lossId),
+    );
+    res.json({ status: "cancelled" });
   }),
 );
 

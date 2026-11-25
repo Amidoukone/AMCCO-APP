@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import type { RowDataPacket } from "mysql2/promise";
 import { getDbPool, queryRows } from "./db.js";
 import { stringColumnDefinition, type IdColumn } from "./schema-identifiers.js";
 
@@ -28,5 +29,14 @@ export async function ensureBeverageStockSchemaReady(): Promise<void> {
       .replace(/\bproduct_id VARCHAR\(36\) NOT NULL/g, `product_id ${productDefinition} NOT NULL`)
       .replace(/\bid VARCHAR\(36\) PRIMARY KEY/g, `id ${productDefinition} PRIMARY KEY`);
     await getDbPool().execute(adapted);
+  }
+  const kindColumns = await queryRows<(RowDataPacket & { Type?: string })[]>(
+    "SHOW COLUMNS FROM beverage_stock_movements LIKE 'kind'"
+  );
+  const kindType = kindColumns[0]?.Type ?? "";
+  if (kindType && kindType.toLowerCase().startsWith("enum(") && !kindType.includes("'LOSS'")) {
+    await getDbPool().execute(
+      "ALTER TABLE beverage_stock_movements MODIFY kind ENUM('ACHAT_STOCK', 'VENTE', 'INVENTORY_IN', 'INVENTORY_OUT', 'LOSS') NOT NULL"
+    );
   }
 }

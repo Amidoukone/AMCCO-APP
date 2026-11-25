@@ -88,10 +88,11 @@ async function fixture(definition, viewport, role = "ACCOUNTANT", options = {}) 
   const records = [{ ...original, metadata: { ...original.metadata } }, ...["EUR", "USD"].filter((currency) => profile.finance.allowedCurrencies.includes(currency)).map((currency) => ({ ...original, id: `transaction-${currency}`, description: `Devise ${currency}`, currency, amount: currency === "EUR" ? "40" : "30" }))];
   let failNextWrite = false;
   const products = [
-    { id: "beverage-a", name: "Boisson A", unit: "casier", quantity: "1000", stockValue: "300000", averageUnitCost: "300", openingQuantity: "1000", initializedAt: "2024-01-01T00:00:00Z" },
-    { id: "beverage-b", name: "Boisson B", unit: "carton", quantity: "0", stockValue: "0", averageUnitCost: "0", openingQuantity: "0", initializedAt: "2024-01-01T00:00:00Z" }
+    { id: "beverage-a", name: "Boisson A", unit: "casier", quantity: "1000", stockValue: "300000", averageUnitCost: "300", openingQuantity: "1000", soldQuantity: "0", lostQuantity: "0", lostValue: "0", initializedAt: "2024-01-01T00:00:00Z" },
+    { id: "beverage-b", name: "Boisson B", unit: "carton", quantity: "0", stockValue: "0", averageUnitCost: "0", openingQuantity: "0", soldQuantity: "0", lostQuantity: "0", lostValue: "0", initializedAt: "2024-01-01T00:00:00Z" }
   ];
   if (options.emptyStock) products.splice(0);
+  const losses = [];
   let stockFailure = options.stockFailure ?? null;
   let stockCreateFailure = null;
   let stockGate = null;
@@ -116,12 +117,41 @@ async function fixture(definition, viewport, role = "ACCOUNTANT", options = {}) 
     else if (path === "/finance/beverage-products" && method === "GET") {
       if (stockGate) await stockGate;
       if (stockFailure) return route.fulfill({ status: stockFailure.status, json: { error: { message: stockFailure.message } } });
-      data = { items: products };
+      data = { items: products, losses };
     }
     else if (path === "/finance/beverage-products" && method === "POST") {
       if (stockCreateFailure) return route.fulfill({ status: stockCreateFailure.status, json: { error: { message: stockCreateFailure.message } } });
-      const item = { ...body, id: `beverage-created-${products.length + 1}`, quantity: body.openingQuantity, averageUnitCost: body.openingUnitCost, stockValue: String(Number(body.openingQuantity) * Number(body.openingUnitCost)), initializedAt: "2026-10-22T00:00:00Z" };
+      const item = { ...body, id: `beverage-created-${products.length + 1}`, quantity: body.openingQuantity, averageUnitCost: body.openingUnitCost, stockValue: String(Number(body.openingQuantity) * Number(body.openingUnitCost)), soldQuantity: "0", lostQuantity: "0", lostValue: "0", initializedAt: "2026-10-22T00:00:00Z" };
       products.push(item); data = { item };
+    }
+    else if (/^\/finance\/beverage-products\/[^/]+\/losses$/.test(path) && method === "POST") {
+      const productId = path.split("/")[3];
+      const product = products.find((item) => item.id === productId);
+      assert.ok(product, "Loss must reference a catalog product");
+      const qty = Number(body.quantity);
+      if (qty > Number(product.quantity)) return route.fulfill({ status: 409, json: { error: { message: "Stock insuffisant" } } });
+      const cost = Number(product.averageUnitCost) * qty;
+      product.quantity = String(Math.round((Number(product.quantity) - qty) * 1000) / 1000);
+      product.stockValue = String(Math.round((Number(product.stockValue) - cost) * 100) / 100);
+      product.lostQuantity = String(Math.round((Number(product.lostQuantity ?? 0) + qty) * 1000) / 1000);
+      product.lostValue = String(Math.round((Number(product.lostValue ?? 0) + cost) * 100) / 100);
+      const item = { id: `loss-${losses.length + 1}`, date: "2026-11-24T12:00:00Z", productId: product.id, productName: product.name, unit: product.unit, quantity: String(qty), value: String(cost), reason: body.reason ?? "" };
+      losses.unshift(item);
+      data = { item };
+    }
+    else if (path.startsWith("/finance/beverage-products/losses/") && method === "DELETE") {
+      const lossId = path.split("/").at(-1);
+      const index = losses.findIndex((item) => item.id === lossId);
+      assert.ok(index >= 0, "Loss to cancel must exist");
+      const [removed] = losses.splice(index, 1);
+      const product = products.find((item) => item.id === removed.productId);
+      if (product) {
+        product.quantity = String(Math.round((Number(product.quantity) + Number(removed.quantity)) * 1000) / 1000);
+        product.stockValue = String(Math.round((Number(product.stockValue) + Number(removed.value)) * 100) / 100);
+        product.lostQuantity = String(Math.max(0, Math.round((Number(product.lostQuantity ?? 0) - Number(removed.quantity)) * 1000) / 1000));
+        product.lostValue = String(Math.max(0, Math.round((Number(product.lostValue ?? 0) - Number(removed.value)) * 100) / 100));
+      }
+      data = { status: "cancelled" };
     }
     else if (path === "/finance/beverage-products/beverage-a/count" && method === "POST") {
       const product = products[0];
@@ -146,6 +176,7 @@ async function fixture(definition, viewport, role = "ACCOUNTANT", options = {}) 
         body.metadata.beverageStockManaged = "1"; body.metadata.beverageStockCost = (cost * quantity).toFixed(9);
         body.metadata.purchaseUnitPrice = String(cost);
         product.quantity = String(Number(product.quantity) + (sale ? -quantity : quantity));
+        if (sale) product.soldQuantity = String(Number(product.soldQuantity ?? 0) + quantity);
         product.stockValue = String(Number(product.stockValue) + (sale ? -cost * quantity : cost * quantity));
         product.averageUnitCost = Number(product.quantity) ? String(Number(product.stockValue) / Number(product.quantity)) : "0";
       }
@@ -166,7 +197,7 @@ async function fixture(definition, viewport, role = "ACCOUNTANT", options = {}) 
   page.setDefaultTimeout(10000);
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("dialog", (dialog) => dialog.dismiss());
-  return { context, page, calls, records, original, profile, products, fail: () => { failNextWrite = true; },
+  return { context, page, calls, records, original, profile, products, losses, fail: () => { failNextWrite = true; },
     setStockFailure: (failure) => { stockFailure = failure; }, setStockCreateFailure: (failure) => { stockCreateFailure = failure; },
     holdStock: () => { stockGate = new Promise((resolve) => { releaseStock = resolve; }); },
     releaseStock: () => { releaseStock?.(); stockGate = null; }
@@ -397,7 +428,7 @@ try {
   for (const [code, role] of process.argv.includes("--field-sectors") || process.argv.includes("--stock-states-only") ? [] : [["HYDROCARBON", "HYDROCARBON_OPERATOR"], ["BEVERAGE_DEPOT", "BEVERAGE_DEPOT_OPERATOR"]].filter(([code]) => !process.argv.includes("--beverage-only") || code === "BEVERAGE_DEPOT")) {
     const definition = definitions.find((item) => item.code === code);
     for (const viewport of code === "BEVERAGE_DEPOT" ? [{ width: 1440, height: 1000 }, { width: 390, height: 844 }] : [{ width: 390, height: 844 }]) {
-    const { context, page, calls, records, original, products } = await fixture(definition, viewport, role);
+    const { context, page, calls, records, original, products, losses } = await fixture(definition, viewport, role);
     await page.goto(`${baseURL}/finance/transactions?activityCode=${code}`);
     await page.getByRole("region", { name: "Saisie rapide du secteur", exact: true }).waitFor();
     assert.equal(await page.getByRole("navigation", { name: "Pages du secteur", exact: true }).getByRole("link", { name: "Rapports", exact: true }).count(), 0);
@@ -483,6 +514,22 @@ try {
       const zeroRow = stockPanel.getByRole("row").filter({ hasText: "Boisson sans stock" });
       await zeroRow.waitFor();
       assert.equal(await zeroRow.getByRole("button", { name: "Vendre", exact: true }).isDisabled(), true);
+      assert.equal(await zeroRow.getByRole("button", { name: "Perte", exact: true }).isDisabled(), true);
+      const qtyBeforeLoss = Number(products[0].quantity);
+      await stockPanel.getByRole("row").filter({ hasText: "Boisson A" }).getByRole("button", { name: "Perte", exact: true }).click();
+      await stockPanel.getByLabel(/Saisir en pièces individuelles/).check();
+      await stockPanel.getByLabel(/^Nombre de pièces perdues/).fill("1");
+      await stockPanel.getByLabel(/^Pièces par casier/).fill("24");
+      await stockPanel.getByRole("button", { name: "Enregistrer la perte", exact: true }).click();
+      await waitFor(() => losses.length === 1, "Operator can record a fractional piece loss without typing a mandatory reason");
+      assert.equal(Number(products[0].quantity), Math.round((qtyBeforeLoss - 0.042) * 1000) / 1000);
+      assert.equal(Number(products[0].lostQuantity), 0.042);
+      await stockPanel.getByText("Historique des pertes (1)", { exact: true }).click();
+      await stockPanel.locator(".beverage-loss-history").getByRole("button", { name: "Annuler", exact: true }).click();
+      await stockPanel.locator(".beverage-loss-history").getByRole("button", { name: "Confirmer l'annulation", exact: true }).click();
+      await waitFor(() => losses.length === 0, "Operator can cancel a loss and restore exact stock");
+      assert.equal(Number(products[0].quantity), qtyBeforeLoss);
+      assert.equal(Number(products[0].lostQuantity), 0);
       await stockPanel.getByRole("row").filter({ hasText: "Boisson A" }).getByRole("button", { name: "Vendre", exact: true }).click();
       assert.equal(await field(page, "Produit").inputValue(), "beverage-a", "Selling from stock selects the correct catalog product");
       assert.ok(await field(page, "Montant").getAttribute("readonly") !== null, "Calculated sale totals cannot be overwritten");

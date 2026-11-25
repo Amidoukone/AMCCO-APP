@@ -1,6 +1,6 @@
 import { drawSectorReportHeader, drawSectorReportFooter, drawReportTable } from "./report-pdf-layout.js";
 import { Buffer } from "node:buffer";
-import { listBeverageProducts, listBeverageStockAdjustments } from "../repositories/beverage-stock.repository.js";
+import { listBeverageProducts, listBeverageStockAdjustments, listBeverageStockLosses } from "../repositories/beverage-stock.repository.js";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
@@ -2375,7 +2375,7 @@ function drawBeverageDepotTable(
 function drawBeverageDepotReadingNotes(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
   const margin = PDF_PAGE_MARGIN;
   const width = doc.page.width - margin * 2;
-  const readingText = "Lecture : pour les ventes liées au stock, la marge brute utilise le coût moyen pondéré enregistré par le serveur lors de la vente. Les anciennes ventes conservent leur coût déclaré et ne modifient pas le stock de départ compté. Le résultat d'exploitation correspond à la marge brute + autres recettes - dépenses + écarts de stock valorisés. Le stock disponible est une situation actuelle. La valeur du stock clôturé reprend le dernier inventaire clôturé sur la période pour chaque produit. Les versements ne sont pas de nouvelles ventes.";
+  const readingText = "Lecture : pour les ventes liées au stock, la marge brute utilise le coût moyen pondéré enregistré par le serveur lors de la vente. Les anciennes ventes conservent leur coût déclaré et ne modifient pas le stock de départ compté. Le résultat d'exploitation correspond à la marge brute + autres recettes - dépenses - pertes de stock + écarts de comptage valorisés. Les pertes (casse, avarie, péremption) diminuent le stock sans mouvement de caisse. Le stock disponible est une situation actuelle (avec cumul vendu et perdu par produit). La valeur du stock clôturé reprend le dernier inventaire clôturé sur la période pour chaque produit. Les versements ne sont pas de nouvelles ventes.";
   doc.font("Helvetica").fontSize(8.5);
   const height = doc.heightOfString(readingText, { width: width - 20 }) + 20;
   if (needsPdfPageBreak(doc, height + 12)) {
@@ -2516,22 +2516,58 @@ function renderBeverageDepotReportsPdf(
     "Aucun rapprochement enregistré sur la période sélectionnée."
   );
   if (report.currentStock) {
+    const stockFixedWidths = [76, 76, 82, 102, 108];
     drawBeverageDepotTable(doc, report, `Stock disponible au ${formatPdfDate(report.currentStock.asOf)} (situation actuelle)`,
-      [{ label: "Produit / unité", width: 180, align: "left" }, { label: "Disponible", width: 85, align: "right" }, { label: "Coût moyen", width: 95, align: "right" }, { label: "Valeur XOF", width: 95, align: "right" }],
+      [
+        { label: "Produit / unité", width: availableWidth - stockFixedWidths.reduce((sum, item) => sum + item, 0), align: "left" },
+        { label: "Vendu", width: stockFixedWidths[0], align: "right" },
+        { label: "Perdu", width: stockFixedWidths[1], align: "right" },
+        { label: "Disponible", width: stockFixedWidths[2], align: "right" },
+        { label: "Coût moyen", width: stockFixedWidths[3], align: "right" },
+        { label: "Valeur XOF", width: stockFixedWidths[4], align: "right" }
+      ],
       report.currentStock.products.map((product) => [
-        { value: `${product.name} / ${product.unit}` }, { value: product.quantity },
-        { value: formatPdfMoney(product.averageUnitCost) }, { value: formatPdfMoney(product.stockValue) }
+        { value: truncatePdfText(`${product.name} / ${product.unit}`, 44) },
+        { value: formatPdfNumber(Number(product.soldQuantity ?? 0), 3), align: "right" },
+        { value: formatPdfNumber(Number(product.lostQuantity ?? 0), 3), align: "right" },
+        { value: formatPdfNumber(Number(product.quantity), 3), align: "right" },
+        { value: formatPdfMoney(product.averageUnitCost), align: "right" },
+        { value: formatPdfMoney(product.stockValue), align: "right" }
       ]), "Aucun produit initialisé pour le suivi de stock.");
   }
+  if (report.stockLosses?.length) {
+    const lossFixedWidths = [74, 185, 82, 110];
+    drawBeverageDepotTable(doc, report, `Pertes de stock constatées sur la période (hors caisse — ${formatPdfMoney(report.stockLossAmount ?? "0.00")})`,
+      [
+        { label: "Date", width: lossFixedWidths[0], align: "center" },
+        { label: "Produit / unité", width: lossFixedWidths[1], align: "left" },
+        { label: "Qté perdue", width: lossFixedWidths[2], align: "right" },
+        { label: "Valeur perdue", width: lossFixedWidths[3], align: "right" },
+        { label: "Motif", width: availableWidth - lossFixedWidths.reduce((sum, item) => sum + item, 0), align: "left" }
+      ],
+      report.stockLosses.map((item) => [
+        { value: formatPdfDate(item.date), align: "center" },
+        { value: truncatePdfText(`${item.productName} (${item.unit})`, 32) },
+        { value: formatPdfNumber(Number(item.quantity), 3), align: "right" },
+        { value: formatPdfMoney(item.value), align: "right" },
+        { value: truncatePdfText(item.reason || "—", 46) }
+      ]), "Aucune perte.");
+  }
   if (report.stockAdjustments?.length) {
-    drawBeverageDepotTable(doc, report, "Écarts de stock constatés sur la période (hors caisse)",
-      [{ label: "Date / produit", width: 200, align: "left" }, { label: "Écart quantité", width: 90, align: "right" }, { label: "Écart valorisé", width: 90, align: "right" }, { label: "Motif", width: 115, align: "left" }],
+    const adjFixedWidths = [200, 90, 105];
+    drawBeverageDepotTable(doc, report, "Écarts de comptage constatés sur la période (hors caisse)",
+      [
+        { label: "Date / produit", width: adjFixedWidths[0], align: "left" },
+        { label: "Écart quantité", width: adjFixedWidths[1], align: "right" },
+        { label: "Écart valorisé", width: adjFixedWidths[2], align: "right" },
+        { label: "Motif", width: availableWidth - adjFixedWidths.reduce((sum, item) => sum + item, 0), align: "left" }
+      ],
       report.stockAdjustments.map((item) => [{ value: `${formatPdfDate(item.date)} / ${item.productName} (${item.unit})` }, { value: item.quantity }, { value: formatPdfMoney(item.value) }, { value: item.reason }]), "Aucun écart.");
   }
   if (report.netOperatingResultAmount !== undefined) {
     if (doc.y + 45 > doc.page.height - 64) { doc.addPage(); drawBeverageDepotContinuationHeader(doc, report); }
     doc.font("Helvetica-Bold").fontSize(10).fillColor("#334e68").text(
-      `Résultat d'exploitation de la période : ${formatPdfMoney(report.netOperatingResultAmount)} (marge brute + autres recettes - dépenses + écarts de stock valorisés).`,
+      `Résultat d'exploitation de la période : ${formatPdfMoney(report.netOperatingResultAmount)} (marge brute + autres recettes - dépenses - pertes de stock + écarts de comptage valorisés).`,
       PDF_PAGE_MARGIN, doc.y, { width: doc.page.width - PDF_PAGE_MARGIN * 2 });
   }
   drawBeverageDepotReadingNotes(doc, report);
@@ -11683,6 +11719,7 @@ export async function getCompanyReportsOverview(
     btpProjects,
     beverageProducts,
     beverageAdjustments,
+    beverageLosses,
   ] = await Promise.all([
     includeDetails && shouldLoadRentalData
       ? listReportRentalTransactions(actor.companyId, asOfDate)
@@ -11713,6 +11750,9 @@ export async function getCompanyReportsOverview(
       : Promise.resolve([]),
     includeDetails && filters.activityCode === "BEVERAGE_DEPOT"
       ? listBeverageStockAdjustments(actor.companyId, filters)
+      : Promise.resolve([]),
+    includeDetails && filters.activityCode === "BEVERAGE_DEPOT"
+      ? listBeverageStockLosses(actor.companyId, filters)
       : Promise.resolve([]),
   ]);
 
@@ -11849,16 +11889,23 @@ export async function getCompanyReportsOverview(
               (sum, item) => sum + toNumberAmount(item.value),
               0,
             );
+            const lossAmount = beverageLosses.reduce(
+              (sum, item) => sum + toNumberAmount(item.value),
+              0,
+            );
             return {
               ...report,
               currentStock: {
                 asOf: new Date().toISOString(),
                 products: beverageProducts,
               },
+              stockLosses: beverageLosses,
+              stockLossAmount: toMoneyString(lossAmount),
               stockAdjustments: beverageAdjustments,
               stockAdjustmentAmount: toMoneyString(adjustmentAmount),
               netOperatingResultAmount: toMoneyString(
-                toNumberAmount(report.netOperatingResultAmount ?? "0") +
+                toNumberAmount(report.netOperatingResultAmount ?? "0") -
+                  lossAmount +
                   adjustmentAmount,
               ),
             };

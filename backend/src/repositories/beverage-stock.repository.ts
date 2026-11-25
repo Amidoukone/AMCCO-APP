@@ -9,21 +9,31 @@ import { averageStockCost, saleStockCost, stockDecimal, stockFormat } from "../u
 export type BeverageProduct = {
   id: string; name: string; unit: string; quantity: string; stockValue: string;
   averageUnitCost: string; openingQuantity: string; initializedAt: string;
+  purchasedQuantity?: string; soldQuantity?: string; lostQuantity?: string; lostValue?: string;
 };
 type ProductRow = RowDataPacket & {
   id: string; name: string; unit: string; openingQuantity: string; openingValue: string;
   quantity: string; stockValue: string; initializedAt: Date;
+  purchasedQuantity?: string; soldQuantity?: string; lostQuantity?: string; lostValue?: string;
 };
 type Movement = RowDataPacket & { id: number; productId: string; kind: string; quantity: string; costValue: string; active: number };
 type Existing = RowDataPacket & { activityCode: string | null; metadataJson: unknown; status: string; occurredAt: Date };
 const productSelect = `SELECT p.id, p.name, p.unit, CAST(p.opening_quantity AS CHAR) AS openingQuantity,
   CAST(p.opening_value AS CHAR) AS openingValue, p.created_at AS initializedAt,
   CAST(p.opening_quantity + COALESCE(m.quantity_change, 0) AS CHAR) AS quantity,
-  CAST(p.opening_value + COALESCE(m.value_change, 0) AS CHAR) AS stockValue
+  CAST(p.opening_value + COALESCE(m.value_change, 0) AS CHAR) AS stockValue,
+  CAST(COALESCE(m.purchased_quantity, 0) AS CHAR) AS purchasedQuantity,
+  CAST(COALESCE(m.sold_quantity, 0) AS CHAR) AS soldQuantity,
+  CAST(COALESCE(m.lost_quantity, 0) AS CHAR) AS lostQuantity,
+  CAST(COALESCE(m.lost_value, 0) AS CHAR) AS lostValue
   FROM beverage_products p LEFT JOIN (
     SELECT company_id, product_id,
       SUM(IF(kind IN ('ACHAT_STOCK', 'INVENTORY_IN'), quantity, -quantity)) AS quantity_change,
-      SUM(IF(kind IN ('ACHAT_STOCK', 'INVENTORY_IN'), cost_value, -cost_value)) AS value_change
+      SUM(IF(kind IN ('ACHAT_STOCK', 'INVENTORY_IN'), cost_value, -cost_value)) AS value_change,
+      SUM(IF(kind = 'ACHAT_STOCK', quantity, 0)) AS purchased_quantity,
+      SUM(IF(kind = 'VENTE', quantity, 0)) AS sold_quantity,
+      SUM(IF(kind = 'LOSS', quantity, 0)) AS lost_quantity,
+      SUM(IF(kind = 'LOSS', cost_value, 0)) AS lost_value
     FROM beverage_stock_movements WHERE company_id = ? AND active = 1
     GROUP BY company_id, product_id
   ) m ON m.product_id = p.id AND m.company_id = p.company_id
@@ -41,10 +51,15 @@ function rethrowStockError(error: unknown): never {
 function toProduct(row: ProductRow): BeverageProduct {
   const quantity = stockDecimal(row.quantity, 3);
   const value = stockDecimal(row.stockValue, 9);
+  const lostValue = stockDecimal(row.lostValue ?? "0", 9);
   return { id: row.id, name: row.name, unit: row.unit, quantity: row.quantity,
     stockValue: stockFormat((value + 5000000n) / 10000000n, 2),
     averageUnitCost: averageStockCost(quantity, value), openingQuantity: row.openingQuantity,
-    initializedAt: new Date(row.initializedAt).toISOString() };
+    initializedAt: new Date(row.initializedAt).toISOString(),
+    purchasedQuantity: row.purchasedQuantity ?? "0.000",
+    soldQuantity: row.soldQuantity ?? "0.000",
+    lostQuantity: row.lostQuantity ?? "0.000",
+    lostValue: stockFormat((lostValue + 5000000n) / 10000000n, 2) };
 }
 
 export async function listBeverageProducts(companyId: string): Promise<BeverageProduct[]> {
@@ -86,6 +101,11 @@ export async function createBeverageProduct(input: {
 }
 
 export type BeverageStockAdjustment = { date: string; productName: string; unit: string; quantity: string; value: string; reason: string };
+export type BeverageStockLoss = {
+  id: string; date: string; productId: string; productName: string; unit: string;
+  quantity: string; value: string; reason: string;
+};
+
 export async function listBeverageStockAdjustments(companyId: string, filters: { dateFrom?: string; dateTo?: string } = {}): Promise<BeverageStockAdjustment[]> {
   const values: unknown[] = [companyId];
   const clauses = ["m.company_id = ?", "m.active = 1", "m.kind IN ('INVENTORY_IN', 'INVENTORY_OUT')"];
@@ -97,6 +117,96 @@ export async function listBeverageStockAdjustments(companyId: string, filters: {
     FROM beverage_stock_movements m JOIN beverage_products p ON p.id = m.product_id AND p.company_id = m.company_id
     WHERE ${clauses.join(" AND ")} ORDER BY m.id`, values).catch(rethrowStockError);
   return rows.map((row) => ({ ...row, date: new Date(row.date).toISOString() }));
+}
+
+export async function listBeverageStockLosses(
+  companyId: string,
+  filters: { dateFrom?: string; dateTo?: string; limit?: number } = {}
+): Promise<BeverageStockLoss[]> {
+  const values: unknown[] = [companyId];
+  const clauses = ["m.company_id = ?", "m.active = 1", "m.kind = 'LOSS'"];
+  if (filters.dateFrom) { clauses.push("m.created_at >= ?"); values.push(new Date(filters.dateFrom)); }
+  if (filters.dateTo) { clauses.push("m.created_at <= ?"); values.push(new Date(filters.dateTo)); }
+  const limitClause = filters.limit !== undefined
+    ? ` LIMIT ${Math.min(Math.max(Math.trunc(filters.limit), 1), 200)}`
+    : "";
+  const rows = await queryRows<(RowDataPacket & BeverageStockLoss)[]>(`SELECT m.transaction_id AS id, m.created_at AS date,
+    m.product_id AS productId, p.name AS productName, p.unit,
+    CAST(m.quantity AS CHAR) AS quantity,
+    CAST(m.cost_value AS CHAR) AS value,
+    COALESCE(m.reason, '') AS reason
+    FROM beverage_stock_movements m JOIN beverage_products p ON p.id = m.product_id AND p.company_id = m.company_id
+    WHERE ${clauses.join(" AND ")} ORDER BY m.id DESC${limitClause}`, values).catch(rethrowStockError);
+  return rows.map((row) => ({ ...row, date: new Date(row.date).toISOString(), reason: row.reason ?? "" }));
+}
+
+export async function recordBeverageStockLoss(input: {
+  companyId: string; actorId: string; productId: string; quantity: string; expectedQuantity?: string; reason?: string;
+}): Promise<BeverageStockLoss> {
+  const quantity = stockDecimal(input.quantity, 3);
+  if (quantity <= 0n) throw new HttpError(400, "La quantité perdue doit être supérieure à zéro.");
+  if (quantity > 999999999000n) throw new HttpError(400, "La quantité dépasse la limite autorisée par opération.");
+  const reason = input.reason?.trim() ? input.reason.trim().slice(0, 500) : null;
+  const connection = await getDbPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
+    const [products] = await connection.query<ProductRow[]>(productSelect, [input.companyId, input.companyId]);
+    const product = products.find((row) => row.id === input.productId);
+    if (!product) throw new HttpError(404, "Produit introuvable.");
+    const available = stockDecimal(product.quantity, 3);
+    if (input.expectedQuantity !== undefined && available !== stockDecimal(input.expectedQuantity, 3)) {
+      throw new HttpError(409, "Le stock a changé. Vérifiez la quantité de pièces avant de confirmer la perte.");
+    }
+    const currentValue = stockDecimal(product.stockValue, 9);
+    const cost = saleStockCost(quantity, available, currentValue);
+    const id = randomUUID();
+    const formattedQuantity = stockFormat(quantity, 3);
+    const formattedCost = stockFormat(cost, 9);
+    await connection.execute(`INSERT INTO beverage_stock_movements (company_id, product_id, transaction_id, kind, quantity, cost_value, active, reason, created_by_id)
+      VALUES (?, ?, ?, 'LOSS', ?, ?, 1, ?, ?)`, [input.companyId, input.productId, id, formattedQuantity, formattedCost, reason, input.actorId]);
+    await connection.commit();
+    return {
+      id,
+      date: new Date().toISOString(),
+      productId: product.id,
+      productName: product.name,
+      unit: product.unit,
+      quantity: formattedQuantity,
+      value: formattedCost,
+      reason: reason ?? ""
+    };
+  } catch (error) {
+    await connection.rollback();
+    rethrowStockError(error);
+  } finally {
+    connection.release();
+  }
+}
+
+export async function cancelBeverageStockLoss(input: { companyId: string; lossId: string }): Promise<void> {
+  const connection = await getDbPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
+    const [rows] = await connection.execute<Movement[]>(
+      `SELECT id, product_id AS productId, kind, CAST(quantity AS CHAR) AS quantity, CAST(cost_value AS CHAR) AS costValue, active
+       FROM beverage_stock_movements WHERE company_id = ? AND transaction_id = ? AND kind = 'LOSS' FOR UPDATE`,
+      [input.companyId, input.lossId]
+    );
+    const loss = rows[0];
+    if (!loss || loss.active !== 1) throw new HttpError(404, "Perte introuvable ou déjà annulée.");
+    await connection.execute(
+      "UPDATE beverage_stock_movements SET active = 0 WHERE company_id = ? AND transaction_id = ? AND kind = 'LOSS'",
+      [input.companyId, input.lossId]
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    rethrowStockError(error);
+  } finally {
+    connection.release();
+  }
 }
 
 export async function countBeverageProduct(input: { companyId: string; actorId: string; productId: string;
@@ -189,9 +299,9 @@ export async function withBeverageStockWrite(
       if (laterCounts.length) throw new HttpError(409, "Un comptage a déjà confirmé le stock après cette opération. Les quantités et coûts ne peuvent plus être modifiés ; les références restent modifiables. Faites corriger l'écart actuel par le comptable.");
     }
     if (changesStock && old?.active === 1 && old.kind === "ACHAT_STOCK") {
-      const [laterSales] = await connection.execute<RowDataPacket[]>(`SELECT id FROM beverage_stock_movements
-        WHERE company_id = ? AND product_id = ? AND active = 1 AND kind = 'VENTE' AND id > ? LIMIT 1`, [input.companyId, old.productId, old.id]);
-      if (laterSales.length) throw new HttpError(409, "Cet achat a déjà servi à des ventes. Il ne peut plus être retiré ou modifier le stock ; ses références et observations restent modifiables. Contactez le comptable pour corriger l'écart constaté.");
+      const [laterOutflows] = await connection.execute<RowDataPacket[]>(`SELECT id FROM beverage_stock_movements
+        WHERE company_id = ? AND product_id = ? AND active = 1 AND kind IN ('VENTE', 'LOSS') AND id > ? LIMIT 1`, [input.companyId, old.productId, old.id]);
+      if (laterOutflows.length) throw new HttpError(409, "Cet achat a déjà servi à valoriser une vente ou une perte. Il ne peut plus être retiré ou modifier le stock ; ses références et observations restent modifiables. Contactez le comptable pour corriger l'écart constaté.");
     }
     if (changesStock && old?.active === 1) {
       await connection.execute("UPDATE beverage_stock_movements SET active = 0 WHERE company_id = ? AND transaction_id = ?", [input.companyId, input.transactionId]);

@@ -22,6 +22,12 @@ describe("sector operator API restrictions", () => {
   router.delete("/finance/transactions/:transactionId", (_req, res) => res.status(200).json({ ok: true }));
   router.patch("/finance/transactions/:transactionId/review", (_req, res) => res.status(200).json({ ok: true }));
   router.get("/finance/accounts", (_req, res) => res.status(200).json({ ok: true }));
+  router.get("/finance/beverage-products", (_req, res) => res.status(200).json({ ok: true }));
+  router.post("/finance/beverage-products", (_req, res) => res.status(201).json({ ok: true }));
+  router.get("/finance/beverage-products/losses", (_req, res) => res.status(200).json({ ok: true }));
+  router.post("/finance/beverage-products/:productId/losses", (_req, res) => res.status(201).json({ ok: true }));
+  router.delete("/finance/beverage-products/losses/:lossId", (_req, res) => res.status(200).json({ ok: true }));
+  router.post("/finance/beverage-products/:productId/count", (_req, res) => res.status(200).json({ ok: true }));
   router.get("/activities", (_req, res) => res.status(200).json({ ok: true }));
   router.get("/activities/HARDWARE/articles", (_req, res) => res.status(200).json({ ok: true }));
   router.get("/reports/overview", (_req, res) => res.status(200).json({ ok: true }));
@@ -106,9 +112,16 @@ describe("sector operator API restrictions", () => {
       role: "BEVERAGE_DEPOT_OPERATOR"
     });
 
+    const id = "123e4567-e89b-12d3-a456-426614174000";
     expect((await request(app).get("/finance/transactions").set("Authorization", "Bearer test")).status).toBe(200);
     expect((await request(app).post("/finance/transactions").set("Authorization", "Bearer test")).status).toBe(201);
     expect((await request(app).get("/finance/accounts").set("Authorization", "Bearer test")).status).toBe(200);
+    expect((await request(app).get("/finance/beverage-products").set("Authorization", "Bearer test")).status).toBe(200);
+    expect((await request(app).post("/finance/beverage-products").set("Authorization", "Bearer test")).status).toBe(201);
+    expect((await request(app).get("/finance/beverage-products/losses").set("Authorization", "Bearer test")).status).toBe(200);
+    expect((await request(app).post(`/finance/beverage-products/${id}/losses`).set("Authorization", "Bearer test")).status).toBe(201);
+    expect((await request(app).delete(`/finance/beverage-products/losses/${id}`).set("Authorization", "Bearer test")).status).toBe(200);
+    expect((await request(app).post(`/finance/beverage-products/${id}/count`).set("Authorization", "Bearer test")).status).toBe(403);
     expect((await request(app).get("/reports/overview").set("Authorization", "Bearer test")).status).toBe(403);
   });
 });

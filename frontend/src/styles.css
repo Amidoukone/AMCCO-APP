@@ -1941,12 +1941,18 @@ a {
   cursor: not-allowed;
 }
 
-.beverage-stock-metrics,
-.beverage-product-grid {
+.beverage-stock-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-block: 12px;
+}
+
+.beverage-product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
 }
 
 .beverage-stock-metrics > div,
@@ -1984,11 +1990,6 @@ a {
   font-weight: 700;
 }
 
-.beverage-product-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
-}
-
 .beverage-product-grid > label {
   min-width: 0;
 }
@@ -2009,6 +2010,8 @@ a {
 }
 
 .beverage-product-create,
+.beverage-stock-loss,
+.beverage-loss-history,
 .beverage-stock-count {
   margin-top: 16px;
 }
@@ -2025,14 +2028,6 @@ a {
 
   .beverage-stock-metrics > div {
     padding: 10px;
-  }
-
-  .beverage-stock-metrics > div:last-child {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
   }
 
   .beverage-stock-panel .beverage-stock-table,

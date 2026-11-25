@@ -578,6 +578,8 @@ export type BeverageDepotReportReconciliation = {
 export type BeverageDepotReport = {
   currentStock?: { asOf: string; products: import("./beverage-stock.repository.js").BeverageProduct[] };
   netOperatingResultAmount?: string;
+  stockLosses?: import("./beverage-stock.repository.js").BeverageStockLoss[];
+  stockLossAmount?: string;
   stockAdjustments?: import("./beverage-stock.repository.js").BeverageStockAdjustment[];
   stockAdjustmentAmount?: string;
   periodLabel: string;

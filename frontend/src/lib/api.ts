@@ -65,7 +65,7 @@ import type {
   DailyActivityCategorySingleResponse
 } from "../types/daily-activity-categories";
 import type { BusinessActivityCode } from "../config/businessActivities";
-import type { BeverageProduct } from "../types/beverage-stock";
+import type { BeverageProduct, BeverageStockLoss } from "../types/beverage-stock";
 import type {
   DashboardSummaryResponse,
   GeneralStoreOperationsReportRow,
@@ -1103,7 +1103,7 @@ export function createFinanceTransactionRequest(
   });
 }
 
-export function getBeverageStockRequest(accessToken: string): Promise<{ items: BeverageProduct[] }> {
+export function getBeverageStockRequest(accessToken: string): Promise<{ items: BeverageProduct[]; losses?: BeverageStockLoss[] }> {
   return request("/finance/beverage-products", { accessToken });
 }
 
@@ -1117,6 +1117,16 @@ export function createBeverageProductRequest(accessToken: string, input: {
   name: string; unit: string; openingQuantity: string; openingUnitCost: string;
 }): Promise<{ item: BeverageProduct }> {
   return request("/finance/beverage-products", { method: "POST", body: input, accessToken });
+}
+
+export function recordBeverageLossRequest(accessToken: string, productId: string, input: {
+  quantity: string; expectedQuantity?: string; reason?: string;
+}): Promise<{ item: BeverageStockLoss }> {
+  return request(`/finance/beverage-products/${productId}/losses`, { method: "POST", body: input, accessToken });
+}
+
+export function cancelBeverageLossRequest(accessToken: string, lossId: string): Promise<{ status: string }> {
+  return request(`/finance/beverage-products/losses/${lossId}`, { method: "DELETE", accessToken });
 }
 
 export function deleteFinanceAccountRequest(
