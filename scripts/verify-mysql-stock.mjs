@@ -62,11 +62,30 @@ try {
       [historicalTransaction, historicalCompany, historicalAccount, JSON.stringify({ beverageOperationKind: "VENTE", productName: "Historical Coca", quantity: "100", purchaseUnitPrice: "150", saleUnitPrice: "200", archivedNote: "preserve" }), historicalUser]);
     await pool.execute(`INSERT INTO tasks (id, company_id, title, activity_code, metadata_json, created_by_id)
       VALUES (?, ?, 'Historical task', 'BEVERAGE_DEPOT', ?, ?)`, [historicalTask, historicalCompany, JSON.stringify({ archivedReference: "KEEP-2025" }), historicalUser]);
+    const historicalProduct = randomUUID();
+    const legacyKinds = ["ACHAT_STOCK", "VENTE", "INVENTORY_IN", "INVENTORY_OUT"];
+    if (index === 2) {
+      await pool.execute(`INSERT INTO beverage_products
+        (id, company_id, name, unit, product_key, opening_quantity, opening_value, created_by_id)
+        VALUES (?, ?, 'Existing product', 'casier', 'existing-product', 12, 6000, ?)`,
+        [historicalProduct, historicalCompany, historicalUser]);
+      for (const kind of legacyKinds) {
+        await pool.execute(`INSERT INTO beverage_stock_movements
+          (company_id, product_id, transaction_id, kind, quantity, cost_value, active, reason, created_by_id)
+          VALUES (?, ?, ?, ?, 1.5, 750, ?, 'Historical movement', ?)`,
+          [historicalCompany, historicalProduct, randomUUID(), kind, kind === "INVENTORY_OUT" ? 0 : 1, historicalUser]);
+      }
+    }
     const history = async () => {
       const snapshots = [];
       for (const [table, id] of [["companies", historicalCompany], ["users", historicalUser], ["financial_accounts", historicalAccount], ["transactions", historicalTransaction], ["tasks", historicalTask]]) {
         const [rows] = await pool.execute(`SELECT * FROM ${table} WHERE id = ?`, [id]);
         snapshots.push(rows);
+      }
+      if (index === 2) {
+        const [products] = await pool.execute("SELECT * FROM beverage_products WHERE company_id = ?", [historicalCompany]);
+        const [movements] = await pool.execute("SELECT * FROM beverage_stock_movements WHERE company_id = ? ORDER BY id", [historicalCompany]);
+        snapshots.push(products, movements);
       }
       return snapshots;
     };
@@ -77,7 +96,7 @@ try {
     await ensureBusinessActivitySchemaReady();
     assert.deepEqual(await history(), beforeInitialization, "Initialization preserves existing companies, users, account balances, transactions and tasks");
     const [[movementCount]] = await pool.query("SELECT COUNT(*) AS total FROM beverage_stock_movements");
-    assert.equal(Number(movementCount.total), 0, "Historical sales must never be replayed into stock");
+    assert.equal(Number(movementCount.total), index === 2 ? legacyKinds.length : 0, "Historical sales must never be replayed into stock");
     const [columns] = await pool.query(`SELECT TABLE_NAME AS t, COLUMN_NAME AS c, COLLATION_NAME AS collation
       FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('companies', 'beverage_products', 'beverage_stock_movements')`, [database]);
     const column = (t, c) => columns.find((row) => row.t === t && row.c === c).collation;

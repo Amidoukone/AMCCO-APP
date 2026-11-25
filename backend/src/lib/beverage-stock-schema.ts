@@ -34,7 +34,10 @@ export async function ensureBeverageStockSchemaReady(): Promise<void> {
     "SHOW COLUMNS FROM beverage_stock_movements LIKE 'kind'"
   );
   const kindType = kindColumns[0]?.Type ?? "";
-  if (kindType && kindType.toLowerCase().startsWith("enum(") && !kindType.includes("'LOSS'")) {
+  if (kindType.toLowerCase().startsWith("enum(") && !kindType.includes("'LOSS'")) {
+    if (kindType !== "enum('ACHAT_STOCK','VENTE','INVENTORY_IN','INVENTORY_OUT')") {
+      throw new Error("Unexpected beverage stock movement types. Review the existing enum before adding LOSS.");
+    }
     await getDbPool().execute(
       "ALTER TABLE beverage_stock_movements MODIFY kind ENUM('ACHAT_STOCK', 'VENTE', 'INVENTORY_IN', 'INVENTORY_OUT', 'LOSS') NOT NULL"
     );

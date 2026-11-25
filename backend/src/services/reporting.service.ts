@@ -2372,29 +2372,6 @@ function drawBeverageDepotTable(
   doc.y = y + 14;
 }
 
-function drawBeverageDepotReadingNotes(doc: PDFKit.PDFDocument, report: BeverageDepotReport): void {
-  const margin = PDF_PAGE_MARGIN;
-  const width = doc.page.width - margin * 2;
-  const readingText = "Lecture : pour les ventes liées au stock, la marge brute utilise le coût moyen pondéré enregistré par le serveur lors de la vente. Les anciennes ventes conservent leur coût déclaré et ne modifient pas le stock de départ compté. Le résultat d'exploitation correspond à la marge brute + autres recettes - dépenses - pertes de stock + écarts de comptage valorisés. Les pertes (casse, avarie, péremption) diminuent le stock sans mouvement de caisse. Le stock disponible est une situation actuelle (avec cumul vendu et perdu par produit). La valeur du stock clôturé reprend le dernier inventaire clôturé sur la période pour chaque produit. Les versements ne sont pas de nouvelles ventes.";
-  doc.font("Helvetica").fontSize(8.5);
-  const height = doc.heightOfString(readingText, { width: width - 20 }) + 20;
-  if (needsPdfPageBreak(doc, height + 12)) {
-    doc.addPage();
-    drawBeverageDepotContinuationHeader(doc, report);
-  }
-  const y = doc.y;
-  doc.roundedRect(margin, y, width, height, 4).fill("#f8fafc");
-  doc.rect(margin, y, width, height).strokeColor("#d9e2ec").lineWidth(0.8).stroke();
-  doc.fillColor("#334e68").font("Helvetica").fontSize(8.5)
-    .text(
-      readingText,
-      margin + 10,
-      y + 9,
-      { width: width - 20 }
-    );
-  doc.y = y + height + 12;
-}
-
 function renderBeverageDepotReportsPdf(
   doc: PDFKit.PDFDocument,
   report: BeverageDepotReport,
@@ -2570,7 +2547,6 @@ function renderBeverageDepotReportsPdf(
       `Résultat d'exploitation de la période : ${formatPdfMoney(report.netOperatingResultAmount)} (marge brute + autres recettes - dépenses - pertes de stock + écarts de comptage valorisés).`,
       PDF_PAGE_MARGIN, doc.y, { width: doc.page.width - PDF_PAGE_MARGIN * 2 });
   }
-  drawBeverageDepotReadingNotes(doc, report);
 }
 
 function renderGeneralExpensesReportsPdf(

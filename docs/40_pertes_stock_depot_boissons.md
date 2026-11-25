@@ -33,7 +33,7 @@ Intégrer la gestion des pertes de stock (canette percée, bouteille cassée, av
 ### 3. Interface utilisateur (`BeverageStockPanel`)
 - Tableau de stock enrichi avec les colonnes **Vendu** et **Perdu** (quantité et valeur perdue) + carte de résumé **Pertes enregistrées (XOF)**.
 - Bouton rapide **Perte** sur chaque ligne de produit (désactivé en cas de rupture) + section repliable **Déclarer une perte**.
-- **Assistant optionnel en pièces individuelles** pour les produits suivis en `casier`, `carton` ou `pack` (ex. 1 canette sur un casier de 24 → calcule automatiquement `0,042 casier` et affiche l'estimation en XOF).
+- **Saisie en pièces individuelles sélectionnée par défaut** pour les produits suivis en `casier`, `carton` ou `pack` (ex. 1 canette sur un casier de 24 → calcule automatiquement `0,042 casier` et affiche l'estimation en XOF).
 - Sur un casier de 24, les pertes successives en pièces sont calculées sur le solde restant au millième. Une modification concurrente du stock impose de vérifier la saisie. Le conditionnement accepte de 1 à 1 000 pièces.
 - Un achat ayant servi à valoriser une perte active bénéficie de la même protection que pour une vente.
 - Section repliable **Historique des pertes** (50 dernières pertes actives) avec annulation directe à confirmation en ligne.
@@ -47,7 +47,7 @@ Intégrer la gestion des pertes de stock (canette percée, bouteille cassée, av
 ## Vérifications exécutées
 
 - `npm run typecheck` (backend + frontend) : réussi sans erreur.
-- `npm --workspace backend run test` : **27 fichiers, 269 tests réussis** (dont schéma legacy ENUM → `LOSS`, intégrité stock/pertes/annulation/concurrence, permissions middleware & service, rapport et PDF).
+- `npm --workspace backend run test` : **27 fichiers, 270 tests réussis** (dont schéma legacy ENUM → `LOSS`, intégrité stock/pertes/annulation/concurrence, permissions middleware & service, rapport et PDF).
 - `npm run build` (backend + frontend Vite) : réussi sans erreur.
 - Recette navigateur Playwright (`scripts/verify-sector-cashflows.mjs --beverage-only` et `--stock-states-only`) sur bureau (1440 px) et mobile (390 px) : réussie sans erreur ni débordement horizontal, incluant déclaration de perte en pièce (`1/24`), vérification de `Perdu` vs `Vendu`, et annulation avec restauration exacte du stock.
 - Recette sur **MySQL 8.4.3 réel** (`node scripts/verify-mysql-stock.mjs --local`, 3 bases temporaires isolées, `amcco_dev` intacte) : **réussie** (`utf8mb4_0900_ai_ci`, `utf8mb4_unicode_ci`, et mise à niveau automatique d'un ancien schéma `ENUM` à 4 valeurs vers `'LOSS'`, conservation des données historiques, ventes concurrentes, pertes, séparation `Vendu`/`Perdu`, rapport, PDF et annulation après comptage).

@@ -66,6 +66,13 @@ describe("stock schema initialization", () => {
     await expect(ensureBeverageStockSchemaReady()).rejects.toThrow("companies.id is missing");
     expect(db.execute).not.toHaveBeenCalled();
   });
+  it("preserves an unrecognized legacy enum for review", async () => {
+    db.queryRows.mockResolvedValueOnce([
+      { tableName: "companies", columnType: "varchar(36)", characterSet: "utf8mb4", collation: "utf8mb4_unicode_ci" }
+    ]).mockResolvedValueOnce([{ Type: "enum('ACHAT_STOCK','VENTE','CUSTOM')" }]);
+    await expect(ensureBeverageStockSchemaReady()).rejects.toThrow("Unexpected beverage stock movement types");
+    expect(db.execute.mock.calls.some(([sql]) => String(sql).includes("ALTER TABLE"))).toBe(false);
+  });
   it("appends LOSS to an existing legacy beverage_stock_movements kind ENUM without altering other tables", async () => {
     db.queryRows.mockImplementation(async (sql: string) => sql.includes("information_schema.COLUMNS")
       ? [{ tableName: "companies", columnType: "varchar(36)", characterSet: "utf8mb4", collation: "utf8mb4_0900_ai_ci" }]

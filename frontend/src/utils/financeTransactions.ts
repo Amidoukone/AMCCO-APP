@@ -2481,20 +2481,21 @@ export function getVisibleFinanceMetadataFields(
       return fields.filter((field) => visibleKeys.has(field.key));
     }
     const operationKind = metadata[DUMP_TRUCK_OPERATION_KEY] ?? "TRAVAUX";
-    const visibleKeys = new Set([
+    const orderedKeys = [
       "transportCategory",
+      DUMP_TRUCK_OPERATION_KEY,
       "vehicleRef",
       "routeRef",
-      DUMP_TRUCK_OPERATION_KEY,
-      "counterpartyRef",
       ...(operationKind === "TRAVAUX" || operationKind === "LOCATION"
         ? ["quantity", "purchaseUnitPrice", "amccoAmount"]
         : []),
       ...(operationKind === "DEPENSE" || operationKind === "ENTRETIEN" || operationKind === "CARBURANT"
         ? ["expenseCategory"]
-        : [])
-    ]);
-    return fields.filter((field) => visibleKeys.has(field.key));
+        : []),
+      "counterpartyRef"
+    ];
+    return fields.filter((field) => orderedKeys.includes(field.key))
+      .sort((left, right) => orderedKeys.indexOf(left.key) - orderedKeys.indexOf(right.key));
   }
 
   if (activityCode !== "HARDWARE") {

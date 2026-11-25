@@ -83,6 +83,7 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
     setLossForm({
       ...emptyLoss(),
       productId: product.id,
+      usePieces: packUnits.has(product.unit),
       piecesPerUnit: defaultPiecesPerUnit(product.unit)
     });
     lossChanges.markClean();
@@ -214,7 +215,6 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
     </div> : null}
     {!error && (ready || changes.isDirty || lossChanges.isDirty || countChanges.isDirty) ? <>
       {canManage && items.length > 0 ? <details ref={lossPanelRef} className="beverage-stock-loss" open={lossOpen} onToggle={(event) => setLossOpen(event.currentTarget.open)}><summary>Déclarer une perte</summary>
-        <p className="hint">Casse, canette percée, péremption ou avarie. La perte est déduite du stock disponible (hors caisse) et distinguée des ventes.</p>
         <form className="beverage-product-form" onSubmit={saveLoss} onChangeCapture={lossChanges.onChangeCapture}>
           <fieldset disabled={!ready || saving} className="beverage-product-fields">
             <legend>Enregistrer une perte de stock</legend>
@@ -224,9 +224,9 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
                 const product = items.find((item) => item.id === event.target.value) ?? null;
                 setLossForm((prev) => ({
                   ...prev,
-                  productId: event.target.value,
+                  productId: product?.id ?? "",
                   quantity: "",
-                  usePieces: false,
+                  usePieces: Boolean(product && packUnits.has(product.unit)),
                   pieces: "1",
                   piecesPerUnit: product ? defaultPiecesPerUnit(product.unit) : "24"
                 }));
@@ -243,7 +243,7 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
               <p className="hint">Disponible : <strong>{number(selectedLossProduct.quantity)} {quantityUnit(selectedLossProduct.quantity, selectedLossProduct.unit)}</strong> · Coût moyen : {money(selectedLossProduct.averageUnitCost)} XOF / {selectedLossProduct.unit}</p>
               {supportsPieceHelper ? <label className="beverage-opening-choice">
                 <input type="checkbox" checked={lossForm.usePieces} onChange={(event) => setLossForm((prev) => ({ ...prev, usePieces: event.target.checked }))} />
-                <span>Saisir en pièces individuelles (ex. canettes ou bouteilles cassées dans un {selectedLossProduct.unit})</span>
+                <span>Saisir en pièces individuelles</span>
               </label> : null}
               {supportsPieceHelper && lossForm.usePieces ? <>
                 <div className="beverage-product-grid">
@@ -256,7 +256,7 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
                     <input required type="number" min="1" max="1000" step="1" value={lossForm.piecesPerUnit} onChange={(event) => setLossForm((prev) => ({ ...prev, piecesPerUnit: event.target.value }))} placeholder="Ex. 24" />
                   </label>
                 </div>
-                {effectiveLossQuantity ? <p className="hint">Équivalent déduit du stock : <strong>{number(effectiveLossQuantity)} {quantityUnit(effectiveLossQuantity, selectedLossProduct.unit)}</strong> ({lossForm.pieces} / {lossForm.piecesPerUnit})</p> : null}
+                {effectiveLossQuantity ? <p className="hint">À retirer du stock : <strong>{number(effectiveLossQuantity)} {quantityUnit(effectiveLossQuantity, selectedLossProduct.unit)}</strong> ({lossForm.pieces} / {lossForm.piecesPerUnit})</p> : null}
               </> : (
                 <label className="operations-inline-group">
                   <span>Quantité perdue ({selectedLossProduct.unit}) *</span>

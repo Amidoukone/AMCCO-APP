@@ -39,6 +39,7 @@ const WORKSPACES: Partial<Record<BusinessActivityCode, SectorTransactionWorkspac
     listTitle: "Opérations des véhicules",
     helpText: "Choisissez une recette ou une dépense, puis le type de véhicule. Les champs et calculs s’adaptent à la catégorie ; la synthèse des camions bennes reste accessible plus bas.",
     presets: [
+      { id: "transport-trips", label: "Saisir des voyages de benne", type: "CASH_IN", metadata: { transportCategory: "Camion benne", dumpTruckOperationKind: "TRAVAUX" } },
       { id: "transport-income", label: "Enregistrer une recette", type: "CASH_IN", metadata: {} },
       { id: "transport-expense", label: "Enregistrer une dépense", type: "CASH_OUT", metadata: {} }
     ]

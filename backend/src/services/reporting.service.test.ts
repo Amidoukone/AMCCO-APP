@@ -1439,7 +1439,7 @@ describe("reporting.service", () => {
     expect(extractedPdfText).toContain("AMCCO - Dépôt de boissons");
     expect(extractedPdfText).toContain("45 000 F CFA");
     expect(extractedPdfText).toContain("15 000 F CFA");
-    expect(extractedPdfText).toContain("dernier inventaire clôturé sur la période");
+    expect(extractedPdfText).not.toContain("Lecture : pour les ventes liées au stock");
     expect(extractedPdfText).not.toContain("105 000 F CFA");
     expect(extractedPdfText).toContain("Boisson gazeuse");
     expect(extractedPdfText).toContain("Vente opérateur compte dédié");

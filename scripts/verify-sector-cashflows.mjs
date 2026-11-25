@@ -28,6 +28,7 @@ const definitions = [
     { button: "Recevoir un appui", type: "CASH_IN", metadata: { fishOperationKind: "SUPPORT_INCOME" }, fields: { "Référence bassin": "BASSIN-02", "Référence cycle": "CYCLE-2026", "Source d'appui": "Partenaire recette" }, amount: "10000" }
   ] },
   { code: "TRANSPORT", original: { transportCategory: "Camion benne", dumpTruckOperationKind: "TRAVAUX", vehicleRef: "TR-01", routeRef: "Trajet historique", quantity: "2", purchaseUnitPrice: "500", assetType: "Camion benne", transportService: "Historique" }, presets: [
+    { button: "Saisir des voyages de benne", type: "CASH_IN", metadata: { transportCategory: "Camion benne", dumpTruckOperationKind: "TRAVAUX" }, fields: { "Véhicule / immatriculation": "TR-03", "Trajet / lieu": "Dépôt", "Nombre de voyages": "2", "Prix par voyage": "3000" }, amount: "6000" },
     { button: "Enregistrer une recette", type: "CASH_IN", fields: { "Type de véhicule": "Camion benne", "Opération camion benne": "TRAVAUX", "Véhicule / immatriculation": "TR-02", "Trajet / lieu": "Chantier recette", "Nombre de voyages": "3", "Prix par voyage": "2000" }, amount: "6000" },
     { button: "Enregistrer une dépense", type: "CASH_OUT", fields: { "Type de véhicule": "Camion benne", "Opération camion benne": "DEPENSE", "Véhicule / immatriculation": "TR-02", "Nature de la dépense": "Pneus" }, amount: "5000" }
   ] },
@@ -181,7 +182,7 @@ async function fixture(definition, viewport, role = "ACCOUNTANT", options = {}) 
         product.averageUnitCost = Number(product.quantity) ? String(Number(product.stockValue) / Number(product.quantity)) : "0";
       }
       if (method === "POST") {
-        const item = { ...original, ...body, description: body.description ?? null, id: `created-${records.length}`, metadata: { ...body.metadata } };
+        const item = { ...original, ...body, status: definition.code === "BEVERAGE_DEPOT" ? "APPROVED" : original.status, createdAt: new Date().toISOString(), description: body.description ?? null, id: `created-${records.length}`, metadata: { ...body.metadata } };
         records.push(item);
         data = { item };
       } else {
@@ -323,6 +324,16 @@ try {
       await page.getByText("Synthèse par devise", { exact: true }).click();
       const actions = page.getByRole("region", { name: "Saisie rapide du secteur", exact: true });
       await actions.getByRole("button", { name: definition.presets[0].button, exact: true }).click();
+      if (definition.code === "SERVICES") {
+        await field(page, "Compte").waitFor();
+        await page.waitForLoadState("networkidle");
+        const countReads = () => calls.filter((call) => call.path === "/finance/transactions" && call.method === "GET").length;
+        const beforeReopen = countReads();
+        await page.locator("#transaction-create > summary").click();
+        await actions.getByRole("button", { name: definition.presets[0].button, exact: true }).click();
+        await page.waitForLoadState("networkidle");
+        assert.equal(countReads(), beforeReopen, "Reopening the same form reuses its recent suggestions");
+      }
       const draftField = definition.code === "BEVERAGE_DEPOT" ? "Quantité" : "Montant";
       await field(page, draftField).fill("123");
       await actions.getByRole("button", { name: definition.presets[1].button, exact: true }).click();
@@ -489,14 +500,14 @@ try {
       await fillField(page, "Quantité", "2000");
       await fillField(page, "Prix de vente unitaire", "500");
       const writesBeforeOversale = calls.filter((call) => call.method === "POST").length;
-      await page.locator(".finance-transaction-form").getByRole("button", { name: "Enregistrer la transaction", exact: true }).click();
+      await page.locator(".finance-transaction-form").getByRole("button", { name: "Enregistrer et continuer", exact: true }).click();
       await page.getByRole("alert").filter({ hasText: "Stock insuffisant" }).waitFor();
       assert.equal(calls.filter((call) => call.method === "POST").length, writesBeforeOversale, "An oversized sale is blocked before sending");
       await page.waitForFunction(() => !document.querySelector('.beverage-stock-panel [role="status"]'));
       await fillField(page, "Quantité", "1");
       const storedQuantity = products[0].quantity;
       products[0].quantity = "0"; // A concurrent operator consumes the stock after the screen was loaded.
-      await page.locator(".finance-transaction-form").getByRole("button", { name: "Enregistrer la transaction", exact: true }).click();
+      await page.locator(".finance-transaction-form").getByRole("button", { name: "Enregistrer et continuer", exact: true }).click();
       await page.getByRole("alert").filter({ hasText: "stock modifié par un autre opérateur" }).waitFor();
       assert.equal(await field(page, "Quantité").inputValue(), "1", "A server stock conflict keeps the operator's draft");
       products[0].quantity = storedQuantity;
@@ -517,7 +528,11 @@ try {
       assert.equal(await zeroRow.getByRole("button", { name: "Perte", exact: true }).isDisabled(), true);
       const qtyBeforeLoss = Number(products[0].quantity);
       await stockPanel.getByRole("row").filter({ hasText: "Boisson A" }).getByRole("button", { name: "Perte", exact: true }).click();
-      await stockPanel.getByLabel(/Saisir en pièces individuelles/).check();
+      const pieceMode = stockPanel.getByLabel("Saisir en pièces individuelles");
+      assert.equal(await pieceMode.isChecked(), true);
+      await pieceMode.uncheck();
+      assert.equal(await stockPanel.getByLabel(/^Quantité perdue/).isVisible(), true);
+      await pieceMode.check();
       await stockPanel.getByLabel(/^Nombre de pièces perdues/).fill("1");
       await stockPanel.getByLabel(/^Pièces par casier/).fill("24");
       await stockPanel.getByRole("button", { name: "Enregistrer la perte", exact: true }).click();
@@ -536,10 +551,40 @@ try {
       await fillField(page, "Quantité", "0.5");
       await fillField(page, "Prix de vente unitaire", "501");
       assert.equal(compactAmount(await field(page, "Montant").inputValue()), "251", "Fractional quantities use a whole-XOF sale total");
-      const beforeFraction = records.length;
-      await page.locator(".finance-transaction-form").getByRole("button", { name: "Enregistrer la transaction", exact: true }).click();
-      await waitFor(() => records.length === beforeFraction + 1, "Fractional sale quantity must pass server profile validation");
-      await page.waitForFunction(() => !document.querySelector('[data-unsaved-sector-form="true"]'));
+      const saleForm = page.locator(".finance-transaction-form");
+      const continueButton = saleForm.getByRole("button", { name: "Enregistrer et continuer", exact: true });
+      const beforeSeries = records.length;
+      const account = await field(page, "Compte").inputValue();
+      const originalUrl = page.url();
+      const startingBalances = products.slice(0, 2).map((product) => Number(product.quantity));
+      for (let index = 0; index < 5; index++) {
+        const productId = products[index % 2].id;
+        if (index > 0) {
+          await fillField(page, "Produit", productId);
+          await fillField(page, "Quantité", "1");
+          if (index === 2) {
+            await saleForm.getByRole("button", { name: /Reprendre le prix récent.*501/ }).click();
+            assert.equal(compactAmount(await field(page, "Montant").inputValue()), "501");
+            await fillField(page, "Quantité", "");
+            assert.equal(await field(page, "Montant").inputValue(), "");
+            await fillField(page, "Quantité", "1");
+          }
+          await fillField(page, "Prix de vente unitaire", "500");
+        }
+        await continueButton.click();
+        await waitFor(() => records.length === beforeSeries + index + 1, "Each confirmed sale creates one transaction");
+        await page.waitForFunction(() => document.activeElement?.matches(".finance-transaction-form select") && document.activeElement.value === "");
+        assert.equal(await field(page, "Produit").evaluate((el) => el === document.activeElement), true);
+        assert.equal(records.at(-1).metadata.beverageProductId, productId);
+        assert.equal(records.at(-1).amount, index === 0 ? "251" : "500");
+        assert.equal(page.url(), originalUrl);
+        assert.equal(await field(page, "Compte").inputValue(), account);
+        assert.equal(await field(page, "Quantité").inputValue(), "");
+        assert.equal(await field(page, "Prix de vente unitaire").inputValue(), "");
+        assert.equal(await field(page, "Montant").inputValue(), "");
+      }
+      assert.equal(Number(products[0].quantity), startingBalances[0] - 2.5);
+      assert.equal(Number(products[1].quantity), startingBalances[1] - 2);
       await stockPanel.getByRole("row").filter({ hasText: "Boisson A" }).getByRole("button", { name: "Vendre", exact: true }).click();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const overflowingControls = await page.locator(".finance-transaction-form-quick label").evaluateAll((labels) => labels.filter((label) => {

@@ -1,4 +1,4 @@
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import type { Dispatch, FormEvent, RefObject, SetStateAction } from "react";
 import { Link } from "react-router-dom";
 import type { SectorTransactionWorkspace } from "../config/sectorTransactionWorkspaces";
 import type { SectorReferenceView } from "../config/sectorWorkspaces";
@@ -141,6 +141,8 @@ type TransactionFormState = {
 
 type Props = {
   selectedActivityCode: BusinessActivityCode | null;
+  recentSalePrice: string | null;
+  nextSaleProductRef: RefObject<HTMLSelectElement>;
   handleSaveTransaction: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   transactionChanges: { isDirty: boolean; onChangeCapture: () => void };
   isSavingTransaction: boolean;
@@ -198,6 +200,8 @@ type Props = {
 
 export function FinanceTransactionForm({
   selectedActivityCode,
+  recentSalePrice,
+  nextSaleProductRef,
   handleSaveTransaction,
   transactionChanges,
   isSavingTransaction,
@@ -1262,15 +1266,28 @@ export function FinanceTransactionForm({
               {visibleFinanceMetadataFields.map((field) => {
                 if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && beverageOperationKind === "VENTE" && field.key === "purchaseUnitPrice") return null;
                 if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && field.key === "productName") return (
-                  <label key={field.key} className="operations-inline-group"><span>Produit en stock *</span>
-                    <select required disabled={beverageStock.loading || Boolean(beverageStock.error)} value={transactionForm.metadata.beverageProductId ?? ""} onChange={(event) => {
-                      const product = beverageStock.items.find((item) => item.id === event.target.value);
-                      setTransactionForm((previous) => ({ ...previous, metadata: { ...previous.metadata,
-                        beverageProductId: product?.id ?? "", productName: product?.name ?? "", beverageUnit: product?.unit ?? "",
-                        purchaseUnitPrice: beverageOperationKind === "VENTE" ? product?.averageUnitCost ?? "" : "" } }));
-                    }}><option value="">Choisir un produit</option>{beverageStock.items.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.quantity} {product.unit} disponible(s)</option>)}</select>
-                    {selectedBeverageProduct ? <span className="hint">Unité : {selectedBeverageProduct.unit}. Disponible : {selectedBeverageProduct.quantity}. {beverageOperationKind === "VENTE" ? `Coût moyen d'achat : ${formatLocalizedAmountForDisplay(selectedBeverageProduct.averageUnitCost)} XOF par ${selectedBeverageProduct.unit}.` : ""}</span> : <span className="hint">Produit absent ? Ajoutez-le dans Stock disponible avant de saisir l'opération.</span>}
-                  </label>
+                  <div key={field.key} className="operations-inline-group">
+                    <label className="operations-inline-group"><span>Produit en stock *</span>
+                      <select ref={nextSaleProductRef} required disabled={beverageStock.loading || Boolean(beverageStock.error)} value={transactionForm.metadata.beverageProductId ?? ""} onChange={(event) => {
+                        const product = beverageStock.items.find((item) => item.id === event.target.value);
+                        setTransactionForm((previous) => ({ ...previous,
+                          amount: !editingTransactionId && beverageOperationKind === "VENTE" ? "" : previous.amount,
+                          metadata: { ...previous.metadata,
+                          ...(!editingTransactionId && beverageOperationKind === "VENTE" ? { saleUnitPrice: "" } : {}),
+                          beverageProductId: product?.id ?? "", productName: product?.name ?? "", beverageUnit: product?.unit ?? "",
+                          purchaseUnitPrice: beverageOperationKind === "VENTE" ? product?.averageUnitCost ?? "" : "" } }));
+                      }}><option value="">Choisir un produit</option>{beverageStock.items.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.quantity} {product.unit} disponible(s)</option>)}</select>
+                      {selectedBeverageProduct ? <span className="hint">Unité : {selectedBeverageProduct.unit}. Disponible : {selectedBeverageProduct.quantity}. {beverageOperationKind === "VENTE" ? `Coût moyen d'achat : ${formatLocalizedAmountForDisplay(selectedBeverageProduct.averageUnitCost)} XOF par ${selectedBeverageProduct.unit}.` : ""}</span> : <span className="hint">Produit absent ? Ajoutez-le dans Stock disponible avant de saisir l'opération.</span>}
+                    </label>
+                    {recentSalePrice ? <button type="button" className="secondary-btn" disabled={isSavingTransaction}
+                      onClick={() => {
+                        transactionChanges.onChangeCapture();
+                        setTransactionForm((previous) => {
+                          const metadata = { ...previous.metadata, saleUnitPrice: formatAmountForInput(recentSalePrice) };
+                          return { ...previous, metadata, amount: formatAmountForInput(deriveBeverageAmount("VENTE", metadata) ?? "") };
+                        });
+                      }}>Reprendre le prix récent · {formatLocalizedAmountForDisplay(recentSalePrice)} {transactionForm.currency}</button> : null}
+                  </div>
                 );
                 const beverageRequiredFields = beverageOperationKind === "VENTE"
                   ? ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"]
@@ -1772,7 +1789,8 @@ export function FinanceTransactionForm({
                           : nextMetadata;
                         return {
                           ...prev,
-                          amount: derivedAmount ? formatAmountForInput(derivedAmount) : prev.amount,
+                          amount: derivedAmount ? formatAmountForInput(derivedAmount)
+                            : selectedActivityCode === "BEVERAGE_DEPOT" && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK") && shouldDeriveAmount && !isLegacyBeverageEdit ? "" : prev.amount,
                           metadata: finalMetadata
                         };
                       });
@@ -1828,6 +1846,12 @@ export function FinanceTransactionForm({
                 "Enregistrer la transaction"
               )}
             </button>
+            {selectedActivityCode === "BEVERAGE_DEPOT" && beverageOperationKind === "VENTE" && !editingTransactionId ? (
+              <button type="submit" value="continue-sale" className="secondary-btn"
+                disabled={!accounts.length || isLoadingActivities || isSavingTransaction || beverageStock.loading || Boolean(beverageStock.error)}>
+                Enregistrer et continuer
+              </button>
+            ) : null}
             {editingTransactionId ? (
               <button
                 type="button"

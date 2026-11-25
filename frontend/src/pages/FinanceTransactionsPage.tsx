@@ -344,6 +344,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   const formScope = `${activeCompany?.id ?? ""}:${selectedActivityCode ?? ""}`;
   const actionScopeKey = JSON.stringify([formScope, user?.id, user?.role]);
   const captureActionScope = useActionScope(actionScopeKey);
+
   useEffect(() => {
     setIsSavingTransaction(false);
     setIsSavingAccount(false);
@@ -447,6 +448,31 @@ export function FinanceTransactionsPage(): JSX.Element {
   const originalBeverageEdit = transactions.find((item) => item.id === editingTransactionId) ?? (linkedTransaction?.id === editingTransactionId ? linkedTransaction : undefined);
   const isLegacyBeverageEdit = selectedActivityCode === "BEVERAGE_DEPOT" && Boolean(editingTransactionId) && !originalBeverageEdit?.metadata.beverageProductId;
   const selectedBeverageProduct = beverageStock.items.find((product) => product.id === transactionForm.metadata.beverageProductId);
+  const recentSalePrice = useMemo(() => {
+    if (!selectedBeverageProduct || editingTransactionId || beverageOperationKind !== "VENTE") return null;
+    const sales = suggestionTransactions.filter((item) =>
+      item.activityCode === "BEVERAGE_DEPOT" && item.status === "APPROVED" && item.type === "CASH_IN" &&
+      item.currency === transactionForm.currency && item.metadata.beverageOperationKind === "VENTE" &&
+      item.metadata.beverageProductId === selectedBeverageProduct.id && Number(item.metadata.saleUnitPrice) > 0
+    );
+    sales.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.createdAt.localeCompare(a.createdAt));
+    const price = sales[0]?.metadata.saleUnitPrice;
+    // The form saves whole currency units. Never offer a rounded historical price.
+    return price && Number.isSafeInteger(Number(price)) ? price : null;
+  }, [selectedBeverageProduct, editingTransactionId, beverageOperationKind, suggestionTransactions, transactionForm.currency]);
+  const nextSaleProductRef = useRef<HTMLSelectElement>(null);
+  const nextSaleFocusScope = useRef<string | null>(null);
+  useEffect(() => {
+    if (nextSaleFocusScope.current !== actionScopeKey || !isTransactionFormExpanded || beverageStock.error) {
+      nextSaleFocusScope.current = null;
+      return;
+    }
+    if (!beverageStock.loading) {
+      nextSaleFocusScope.current = null;
+      nextSaleProductRef.current?.focus();
+    }
+  }, [actionScopeKey, isTransactionFormExpanded, beverageStock.loading, beverageStock.error, isSavingTransaction]);
+
   const agencyOperationKind = selectedActivityCode === "REAL_ESTATE_AGENCY"
     ? getAgencyOperationKind(transactionForm.type, transactionForm.metadata)
     : "SALE_COMMISSION";
@@ -1103,6 +1129,9 @@ export function FinanceTransactionsPage(): JSX.Element {
     }
   }, [activeCompany?.id, debouncedSearch, filters.type, isLoadingActivities, selectedActivityCode, transactionsFetchPageSize, withAuthorizedToken]);
 
+  const suggestionHistoryCache = useRef<{ key: string; loadedAt: number } | null>(null);
+  const historyType = isQuickFillSectorActivity(selectedActivityCode) || filters.type === "ALL" ? undefined : filters.type;
+  const historySearch = isQuickFillSectorActivity(selectedActivityCode) ? undefined : debouncedSearch || undefined;
   const loadSectorSuggestionHistory = useCallback(async () => {
     const requestId = ++sectorSuggestionLoadRequestRef.current;
     if (
@@ -1112,11 +1141,16 @@ export function FinanceTransactionsPage(): JSX.Element {
       !needsTransactionSuggestionHistory(selectedActivityCode)
     ) {
       if (!needsTransactionSuggestionHistory(selectedActivityCode)) {
+        suggestionHistoryCache.current = null;
         setSectorSuggestionHistory([]);
       }
       return;
     }
 
+    const key = JSON.stringify([actionScopeKey, historyType, historySearch, suggestionHistoryPageSize]);
+    const cached = suggestionHistoryCache.current;
+    if (cached?.key === key && Date.now() - cached.loadedAt < 60_000) return;
+    suggestionHistoryCache.current = null;
     setSectorSuggestionHistory([]);
     try {
       const response = await withAuthorizedToken((accessToken) =>
@@ -1124,13 +1158,12 @@ export function FinanceTransactionsPage(): JSX.Element {
           limit: suggestionHistoryPageSize,
           offset: 0,
           activityCode: selectedActivityCode,
-          ...(!isQuickFillSectorActivity(selectedActivityCode) ? {
-            type: filters.type === "ALL" ? undefined : filters.type,
-            search: debouncedSearch || undefined
-          } : {})
+          type: historyType,
+          search: historySearch
         })
       );
       if (requestId === sectorSuggestionLoadRequestRef.current) {
+        suggestionHistoryCache.current = { key, loadedAt: Date.now() };
         setSectorSuggestionHistory(response.items);
       }
     } catch {
@@ -1139,9 +1172,9 @@ export function FinanceTransactionsPage(): JSX.Element {
       }
     }
   }, [
-    activeCompany?.id,
-    debouncedSearch,
-    filters.type,
+    actionScopeKey,
+    historySearch,
+    historyType,
     isLoadingActivities,
     isTransactionFormExpanded,
     selectedActivityCode,
@@ -1199,6 +1232,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   useEffect(() => {
     if (loadedCompanyIdRef.current === activeCompany?.id) return;
     loadedCompanyIdRef.current = activeCompany?.id;
+    suggestionHistoryCache.current = null;
     accountsLoadRequestRef.current += 1;
     setAccounts([]);
     setTransactions([]);
@@ -1996,7 +2030,7 @@ export function FinanceTransactionsPage(): JSX.Element {
   async function handleSaveTransaction(event: FormEvent<HTMLFormElement>): Promise<void> {
     const isCurrentAction = captureActionScope();
     event.preventDefault();
-    if (!selectedActivityCode) {
+    if (!selectedActivityCode || isSavingTransaction) {
       return;
     }
     if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK")) {
@@ -2016,6 +2050,9 @@ export function FinanceTransactionsPage(): JSX.Element {
       setErrorMessage("Cette transaction appartient à un autre secteur. Rouvrez-la depuis son secteur.");
       return;
     }
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const continueSale = selectedActivityCode === "BEVERAGE_DEPOT" && beverageOperationKind === "VENTE" &&
+      !editingTransactionId && submitter instanceof HTMLButtonElement && submitter.value === "continue-sale";
     const proofFileToUpload = transactionProofFile;
     const transactionSavedLabel = editingTransactionId
       ? "Transaction modifiée"
@@ -2078,16 +2115,18 @@ export function FinanceTransactionsPage(): JSX.Element {
           ...prev.filter((item) => item.id !== response.item.id)
         ]);
       }
-      handleOpenTransactionDetails(response.item.id, response.item.activityCode);
-      if (window.matchMedia("(max-width: 640px)").matches) {
-        setIsTransactionFormExpanded(false);
+      if (continueSale) {
+        nextSaleFocusScope.current = actionScopeKey;
+      } else {
+        handleOpenTransactionDetails(response.item.id, response.item.activityCode);
+        if (window.matchMedia("(max-width: 640px)").matches) setIsTransactionFormExpanded(false);
       }
       setSuccessMessage(
         proofFileToUpload
           ? `${transactionSavedLabel}. Envoi de la preuve en cours…`
           : editingTransactionId
             ? "Transaction modifiée."
-            : "Transaction enregistrée."
+            : continueSale ? "Vente enregistrée. Choisissez le produit suivant." : "Transaction enregistrée."
       );
       resetTransactionForm();
       void loadAccounts();
@@ -3248,6 +3287,8 @@ export function FinanceTransactionsPage(): JSX.Element {
           ) : null}
           {shouldRenderTransactionForm ? <DeferredViewBoundary key={formScope} hasUnsavedChanges={transactionChanges.isDirty}><Suspense fallback={<p role="status">Chargement du formulaire…</p>}><FinanceTransactionForm key={formScope}
             selectedActivityCode={selectedActivityCode}
+            recentSalePrice={recentSalePrice}
+            nextSaleProductRef={nextSaleProductRef}
             handleSaveTransaction={handleSaveTransaction}
             transactionChanges={transactionChanges}
             isSavingTransaction={isSavingTransaction}
