@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { isBeverageProductArchiveEnabled } from "../config/env.js";
 import { checkDatabaseConnection } from "../lib/db.js";
 
 export const healthRouter = Router();
@@ -8,6 +9,7 @@ healthRouter.get("/health", (_req, res) => {
     status: "ok",
     service: "amcco-backend",
     revision: process.env.RENDER_GIT_COMMIT,
+    beverageProductArchiveEnabled: isBeverageProductArchiveEnabled(),
     timestamp: new Date().toISOString()
   });
 });

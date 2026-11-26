@@ -20,6 +20,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: BEVERAGE_PRODUCT_ARCHIVE_ENABLED
+        value: "true"
       - key: API_PREFIX
         value: /api/v1
       - key: CORS_ORIGIN
