@@ -65,5 +65,5 @@ if (!parsed.success) {
 export const env = parsed.data;
 
 export function isBeverageProductArchiveEnabled(): boolean {
-  return env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED ?? env.NODE_ENV !== "production";
+  return env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED ?? true;
 }

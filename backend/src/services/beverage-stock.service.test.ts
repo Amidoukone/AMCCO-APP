@@ -62,17 +62,17 @@ describe("beverage stock access", () => {
     expect(archiveBeverageProduct).toHaveBeenCalledTimes(3);
     expect(archiveBeverageProduct).toHaveBeenCalledWith({ ...input, companyId: operator.companyId, actorId: operator.actorId });
   });
-  it("requires explicit activation in production and leaves stock readable while disabled", async () => {
+  it("allows production archiving by default and leaves stock readable when archiving is suspended", async () => {
     const previousMode = env.NODE_ENV;
     const previousFlag = env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED;
     try {
       env.NODE_ENV = "production";
-      env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED = undefined;
+      env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED = false;
       const input = { productId: "coca", expectedQuantity: "10" };
       await expect(getCompanyBeverageStockOverview(operator)).resolves.toMatchObject({ canArchiveProducts: false });
       await expect(archiveCompanyBeverageProduct(operator, input)).rejects.toMatchObject({ statusCode: 403 });
       expect(archiveBeverageProduct).not.toHaveBeenCalled();
-      env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED = true;
+      env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED = undefined;
       await expect(getCompanyBeverageStockOverview(operator)).resolves.toMatchObject({ canArchiveProducts: true });
       await expect(getCompanyBeverageStockOverview({ ...operator, role: "OWNER" })).resolves.toMatchObject({ canArchiveProducts: false });
       await archiveCompanyBeverageProduct(operator, input);
