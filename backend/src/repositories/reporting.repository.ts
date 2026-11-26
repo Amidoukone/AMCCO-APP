@@ -137,6 +137,8 @@ export type ReportTaskByActivity = {
   doneCount: number;
 };
 
+type ReportTaskActivityTotals = Omit<ReportTaskByActivity, "activityCode"> & { activityCode: BusinessActivityCode | null };
+
 export type ReportRoleDistribution = {
   role: RoleCode;
   count: number;
@@ -1141,40 +1143,21 @@ type DashboardWorkloadRow = RowDataPacket & {
   doneTasksCount: number;
 };
 
-type ReportFinanceByStatusRow = RowDataPacket & {
-  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
-  currency: string;
+type ReportFinanceBreakdownRow = RowDataPacket & {
   count: number;
   totalAmount: string;
-};
+} & (
+  | { dimension: "status"; bucket: ReportFinanceByStatus["status"]; currency: string }
+  | { dimension: "type"; bucket: ReportFinanceByType["type"]; currency: string; approvedAmount: string }
+  | { dimension: "activity"; bucket: BusinessActivityCode; approvedAmount: string }
+);
 
-type ReportFinanceByTypeRow = RowDataPacket & {
-  type: "CASH_IN" | "CASH_OUT";
-  currency: string;
-  count: number;
-  totalAmount: string;
-  approvedAmount: string;
-};
-
-type ReportFinanceByActivityRow = RowDataPacket & {
-  activityCode: BusinessActivityCode | null;
-  count: number;
-  totalAmount: string;
-  approvedAmount: string;
-};
-
-type ReportTaskByStatusRow = RowDataPacket & {
-  status: "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED";
-  count: number;
-};
-
-type ReportTaskByActivityRow = RowDataPacket & {
-  activityCode: BusinessActivityCode | null;
+type ReportTaskBreakdownRow = RowDataPacket & {
   totalCount: number;
-  openCount: number;
-  blockedCount: number;
-  doneCount: number;
-};
+} & (
+  | { dimension: "status"; bucket: ReportTaskByStatus["status"] }
+  | { dimension: "activity"; bucket: BusinessActivityCode | null; openCount: number; blockedCount: number; doneCount: number }
+);
 
 type ReportRoleDistributionRow = RowDataPacket & {
   role: RoleCode;
@@ -1650,175 +1633,133 @@ export async function listDashboardTaskActivitySummary(
   }));
 }
 
-export async function listReportFinanceByStatus(
+export async function getReportFinanceBreakdown(
   companyId: string,
   period?: ReportPeriodFilter
-): Promise<ReportFinanceByStatus[]> {
+): Promise<{
+  byStatus: ReportFinanceByStatus[];
+  byType: ReportFinanceByType[];
+  byActivity: ReportFinanceByActivity[];
+}> {
   const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
   const values: Array<string | number> = [companyId];
   appendPeriodFilters(filters, values, "occurred_at", period);
   appendActivityFilter(filters, values, "activity_code", period);
 
-  const rows = await queryRows<ReportFinanceByStatusRow[]>(
+  // Aggregating the filtered rows once lets MySQL reuse a small materialized
+  // result for each breakdown and keep all monetary arithmetic in DECIMAL.
+  const rows = await queryRows<ReportFinanceBreakdownRow[]>(
     `
-      SELECT
-        status AS status,
-        currency AS currency,
-        COUNT(*) AS count,
-        COALESCE(CAST(SUM(amount) AS CHAR), '0.00') AS totalAmount
-      FROM transactions
-      WHERE ${filters.join(" AND ")}
+      WITH finance_totals AS (
+        SELECT activity_code, status, type, currency, COUNT(*) AS row_count, SUM(amount) AS amount
+        FROM transactions
+        WHERE ${filters.join(" AND ")}
+        GROUP BY activity_code, status, type, currency
+      )
+      SELECT 'status' AS dimension, status AS bucket, currency,
+        CAST(SUM(row_count) AS UNSIGNED) AS count,
+        CAST(SUM(amount) AS CHAR) AS totalAmount, NULL AS approvedAmount,
+        FIELD(status, 'APPROVED', 'SUBMITTED', 'DRAFT', 'REJECTED') AS sortOrder
+      FROM finance_totals
       GROUP BY status, currency
-      ORDER BY FIELD(status, 'APPROVED', 'SUBMITTED', 'DRAFT', 'REJECTED'), currency ASC
-    `,
-    values
-  );
-
-  return rows.map((row) => ({
-    status: row.status,
-    currency: row.currency,
-    count: row.count,
-    totalAmount: row.totalAmount
-  }));
-}
-
-export async function listReportFinanceByType(
-  companyId: string,
-  period?: ReportPeriodFilter
-): Promise<ReportFinanceByType[]> {
-  const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
-  const values: Array<string | number> = [companyId];
-  appendPeriodFilters(filters, values, "occurred_at", period);
-  appendActivityFilter(filters, values, "activity_code", period);
-
-  const rows = await queryRows<ReportFinanceByTypeRow[]>(
-    `
-      SELECT
-        type AS type,
-        currency AS currency,
-        COUNT(*) AS count,
-        COALESCE(CAST(SUM(amount) AS CHAR), '0.00') AS totalAmount,
-        COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedAmount
-      FROM transactions
-      WHERE ${filters.join(" AND ")}
+      UNION ALL
+      SELECT 'type', type, currency,
+        CAST(SUM(row_count) AS UNSIGNED),
+        CAST(SUM(amount) AS CHAR),
+        CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') THEN amount ELSE 0 END) AS CHAR),
+        FIELD(type, 'CASH_IN', 'CASH_OUT')
+      FROM finance_totals
       GROUP BY type, currency
-      ORDER BY FIELD(type, 'CASH_IN', 'CASH_OUT'), currency ASC
-    `,
-    values
-  );
-
-  return rows.map((row) => ({
-    type: row.type,
-    currency: row.currency,
-    count: row.count,
-    totalAmount: row.totalAmount,
-    approvedAmount: row.approvedAmount
-  }));
-}
-
-export async function listReportFinanceByActivity(
-  companyId: string,
-  period?: ReportPeriodFilter
-): Promise<Array<{
-  activityCode: BusinessActivityCode | null;
-  count: number;
-  totalAmount: string;
-  approvedAmount: string;
-}>> {
-  const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
-  const values: Array<string | number> = [companyId];
-  appendPeriodFilters(filters, values, "occurred_at", period);
-  appendActivityFilter(filters, values, "activity_code", period);
-
-  const rows = await queryRows<ReportFinanceByActivityRow[]>(
-    `
-      SELECT
-        activity_code AS activityCode,
-        COUNT(*) AS count,
-        COALESCE(CAST(SUM(amount) AS CHAR), '0.00') AS totalAmount,
-        COALESCE(CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') THEN amount ELSE 0 END) AS CHAR), '0.00') AS approvedAmount
-      FROM transactions
-      WHERE ${filters.join(" AND ")}
+      UNION ALL
+      SELECT 'activity', activity_code, NULL,
+        CAST(SUM(row_count) AS UNSIGNED),
+        CAST(SUM(amount) AS CHAR),
+        CAST(SUM(CASE WHEN status IN ('SUBMITTED', 'APPROVED') THEN amount ELSE 0 END) AS CHAR),
+        0
+      FROM finance_totals
       GROUP BY activity_code
-      ORDER BY activity_code ASC
+      ORDER BY dimension, sortOrder, currency, bucket
     `,
     values
   );
 
-  return rows.map((row) => ({
-    activityCode: row.activityCode,
-    count: row.count ?? 0,
-    totalAmount: row.totalAmount,
-    approvedAmount: row.approvedAmount
-  }));
+  const byStatus: ReportFinanceByStatus[] = [];
+  const byType: ReportFinanceByType[] = [];
+  const byActivity: ReportFinanceByActivity[] = [];
+  for (const row of rows) {
+    const totals = { count: row.count, totalAmount: row.totalAmount };
+    switch (row.dimension) {
+      case "status":
+        byStatus.push({ status: row.bucket, currency: row.currency, ...totals });
+        break;
+      case "type":
+        byType.push({ type: row.bucket, currency: row.currency, approvedAmount: row.approvedAmount, ...totals });
+        break;
+      case "activity":
+        byActivity.push({ activityCode: row.bucket, approvedAmount: row.approvedAmount, ...totals });
+        break;
+    }
+  }
+  return { byStatus, byType, byActivity };
 }
 
-export async function listReportTaskByStatus(
+export async function getReportTaskBreakdown(
   companyId: string,
   period?: ReportPeriodFilter
-): Promise<ReportTaskByStatus[]> {
-  const filters: string[] = ["company_id = ?", "activity_code IS NOT NULL"];
-  const values: Array<string | number> = [companyId];
-  appendTaskPeriodFilters(filters, values, period);
-  appendActivityFilter(filters, values, "activity_code", period);
-
-  const rows = await queryRows<ReportTaskByStatusRow[]>(
-    `
-      SELECT
-        status AS status,
-        COUNT(*) AS count
-      FROM tasks
-      WHERE ${filters.join(" AND ")}
-      GROUP BY status
-      ORDER BY FIELD(status, 'BLOCKED', 'IN_PROGRESS', 'TODO', 'DONE')
-    `,
-    values
-  );
-
-  return rows.map((row) => ({
-    status: row.status,
-    count: row.count
-  }));
-}
-
-export async function listReportTaskByActivity(
-  companyId: string,
-  period?: ReportPeriodFilter
-): Promise<Array<{
-  activityCode: BusinessActivityCode | null;
-  totalCount: number;
-  openCount: number;
-  blockedCount: number;
-  doneCount: number;
-}>> {
+): Promise<{
+  byStatus: ReportTaskByStatus[];
+  byActivity: ReportTaskActivityTotals[];
+}> {
   const filters: string[] = ["company_id = ?"];
   const values: Array<string | number> = [companyId];
   appendTaskPeriodFilters(filters, values, period);
   appendActivityFilter(filters, values, "activity_code", period);
 
-  const rows = await queryRows<ReportTaskByActivityRow[]>(
+  const rows = await queryRows<ReportTaskBreakdownRow[]>(
     `
-      SELECT
-        activity_code AS activityCode,
-        COUNT(*) AS totalCount,
-        COALESCE(SUM(CASE WHEN status IN ('TODO', 'IN_PROGRESS', 'BLOCKED') THEN 1 ELSE 0 END), 0) AS openCount,
-        COALESCE(SUM(CASE WHEN status = 'BLOCKED' THEN 1 ELSE 0 END), 0) AS blockedCount,
-        COALESCE(SUM(CASE WHEN status = 'DONE' THEN 1 ELSE 0 END), 0) AS doneCount
-      FROM tasks
-      WHERE ${filters.join(" AND ")}
+      WITH task_totals AS (
+        SELECT activity_code, status, COUNT(*) AS row_count
+        FROM tasks
+        WHERE ${filters.join(" AND ")}
+        GROUP BY activity_code, status
+      )
+      SELECT 'status' AS dimension, status AS bucket,
+        CAST(SUM(row_count) AS UNSIGNED) AS totalCount,
+        NULL AS openCount, NULL AS blockedCount, NULL AS doneCount,
+        FIELD(status, 'BLOCKED', 'IN_PROGRESS', 'TODO', 'DONE') AS sortOrder
+      FROM task_totals
+      WHERE activity_code IS NOT NULL
+      GROUP BY status
+      UNION ALL
+      SELECT 'activity', activity_code,
+        CAST(SUM(row_count) AS UNSIGNED),
+        SUM(CASE WHEN status IN ('TODO', 'IN_PROGRESS', 'BLOCKED') THEN row_count ELSE 0 END),
+        SUM(CASE WHEN status = 'BLOCKED' THEN row_count ELSE 0 END),
+        SUM(CASE WHEN status = 'DONE' THEN row_count ELSE 0 END),
+        0
+      FROM task_totals
       GROUP BY activity_code
-      ORDER BY activity_code ASC
+      ORDER BY dimension, sortOrder, bucket
     `,
     values
   );
 
-  return rows.map((row) => ({
-    activityCode: row.activityCode,
-    totalCount: row.totalCount ?? 0,
-    openCount: row.openCount ?? 0,
-    blockedCount: row.blockedCount ?? 0,
-    doneCount: row.doneCount ?? 0
-  }));
+  const byStatus: ReportTaskByStatus[] = [];
+  const byActivity: ReportTaskActivityTotals[] = [];
+  for (const row of rows) {
+    if (row.dimension === "status") {
+      byStatus.push({ status: row.bucket, count: row.totalCount });
+    } else {
+      byActivity.push({
+        activityCode: row.bucket,
+        totalCount: row.totalCount,
+        openCount: row.openCount,
+        blockedCount: row.blockedCount,
+        doneCount: row.doneCount
+      });
+    }
+  }
+  return { byStatus, byActivity };
 }
 
 export async function listReportOperationalTransactions(

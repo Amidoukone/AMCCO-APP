@@ -18,7 +18,8 @@ type ProductRow = RowDataPacket & {
 };
 type Movement = RowDataPacket & { id: number; productId: string; kind: string; quantity: string; costValue: string; active: number };
 type Existing = RowDataPacket & { activityCode: string | null; metadataJson: unknown; status: string; occurredAt: Date };
-const productSelect = `SELECT p.id, p.name, p.unit, CAST(p.opening_quantity AS CHAR) AS openingQuantity,
+function productStockSelect(singleProduct: boolean): string {
+  return `SELECT p.id, p.name, p.unit, CAST(p.opening_quantity AS CHAR) AS openingQuantity,
   CAST(p.opening_value AS CHAR) AS openingValue, p.created_at AS initializedAt,
   CAST(p.opening_quantity + COALESCE(m.quantity_change, 0) AS CHAR) AS quantity,
   CAST(p.opening_value + COALESCE(m.value_change, 0) AS CHAR) AS stockValue,
@@ -34,11 +35,24 @@ const productSelect = `SELECT p.id, p.name, p.unit, CAST(p.opening_quantity AS C
       SUM(IF(kind = 'VENTE', quantity, 0)) AS sold_quantity,
       SUM(IF(kind = 'LOSS', quantity, 0)) AS lost_quantity,
       SUM(IF(kind = 'LOSS', cost_value, 0)) AS lost_value
-    FROM beverage_stock_movements WHERE company_id = ? AND active = 1
+    FROM beverage_stock_movements WHERE company_id = ? AND active = 1${singleProduct ? " AND product_id = ?" : ""}
     GROUP BY company_id, product_id
   ) m ON m.product_id = p.id AND m.company_id = p.company_id
-  WHERE p.company_id = ?`;
-const activeProducts = `${productSelect} AND p.archived_at IS NULL`;
+  WHERE p.company_id = ?${singleProduct ? " AND p.id = ?" : ""}`;
+}
+
+const activeProducts = `${productStockSelect(false)} AND p.archived_at IS NULL`;
+const productById = productStockSelect(true);
+
+async function findProductStock(
+  connection: PoolConnection, companyId: string, productId: string, includeArchived = false
+): Promise<ProductRow | undefined> {
+  const [rows] = await connection.query<ProductRow[]>(
+    includeArchived ? productById : `${productById} AND p.archived_at IS NULL`,
+    [companyId, productId, companyId, productId]
+  );
+  return rows[0];
+}
 
 function rethrowStockError(error: unknown): never {
   const databaseError = error as { code?: string; message?: string };
@@ -90,11 +104,9 @@ export async function createBeverageProduct(input: {
     await connection.execute(`INSERT INTO audit_logs (id, company_id, actor_id, action, entity_type, entity_id, metadata)
       VALUES (?, ?, ?, 'BEVERAGE_PRODUCT_OPENED', 'BEVERAGE_PRODUCT', ?, ?)`, [randomUUID(), input.companyId, input.actorId, id,
       JSON.stringify({ name, unit, openingQuantity: input.openingQuantity, openingUnitCost: input.openingUnitCost, openingValue: stockFormat(quantity * cost, 9) })]);
-    const [products] = await connection.query<ProductRow[]>(
-      `${activeProducts} AND p.id = ?`, [input.companyId, input.companyId, id]
-    );
-    if (!products[0]) throw new HttpError(500, "Impossible de recharger le produit créé.");
-    const product = toProduct(products[0]);
+    const row = await findProductStock(connection, input.companyId, id);
+    if (!row) throw new HttpError(500, "Impossible de recharger le produit créé.");
+    const product = toProduct(row);
     await connection.commit();
     return product;
   } catch (error) {
@@ -111,10 +123,7 @@ export async function archiveBeverageProduct(input: {
   try {
     await connection.beginTransaction();
     await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
-    const [products] = await connection.query<ProductRow[]>(
-      `${activeProducts} AND p.id = ?`, [input.companyId, input.companyId, input.productId]
-    );
-    const product = products[0];
+    const product = await findProductStock(connection, input.companyId, input.productId);
     if (!product) throw new HttpError(404, "Produit introuvable dans le stock actif.");
     if (stockDecimal(product.quantity, 3) !== stockDecimal(input.expectedQuantity, 3)) {
       throw new HttpError(409, "Le stock a changé. Vérifiez la quantité disponible avant de confirmer la suppression.");
@@ -189,9 +198,8 @@ export async function recordBeverageStockLoss(input: {
   try {
     await connection.beginTransaction();
     await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
-    const [products] = await connection.query<ProductRow[]>(activeProducts, [input.companyId, input.companyId]);
-    const product = products.find((row) => row.id === input.productId);
-    if (!product) throw new HttpError(404, "Produit introuvable.");
+    const product = await findProductStock(connection, input.companyId, input.productId);
+    if (product?.id !== input.productId) throw new HttpError(404, "Produit introuvable.");
     const available = stockDecimal(product.quantity, 3);
     if (input.expectedQuantity !== undefined && available !== stockDecimal(input.expectedQuantity, 3)) {
       throw new HttpError(409, "Le stock a changé. Vérifiez la quantité de pièces avant de confirmer la perte.");
@@ -253,9 +261,8 @@ export async function countBeverageProduct(input: { companyId: string; actorId: 
   try {
     await connection.beginTransaction();
     await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
-    const [products] = await connection.query<ProductRow[]>(activeProducts, [input.companyId, input.companyId]);
-    const product = products.find((row) => row.id === input.productId);
-    if (!product) throw new HttpError(404, "Produit introuvable.");
+    const product = await findProductStock(connection, input.companyId, input.productId);
+    if (product?.id !== input.productId) throw new HttpError(404, "Produit introuvable.");
     const available = stockDecimal(product.quantity, 3), counted = stockDecimal(input.countedQuantity, 3);
     if (available !== stockDecimal(input.expectedQuantity, 3)) throw new HttpError(409, "Le stock a changé pendant le comptage. Actualisez et vérifiez à nouveau la quantité physique.");
     const delta = counted - available;
@@ -347,9 +354,8 @@ export async function withBeverageStockWrite(
 
     let movement: { productId: string; quantity: string; costValue: string } | undefined;
     if (isSave && isStockOperation && metadata.beverageProductId) {
-      const [products] = await connection.query<ProductRow[]>(sameStock ? productSelect : activeProducts, [input.companyId, input.companyId]);
-      const product = products.find((row) => row.id === metadata.beverageProductId);
-      if (!product) throw new HttpError(400, "Produit introuvable dans le stock de cette entreprise.");
+      const product = await findProductStock(connection, input.companyId, metadata.beverageProductId, sameStock);
+      if (product?.id !== metadata.beverageProductId) throw new HttpError(400, "Produit introuvable dans le stock de cette entreprise.");
       // Financial dates may be backdated, but a stock movement cannot predate its physical opening count.
       if (input.occurredAt && input.occurredAt.toISOString().slice(0, 10) < new Date(product.initializedAt).toISOString().slice(0, 10)) throw new HttpError(400, "La date de l'opération précède le stock de départ de ce produit. Vérifiez la date.");
       const quantity = stockDecimal(metadata.quantity || "0", 3);
@@ -370,9 +376,8 @@ export async function withBeverageStockWrite(
     }
     if (changesStock && old?.active === 1) {
       // Removing a purchase must never leave a negative stock, including concurrent edits.
-      const [products] = await connection.query<ProductRow[]>(productSelect, [input.companyId, input.companyId]);
-      const product = products.find((row) => row.id === old.productId);
-      if (product && (product.quantity.startsWith("-") || product.stockValue.startsWith("-"))) throw new HttpError(409, "Ce mouvement est nécessaire au stock existant et ne peut pas être retiré.");
+      const product = await findProductStock(connection, input.companyId, old.productId, true);
+      if (product?.id === old.productId && (product.quantity.startsWith("-") || product.stockValue.startsWith("-"))) throw new HttpError(409, "Ce mouvement est nécessaire au stock existant et ne peut pas être retiré.");
     }
     await write(connection, metadata);
     if (movement && changesStock) {

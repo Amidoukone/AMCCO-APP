@@ -75,7 +75,12 @@ beforeEach(() => {
         }
         throw new Error(`Unexpected SQL: ${sql}`);
       },
-      query: async (sql: string, values: unknown[]) => { expect(sql).toContain("p.company_id = ?"); expect(values).toEqual(["company-a", "company-a"]); return [products(local)]; },
+      query: async (sql: string, values: unknown[]) => {
+        expect(sql).toContain("company_id = ? AND active = 1 AND product_id = ?");
+        expect(sql).toContain("p.company_id = ? AND p.id = ?");
+        expect(values).toEqual(["company-a", values[3], "company-a", values[3]]);
+        return [products(local).filter((product) => product.id === values[3])];
+      },
       commit: async () => { state = local; unlock?.(); },
       rollback: async () => { unlock?.(); }, release: () => {},
       persist: (id: string, metadata: { [key: string]: string }) => {

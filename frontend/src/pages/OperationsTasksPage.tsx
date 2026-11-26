@@ -799,7 +799,7 @@ export function OperationsTasksPage(): JSX.Element {
   }, [totalVisibleTaskPages]);
 
   async function handleLoadMoreTasks(): Promise<void> {
-    if (isLoading || isLoadingMoreTasks || !hasMoreTasks) {
+    if (isLoading || isLoadingMoreTasks || !hasMoreTasks || searchQuery.trim() !== debouncedSearch) {
       return;
     }
     await loadData({
@@ -1559,6 +1559,18 @@ export function OperationsTasksPage(): JSX.Element {
           </div>
           {renderVisibleTasksPagination("bottom")}
           </>
+        ) : null}
+        {!isLoading && hasMoreTasks ? (
+          <div className="list-pagination">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => void handleLoadMoreTasks()}
+              disabled={isLoadingMoreTasks || searchQuery.trim() !== debouncedSearch}
+            >
+              {isLoadingMoreTasks ? "Chargement…" : "Charger plus"}
+            </button>
+          </div>
         ) : null}
       </section>
     );

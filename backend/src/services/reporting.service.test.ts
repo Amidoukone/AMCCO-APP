@@ -19,9 +19,6 @@ import {
   listDashboardRecentTransactions,
   listDashboardTaskActivitySummary,
   listDashboardWorkload,
-  listReportFinanceByActivity,
-  listReportFinanceByStatus,
-  listReportFinanceByType,
   listReportBtpTransactions,
   listReportGeneralStoreInventorySnapshots,
   listReportGeneralStoreTransactions,
@@ -30,8 +27,12 @@ import {
   listReportOperationalTransactions,
   listReportRentalTransactions,
   listReportRoleDistribution,
-  listReportTaskByActivity,
-  listReportTaskByStatus,
+  getReportTaskBreakdown,
+  type ReportFinanceByActivity,
+  type ReportFinanceByStatus,
+  type ReportFinanceByType,
+  type ReportTaskByActivity,
+  type ReportTaskByStatus,
 } from "../repositories/reporting.repository.js";
 import {
   getFinancialAccountsSummary,
@@ -40,6 +41,14 @@ import {
 import { listRentalTenants } from "../repositories/rental-tenants.repository.js";
 import { listGeneralStoreShops } from "../repositories/general-store-shops.repository.js";
 import { listBtpProjects } from "../repositories/btp-projects.repository.js";
+
+const { listReportFinanceByActivity, listReportFinanceByStatus, listReportFinanceByType, listReportTaskByActivity, listReportTaskByStatus } = vi.hoisted(() => ({
+  listReportFinanceByActivity: vi.fn<() => Promise<ReportFinanceByActivity[]>>(),
+  listReportFinanceByStatus: vi.fn<() => Promise<ReportFinanceByStatus[]>>(),
+  listReportFinanceByType: vi.fn<() => Promise<ReportFinanceByType[]>>(),
+  listReportTaskByActivity: vi.fn<() => Promise<ReportTaskByActivity[]>>(),
+  listReportTaskByStatus: vi.fn<() => Promise<ReportTaskByStatus[]>>()
+}));
 
 vi.mock("../repositories/reporting.repository.js", () => ({
   getDashboardCompanySummary: vi.fn(),
@@ -52,9 +61,11 @@ vi.mock("../repositories/reporting.repository.js", () => ({
   listDashboardRecentTransactions: vi.fn(),
   listDashboardTaskActivitySummary: vi.fn(),
   listDashboardWorkload: vi.fn(),
-  listReportFinanceByActivity: vi.fn(),
-  listReportFinanceByStatus: vi.fn(),
-  listReportFinanceByType: vi.fn(),
+  getReportFinanceBreakdown: vi.fn(async () => ({
+    byActivity: await listReportFinanceByActivity(),
+    byStatus: await listReportFinanceByStatus(),
+    byType: await listReportFinanceByType()
+  })),
   listReportBtpTransactions: vi.fn(),
   listReportGeneralStoreInventorySnapshots: vi.fn(),
   listReportGeneralStoreTransactions: vi.fn(),
@@ -63,8 +74,10 @@ vi.mock("../repositories/reporting.repository.js", () => ({
   listReportOperationalTransactions: vi.fn(),
   listReportRentalTransactions: vi.fn(),
   listReportRoleDistribution: vi.fn(),
-  listReportTaskByActivity: vi.fn(),
-  listReportTaskByStatus: vi.fn(),
+  getReportTaskBreakdown: vi.fn(async () => ({
+    byActivity: await listReportTaskByActivity(),
+    byStatus: await listReportTaskByStatus()
+  })),
 }));
 
 vi.mock("../repositories/finance.repository.js", () => ({
@@ -1084,8 +1097,7 @@ describe("reporting.service", () => {
       }]
     });
     expect(result.operationalPerformance).toEqual([]);
-    expect(listReportTaskByStatus).not.toHaveBeenCalled();
-    expect(listReportTaskByActivity).not.toHaveBeenCalled();
+    expect(getReportTaskBreakdown).not.toHaveBeenCalled();
     expect(listReportOperationalTasks).not.toHaveBeenCalled();
 
     const pdf = await renderReportArtifact(actor, {

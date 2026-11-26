@@ -784,9 +784,19 @@ export async function listFinancialTransactions(input: {
   ]);
   filters.push(...search.filters);
   values.push(...search.values, input.limit, input.offset);
+  const order = "t.occurred_at DESC, t.created_at DESC, t.id DESC";
 
   const rows = await queryRows<TransactionRow[]>(
     `
+      WITH selected_transactions AS (
+        SELECT t.id
+        FROM transactions t
+        INNER JOIN financial_accounts fa ON fa.id = t.account_id
+        INNER JOIN users cu ON cu.id = t.created_by_id
+        WHERE ${filters.join(" AND ")}
+        ORDER BY ${order}
+        LIMIT ? OFFSET ?
+      )
       SELECT
         t.id AS id,
         t.company_id AS companyId,
@@ -824,14 +834,13 @@ export async function listFinancialTransactions(input: {
           FROM transaction_proofs tp
           WHERE tp.transaction_id = t.id
         ) AS proofsCount
-      FROM transactions t
+      FROM selected_transactions page
+      INNER JOIN transactions t ON t.id = page.id
       INNER JOIN financial_accounts fa ON fa.id = t.account_id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users vu ON vu.id = t.validated_by_id
       LEFT JOIN users su ON su.id = t.salary_confirmed_by_id
-      WHERE ${filters.join(" AND ")}
-      ORDER BY t.occurred_at DESC, t.created_at DESC
-      LIMIT ? OFFSET ?
+      ORDER BY ${order}
     `,
     values
   );

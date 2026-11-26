@@ -226,9 +226,21 @@ export async function listOperationsTasks(input: {
   ]);
   filters.push(...search.filters);
   values.push(...search.values, input.limit, input.offset);
+  const order = `t.created_at DESC, t.updated_at DESC,
+    CASE t.status WHEN 'BLOCKED' THEN 0 WHEN 'IN_PROGRESS' THEN 1 WHEN 'TODO' THEN 2 ELSE 3 END ASC,
+    COALESCE(t.due_date, '9999-12-31') ASC, t.id DESC`;
 
   const rows = await queryRows<OperationTaskRow[]>(
     `
+      WITH selected_tasks AS (
+        SELECT t.id
+        FROM tasks t
+        INNER JOIN users cu ON cu.id = t.created_by_id
+        ${search.filters.length ? "LEFT JOIN users au ON au.id = t.assigned_to_id" : ""}
+        WHERE ${filters.join(" AND ")}
+        ORDER BY ${order}
+        LIMIT ? OFFSET ?
+      )
       SELECT
         t.id AS id,
         t.company_id AS companyId,
@@ -246,21 +258,11 @@ export async function listOperationsTasks(input: {
         t.due_date AS dueDate,
         t.created_at AS createdAt,
         t.updated_at AS updatedAt
-      FROM tasks t
+      FROM selected_tasks page
+      INNER JOIN tasks t ON t.id = page.id
       INNER JOIN users cu ON cu.id = t.created_by_id
       LEFT JOIN users au ON au.id = t.assigned_to_id
-      WHERE ${filters.join(" AND ")}
-      ORDER BY
-        t.created_at DESC,
-        t.updated_at DESC,
-        CASE t.status
-          WHEN 'BLOCKED' THEN 0
-          WHEN 'IN_PROGRESS' THEN 1
-          WHEN 'TODO' THEN 2
-          ELSE 3
-        END ASC,
-        COALESCE(t.due_date, '9999-12-31') ASC
-      LIMIT ? OFFSET ?
+      ORDER BY ${order}
     `,
     values
   );

@@ -14,6 +14,8 @@ import {
   listDashboardFinanceActivitySummary,
   getDashboardFinanceSummary,
   getDashboardOperationsSummary,
+  getReportFinanceBreakdown,
+  getReportTaskBreakdown,
   listGeneralStoreLedgerTransactions,
   listDashboardOperationalTasks,
   listDashboardOperationalTransactions,
@@ -21,9 +23,6 @@ import {
   listDashboardRecentTransactions,
   listDashboardTaskActivitySummary,
   listDashboardWorkload,
-  listReportFinanceByActivity,
-  listReportFinanceByStatus,
-  listReportFinanceByType,
   listReportBtpTransactions,
   listReportGeneralStoreInventorySnapshots,
   listReportGeneralStoreTransactions,
@@ -31,8 +30,6 @@ import {
   listReportOperationalTasks,
   listReportOperationalTransactions,
   listReportRentalTransactions,
-  listReportTaskByActivity,
-  listReportTaskByStatus,
   type ReportPeriodFilter,
   type AgricultureOperationsReport,
   type AgencyOperationsReport,
@@ -11659,27 +11656,19 @@ export async function getCompanyReportsOverview(
   // specialised data is deliberately fetched only after these shared metrics
   // have completed, so opening a report cannot starve ordinary transactions.
   const [
-    financeByStatus,
-    financeByType,
-    financeByActivity,
+    { byStatus: financeByStatus, byType: financeByType, byActivity: financeByActivity },
     financialAccounts,
-    taskByStatus,
-    taskByActivity,
+    { byStatus: taskByStatus, byActivity: taskByActivity },
     operationalTransactions,
     operationalTasks,
   ] = await Promise.all([
-    listReportFinanceByStatus(actor.companyId, filters),
-    listReportFinanceByType(actor.companyId, filters),
-    listReportFinanceByActivity(actor.companyId, filters),
+    getReportFinanceBreakdown(actor.companyId, filters),
     isTransportReport
       ? Promise.resolve([])
       : listFinancialAccounts({ companyId: actor.companyId }),
     isTransportReport
-      ? Promise.resolve([])
-      : listReportTaskByStatus(actor.companyId, filters),
-    isTransportReport
-      ? Promise.resolve([])
-      : listReportTaskByActivity(actor.companyId, filters),
+      ? Promise.resolve({ byStatus: [], byActivity: [] })
+      : getReportTaskBreakdown(actor.companyId, filters),
     includeDetails ? listReportOperationalTransactions(actor.companyId, filters) : Promise.resolve([]),
     includeDetails && !isTransportReport ? listReportOperationalTasks(actor.companyId, filters) : Promise.resolve([]),
   ]);

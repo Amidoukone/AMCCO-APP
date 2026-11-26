@@ -20,6 +20,8 @@ describe("finance.repository", () => {
     expect(sql).toContain("t.created_by_id = ?");
     expect(sql).toContain("t.activity_code = ?");
     expect(sql.indexOf("LIKE ? ESCAPE")).toBeLessThan(sql.indexOf("LIMIT ? OFFSET ?"));
+    expect(sql.indexOf("AS proofsCount")).toBeGreaterThan(sql.indexOf("LIMIT ? OFFSET ?"));
+    expect(sql.match(/ORDER BY t\.occurred_at DESC, t\.created_at DESC, t\.id DESC/g)).toHaveLength(2);
     expect(sql).not.toContain("ciment");
     expect(values.slice(0, 3)).toEqual(["company-1", "operator-1", "HARDWARE"]);
     expect(values.slice(3, -2)).toEqual([...Array(8).fill("%ciment%"), ...Array(8).fill("%50!%%")]);

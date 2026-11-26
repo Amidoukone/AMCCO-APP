@@ -255,6 +255,21 @@ try {
     const replacement = await stock.addCompanyBeverageProduct(operator, { name: product.name, unit: product.unit, openingQuantity: "0", openingUnitCost: "0" });
     assert.notEqual(replacement.id, product.id);
     assert.equal(Number(replacement.quantity), 0);
+    const movedSale = await post(operator, "VENTE", "2", "150", second.id);
+    const moveSaleTo = (productId) => finance.updateCompanyTransaction(operator, {
+      transactionId: movedSale.id, accountId: movedSale.accountId, activityCode: movedSale.activityCode, type: movedSale.type,
+      amount: movedSale.amount, currency: movedSale.currency, metadata: { ...movedSale.metadata, beverageProductId: productId },
+      occurredAt: movedSale.occurredAt
+    });
+    await assert.rejects(moveSaleTo(replacement.id), (error) => error.statusCode === 409);
+    assert.equal(Number((await available(second.id)).quantity), 8);
+    const destination = await stock.addCompanyBeverageProduct(operator, {
+      name: "Review moved sale destination", unit: "casier", openingQuantity: "5", openingUnitCost: "120"
+    });
+    const updatedSale = await moveSaleTo(destination.id);
+    assert.equal(updatedSale.metadata.beverageStockCost, "240.000000000");
+    assert.equal(Number((await available(second.id)).quantity), 10);
+    assert.equal(Number((await available(destination.id)).quantity), 3);
     if (process.env.AMCCO_MYSQLDUMP_PATH) {
       const { stdout: dump } = await promisify(execFile)(process.env.AMCCO_MYSQLDUMP_PATH, [
         "--no-defaults", "--protocol=TCP", `--host=${source.hostname === "[::1]" ? "::1" : source.hostname}`,
