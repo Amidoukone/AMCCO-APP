@@ -1,6 +1,8 @@
 import { HttpError } from "../errors/http-error.js";
+import { env } from "../config/env.js";
 import type { RoleCode } from "../types/role.js";
 import {
+  archiveBeverageProduct,
   cancelBeverageStockLoss,
   countBeverageProduct,
   createBeverageProduct,
@@ -13,6 +15,10 @@ import { ensureCompanyActivityEnabledOrThrow } from "./company-activities.servic
 type Actor = { companyId: string; actorId: string; role: RoleCode };
 const readers: RoleCode[] = ["SYS_ADMIN", "OWNER", "ACCOUNTANT", "SUPERVISOR", "EMPLOYEE", "BEVERAGE_DEPOT_OPERATOR"];
 const writers: RoleCode[] = ["SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"];
+
+function isProductArchiveEnabled(): boolean {
+  return env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED ?? env.NODE_ENV !== "production";
+}
 
 export async function getCompanyBeverageStock(actor: Actor) {
   if (!readers.includes(actor.role)) throw new HttpError(403, "Accès au stock du dépôt non autorisé.");
@@ -27,7 +33,7 @@ export async function getCompanyBeverageStockOverview(actor: Actor) {
     listBeverageProducts(actor.companyId),
     listBeverageStockLosses(actor.companyId, { limit: 50 })
   ]);
-  return { items, losses };
+  return { items, losses, canArchiveProducts: writers.includes(actor.role) && isProductArchiveEnabled() };
 }
 
 export async function listCompanyBeverageLosses(actor: Actor, filters: { dateFrom?: string; dateTo?: string; limit?: number } = {}) {
@@ -51,6 +57,13 @@ export async function recordCompanyBeverageLoss(actor: Actor, input: {
   if (!writers.includes(actor.role)) throw new HttpError(403, "Déclaration de perte non autorisée.");
   await ensureCompanyActivityEnabledOrThrow(actor.companyId, "BEVERAGE_DEPOT");
   return recordBeverageStockLoss({ ...input, companyId: actor.companyId, actorId: actor.actorId });
+}
+
+export async function archiveCompanyBeverageProduct(actor: Actor, input: { productId: string; expectedQuantity: string }) {
+  if (!writers.includes(actor.role)) throw new HttpError(403, "Suppression de produit non autorisée.");
+  await ensureCompanyActivityEnabledOrThrow(actor.companyId, "BEVERAGE_DEPOT");
+  if (!isProductArchiveEnabled()) throw new HttpError(403, "La suppression de produits est actuellement désactivée.");
+  await archiveBeverageProduct({ ...input, companyId: actor.companyId, actorId: actor.actorId });
 }
 
 export async function cancelCompanyBeverageLoss(actor: Actor, lossId: string) {

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ApiError,
+  archiveBeverageProductRequest,
   cancelBeverageLossRequest,
   countBeverageStockRequest,
   createBeverageProductRequest,
@@ -9,6 +10,7 @@ import {
 import { useAuthorizedRequest } from "../lib/useAuthorizedRequest";
 import { useFormChanges } from "../lib/useFormChanges";
 import type { BeverageProduct, BeverageStockLoss } from "../types/beverage-stock";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 const number = (value: string | number) => Number(value).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
 const money = (value: string | number) => Number(value).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
@@ -40,9 +42,10 @@ function writeError(error: unknown): string {
   return error instanceof Error ? error.message : "L'enregistrement n'a pas pu être confirmé.";
 }
 
-export function BeverageStockPanel({ items, losses = [], loading, error, refresh, canManage, canCount, onOperation }: {
+export function BeverageStockPanel({ items, losses = [], loading, error, refresh, canManage, canCount, canArchiveProducts, onOperation }: {
   items: BeverageProduct[]; losses?: BeverageStockLoss[]; loading: boolean; error: string | null; refresh: () => Promise<void>;
   canManage: boolean; canCount: boolean; onOperation: (product: BeverageProduct, kind: "VENTE" | "ACHAT_STOCK") => void;
+  canArchiveProducts: boolean;
 }) {
   const authorize = useAuthorizedRequest();
   const [query, setQuery] = useState("");
@@ -50,6 +53,8 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
   const [lossForm, setLossForm] = useState(emptyLoss);
   const [lossOpen, setLossOpen] = useState(false);
   const [confirmCancelLossId, setConfirmCancelLossId] = useState<string | null>(null);
+  const [pendingArchive, setPendingArchive] = useState<BeverageProduct | null>(null);
+  const closeArchiveDialog = useCallback(() => setPendingArchive(null), []);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -135,7 +140,27 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
       await authorize((token) => cancelBeverageLossRequest(token, loss.id));
       if (!alive.current) return;
       setConfirmCancelLossId(null);
-      setNotice({ kind: "success", text: `Perte annulée. ${number(loss.quantity)} ${quantityUnit(loss.quantity, loss.unit)} de ${loss.productName} remis en stock.` });
+      setNotice({ kind: "success", text: `Perte annulée pour ${loss.productName}.` });
+      await refresh();
+    } catch (failure) {
+      if (alive.current) { setNotice({ kind: "error", text: writeError(failure) }); await refresh(); }
+    } finally { if (alive.current) setSaving(false); }
+  }
+  async function confirmArchive() {
+    if (!canArchiveProducts || !pendingArchive || !ready || saving) return;
+    const product = pendingArchive;
+    setPendingArchive(null);
+    setSaving(true); setNotice(null);
+    try {
+      await authorize((token) => archiveBeverageProductRequest(token, product.id, product.quantity));
+      if (!alive.current) return;
+      if (lossForm.productId === product.id) {
+        lossChanges.markClean(); setLossForm(emptyLoss()); setLossOpen(false);
+      }
+      if (counting?.id === product.id) {
+        countChanges.markClean(); setCounting(null);
+      }
+      setNotice({ kind: "success", text: `${product.name} et son stock ont été retirés du stock actif.` });
       await refresh();
     } catch (failure) {
       if (alive.current) { setNotice({ kind: "error", text: writeError(failure) }); await refresh(); }
@@ -192,7 +217,7 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
         <div><span>Produits suivis</span><strong>{items.length}</strong></div>
         <div><span>En rupture</span><strong>{items.filter((item) => Number(item.quantity) === 0).length}</strong></div>
         <div><span>Valeur du stock</span><strong>{money(items.reduce((total, item) => total + Number(item.stockValue), 0))} XOF</strong></div>
-        <div><span>Pertes enregistrées</span><strong>{money(totalLostValue)} XOF</strong></div>
+        <div><span>Pertes des produits suivis</span><strong>{money(totalLostValue)} XOF</strong></div>
       </div>
       <label className="operations-inline-group"><span>Rechercher un produit en stock</span><input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Nom ou unité du produit" /></label>
       <p className="hint">Stock commun au dépôt, dans l'unité indiquée pour chaque produit.</p>
@@ -204,10 +229,23 @@ export function BeverageStockPanel({ items, losses = [], loading, error, refresh
           <td data-label="Perdu"><span>{number(item.lostQuantity ?? "0")} {quantityUnit(item.lostQuantity ?? "0", item.unit)}{Number(item.lostValue ?? 0) > 0 ? <small className="hint"> · {money(item.lostValue ?? "0")} XOF</small> : null}</span></td>
           <td data-label="Coût moyen">{money(item.averageUnitCost)} XOF / {item.unit}</td>
           <td data-label="Valeur">{money(item.stockValue)} XOF</td>
-          {canManage ? <td data-label="Action"><div className="actions-inline"><button type="button" disabled={!ready || saving || Number(item.quantity) <= 0} onClick={() => onOperation(item, "VENTE")}>Vendre</button><button type="button" className="secondary-btn" disabled={!ready || saving} onClick={() => onOperation(item, "ACHAT_STOCK")}>Approvisionner</button><button type="button" className="secondary-btn" disabled={!ready || saving || Number(item.quantity) <= 0} onClick={() => openLossForProduct(item)}>Perte</button></div></td> : null}
+          {canManage ? <td data-label="Action"><div className="actions-inline"><button type="button" disabled={!ready || saving || Number(item.quantity) <= 0} onClick={() => onOperation(item, "VENTE")}>Vendre</button><button type="button" className="secondary-btn" disabled={!ready || saving} onClick={() => onOperation(item, "ACHAT_STOCK")}>Approvisionner</button><button type="button" className="secondary-btn" disabled={!ready || saving || Number(item.quantity) <= 0} onClick={() => openLossForProduct(item)}>Perte</button>
+            {canArchiveProducts ? <button type="button" className="secondary-btn" disabled={!ready || saving} onClick={() => setPendingArchive(item)}>Supprimer</button> : null}
+          </div></td> : null}
         </tr>)}
       </tbody></table></div> : <p role="status">Aucun produit ne correspond à cette recherche.</p>}
     </> : null}
+    {canManage && canArchiveProducts && pendingArchive ? <ConfirmDialog
+      open
+      title="Supprimer le produit et son stock ?"
+      description="Le produit sera retiré des listes de vente et d’approvisionnement."
+      objectLabel="Produit et stock disponible"
+      objectName={`${pendingArchive.name} · ${number(pendingArchive.quantity)} ${quantityUnit(pendingArchive.quantity, pendingArchive.unit)}`}
+      impactText="Les achats, ventes et pertes enregistrés restent dans l’historique."
+      confirmLabel="Supprimer le produit"
+      onCancel={closeArchiveDialog}
+      onConfirm={() => void confirmArchive()}
+    /> : null}
     {ready && items.length === 0 ? <div className="beverage-stock-empty">
       <h4>Aucun produit enregistré</h4>
       <p>{canManage ? "Ajoutez votre premier produit, puis enregistrez les achats pour alimenter son stock." : "Les produits apparaîtront ici une fois enregistrés par l'opérateur ou le comptable."}</p>

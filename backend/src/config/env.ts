@@ -47,6 +47,7 @@ const envSchema = z.object({
   DB_SSL: z.preprocess(booleanLike, z.boolean()).default(false),
   DB_SSL_REJECT_UNAUTHORIZED: z.preprocess(booleanLike, z.boolean()).default(true),
   DB_SSL_CA: z.preprocess(escapedNewlinesToNewlines, z.string().optional()),
+  BEVERAGE_PRODUCT_ARCHIVE_ENABLED: z.preprocess(booleanLike, z.boolean().optional()),
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(60000).default(900000),
   AUTH_RATE_LIMIT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(10),
   IMAGEKIT_PUBLIC_KEY: z.preprocess(emptyStringToUndefined, z.string().optional()),

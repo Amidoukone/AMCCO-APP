@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "../config/env.js";
 import {
+  archiveBeverageProduct,
   cancelBeverageStockLoss,
   countBeverageProduct,
   createBeverageProduct,
@@ -10,6 +12,7 @@ import {
 import { ensureCompanyActivityEnabledOrThrow } from "./company-activities.service.js";
 import {
   addCompanyBeverageProduct,
+  archiveCompanyBeverageProduct,
   cancelCompanyBeverageLoss,
   countCompanyBeverageStock,
   getCompanyBeverageStock,
@@ -18,6 +21,7 @@ import {
   recordCompanyBeverageLoss
 } from "./beverage-stock.service.js";
 vi.mock("../repositories/beverage-stock.repository.js", () => ({
+  archiveBeverageProduct: vi.fn(),
   cancelBeverageStockLoss: vi.fn(),
   countBeverageProduct: vi.fn(),
   createBeverageProduct: vi.fn(),
@@ -39,13 +43,44 @@ describe("beverage stock access", () => {
   it("loads stock and recent losses together in one overview call", async () => {
     vi.mocked(listBeverageProducts).mockResolvedValueOnce([]);
     vi.mocked(listBeverageStockLosses).mockResolvedValueOnce([]);
-    await expect(getCompanyBeverageStockOverview(operator)).resolves.toEqual({ items: [], losses: [] });
+    await expect(getCompanyBeverageStockOverview(operator)).resolves.toEqual({ items: [], losses: [], canArchiveProducts: true });
     expect(listBeverageProducts).toHaveBeenCalledWith(operator.companyId);
     expect(listBeverageStockLosses).toHaveBeenCalledWith(operator.companyId, { limit: 50 });
   });
   it("allows the operator to create a distinct product and its physical opening count", async () => {
     await addCompanyBeverageProduct(operator, product);
     expect(createBeverageProduct).toHaveBeenCalledWith({ ...product, companyId: operator.companyId, actorId: operator.actorId });
+  });
+  it("restricts product removal to stock writers in the active company", async () => {
+    const input = { productId: "coca", expectedQuantity: "10" };
+    for (const role of ["BEVERAGE_DEPOT_OPERATOR", "ACCOUNTANT", "SYS_ADMIN"] as const) {
+      await archiveCompanyBeverageProduct({ ...operator, role }, input);
+    }
+    for (const role of ["OWNER", "SUPERVISOR", "EMPLOYEE", "HARDWARE_OPERATOR", "HYDROCARBON_OPERATOR"] as const) {
+      await expect(archiveCompanyBeverageProduct({ ...operator, role }, input)).rejects.toMatchObject({ statusCode: 403 });
+    }
+    expect(archiveBeverageProduct).toHaveBeenCalledTimes(3);
+    expect(archiveBeverageProduct).toHaveBeenCalledWith({ ...input, companyId: operator.companyId, actorId: operator.actorId });
+  });
+  it("requires explicit activation in production and leaves stock readable while disabled", async () => {
+    const previousMode = env.NODE_ENV;
+    const previousFlag = env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED;
+    try {
+      env.NODE_ENV = "production";
+      env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED = undefined;
+      const input = { productId: "coca", expectedQuantity: "10" };
+      await expect(getCompanyBeverageStockOverview(operator)).resolves.toMatchObject({ canArchiveProducts: false });
+      await expect(archiveCompanyBeverageProduct(operator, input)).rejects.toMatchObject({ statusCode: 403 });
+      expect(archiveBeverageProduct).not.toHaveBeenCalled();
+      env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED = true;
+      await expect(getCompanyBeverageStockOverview(operator)).resolves.toMatchObject({ canArchiveProducts: true });
+      await expect(getCompanyBeverageStockOverview({ ...operator, role: "OWNER" })).resolves.toMatchObject({ canArchiveProducts: false });
+      await archiveCompanyBeverageProduct(operator, input);
+      expect(archiveBeverageProduct).toHaveBeenCalledOnce();
+    } finally {
+      env.NODE_ENV = previousMode;
+      env.BEVERAGE_PRODUCT_ARCHIVE_ENABLED = previousFlag;
+    }
   });
   it("allows the operator, accountant and sys_admin to record and cancel stock losses", async () => {
     for (const role of ["BEVERAGE_DEPOT_OPERATOR", "ACCOUNTANT", "SYS_ADMIN"] as const) {
@@ -84,10 +119,12 @@ describe("beverage stock access", () => {
     vi.mocked(ensureCompanyActivityEnabledOrThrow).mockRejectedValue(new Error("Secteur désactivé"));
     await expect(getCompanyBeverageStock(operator)).rejects.toThrow("désactivé");
     await expect(addCompanyBeverageProduct(operator, product)).rejects.toThrow("désactivé");
+    await expect(archiveCompanyBeverageProduct(operator, count)).rejects.toThrow("désactivé");
     await expect(recordCompanyBeverageLoss(operator, loss)).rejects.toThrow("désactivé");
     await expect(cancelCompanyBeverageLoss(operator, "loss-1")).rejects.toThrow("désactivé");
     expect(listBeverageProducts).not.toHaveBeenCalled();
     expect(createBeverageProduct).not.toHaveBeenCalled();
+    expect(archiveBeverageProduct).not.toHaveBeenCalled();
     expect(recordBeverageStockLoss).not.toHaveBeenCalled();
     expect(cancelBeverageStockLoss).not.toHaveBeenCalled();
   });

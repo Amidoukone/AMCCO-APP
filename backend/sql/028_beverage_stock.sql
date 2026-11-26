@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS beverage_products (
   opening_value DECIMAL(30,9) NOT NULL DEFAULT 0,
   created_by_id VARCHAR(36) NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  archived_at DATETIME(3) NULL DEFAULT NULL,
   UNIQUE KEY uq_beverage_product (company_id, product_key),
   CONSTRAINT fk_beverage_product_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

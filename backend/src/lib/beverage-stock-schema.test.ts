@@ -73,7 +73,7 @@ describe("stock schema initialization", () => {
     await expect(ensureBeverageStockSchemaReady()).rejects.toThrow("Unexpected beverage stock movement types");
     expect(db.execute.mock.calls.some(([sql]) => String(sql).includes("ALTER TABLE"))).toBe(false);
   });
-  it("appends LOSS to an existing legacy beverage_stock_movements kind ENUM without altering other tables", async () => {
+  it("upgrades legacy movement types and adds a nullable archive timestamp to the existing catalog", async () => {
     db.queryRows.mockImplementation(async (sql: string) => sql.includes("information_schema.COLUMNS")
       ? [{ tableName: "companies", columnType: "varchar(36)", characterSet: "utf8mb4", collation: "utf8mb4_0900_ai_ci" }]
       : sql.includes("SHOW COLUMNS FROM beverage_stock_movements LIKE 'kind'")
@@ -81,9 +81,10 @@ describe("stock schema initialization", () => {
         : []);
     await ensureBeverageStockSchemaReady();
     const statements = db.execute.mock.calls.map(([sql]) => String(sql));
-    expect(statements).toHaveLength(3);
+    expect(statements).toHaveLength(4);
     expect(statements[2]).toBe(
       "ALTER TABLE beverage_stock_movements MODIFY kind ENUM('ACHAT_STOCK', 'VENTE', 'INVENTORY_IN', 'INVENTORY_OUT', 'LOSS') NOT NULL"
     );
+    expect(statements[3]).toBe("ALTER TABLE beverage_products ADD COLUMN archived_at DATETIME(3) NULL DEFAULT NULL");
   });
 });

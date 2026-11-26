@@ -7,6 +7,7 @@ import { BUSINESS_ACTIVITY_CODES } from "../types/business-activity.js";
 import { getRoleActivityCode } from "../types/role.js";
 import {
   addCompanyBeverageProduct,
+  archiveCompanyBeverageProduct,
   cancelCompanyBeverageLoss,
   countCompanyBeverageStock,
   getCompanyBeverageStockOverview,
@@ -234,6 +235,20 @@ financeRouter.post(
       { ...body, productId: z.string().uuid().parse(req.params.productId) },
     );
     res.json({ status: "ok" });
+  }),
+);
+
+financeRouter.delete(
+  "/finance/beverage-products/:productId",
+  authorizeRoles("SYS_ADMIN", "ACCOUNTANT", "BEVERAGE_DEPOT_OPERATOR"),
+  asyncHandler(async (req, res) => {
+    if (!req.auth) throw new HttpError(401, "Authentification requise.");
+    const body = z.object({ expectedQuantity: z.string().regex(/^\d{1,21}(\.\d{1,3})?$/) }).parse(req.body);
+    await archiveCompanyBeverageProduct(
+      { companyId: req.auth.companyId, actorId: req.auth.userId, role: req.auth.role },
+      { ...body, productId: z.string().uuid().parse(req.params.productId) },
+    );
+    res.json({ status: "archived" });
   }),
 );
 

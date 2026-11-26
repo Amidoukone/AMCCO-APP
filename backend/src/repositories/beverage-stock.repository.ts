@@ -37,7 +37,8 @@ const productSelect = `SELECT p.id, p.name, p.unit, CAST(p.opening_quantity AS C
     FROM beverage_stock_movements WHERE company_id = ? AND active = 1
     GROUP BY company_id, product_id
   ) m ON m.product_id = p.id AND m.company_id = p.company_id
-  WHERE p.company_id = ? ORDER BY p.name, p.unit`;
+  WHERE p.company_id = ?`;
+const activeProducts = `${productSelect} AND p.archived_at IS NULL`;
 
 function rethrowStockError(error: unknown): never {
   const databaseError = error as { code?: string; message?: string };
@@ -64,7 +65,7 @@ function toProduct(row: ProductRow): BeverageProduct {
 
 export async function listBeverageProducts(companyId: string): Promise<BeverageProduct[]> {
   try {
-    return (await queryRows<ProductRow[]>(productSelect, [companyId, companyId])).map(toProduct);
+    return (await queryRows<ProductRow[]>(`${activeProducts} ORDER BY p.name, p.unit`, [companyId, companyId])).map(toProduct);
   } catch (error) { rethrowStockError(error); }
 }
 
@@ -89,15 +90,52 @@ export async function createBeverageProduct(input: {
     await connection.execute(`INSERT INTO audit_logs (id, company_id, actor_id, action, entity_type, entity_id, metadata)
       VALUES (?, ?, ?, 'BEVERAGE_PRODUCT_OPENED', 'BEVERAGE_PRODUCT', ?, ?)`, [randomUUID(), input.companyId, input.actorId, id,
       JSON.stringify({ name, unit, openingQuantity: input.openingQuantity, openingUnitCost: input.openingUnitCost, openingValue: stockFormat(quantity * cost, 9) })]);
+    const [products] = await connection.query<ProductRow[]>(
+      `${activeProducts} AND p.id = ?`, [input.companyId, input.companyId, id]
+    );
+    if (!products[0]) throw new HttpError(500, "Impossible de recharger le produit créé.");
+    const product = toProduct(products[0]);
     await connection.commit();
+    return product;
   } catch (error) {
     await connection.rollback();
     if ((error as { code?: string }).code === "ER_DUP_ENTRY") throw new HttpError(409, "Ce produit existe déjà avec cette unité. Utilisez-le pour les achats et les ventes.");
     rethrowStockError(error);
   } finally { connection.release(); }
-  const product = (await listBeverageProducts(input.companyId)).find((item) => item.id === id);
-  if (!product) throw new HttpError(500, "Impossible de recharger le produit créé.");
-  return product;
+}
+
+export async function archiveBeverageProduct(input: {
+  companyId: string; actorId: string; productId: string; expectedQuantity: string;
+}): Promise<void> {
+  const connection = await getDbPool().getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
+    const [products] = await connection.query<ProductRow[]>(
+      `${activeProducts} AND p.id = ?`, [input.companyId, input.companyId, input.productId]
+    );
+    const product = products[0];
+    if (!product) throw new HttpError(404, "Produit introuvable dans le stock actif.");
+    if (stockDecimal(product.quantity, 3) !== stockDecimal(input.expectedQuantity, 3)) {
+      throw new HttpError(409, "Le stock a changé. Vérifiez la quantité disponible avant de confirmer la suppression.");
+    }
+    // Active keys contain a "|" separator. Reserve a separate key for the archived row.
+    await connection.execute(
+      "UPDATE beverage_products SET archived_at = CURRENT_TIMESTAMP(3), product_key = CONCAT('archived:', id) WHERE company_id = ? AND id = ?",
+      [input.companyId, product.id]
+    );
+    await connection.execute(`INSERT INTO audit_logs (id, company_id, actor_id, action, entity_type, entity_id, metadata)
+      VALUES (?, ?, ?, 'BEVERAGE_PRODUCT_ARCHIVED', 'BEVERAGE_PRODUCT', ?, ?)`,
+    [randomUUID(), input.companyId, input.actorId, product.id, JSON.stringify({
+      name: product.name, unit: product.unit, quantity: product.quantity, stockValue: product.stockValue
+    })]);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    rethrowStockError(error);
+  } finally {
+    connection.release();
+  }
 }
 
 export type BeverageStockAdjustment = { date: string; productName: string; unit: string; quantity: string; value: string; reason: string };
@@ -151,7 +189,7 @@ export async function recordBeverageStockLoss(input: {
   try {
     await connection.beginTransaction();
     await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
-    const [products] = await connection.query<ProductRow[]>(productSelect, [input.companyId, input.companyId]);
+    const [products] = await connection.query<ProductRow[]>(activeProducts, [input.companyId, input.companyId]);
     const product = products.find((row) => row.id === input.productId);
     if (!product) throw new HttpError(404, "Produit introuvable.");
     const available = stockDecimal(product.quantity, 3);
@@ -215,7 +253,7 @@ export async function countBeverageProduct(input: { companyId: string; actorId: 
   try {
     await connection.beginTransaction();
     await connection.execute("SELECT id FROM companies WHERE id = ? FOR UPDATE", [input.companyId]);
-    const [products] = await connection.query<ProductRow[]>(productSelect, [input.companyId, input.companyId]);
+    const [products] = await connection.query<ProductRow[]>(activeProducts, [input.companyId, input.companyId]);
     const product = products.find((row) => row.id === input.productId);
     if (!product) throw new HttpError(404, "Produit introuvable.");
     const available = stockDecimal(product.quantity, 3), counted = stockDecimal(input.countedQuantity, 3);
@@ -309,7 +347,7 @@ export async function withBeverageStockWrite(
 
     let movement: { productId: string; quantity: string; costValue: string } | undefined;
     if (isSave && isStockOperation && metadata.beverageProductId) {
-      const [products] = await connection.query<ProductRow[]>(productSelect, [input.companyId, input.companyId]);
+      const [products] = await connection.query<ProductRow[]>(sameStock ? productSelect : activeProducts, [input.companyId, input.companyId]);
       const product = products.find((row) => row.id === metadata.beverageProductId);
       if (!product) throw new HttpError(400, "Produit introuvable dans le stock de cette entreprise.");
       // Financial dates may be backdated, but a stock movement cannot predate its physical opening count.

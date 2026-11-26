@@ -160,6 +160,7 @@ type Props = {
   hotelOperationKind: HotelOperationKind;
   beverageOperationKind: BeverageOperationKind;
   isLegacyBeverageEdit: boolean;
+  isArchivedBeverageEdit: boolean;
   waterOperationKind: WaterOperationKind;
   agencyOperationKind: AgencyOperationKind;
   fishFarmingOperationKind: FishFarmingOperationKind;
@@ -219,6 +220,7 @@ export function FinanceTransactionForm({
   hotelOperationKind,
   beverageOperationKind,
   isLegacyBeverageEdit,
+  isArchivedBeverageEdit,
   waterOperationKind,
   agencyOperationKind,
   fishFarmingOperationKind,
@@ -696,7 +698,7 @@ export function FinanceTransactionForm({
                   <span>Opération</span>
                   <select
                     value={beverageOperationKind}
-                    disabled={isLegacyBeverageEdit}
+                    disabled={isLegacyBeverageEdit || isArchivedBeverageEdit}
                     onChange={(event) => {
                       const nextKind = event.target.value as BeverageOperationKind;
                       setTransactionForm((prev) => {
@@ -1047,7 +1049,7 @@ export function FinanceTransactionForm({
             <div className="finance-transaction-form-options-body">
               {selectedActivityCode === "BEVERAGE_DEPOT" ? (
                 <p className="hint finance-form-mode-hint">
-                  {beverageOperationKind === "VENTE"
+                  {isArchivedBeverageEdit ? "Produit retiré du stock actif. Les références et précisions restent modifiables." : beverageOperationKind === "VENTE"
                     ? isLegacyBeverageEdit ? "Historique antérieur au suivi de stock : les produits, quantités et prix sont conservés. Les références et précisions restent modifiables. Le stock actuel n'est pas modifié." : "Choisissez le produit en stock, puis la quantité et le prix de vente dans son unité. Le coût d'achat provient automatiquement du stock."
                     : beverageOperationKind === "ACHAT_STOCK"
                       ? isLegacyBeverageEdit ? "Achat historique : les produits, quantités et prix sont conservés. Cette modification ne crée pas une nouvelle entrée de stock." : "Choisissez le produit, puis le fournisseur, la quantité reçue et le prix d'achat dans l'unité du produit. Le stock augmente à l'enregistrement."
@@ -1265,7 +1267,7 @@ export function FinanceTransactionForm({
 
               {visibleFinanceMetadataFields.map((field) => {
                 if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && beverageOperationKind === "VENTE" && field.key === "purchaseUnitPrice") return null;
-                if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && field.key === "productName") return (
+                if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && !isArchivedBeverageEdit && field.key === "productName") return (
                   <div key={field.key} className="operations-inline-group">
                     <label className="operations-inline-group"><span>Produit en stock *</span>
                       <select ref={nextSaleProductRef} required disabled={beverageStock.loading || Boolean(beverageStock.error)} value={transactionForm.metadata.beverageProductId ?? ""} onChange={(event) => {
@@ -1751,7 +1753,7 @@ export function FinanceTransactionForm({
                     inputMode={isMoneyMetadataField(field.key) ? "numeric" : getMetadataInputMode(field.key)}
                     placeholder={field.helpText || field.label}
                     value={transactionForm.metadata[field.key] ?? ""}
-                    readOnly={isLegacyBeverageEdit && ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"].includes(field.key)}
+                    readOnly={(isLegacyBeverageEdit || isArchivedBeverageEdit) && ["productName", "quantity", "purchaseUnitPrice", "saleUnitPrice"].includes(field.key)}
                     onChange={(event) => {
                       const nextValue = isMoneyMetadataField(field.key)
                         ? formatEditableAmountForInput(event.target.value)

@@ -7,6 +7,7 @@ healthRouter.get("/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
     service: "amcco-backend",
+    revision: process.env.RENDER_GIT_COMMIT,
     timestamp: new Date().toISOString()
   });
 });

@@ -448,6 +448,9 @@ export function FinanceTransactionsPage(): JSX.Element {
   const originalBeverageEdit = transactions.find((item) => item.id === editingTransactionId) ?? (linkedTransaction?.id === editingTransactionId ? linkedTransaction : undefined);
   const isLegacyBeverageEdit = selectedActivityCode === "BEVERAGE_DEPOT" && Boolean(editingTransactionId) && !originalBeverageEdit?.metadata.beverageProductId;
   const selectedBeverageProduct = beverageStock.items.find((product) => product.id === transactionForm.metadata.beverageProductId);
+  const isArchivedBeverageEdit = selectedActivityCode === "BEVERAGE_DEPOT" &&
+    Boolean(originalBeverageEdit?.metadata.beverageProductId) && !beverageStock.loading && !beverageStock.error &&
+    !beverageStock.items.some((product) => product.id === originalBeverageEdit?.metadata.beverageProductId);
   const recentSalePrice = useMemo(() => {
     if (!selectedBeverageProduct || editingTransactionId || beverageOperationKind !== "VENTE") return null;
     const sales = suggestionTransactions.filter((item) =>
@@ -2033,7 +2036,7 @@ export function FinanceTransactionsPage(): JSX.Element {
     if (!selectedActivityCode || isSavingTransaction) {
       return;
     }
-    if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK")) {
+    if (selectedActivityCode === "BEVERAGE_DEPOT" && !isLegacyBeverageEdit && !isArchivedBeverageEdit && (beverageOperationKind === "VENTE" || beverageOperationKind === "ACHAT_STOCK")) {
       if (beverageStock.loading || beverageStock.error || !selectedBeverageProduct) {
         setErrorMessage("Choisissez un produit dans le stock disponible. Ajoutez d'abord le produit si nécessaire.");
         return;
@@ -3306,6 +3309,7 @@ export function FinanceTransactionsPage(): JSX.Element {
             hotelOperationKind={hotelOperationKind}
             beverageOperationKind={beverageOperationKind}
             isLegacyBeverageEdit={isLegacyBeverageEdit}
+            isArchivedBeverageEdit={isArchivedBeverageEdit}
             waterOperationKind={waterOperationKind}
             agencyOperationKind={agencyOperationKind}
             fishFarmingOperationKind={fishFarmingOperationKind}

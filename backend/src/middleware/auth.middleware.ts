@@ -10,6 +10,7 @@ function isAllowedSectorOperatorRequest(req: Request, role: RoleCode): boolean {
   if (role === "BEVERAGE_DEPOT_OPERATOR") {
     if (req.path === "/finance/beverage-products" && (req.method === "GET" || req.method === "POST")) return true;
     if (req.path === "/finance/beverage-products/losses" && req.method === "GET") return true;
+    if (/^\/finance\/beverage-products\/[a-f0-9-]+$/i.test(req.path) && req.method === "DELETE") return true;
     if (/^\/finance\/beverage-products\/[a-f0-9-]+\/losses$/i.test(req.path) && req.method === "POST") return true;
     if (/^\/finance\/beverage-products\/losses\/[a-f0-9-]+$/i.test(req.path) && req.method === "DELETE") return true;
   }

@@ -42,4 +42,15 @@ export async function ensureBeverageStockSchemaReady(): Promise<void> {
       "ALTER TABLE beverage_stock_movements MODIFY kind ENUM('ACHAT_STOCK', 'VENTE', 'INVENTORY_IN', 'INVENTORY_OUT', 'LOSS') NOT NULL"
     );
   }
+  const archiveColumns = await queryRows<RowDataPacket[]>(
+    "SHOW COLUMNS FROM beverage_products LIKE 'archived_at'"
+  );
+  if (archiveColumns.length === 0) {
+    try {
+      await getDbPool().execute("ALTER TABLE beverage_products ADD COLUMN archived_at DATETIME(3) NULL DEFAULT NULL");
+    } catch (error) {
+      // Another instance can apply the same additive migration at startup.
+      if ((error as { code?: string }).code !== "ER_DUP_FIELDNAME") throw error;
+    }
+  }
 }

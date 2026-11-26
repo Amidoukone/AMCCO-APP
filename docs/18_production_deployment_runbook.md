@@ -309,8 +309,8 @@ git push -u origin feat/nom-court
 Release:
 
 1. Ouvrir une PR vers `develop`.
-2. Corriger jusqu'a CI verte.
-3. Tester la recette.
+2. Exécuter les tests, la vérification des types et la compilation en local.
+3. Tester la recette locale.
 4. Merger `develop` vers `main` via PR.
 5. Le push sur `main` declenche Netlify et Render.
 6. Executer la verification post-deploiement.
@@ -321,6 +321,17 @@ Release:
 - Render: rollback vers le deploy precedent depuis Events/Deploys.
 - Base de donnees: utiliser les backups/PITR DigitalOcean. Ne jamais faire de
   rollback SQL manuel sans sauvegarde prealable.
+
+### Suppression de produits du dépôt de boissons
+
+La recette locale `node scripts/verify-mysql-stock.mjs --local` vérifie la migration sur MySQL avec des données de test, y compris les catalogues qui contiennent déjà des pertes de stock. Fournir le chemin de `mysqldump` dans `AMCCO_MYSQLDUMP_PATH` pour inclure la restauration sur une base séparée.
+
+1. Avant la mise en production, identifier le point de restauration MySQL à utiliser et vérifier sa restauration sur une instance séparée. Comparer le catalogue, les mouvements, les transactions et les soldes sur cette copie.
+2. Déployer le backend et le frontend avec la suppression désactivée. En production, c’est l’état par défaut de `BEVERAGE_PRODUCT_ARCHIVE_ENABLED`. L’initialisation ajoute la colonne nullable `beverage_products.archived_at` sans reprendre les mouvements existants. Vérifier la lecture du stock et des rapports, puis relever l’identifiant de ce déploiement backend pour un éventuel retour arrière.
+3. Après validation du point de restauration et de la recette, régler `BEVERAGE_PRODUCT_ARCHIVE_ENABLED=true` sur Render. Vérifier que le bouton est disponible pour les rôles habilités. Effectuer les essais de suppression sur la recette.
+4. Pour suspendre les suppressions, régler `BEVERAGE_PRODUCT_ARCHIVE_ENABLED=false`. Le backend continue de filtrer les produits archivés et de présenter leur historique. Le frontend peut revenir à un déploiement antérieur en conservant ce backend.
+
+Après la première suppression, un backend antérieur au filtre `archived_at IS NULL` réafficherait les produits archivés et accepterait de nouveaux mouvements sur ces produits. Pour un retour arrière du backend, utiliser une version qui conserve ce filtre. Éviter de rétablir la base de production à une date passée pour corriger un problème applicatif. Une telle restauration peut effacer les transactions enregistrées depuis ce point.
 
 ## 14. References officielles
 

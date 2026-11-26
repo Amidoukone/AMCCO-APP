@@ -1924,7 +1924,7 @@ a {
   padding: 10px;
 }
 
-.beverage-stock-panel button:not(.secondary-btn) {
+.beverage-stock-panel button:not(.secondary-btn, .danger-btn) {
   min-height: 44px;
   padding: 10px 14px;
   border: 1px solid #f5cc51;

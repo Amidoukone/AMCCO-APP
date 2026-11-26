@@ -1103,7 +1103,7 @@ export function createFinanceTransactionRequest(
   });
 }
 
-export function getBeverageStockRequest(accessToken: string): Promise<{ items: BeverageProduct[]; losses?: BeverageStockLoss[] }> {
+export function getBeverageStockRequest(accessToken: string): Promise<{ items: BeverageProduct[]; losses?: BeverageStockLoss[]; canArchiveProducts?: boolean }> {
   return request("/finance/beverage-products", { accessToken });
 }
 
@@ -1123,6 +1123,10 @@ export function recordBeverageLossRequest(accessToken: string, productId: string
   quantity: string; expectedQuantity?: string; reason?: string;
 }): Promise<{ item: BeverageStockLoss }> {
   return request(`/finance/beverage-products/${productId}/losses`, { method: "POST", body: input, accessToken });
+}
+
+export function archiveBeverageProductRequest(accessToken: string, productId: string, expectedQuantity: string): Promise<{ status: string }> {
+  return request(`/finance/beverage-products/${productId}`, { method: "DELETE", body: { expectedQuantity }, accessToken });
 }
 
 export function cancelBeverageLossRequest(accessToken: string, lossId: string): Promise<{ status: string }> {

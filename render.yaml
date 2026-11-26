@@ -5,7 +5,7 @@ services:
     plan: starter
     region: frankfurt
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: commit
     buildCommand: "npm ci --include=dev && npm --workspace backend run build && npm prune --omit=dev"
     preDeployCommand: "npm --workspace backend run db:init"
     startCommand: "npm --workspace backend run start"
